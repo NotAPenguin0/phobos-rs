@@ -1,9 +1,11 @@
 extern crate core;
 
-use std::borrow::Cow;
-use std::ffi::{c_char, CStr, CString};
-use ash::{vk, Entry};
+use std::ffi::{CString};
 use std::str::FromStr;
+use ash::{vk, Entry, Instance};
+use ash::extensions::ext::DebugUtils;
+
+mod util;
 
 /// Application settings used to initialize the phobos context.
 pub struct AppSettings {
@@ -20,22 +22,10 @@ pub struct AppSettings {
 pub struct Context {
     /// Entry point for Vulkan functions.
     vk_entry: Entry,
-    /// Stores the handle to the created VkInstance.
-    instance: ash::Instance,
-}
-
-/// Safely wraps a c string into a string, or an empty string if the provided c string was null.
-/// Assumes the provided c string is null terminated.
-fn wrap_c_str(s: *const c_char) -> String {
-    return if s.is_null() {
-        String::default()
-    } else {
-        unsafe { CStr::from_ptr(s).to_string_lossy().to_owned().to_string() }
-    }
-}
-
-fn unwrap_to_c_str_array(strings: &[&str]) -> *const *const c_char {
-
+    /// Stores the handle to the created [`VkInstance`](ash::Instance).
+    instance: Instance,
+    /// handle to the [`VkDebugUtilsMessengerEXT`](vk::DebugUtilsMessengerEXT) object. Null if `AppSettings::enable_validation` was `false` on initialization.
+    debug_messenger: vk::DebugUtilsMessengerEXT,
 }
 
 extern "system" fn vk_debug_callback(
@@ -46,8 +36,8 @@ extern "system" fn vk_debug_callback(
 
     let callback_data = unsafe { *p_callback_data };
     let message_id_number = callback_data.message_id_number as i32;
-    let message_id_name = wrap_c_str(callback_data.p_message_id_name);
-    let message = wrap_c_str(callback_data.p_message);
+    let message_id_name = util::wrap_c_str(callback_data.p_message_id_name);
+    let message = util::wrap_c_str(callback_data.p_message);
 
     println!("[{:?}]:[{:?}]: {} ({}): {}\n",
              severity,
@@ -74,29 +64,62 @@ fn create_vk_instance(entry: &Entry, settings: &AppSettings) -> Option<ash::Inst
         ..Default::default()
     };
 
-    let mut layers = Vec::<&str>::new();
+    let mut layers = Vec::<CString>::new();
+    let mut extensions = Vec::<CString>::new();
+
     if settings.enable_validation {
-        layers.push("VK_LAYER_KHRONOS_validation");
+        layers.push(CString::new("VK_LAYER_KHRONOS_validation").unwrap());
+        extensions.push(CString::from(DebugUtils::name()));
     }
 
-    let instance_info = vk::InstanceCreateInfo {
-        p_application_info: &app_info,
-        enabled_layer_count: layers.len() as u32,
-        pp_enabled_layer_names: unwrap_to_c_str_array(layers.as_slice()),
-        ..Default::default()
-    };
+    let layers_raw = util::unwrap_to_raw_strings(layers.as_slice());
+    let extensions_raw = util::unwrap_to_raw_strings(extensions.as_slice());
+
+    let instance_info = vk::InstanceCreateInfo::builder()
+        .application_info(&app_info)
+        .enabled_layer_names(layers_raw.as_slice())
+        .enabled_extension_names(extensions_raw.as_slice())
+        .build();
 
     return unsafe { entry.create_instance(&instance_info, None).ok() };
+}
+
+fn create_debug_messenger(entry: &Entry, instance: &Instance) -> vk::DebugUtilsMessengerEXT {
+    let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+        .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR)
+        .message_type(vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION)
+        .pfn_user_callback(Some(vk_debug_callback))
+        .build();
+
+    let loader = DebugUtils::new(&entry, &instance);
+    unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() }
 }
 
 impl Context {
     pub fn new(settings: AppSettings) -> Option<Context> {
         let entry = unsafe { Entry::load().unwrap() };
         let instance = create_vk_instance(&entry, &settings).unwrap();
+        let debug_messenger = if settings.enable_validation {
+            create_debug_messenger(&entry, &instance)
+        } else {
+            vk::DebugUtilsMessengerEXT::null()
+        };
 
         Some(Context {
             vk_entry: entry,
-            instance
+            instance,
+            debug_messenger
         })
+    }
+}
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        let debug_utils_loader = DebugUtils::new(&self.vk_entry, &self.instance);
+
+        unsafe {
+            debug_utils_loader.destroy_debug_utils_messenger(self.debug_messenger, None);
+            self.instance.destroy_instance(None);
+        }
     }
 }
