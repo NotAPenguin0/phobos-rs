@@ -277,7 +277,7 @@ fn get_queue_family_prefer_dedicated(families: &[vk::QueueFamilyProperties], que
     })
 }
 
-fn select_physical_device<Window>(settings: &AppSettings<Window>, instance: &Instance) -> PhysicalDevice where Window: WindowInterface {
+fn select_physical_device<Window>(settings: &AppSettings<Window>, surface: &Option<Surface>, funcs: &FuncPointers, instance: &Instance) -> PhysicalDevice where Window: WindowInterface {
     let devices = unsafe { instance.enumerate_physical_devices().expect("No physical devices found.") };
 
     devices.iter()
@@ -323,6 +323,27 @@ fn select_physical_device<Window>(settings: &AppSettings<Window>, instance: &Ins
             // at least one is missing and could not be fulfilled. In this case we reject the device.
             if physical_device.queues.len() < settings.gpu_requirements.queues.len() { return None; }
 
+            // Now check surface support (if we are not creating a headless context)
+            if let Some(surface) = surface {
+                // The surface is supported if one of the queues we found can present to it.
+                let mut supported_queue = physical_device.queues.iter_mut().find(|queue| {
+                    unsafe {
+                        funcs.surface.as_ref().unwrap()
+                            .get_physical_device_surface_support(
+                                physical_device.handle,
+                                queue.family_index,
+                                surface.handle)
+                            .unwrap()
+                    }
+                });
+                if let Some(queue) = supported_queue {
+                    // Flag that we can present to it
+                    queue.can_present = true;
+                } else { // No queue to present found, reject physical device
+                    return None;
+                }
+            }
+
             return Some(physical_device);
         })
         .expect("No physical device matching requested capabilities found.")
@@ -339,7 +360,7 @@ impl Context {
 
         let debug_messenger = settings.enable_validation.then(|| create_debug_messenger(&funcs));
         let surface = settings.window.map(|_| create_surface(&settings, &entry, &instance));
-        let physical_device = select_physical_device(&settings, &instance);
+        let physical_device = select_physical_device(&settings, &surface, &funcs, &instance);
 
         println!("{:?}", physical_device);
 
