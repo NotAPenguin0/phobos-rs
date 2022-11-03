@@ -32,7 +32,7 @@ impl<T: HasRawWindowHandle + HasRawDisplayHandle> WindowInterface for T {}
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub enum QueueType {
     #[default]
     Graphics = vk::QueueFlags::GRAPHICS.as_raw() as isize,
@@ -41,6 +41,7 @@ pub enum QueueType {
 }
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
+#[derive(Debug)]
 pub struct QueueRequest {
     /// Whether this queue should be dedicated if possible. For example, requesting a dedicated queue of type `QueueType::Transfer` will try to
     /// match this to a queue that does not have graphics or compute capabilities. On the other hand, requesting a dedicated graphics queue will not
@@ -51,7 +52,7 @@ pub struct QueueRequest {
 }
 
 /// Minimum requirements for the GPU. This will be used to determine what physical device is selected.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct GPURequirements {
     /// Whether a dedicated GPU is required. Setting this to true will discard integrated GPUs.
     pub dedicated: bool,
@@ -70,7 +71,7 @@ pub struct GPURequirements {
 }
 
 /// Application settings used to initialize the phobos context.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AppSettings<'a, Window> where Window: WindowInterface {
     /// Application name. Possibly displayed in debugging tools, task manager, etc.
     pub name: String,
@@ -85,7 +86,7 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
 }
 
 /// Contains all information about a [`VkSurfaceKHR`](vk::SurfaceKHR)
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Surface {
     /// Handle to the [`VkSurfaceKHR`](vk::SurfaceKHR)
     pub handle: vk::SurfaceKHR,
@@ -98,7 +99,7 @@ pub struct Surface {
 }
 
 /// Stores all information of a queue that was found on the physical device.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct QueueInfo {
     /// Functionality that this queue provides.
     pub queue_type: QueueType,
@@ -111,7 +112,7 @@ pub struct QueueInfo {
 }
 
 /// A physical device abstracts away an actual device, like a graphics card or integrated graphics card.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct PhysicalDevice {
     /// Handle to the [`VkPhysicalDevice`](vk::PhysicalDevice).
     pub handle: vk::PhysicalDevice,
@@ -219,7 +220,7 @@ fn create_vk_instance<Window>(entry: &Entry, settings: &AppSettings<Window>) -> 
     return unsafe { entry.create_instance(&instance_info, None).ok() };
 }
 
-fn create_debug_messenger(funcs: &FuncPointers, instance: &Instance) -> vk::DebugUtilsMessengerEXT {
+fn create_debug_messenger(funcs: &FuncPointers) -> vk::DebugUtilsMessengerEXT {
     let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
         .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR)
         .message_type(vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION)
@@ -259,8 +260,9 @@ fn get_queue_family_prefer_dedicated(families: &[vk::QueueFamilyProperties], que
     families.iter().enumerate().fold(None, |current_best_match, (index, family) | -> Option<usize> {
         // Does not contain required flags, must skip
         if !family.queue_flags.contains(required) { return current_best_match; }
-        // Contains required flags and does not contain flags to avoid, this is an optimal match
-        if !family.queue_flags.contains(avoid) { return Some(index) }
+        // Contains required flags and does not contain *any* flags to avoid, this is an optimal match.
+        // Note that to check of it doesn't contain any of the avoid flags, contains() will not work, we need to use intersects()
+        if !family.queue_flags.intersects(avoid) { return Some(index) }
 
         // Only if we don't have a match yet, settle for a suboptimal match
         return if current_best_match.is_none() {
@@ -271,7 +273,7 @@ fn get_queue_family_prefer_dedicated(families: &[vk::QueueFamilyProperties], que
 
     })
     .map(|index| {
-        return (index, !families[index].queue_flags.contains(avoid));
+        return (index, !families[index].queue_flags.intersects(avoid));
     })
 }
 
@@ -290,6 +292,7 @@ fn select_physical_device<Window>(settings: &AppSettings<Window>, instance: &Ins
 
             if settings.gpu_requirements.dedicated && physical_device.properties.device_type != vk::PhysicalDeviceType::DISCRETE_GPU { return None; }
             if settings.gpu_requirements.min_video_memory > total_video_memory(&physical_device) { return None; }
+            if settings.gpu_requirements.min_dedicated_video_memory > total_device_memory(&physical_device) { return None; }
 
             physical_device.queues = {
                 settings.gpu_requirements.queues.iter()
@@ -334,9 +337,11 @@ impl Context {
             surface: settings.window.map(|_| ash::extensions::khr::Surface::new(&entry, &instance))
         };
 
-        let debug_messenger = settings.enable_validation.then(|| create_debug_messenger(&funcs, &instance));
+        let debug_messenger = settings.enable_validation.then(|| create_debug_messenger(&funcs));
         let surface = settings.window.map(|_| create_surface(&settings, &entry, &instance));
         let physical_device = select_physical_device(&settings, &instance);
+
+        println!("{:?}", physical_device);
 
         Some(Context {
             vk_entry: entry,
