@@ -349,6 +349,15 @@ fn select_physical_device<Window>(settings: &AppSettings<Window>, surface: &Opti
         .expect("No physical device matching requested capabilities found.")
 }
 
+fn fill_surface_details(surface: &mut Surface, physical_device: &PhysicalDevice, funcs: &FuncPointers) {
+    let surface_funcs = funcs.surface.as_ref().unwrap();
+    unsafe {
+        surface.capabilities = surface_funcs.get_physical_device_surface_capabilities(physical_device.handle, surface.handle).unwrap();
+        surface.formats = surface_funcs.get_physical_device_surface_formats(physical_device.handle, surface.handle).unwrap();
+        surface.present_modes = surface_funcs.get_physical_device_surface_present_modes(physical_device.handle, surface.handle).unwrap();
+    }
+}
+
 impl Context {
     pub fn new<Window>(settings: AppSettings<Window>) -> Option<Context> where Window: WindowInterface {
         let entry = unsafe { Entry::load().unwrap() };
@@ -359,10 +368,11 @@ impl Context {
         };
 
         let debug_messenger = settings.enable_validation.then(|| create_debug_messenger(&funcs));
-        let surface = settings.window.map(|_| create_surface(&settings, &entry, &instance));
+        let mut surface = settings.window.map(|_| create_surface(&settings, &entry, &instance));
         let physical_device = select_physical_device(&settings, &surface, &funcs, &instance);
-
-        println!("{:?}", physical_device);
+        if let Some(surface) = surface.as_mut() {
+            fill_surface_details(surface, &physical_device, &funcs);
+        }
 
         Some(Context {
             vk_entry: entry,
