@@ -1,12 +1,12 @@
 use std::ffi::{c_char, CStr, CString};
 
-/// Safely wraps a c string into a string, or an empty string if the provided c string was null.
+/// Wraps a c string into a string, or an empty string if the provided c string was null.
 /// Assumes the provided c string is null terminated.
-pub fn wrap_c_str(s: *const c_char) -> String {
+pub unsafe fn wrap_c_str(s: *const c_char) -> String {
     return if s.is_null() {
         String::default()
     } else {
-        unsafe { CStr::from_ptr(s).to_string_lossy().to_owned().to_string() }
+        CStr::from_ptr(s).to_string_lossy().to_owned().to_string()
     }
 }
 

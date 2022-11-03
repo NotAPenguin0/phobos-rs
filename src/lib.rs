@@ -1,6 +1,6 @@
 extern crate core;
 
-use std::ffi::{CString};
+use std::ffi::{CStr, CString};
 use std::str::FromStr;
 use ash::{vk, Entry, Instance};
 use ash::extensions::ext::DebugUtils;
@@ -30,7 +30,47 @@ unsafe impl HasRawDisplayHandle for HeadlessWindowInterface {
 pub trait WindowInterface: HasRawWindowHandle + HasRawDisplayHandle {}
 impl<T: HasRawWindowHandle + HasRawDisplayHandle> WindowInterface for T {}
 
+/// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
+/// e.g. graphics queue and transfer could point to the same hardware queue.
+#[derive(Copy, Clone, Default)]
+pub enum QueueType {
+    #[default]
+    Graphics = vk::QueueFlags::GRAPHICS.as_raw() as isize,
+    Compute = vk::QueueFlags::COMPUTE.as_raw() as isize,
+    Transfer = vk::QueueFlags::TRANSFER.as_raw() as isize
+}
+
+/// Structure holding a queue with specific capabilities to request from the physical device.
+pub struct QueueRequest {
+    /// Whether this queue should be dedicated if possible. For example, requesting a dedicated queue of type `QueueType::Transfer` will try to
+    /// match this to a queue that does not have graphics or compute capabilities. On the other hand, requesting a dedicated graphics queue will not
+    /// try to exclude transfer capabilities, as this is not possible per spec guarantees (a graphics queue must have transfer support)
+    pub dedicated: bool,
+    /// Capabilities that are requested from the queue.
+    pub queue_type: QueueType
+}
+
+/// Minimum requirements for the GPU. This will be used to determine what physical device is selected.
+#[derive(Default)]
+pub struct GPURequirements {
+    /// Whether a dedicated GPU is required. Setting this to true will discard integrated GPUs.
+    pub dedicated: bool,
+    /// Minimum amount of video memory required, in bytes. Note that this might count shared memory if RAM is shared.
+    pub min_video_memory: usize,
+    /// Minimum amount of dedicated video memory, in bytes. This only counts memory that is on the device.
+    pub min_dedicated_video_memory: usize,
+    /// Command queue types requested from the physical device.
+    pub queues: Vec<QueueRequest>,
+    /// Vulkan 1.0 features that are required from the physical device.
+    pub features: vk::PhysicalDeviceFeatures,
+    /// Vulkan 1.1 features that are required from the physical device.
+    pub features_1_1: vk::PhysicalDeviceVulkan11Features,
+    /// Vulkan 1.2 features that are required from the physical device.
+    pub features_1_2: vk::PhysicalDeviceVulkan12Features,
+}
+
 /// Application settings used to initialize the phobos context.
+#[derive(Default)]
 pub struct AppSettings<'a, Window> where Window: WindowInterface {
     /// Application name. Possibly displayed in debugging tools, task manager, etc.
     pub name: String,
@@ -40,9 +80,12 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
     pub enable_validation: bool,
     /// Optionally a reference to an object implementing a windowing system. If this is not None, it will be used to create a [`VkSurfaceKHR`](vk::SurfaceKHR) to present to.
     pub window: Option<&'a Window>,
+    /// Minimum requirements the selected physical device should have.
+    pub gpu_requirements: GPURequirements,
 }
 
 /// Contains all information about a [`VkSurfaceKHR`](vk::SurfaceKHR)
+#[derive(Default)]
 pub struct Surface {
     /// Handle to the [`VkSurfaceKHR`](vk::SurfaceKHR)
     pub handle: vk::SurfaceKHR,
@@ -54,6 +97,43 @@ pub struct Surface {
     pub present_modes: Vec<vk::PresentModeKHR>
 }
 
+/// Stores all information of a queue that was found on the physical device.
+#[derive(Default)]
+pub struct QueueInfo {
+    /// Functionality that this queue provides.
+    pub queue_type: QueueType,
+    /// Whether this is a dedicated queue or not.
+    pub dedicated: bool,
+    /// Whether this queue is capable of presenting to a surface.
+    pub can_present: bool,
+    /// The queue family index.
+    family_index: u32,
+}
+
+/// A physical device abstracts away an actual device, like a graphics card or integrated graphics card.
+#[derive(Default)]
+pub struct PhysicalDevice {
+    /// Handle to the [`VkPhysicalDevice`](vk::PhysicalDevice).
+    pub handle: vk::PhysicalDevice,
+    /// [`VkPhysicalDeviceProperties`](vk::PhysicalDeviceProperties) structure with properties of this physical device.
+    pub properties: vk::PhysicalDeviceProperties,
+    /// [`VkPhysicalDeviceMemoryProperties`](vk::PhysicalDeviceMemoryProperties) structure with memory properties of the physical device, such as
+    /// available memory types and heaps.
+    pub memory_properties: vk::PhysicalDeviceMemoryProperties,
+    /// List of [`VkQueueFamilyProperties`](vk::QueueFamilyProperties) with properties of each queue family on the device.
+    pub queue_families: Vec<vk::QueueFamilyProperties>,
+    /// List of [`QueueInfo`]  with requested queues abstracted away from the physical queues.
+    pub queues: Vec<QueueInfo>
+}
+
+/// Stores function pointers for extension functions.
+struct FuncPointers {
+    /// Function pointers for the VK_DEBUG_UTILS_EXT extension
+    pub debug_utils: Option<DebugUtils>,
+    /// Function pointers for the VK_SURFACE_KHR extension
+    pub surface: Option<ash::extensions::khr::Surface>
+}
+
 /// Main phobos context. This stores all global Vulkan state. Interaction with the device all happens through this
 /// struct.
 pub struct Context {
@@ -61,10 +141,14 @@ pub struct Context {
     vk_entry: Entry,
     /// Stores the handle to the created [`VkInstance`](ash::Instance).
     instance: Instance,
+    /// Extension function pointers.
+    funcs: FuncPointers,
     /// handle to the [`VkDebugUtilsMessengerEXT`](vk::DebugUtilsMessengerEXT) object. None if `AppSettings::enable_validation` was `false` on initialization.
     debug_messenger: Option<vk::DebugUtilsMessengerEXT>,
     /// Surface information and handle. None if `AppSettings::create_headless` was `true` on initialization.
     surface: Option<Surface>,
+    /// Physical device handle and properties.
+    physical_device: PhysicalDevice,
 }
 
 extern "system" fn vk_debug_callback(
@@ -75,8 +159,10 @@ extern "system" fn vk_debug_callback(
 
     let callback_data = unsafe { *p_callback_data };
     let message_id_number = callback_data.message_id_number as i32;
-    let message_id_name = util::wrap_c_str(callback_data.p_message_id_name);
-    let message = util::wrap_c_str(callback_data.p_message);
+    let message_id_name = unsafe { util::wrap_c_str(callback_data.p_message_id_name) };
+    let message = unsafe { util::wrap_c_str(callback_data.p_message) };
+
+    // TODO: switch out logging with log crate: https://docs.rs/log
 
     println!("[{:?}]:[{:?}]: {} ({}): {}\n",
              severity,
@@ -89,7 +175,7 @@ extern "system" fn vk_debug_callback(
     false as vk::Bool32
 }
 
-fn create_vk_instance<Window>(entry: &Entry, settings: &AppSettings<Window>) -> Option<ash::Instance> where Window: WindowInterface {
+fn create_vk_instance<Window>(entry: &Entry, settings: &AppSettings<Window>) -> Option<Instance> where Window: WindowInterface {
     let app_name = CString::new(settings.name.clone()).unwrap();
     let engine_name = CString::new("Phobos").unwrap();
     let app_info = vk::ApplicationInfo {
@@ -111,6 +197,16 @@ fn create_vk_instance<Window>(entry: &Entry, settings: &AppSettings<Window>) -> 
         extensions.push(CString::from(DebugUtils::name()));
     }
 
+    if let Some(window) = settings.window {
+        extensions.extend(
+            ash_window::enumerate_required_extensions(window.raw_display_handle())
+                .unwrap()
+                .to_vec()
+                .iter()
+                .map(|&raw_str| unsafe { CString::from(CStr::from_ptr(raw_str)) })
+        );
+    }
+
     let layers_raw = util::unwrap_to_raw_strings(layers.as_slice());
     let extensions_raw = util::unwrap_to_raw_strings(extensions.as_slice());
 
@@ -123,55 +219,147 @@ fn create_vk_instance<Window>(entry: &Entry, settings: &AppSettings<Window>) -> 
     return unsafe { entry.create_instance(&instance_info, None).ok() };
 }
 
-fn create_debug_messenger(entry: &Entry, instance: &Instance) -> vk::DebugUtilsMessengerEXT {
+fn create_debug_messenger(funcs: &FuncPointers, instance: &Instance) -> vk::DebugUtilsMessengerEXT {
     let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
         .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR)
         .message_type(vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION)
         .pfn_user_callback(Some(vk_debug_callback))
         .build();
 
-    let loader = DebugUtils::new(&entry, &instance);
-    unsafe { loader.create_debug_utils_messenger(&create_info, None).unwrap() }
+    unsafe { funcs.debug_utils.as_ref().unwrap().create_debug_utils_messenger(&create_info, None).unwrap() }
 }
 
 fn create_surface<Window>(settings: &AppSettings<Window>, entry: &Entry, instance: &Instance) -> Surface where Window: WindowInterface {
     let window = settings.window.unwrap();
     let surface_handle = unsafe { ash_window::create_surface(&entry, &instance, window.raw_display_handle(), window.raw_window_handle(), None).unwrap() };
-    todo!()
+    return Surface {
+        handle: surface_handle,
+        // Surface capabilities will be queried by the VkPhysicalDevice.
+        ..Default::default()
+    };
+}
+
+fn total_video_memory(device: &PhysicalDevice) -> usize {
+    device.memory_properties.memory_heaps.iter()
+        .map(|heap| heap.size as usize)
+        .sum()
+}
+
+fn total_device_memory(device: &PhysicalDevice) -> usize {
+    device.memory_properties.memory_heaps.iter()
+        .filter(|heap|
+            heap.flags.contains(vk::MemoryHeapFlags::DEVICE_LOCAL)
+        )
+        .map(|heap| heap.size as usize)
+        .sum()
+}
+
+fn get_queue_family_prefer_dedicated(families: &[vk::QueueFamilyProperties], queue_type: QueueType, avoid: vk::QueueFlags) -> Option<(usize, bool)> {
+    let required = vk::QueueFlags::from_raw(queue_type as vk::Flags);
+    families.iter().enumerate().fold(None, |current_best_match, (index, family) | -> Option<usize> {
+        // Does not contain required flags, must skip
+        if !family.queue_flags.contains(required) { return current_best_match; }
+        // Contains required flags and does not contain flags to avoid, this is an optimal match
+        if !family.queue_flags.contains(avoid) { return Some(index) }
+
+        // Only if we don't have a match yet, settle for a suboptimal match
+        return if current_best_match.is_none() {
+            Some(index)
+        } else {
+            current_best_match
+        }
+
+    })
+    .map(|index| {
+        return (index, !families[index].queue_flags.contains(avoid));
+    })
+}
+
+fn select_physical_device<Window>(settings: &AppSettings<Window>, instance: &Instance) -> PhysicalDevice where Window: WindowInterface {
+    let devices = unsafe { instance.enumerate_physical_devices().expect("No physical devices found.") };
+
+    devices.iter()
+        .find_map(|device| -> Option<PhysicalDevice> {
+            let mut physical_device = PhysicalDevice {
+                handle: *device,
+                properties: unsafe { instance.get_physical_device_properties(*device) },
+                memory_properties: unsafe { instance.get_physical_device_memory_properties(*device) },
+                queue_families: unsafe { instance.get_physical_device_queue_family_properties(*device) },
+                ..Default::default()
+            };
+
+            if settings.gpu_requirements.dedicated && physical_device.properties.device_type != vk::PhysicalDeviceType::DISCRETE_GPU { return None; }
+            if settings.gpu_requirements.min_video_memory > total_video_memory(&physical_device) { return None; }
+
+            physical_device.queues = {
+                settings.gpu_requirements.queues.iter()
+                    .filter_map(|request| -> Option<QueueInfo> {
+                        let avoid = if request.dedicated {
+                            match request.queue_type {
+                                QueueType::Graphics => vk::QueueFlags::COMPUTE,
+                                QueueType::Compute => vk::QueueFlags::GRAPHICS,
+                                QueueType::Transfer => vk::QueueFlags::COMPUTE | vk::QueueFlags::GRAPHICS
+                            }
+                        } else { vk::QueueFlags::default() };
+
+                        return if let Some((index, dedicated)) = get_queue_family_prefer_dedicated(physical_device.queue_families.as_slice(), request.queue_type, avoid) {
+                            Some(QueueInfo {
+                                queue_type: request.queue_type,
+                                dedicated,
+                                family_index: index as u32,
+                                ..Default::default()
+                            })
+                        } else {
+                            None
+                        };
+                    })
+                    .collect()
+            };
+
+            // We now have a list of all the queues that were found matching our request. If this amount is smaller than the number of requested queues,
+            // at least one is missing and could not be fulfilled. In this case we reject the device.
+            if physical_device.queues.len() < settings.gpu_requirements.queues.len() { return None; }
+
+            return Some(physical_device);
+        })
+        .expect("No physical device matching requested capabilities found.")
 }
 
 impl Context {
     pub fn new<Window>(settings: AppSettings<Window>) -> Option<Context> where Window: WindowInterface {
         let entry = unsafe { Entry::load().unwrap() };
         let instance = create_vk_instance(&entry, &settings).unwrap();
-        let debug_messenger = if settings.enable_validation {
-            Some(create_debug_messenger(&entry, &instance))
-        } else {
-            None
+        let funcs = FuncPointers {
+            debug_utils: Some(DebugUtils::new(&entry, &instance)),
+            surface: settings.window.map(|_| ash::extensions::khr::Surface::new(&entry, &instance))
         };
-        let surface = if settings.window.is_some() {
-            Some(create_surface(&settings, &entry, &instance))
-        } else {
-            None
-        };
+
+        let debug_messenger = settings.enable_validation.then(|| create_debug_messenger(&funcs, &instance));
+        let surface = settings.window.map(|_| create_surface(&settings, &entry, &instance));
+        let physical_device = select_physical_device(&settings, &instance);
 
         Some(Context {
             vk_entry: entry,
             instance,
+            funcs,
             debug_messenger,
-            surface
+            surface,
+            physical_device,
         })
+
     }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
-        unsafe {
-            if let Some(debug_messenger) = self.debug_messenger {
-                let debug_utils_loader = DebugUtils::new(&self.vk_entry, &self.instance);
-                debug_utils_loader.destroy_debug_utils_messenger(debug_messenger, None);
-            }
-            self.instance.destroy_instance(None);
+        if let Some(surface) = &self.surface {
+            unsafe { self.funcs.surface.as_ref().unwrap().destroy_surface(surface.handle, None); }
         }
+
+        if let Some(debug_messenger) = self.debug_messenger {
+            unsafe { self.funcs.debug_utils.as_ref().unwrap().destroy_debug_utils_messenger(debug_messenger, None); }
+        }
+
+        unsafe { self.instance.destroy_instance(None); }
     }
 }
