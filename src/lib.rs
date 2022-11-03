@@ -115,10 +115,11 @@ impl Context {
 
 impl Drop for Context {
     fn drop(&mut self) {
-        let debug_utils_loader = DebugUtils::new(&self.vk_entry, &self.instance);
-
         unsafe {
-            debug_utils_loader.destroy_debug_utils_messenger(self.debug_messenger, None);
+            if self.debug_messenger != vk::DebugUtilsMessengerEXT::null() {
+                let debug_utils_loader = DebugUtils::new(&self.vk_entry, &self.instance);
+                debug_utils_loader.destroy_debug_utils_messenger(self.debug_messenger, None);
+            }
             self.instance.destroy_instance(None);
         }
     }
