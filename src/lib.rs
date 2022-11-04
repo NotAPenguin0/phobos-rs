@@ -2,7 +2,7 @@ extern crate core;
 
 use std::ffi::{CStr, CString};
 use std::str::FromStr;
-use ash::{vk, Entry, Instance};
+use ash::{vk, Entry, Instance, Device};
 use ash::extensions::ext::DebugUtils;
 use ash_window;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
@@ -150,6 +150,8 @@ pub struct Context {
     surface: Option<Surface>,
     /// Physical device handle and properties.
     physical_device: PhysicalDevice,
+    /// Logical device. This will be what is used for most Vulkan calls.
+    device: Device,
 }
 
 extern "system" fn vk_debug_callback(
@@ -165,7 +167,7 @@ extern "system" fn vk_debug_callback(
 
     // TODO: switch out logging with log crate: https://docs.rs/log
 
-    println!("[{:?}]:[{:?}]: {} ({}): {}\n",
+    println!("[{:?}] [{:?}]: {} ({}): {}",
              severity,
              msg_type,
              message_id_name,
@@ -326,7 +328,7 @@ fn select_physical_device<Window>(settings: &AppSettings<Window>, surface: &Opti
             // Now check surface support (if we are not creating a headless context)
             if let Some(surface) = surface {
                 // The surface is supported if one of the queues we found can present to it.
-                let mut supported_queue = physical_device.queues.iter_mut().find(|queue| {
+                let supported_queue = physical_device.queues.iter_mut().find(|queue| {
                     unsafe {
                         funcs.surface.as_ref().unwrap()
                             .get_physical_device_surface_support(
@@ -358,6 +360,30 @@ fn fill_surface_details(surface: &mut Surface, physical_device: &PhysicalDevice,
     }
 }
 
+fn create_device<Window>(settings: &AppSettings<Window>, physical_device: &PhysicalDevice, instance: &Instance) -> Device where Window: WindowInterface {
+    let mut priorities = Vec::<f32>::new();
+    let queue_create_infos = physical_device.queue_families.iter()
+        .enumerate()
+        .map(|(index, _)| {
+            let count = physical_device.queues.iter().filter(|queue| queue.family_index == index as u32).count();
+            priorities.resize(usize::max(priorities.len(), count), 1.0);
+            vk::DeviceQueueCreateInfo {
+                queue_family_index: index as u32,
+                queue_count: count as u32,
+                p_queue_priorities: priorities.as_ptr(),
+                ..Default::default()
+            }
+        })
+        .collect::<Vec<_>>();
+    let info = vk::DeviceCreateInfo::builder()
+        .queue_create_infos(queue_create_infos.as_slice())
+        // TODO: extensions, features
+        .build();
+
+
+    unsafe { instance.create_device(physical_device.handle, &info, None).unwrap() }
+}
+
 impl Context {
     pub fn new<Window>(settings: AppSettings<Window>) -> Option<Context> where Window: WindowInterface {
         let entry = unsafe { Entry::load().unwrap() };
@@ -374,6 +400,8 @@ impl Context {
             fill_surface_details(surface, &physical_device, &funcs);
         }
 
+        let device = create_device(&settings, &physical_device, &instance);
+
         Some(Context {
             vk_entry: entry,
             instance,
@@ -381,6 +409,7 @@ impl Context {
             debug_messenger,
             surface,
             physical_device,
+            device
         })
 
     }
