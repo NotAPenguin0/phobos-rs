@@ -5,9 +5,7 @@ mod init;
 
 use ash::{vk, Entry, Instance, Device};
 use ash::extensions::ext::DebugUtils;
-use ash_window;
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
-use init::*;
 
 /// Used as a dummy window interface in case of a headless context. Calling any of the `raw_xxx_handle()` functions on this will result in a panic.
 pub struct HeadlessWindowInterface;
