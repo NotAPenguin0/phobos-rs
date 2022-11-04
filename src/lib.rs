@@ -99,7 +99,7 @@ pub struct Surface {
 }
 
 /// Stores all information of a queue that was found on the physical device.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct QueueInfo {
     /// Functionality that this queue provides.
     pub queue_type: QueueType,
@@ -146,6 +146,15 @@ pub struct FuncPointers {
     pub surface: Option<ash::extensions::khr::Surface>
 }
 
+/// Exposes a logical command queue on the device.
+#[derive(Debug, Default)]
+pub struct Queue {
+    /// Raw [`VkQueue`](vk::Queue) handle.
+    handle: vk::Queue,
+    /// Information about this queue, such as supported operations, family index, etc. See also [`QueueInfo`]
+    info: QueueInfo,
+}
+
 /// Main phobos context. This stores all global Vulkan state. Interaction with the device all happens through this
 /// struct.
 pub struct Context {
@@ -163,6 +172,8 @@ pub struct Context {
     physical_device: PhysicalDevice,
     /// Logical device. This will be what is used for most Vulkan calls.
     device: Device,
+    /// Logical device command queues. Used for command buffer submission.
+    queues: Vec<Queue>
 }
 
 impl Context {
@@ -182,6 +193,9 @@ impl Context {
         }
 
         let device = init::create_device(&settings, &physical_device, &instance);
+        let queues = init::get_queues(&physical_device, &device);
+
+        println!("{:?}", queues);
 
         Some(Context {
             vk_entry: entry,
@@ -190,7 +204,8 @@ impl Context {
             debug_messenger,
             surface,
             physical_device,
-            device
+            device,
+            queues
         })
 
     }

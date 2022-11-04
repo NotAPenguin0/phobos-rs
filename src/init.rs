@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::str::FromStr;
 
@@ -264,4 +265,18 @@ pub fn create_device<Window>(settings: &AppSettings<Window>, physical_device: &P
 
 
     unsafe { instance.create_device(physical_device.handle, &info, None).unwrap() }
+}
+
+pub fn get_queues(physical_device: &PhysicalDevice, device: &Device) -> Vec<Queue> {
+    let mut counts = HashMap::new();
+    physical_device.queues.iter().map(|queue| -> Queue {
+        let index = counts.entry(queue.family_index).or_insert(0 as u32);
+        let handle = unsafe { device.get_device_queue(queue.family_index, *index) };
+        *counts.get_mut(&queue.family_index).unwrap() += 1;
+        Queue {
+            handle,
+            info: *queue
+        }
+    })
+    .collect()
 }
