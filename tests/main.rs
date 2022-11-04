@@ -41,6 +41,7 @@ fn create_context() {
 
         ph::Context::new(settings).unwrap()
     };
+    println!("{:#?}", ctx);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;

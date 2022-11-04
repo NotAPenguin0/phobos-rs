@@ -2,6 +2,7 @@ use std::sync::Arc;
 use ash::{Device, vk};
 use gpu_allocator::vulkan as vk_alloc;
 
+
 #[derive(Debug, Default, Copy, Clone)]
 pub struct ImageViewInfo {
     /// [`VkFormat`](vk::Format) this image view uses. Note that this could be a different format than the owning [`Image`]
@@ -24,9 +25,12 @@ pub struct ImageViewInfo {
 
 /// Abstraction over a [`VkImage`](vk::Image). Stores information about size, format, etc. Additionally couples the image data together
 /// with a memory allocation.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Image {
     /// Reference to the [`VkDevice`](vk::Device).
-    device: Arc<Device>,
+    #[derivative(Debug="ignore")]
+    pub device: Arc<Device>,
     /// [`VkImage`](vk::Image) handle.
     pub handle: vk::Image,
     /// Image format
@@ -52,11 +56,12 @@ pub struct Image {
 /// <br>
 /// # Lifetime
 /// - An instance of this struct must not live longer than the [`Image`] it refers to.
-pub struct ImgView<'i> {
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct ImgView {
     /// Reference to the [`VkDevice`](vk::Device).
-    device: Arc<Device>,
-    /// Reference to the [`VkImage`](vk::Image) this image view points to.
-    pub image: &'i Image,
+    #[derivative(Debug="ignore")]
+    pub device: Arc<Device>,
     /// [`VkImageView`](vk::ImageView) handle.
     pub handle: vk::ImageView,
     /// Whether this ImgView owns the [`VkImageView`](vk::ImageView) it holds.
@@ -67,14 +72,59 @@ pub struct ImgView<'i> {
 
 /// Abstraction over [`VkImageView`](vk::ImageView). An [`ImageView`] owns both the [`VkImageView`](vk::ImageView) and the [`VkImage`](vk::Image).
 /// It can be dereferenced into a non-owning [`ImgView`].
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct ImageView {
-    device: Arc<Device>,
+    #[derivative(Debug="ignore")]
+    pub device: Arc<Device>,
+    /// Image owned by this [`ImageView`].
     pub image: Image,
+    /// [`ImageView`] pointing to the stored image.
     pub view: vk::ImageView,
+    /// Information about the [`ImageView`].
     pub info: ImageViewInfo,
 }
 
+
 impl Image {
+    /// Construct a trivial [`ImgView`] from this [`Image`]. This is an image view that views the
+    /// entire image subresource.
+    /// <br>
+    /// <br>
+    /// # Lifetime
+    /// The returned [`ImgView`] is valid as long as `self` is valid.
+    pub fn view(&self, aspect: vk::ImageAspectFlags) -> ImgView {
+        let info = vk::ImageViewCreateInfo::builder()
+            .view_type(vk::ImageViewType::TYPE_2D) // TODO: 3D images, cubemaps, etc
+            .format(self.format)
+            .image(self.handle)
+            .subresource_range(vk::ImageSubresourceRange::builder()
+                .aspect_mask(aspect)
+                .base_mip_level(0)
+                .level_count(self.mip_levels)
+                .base_array_layer(0)
+                .layer_count(self.layers)
+                .build()
+            )
+            .build();
+        let view_handle = unsafe { self.device.create_image_view(&info, None).unwrap() };
+        ImgView {
+            device: self.device.clone(),
+            handle: view_handle,
+            owned: true,
+            info: ImageViewInfo {
+                format: self.format,
+                samples: self.samples,
+                aspect,
+                size: self.size,
+                base_level: 0,
+                level_count: self.mip_levels,
+                base_layer: 0,
+                layer_count: self.layers
+            }
+        }
+    }
+
     /// Whether this image resource is owned by the application or an external manager (such as the swapchain).
     pub fn is_owned(&self) -> bool {
         self.memory.is_some()
@@ -89,12 +139,11 @@ impl Drop for Image {
     }
 }
 
-impl<'i> ImgView<'i> {
+impl ImgView {
     /// Construct a non-owning [`ImgView`] from an [`ImageView`] object.
-    pub fn from_owned(view: &'i ImageView) -> Self {
+    pub fn from_owned(view: ImageView) -> Self {
         ImgView {
             device: view.device.clone(),
-            image: &view.image,
             handle: view.view,
             owned: false,
             info: view.info
@@ -102,10 +151,21 @@ impl<'i> ImgView<'i> {
     }
 }
 
-impl<'i> Drop for ImgView<'i> {
+impl Drop for ImgView {
     fn drop(&mut self) {
         if self.owned {
             unsafe { self.device.destroy_image_view(self.handle, None); }
+        }
+    }
+}
+
+impl<'i> From<(Image, ImgView)> for ImageView {
+    fn from((image, view): (Image, ImgView)) -> Self {
+        ImageView {
+            device: image.device.clone(),
+            image,
+            view: view.handle,
+            info: view.info
         }
     }
 }

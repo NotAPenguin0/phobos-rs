@@ -345,11 +345,36 @@ pub fn create_swapchain<Window>(device: Arc<Device>, settings: &AppSettings<Wind
 
     let swapchain = unsafe { funcs.swapchain.as_ref().unwrap().create_swapchain(&info, None) }.unwrap();
 
+    let images: Vec<ImageView> = unsafe { funcs.swapchain.as_ref().unwrap().get_swapchain_images(swapchain) }
+        .unwrap()
+        .iter()
+        .map(move |image| {
+            let image = Image {
+                device: device.clone(),
+                handle: *image,
+                format: format.format,
+                size: vk::Extent3D {
+                    width: extent.width,
+                    height: extent.height,
+                    depth: 1
+                },
+                layers: 1,
+                mip_levels: 1,
+                samples: vk::SampleCountFlags::TYPE_1,
+                // Leave memory at None since this is managed by the swapchain, not our application.
+                memory: None
+            };
+            // Create a trivial ImgView.
+            let view = image.view(vk::ImageAspectFlags::COLOR);
+            // Bundle them together into an owning ImageView
+            ImageView::from((image, view))
+        })
+        .collect();
     Swapchain {
         handle: swapchain,
         format,
         present_mode,
         extent,
-        ..Default::default()
+        images
     }
 }

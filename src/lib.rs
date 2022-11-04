@@ -1,5 +1,8 @@
 extern crate core;
 
+#[macro_use]
+extern crate derivative;
+
 mod util;
 mod init;
 mod window;
@@ -131,7 +134,7 @@ pub struct PhysicalDevice {
 
 /// A swapchain is an abstraction of a presentation system. It handles buffering, VSync, and acquiring images
 /// to render and present frames to.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Swapchain {
     /// Handle to the [`VkSwapchainKHR`](vk::SwapchainKHR) object.
     pub handle: vk::SwapchainKHR,
@@ -167,12 +170,17 @@ pub struct FuncPointers {
 
 /// Main phobos context. This stores all global Vulkan state. Interaction with the device all happens through this
 /// struct.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Context {
     /// Entry point for Vulkan functions.
+    #[derivative(Debug="ignore")]
     vk_entry: Entry,
-    /// Stores the handle to the created [`VkInstance`](ash::Instance).
+    /// Vulkan instance
+    #[derivative(Debug="ignore")]
     instance: Instance,
     /// Extension function pointers.
+    #[derivative(Debug="ignore")]
     funcs: FuncPointers,
     /// handle to the [`VkDebugUtilsMessengerEXT`](vk::DebugUtilsMessengerEXT) object. None if `AppSettings::enable_validation` was `false` on initialization.
     debug_messenger: Option<vk::DebugUtilsMessengerEXT>,
@@ -181,6 +189,7 @@ pub struct Context {
     /// Physical device handle and properties.
     physical_device: PhysicalDevice,
     /// Logical device. This will be what is used for most Vulkan calls.
+    #[derivative(Debug="ignore")]
     device: Arc<Device>,
     /// Logical device command queues. Used for command buffer submission.
     queues: Vec<Queue>,
