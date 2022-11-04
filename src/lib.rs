@@ -2,31 +2,15 @@ extern crate core;
 
 mod util;
 mod init;
+mod window;
+mod image;
 
+use std::sync::Arc;
 use ash::{vk, Entry, Instance, Device};
 use ash::extensions::ext::DebugUtils;
-use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
+use window::WindowInterface;
 
-/// Used as a dummy window interface in case of a headless context. Calling any of the `raw_xxx_handle()` functions on this will result in a panic.
-pub struct HeadlessWindowInterface;
-
-unsafe impl HasRawWindowHandle for HeadlessWindowInterface {
-    fn raw_window_handle(&self) -> RawWindowHandle {
-        panic!("Called raw_window_handle() on headless window context.");
-    }
-}
-
-unsafe impl HasRawDisplayHandle for HeadlessWindowInterface {
-    fn raw_display_handle(&self) -> RawDisplayHandle {
-        panic!("Called raw_display_handle() on headless window context.");
-    }
-}
-
-/// Parent trait combining all requirements for a window interface. To be a window interface, a type T must implement the following traits:
-/// - [`HasRawWindowHandle`](raw_window_handle::HasRawWindowHandle)
-/// - [`HasRawDisplayHandle`](raw_window_handle::HasRawDisplayHandle)
-pub trait WindowInterface: HasRawWindowHandle + HasRawDisplayHandle {}
-impl<T: HasRawWindowHandle + HasRawDisplayHandle> WindowInterface for T {}
+pub use image::*;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.
@@ -81,6 +65,12 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
     pub enable_validation: bool,
     /// Optionally a reference to an object implementing a windowing system. If this is not None, it will be used to create a [`VkSurfaceKHR`](vk::SurfaceKHR) to present to.
     pub window: Option<&'a Window>,
+    /// Optionally a preferred surface format. This is ignored for a headless context. If set to None, a fallback surface format will be chosen.
+    /// This format is `{BGRA8_SRGB, NONLINEAR_SRGB}` if it is available. Otherwise, the format is implementation-defined.
+    pub surface_format: Option<vk::SurfaceFormatKHR>,
+    /// Optionally a preferred present mode. This is ignored for a headless context. If set to None, this will fall back to
+    /// `vk::PresentModeKHR::FIFO`, as this is guaranteed to always be supported.
+    pub present_mode: Option<vk::PresentModeKHR>,
     /// Minimum requirements the selected physical device should have.
     pub gpu_requirements: GPURequirements,
 }
@@ -138,12 +128,21 @@ pub struct PhysicalDevice {
     pub queues: Vec<QueueInfo>
 }
 
-/// Stores function pointers for extension functions.
-pub struct FuncPointers {
-    /// Function pointers for the VK_DEBUG_UTILS_EXT extension
-    pub debug_utils: Option<DebugUtils>,
-    /// Function pointers for the VK_SURFACE_KHR extension
-    pub surface: Option<ash::extensions::khr::Surface>
+
+/// A swapchain is an abstraction of a presentation system. It handles buffering, VSync, and acquiring images
+/// to render and present frames to.
+#[derive(Default)]
+pub struct Swapchain {
+    /// Handle to the [`VkSwapchainKHR`](vk::SwapchainKHR) object.
+    pub handle: vk::SwapchainKHR,
+    /// Swapchain image format.
+    pub format: vk::SurfaceFormatKHR,
+    /// Present mode. The only mode that is required by the spec to always be supported is `FIFO`.
+    pub present_mode: vk::PresentModeKHR,
+    /// Size of the swapchain images. This is effectively the window render area.
+    pub extent: vk::Extent2D,
+    /// Swapchain images to present to.
+    pub images: Vec<ImageView>,
 }
 
 /// Exposes a logical command queue on the device.
@@ -153,6 +152,17 @@ pub struct Queue {
     handle: vk::Queue,
     /// Information about this queue, such as supported operations, family index, etc. See also [`QueueInfo`]
     info: QueueInfo,
+}
+
+/// Stores function pointers for extension functions.
+#[derive(Default)]
+pub struct FuncPointers {
+    /// Function pointers for the VK_DEBUG_UTILS_EXT extension
+    pub debug_utils: Option<DebugUtils>,
+    /// Function pointers for the VK_SURFACE_KHR extension
+    pub surface: Option<ash::extensions::khr::Surface>,
+    /// Function pointers for the VK_SWAPCHAIN_KHR extension
+    pub swapchain: Option<ash::extensions::khr::Swapchain>,
 }
 
 /// Main phobos context. This stores all global Vulkan state. Interaction with the device all happens through this
@@ -171,18 +181,21 @@ pub struct Context {
     /// Physical device handle and properties.
     physical_device: PhysicalDevice,
     /// Logical device. This will be what is used for most Vulkan calls.
-    device: Device,
+    device: Arc<Device>,
     /// Logical device command queues. Used for command buffer submission.
-    queues: Vec<Queue>
+    queues: Vec<Queue>,
+    /// Swapchain for presenting. None in headless mode.
+    swapchain: Option<Swapchain>,
 }
 
 impl Context {
     pub fn new<Window>(settings: AppSettings<Window>) -> Option<Context> where Window: WindowInterface {
         let entry = unsafe { Entry::load().unwrap() };
         let instance = init::create_vk_instance(&entry, &settings).unwrap();
-        let funcs = FuncPointers {
+        let mut funcs = FuncPointers {
             debug_utils: Some(DebugUtils::new(&entry, &instance)),
-            surface: settings.window.map(|_| ash::extensions::khr::Surface::new(&entry, &instance))
+            surface: settings.window.map(|_| ash::extensions::khr::Surface::new(&entry, &instance)),
+            ..Default::default()
         };
 
         let debug_messenger = settings.enable_validation.then(|| init::create_debug_messenger(&funcs));
@@ -192,10 +205,17 @@ impl Context {
             init::fill_surface_details(surface, &physical_device, &funcs);
         }
 
-        let device = init::create_device(&settings, &physical_device, &instance);
-        let queues = init::get_queues(&physical_device, &device);
+        let device = Arc::from(init::create_device(&settings, &physical_device, &instance));
+        // After creating the device we can load the VK_SWAPCHAIN_KHR extension
+        funcs.swapchain = settings.window.map(|_| ash::extensions::khr::Swapchain::new(&instance, device.as_ref()));
+        let queues = init::get_queues(&physical_device, device.clone());
 
-        println!("{:?}", queues);
+        let swapchain = {
+            let surface = surface.as_ref().unwrap();
+            let funcs = &funcs;
+            let device = device.clone();
+            settings.window.map(move |_| init::create_swapchain(device, &settings, surface, funcs))
+        };
 
         Some(Context {
             vk_entry: entry,
@@ -205,7 +225,8 @@ impl Context {
             surface,
             physical_device,
             device,
-            queues
+            queues,
+            swapchain
         })
 
     }
@@ -213,6 +234,9 @@ impl Context {
 
 impl Drop for Context {
     fn drop(&mut self) {
+        if let Some(swapchain) = &self.swapchain {
+            unsafe { self.funcs.swapchain.as_ref().unwrap().destroy_swapchain(swapchain.handle, None); }
+        }
         unsafe { self.device.destroy_device(None); }
 
         if let Some(surface) = &self.surface {

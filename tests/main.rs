@@ -1,3 +1,4 @@
+use ash::vk::PresentModeKHR;
 use phobos as ph;
 
 use winit;
@@ -14,28 +15,32 @@ fn create_context() {
         .build(&event_loop)
         .unwrap();
 
-    let settings = ph::AppSettings {
-        version: (1, 0, 0),
-        name: String::from("Phobos test app"),
-        enable_validation: true,
-        window: Some(&window),
-        gpu_requirements: ph::GPURequirements {
-            dedicated: true,
-            min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.
-            min_dedicated_video_memory: 1 * 1024 * 1024 * 1024,
-            queues: vec![
-                ph::QueueRequest { dedicated: false, queue_type: ph::QueueType::Graphics },
-                ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Transfer},
-                ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Compute}
-            ],
-            features: Default::default(),
-            features_1_1: Default::default(),
-            features_1_2: Default::default(),
-            device_extensions: Default::default()
-        }
-    };
+    let ctx = {
+        let settings = ph::AppSettings {
+            version: (1, 0, 0),
+            name: String::from("Phobos test app"),
+            enable_validation: true,
+            window: Some(&window),
+            surface_format: None, // Use default fallback format.
+            present_mode: Some(PresentModeKHR::MAILBOX),
+            gpu_requirements: ph::GPURequirements {
+                dedicated: true,
+                min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.
+                min_dedicated_video_memory: 1 * 1024 * 1024 * 1024,
+                queues: vec![
+                    ph::QueueRequest { dedicated: false, queue_type: ph::QueueType::Graphics },
+                    ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Transfer },
+                    ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Compute }
+                ],
+                features: Default::default(),
+                features_1_1: Default::default(),
+                features_1_2: Default::default(),
+                device_extensions: Default::default()
+            }
+        };
 
-    let ctx = ph::Context::new(settings).unwrap();
+        ph::Context::new(settings).unwrap()
+    };
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;

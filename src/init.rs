@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::str::FromStr;
+use std::sync::Arc;
 
 use ash::{vk, Entry, Instance, Device};
 use ash::extensions::ext::DebugUtils;
@@ -267,7 +268,7 @@ pub fn create_device<Window>(settings: &AppSettings<Window>, physical_device: &P
     unsafe { instance.create_device(physical_device.handle, &info, None).unwrap() }
 }
 
-pub fn get_queues(physical_device: &PhysicalDevice, device: &Device) -> Vec<Queue> {
+pub fn get_queues(physical_device: &PhysicalDevice, device: Arc<Device>) -> Vec<Queue> {
     let mut counts = HashMap::new();
     physical_device.queues.iter().map(|queue| -> Queue {
         let index = counts.entry(queue.family_index).or_insert(0 as u32);
@@ -279,4 +280,76 @@ pub fn get_queues(physical_device: &PhysicalDevice, device: &Device) -> Vec<Queu
         }
     })
     .collect()
+}
+
+fn choose_surface_format<Window>(settings: &AppSettings<Window>, surface: &Surface) -> vk::SurfaceFormatKHR where Window: WindowInterface {
+    // In case requested format isn't found, try this. If that one isn't found we fall back to the first available format.
+    const FALLBACK_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
+        format: vk::Format::B8G8R8A8_SRGB,
+        color_space: vk::ColorSpaceKHR::SRGB_NONLINEAR
+    };
+
+    if let Some(preferred_format) = settings.surface_format {
+        if surface.formats.contains(&preferred_format) { return preferred_format; }
+    }
+    if surface.formats.contains(&FALLBACK_FORMAT) { return FALLBACK_FORMAT; }
+
+    *surface.formats.first().unwrap()
+}
+
+fn choose_present_mode<Window>(settings: &AppSettings<Window>, surface: &Surface) -> vk::PresentModeKHR where Window: WindowInterface {
+    if let Some(mode) = settings.present_mode {
+        if surface.present_modes.contains(&mode) { return mode; }
+    }
+    // VSync, guaranteed to be supported
+    vk::PresentModeKHR::FIFO
+}
+
+fn choose_swapchain_extent<Window>(settings: &AppSettings<Window>, surface: &Surface) -> vk::Extent2D where Window: WindowInterface {
+    if surface.capabilities.current_extent.width != u32::MAX {
+        return surface.capabilities.current_extent;
+    }
+
+    vk::Extent2D {
+        width: settings.window.unwrap().width().clamp(surface.capabilities.min_image_extent.width, surface.capabilities.max_image_extent.width),
+        height: settings.window.unwrap().height().clamp(surface.capabilities.min_image_extent.height, surface.capabilities.max_image_extent.height)
+    }
+}
+
+pub fn create_swapchain<Window>(device: Arc<Device>, settings: &AppSettings<Window>, surface: &Surface, funcs: &FuncPointers) -> Swapchain where Window: WindowInterface {
+    let format = choose_surface_format(settings, surface);
+    let present_mode = choose_present_mode(settings, surface);
+    let extent = choose_swapchain_extent(settings, surface);
+
+    let image_count = {
+        let mut count = surface.capabilities.min_image_count + 1;
+        // If a maximum is set, clamp to it
+        if surface.capabilities.max_image_count != 0 { count = count.clamp(0, surface.capabilities.max_image_count); }
+        count
+    };
+
+    let info = vk::SwapchainCreateInfoKHR::builder()
+        .surface(surface.handle)
+        .image_format(format.format)
+        .image_color_space(format.color_space)
+        .image_extent(extent)
+        .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
+        .image_array_layers(1)
+        .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
+        .present_mode(present_mode)
+        .min_image_count(image_count)
+        .clipped(true)
+        .pre_transform(surface.capabilities.current_transform)
+        .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+        .build();
+
+    let swapchain = unsafe { funcs.swapchain.as_ref().unwrap().create_swapchain(&info, None) }.unwrap();
+
+    Swapchain {
+        handle: swapchain,
+        format,
+        present_mode,
+        extent,
+        ..Default::default()
+    }
 }
