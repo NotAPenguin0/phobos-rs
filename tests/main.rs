@@ -30,7 +30,8 @@ fn create_context() {
             ],
             features: Default::default(),
             features_1_1: Default::default(),
-            features_1_2: Default::default()
+            features_1_2: Default::default(),
+            device_extensions: Default::default()
         }
     };
 

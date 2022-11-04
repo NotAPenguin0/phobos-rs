@@ -66,6 +66,8 @@ pub struct GPURequirements {
     pub features_1_1: vk::PhysicalDeviceVulkan11Features,
     /// Vulkan 1.2 features that are required from the physical device.
     pub features_1_2: vk::PhysicalDeviceVulkan12Features,
+    /// Vulkan extensions that should be present and enabled.
+    pub device_extensions: Vec<String>,
 }
 
 /// Application settings used to initialize the phobos context.
@@ -109,6 +111,15 @@ pub struct QueueInfo {
     family_index: u32,
 }
 
+/// Stores queried properties of a Vulkan extension.
+#[derive(Debug, Default)]
+pub struct ExtensionProperties {
+    /// Name of the extension.
+    pub name: String,
+    /// Specification version of the extension.
+    pub spec_version: u32,
+}
+
 /// A physical device abstracts away an actual device, like a graphics card or integrated graphics card.
 #[derive(Default, Debug)]
 pub struct PhysicalDevice {
@@ -119,6 +130,8 @@ pub struct PhysicalDevice {
     /// [`VkPhysicalDeviceMemoryProperties`](vk::PhysicalDeviceMemoryProperties) structure with memory properties of the physical device, such as
     /// available memory types and heaps.
     pub memory_properties: vk::PhysicalDeviceMemoryProperties,
+    /// Available Vulkan extensions.
+    pub extension_properties: Vec<ExtensionProperties>,
     /// List of [`VkQueueFamilyProperties`](vk::QueueFamilyProperties) with properties of each queue family on the device.
     pub queue_families: Vec<vk::QueueFamilyProperties>,
     /// List of [`QueueInfo`]  with requested queues abstracted away from the physical queues.

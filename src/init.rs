@@ -141,6 +141,12 @@ pub fn select_physical_device<Window>(settings: &AppSettings<Window>, surface: &
                 handle: *device,
                 properties: unsafe { instance.get_physical_device_properties(*device) },
                 memory_properties: unsafe { instance.get_physical_device_memory_properties(*device) },
+                extension_properties: unsafe { instance.enumerate_device_extension_properties(*device).unwrap().iter().map(|vk_properties| {
+                  ExtensionProperties {
+                      name: util::wrap_c_str(vk_properties.extension_name.as_ptr()),
+                      spec_version: vk_properties.spec_version
+                  }
+                }).collect() },
                 queue_families: unsafe { instance.get_physical_device_queue_family_properties(*device) },
                 ..Default::default()
             };
@@ -199,6 +205,17 @@ pub fn select_physical_device<Window>(settings: &AppSettings<Window>, surface: &
                 }
             }
 
+            // Check if all requested extensions are present
+            if !settings.gpu_requirements.device_extensions.iter().all(|requested_extension| {
+                physical_device.extension_properties.iter()
+                    .find(|ext|
+                        ext.name == *requested_extension
+                    )
+                    .is_some()
+            }) {
+                return None;
+            }
+
             return Some(physical_device);
         })
         .expect("No physical device matching requested capabilities found.")
@@ -228,9 +245,21 @@ pub fn create_device<Window>(settings: &AppSettings<Window>, physical_device: &P
             }
         })
         .collect::<Vec<_>>();
+    let mut extension_names: Vec<CString> = settings.gpu_requirements.device_extensions.iter()
+        .map(|ext|
+            CString::new(ext.clone()).unwrap()
+        )
+        .collect();
+
+    // Add required extensions
+    if settings.window.is_some() {
+        extension_names.push(CString::from(ash::extensions::khr::Swapchain::name()));
+    }
+
+    let extension_names_raw = util::unwrap_to_raw_strings(extension_names.as_slice());
     let info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(queue_create_infos.as_slice())
-        // TODO: extensions, features
+        .enabled_extension_names(extension_names_raw.as_slice())
         .build();
 
 
