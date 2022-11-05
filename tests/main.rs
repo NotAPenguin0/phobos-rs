@@ -41,10 +41,11 @@ fn create_context() {
 
         ph::Context::new(settings).unwrap()
     };
-    println!("{:#?}", ctx);
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
+
+        ctx.frame.wait_for_frame();
 
         match event {
             Event::WindowEvent {

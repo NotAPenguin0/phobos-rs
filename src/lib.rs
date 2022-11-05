@@ -7,13 +7,17 @@ mod util;
 mod init;
 mod window;
 mod image;
+mod frame;
+mod sync;
 
 use std::sync::Arc;
 use ash::{vk, Entry, Instance, Device};
 use ash::extensions::ext::DebugUtils;
 use window::WindowInterface;
 
-pub use image::*;
+pub use crate::image::*;
+pub use crate::frame::*;
+pub use crate::sync::*;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.
@@ -168,33 +172,49 @@ pub struct FuncPointers {
     pub swapchain: Option<ash::extensions::khr::Swapchain>,
 }
 
+/// Information stored for each in-flight frame.
+#[derive(Debug)]
+pub struct PerFrame {
+    pub fence: Fence,
+}
+
+/// Responsible for presentation, frame-frame synchronization and per-frame resources.
+#[derive(Debug)]
+pub struct FrameManager {
+    per_frame: [PerFrame; FrameManager::FRAMES_IN_FLIGHT],
+    current_frame: u32,
+}
+
+
 /// Main phobos context. This stores all global Vulkan state. Interaction with the device all happens through this
 /// struct.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Context {
-    /// Entry point for Vulkan functions.
-    #[derivative(Debug="ignore")]
-    vk_entry: Entry,
-    /// Vulkan instance
-    #[derivative(Debug="ignore")]
-    instance: Instance,
-    /// Extension function pointers.
-    #[derivative(Debug="ignore")]
-    funcs: FuncPointers,
-    /// handle to the [`VkDebugUtilsMessengerEXT`](vk::DebugUtilsMessengerEXT) object. None if `AppSettings::enable_validation` was `false` on initialization.
-    debug_messenger: Option<vk::DebugUtilsMessengerEXT>,
+    /// Implements frame functionality, presentation and synchronization.
+    pub frame: FrameManager,
+    /// Swapchain for presenting. None in headless mode.
+    swapchain: Option<Swapchain>,
     /// Surface information and handle. None if `AppSettings::create_headless` was `true` on initialization.
     surface: Option<Surface>,
-    /// Physical device handle and properties.
-    physical_device: PhysicalDevice,
+    /// Logical device command queues. Used for command buffer submission.
+    queues: Vec<Queue>,
     /// Logical device. This will be what is used for most Vulkan calls.
     #[derivative(Debug="ignore")]
     device: Arc<Device>,
-    /// Logical device command queues. Used for command buffer submission.
-    queues: Vec<Queue>,
-    /// Swapchain for presenting. None in headless mode.
-    swapchain: Option<Swapchain>,
+    /// Physical device handle and properties.
+    physical_device: PhysicalDevice,
+    /// handle to the [`VkDebugUtilsMessengerEXT`](vk::DebugUtilsMessengerEXT) object. None if `AppSettings::enable_validation` was `false` on initialization.
+    debug_messenger: Option<vk::DebugUtilsMessengerEXT>,
+    /// Extension function pointers.
+    #[derivative(Debug="ignore")]
+    funcs: FuncPointers,
+    /// Vulkan instance
+    #[derivative(Debug="ignore")]
+    instance: Instance,
+    /// Entry point for Vulkan functions.
+    #[derivative(Debug="ignore")]
+    vk_entry: Entry,
 }
 
 impl Context {
@@ -226,23 +246,35 @@ impl Context {
             settings.window.map(move |_| init::create_swapchain(device, &settings, surface, funcs))
         };
 
-        Some(Context {
-            vk_entry: entry,
-            instance,
-            funcs,
-            debug_messenger,
-            surface,
-            physical_device,
-            device,
-            queues,
-            swapchain
-        })
+        let frame = FrameManager::new(device.clone());
 
+
+        Some(Context {
+            frame,
+            swapchain,
+            surface,
+            queues,
+            device,
+            physical_device,
+            debug_messenger,
+            funcs,
+            instance,
+            vk_entry: entry,
+        })
+    }
+
+    pub fn wait_idle(&self) {
+        unsafe { self.device.device_wait_idle().unwrap(); }
     }
 }
 
 impl Drop for Context {
     fn drop(&mut self) {
+        self.wait_idle();
+
+        // TODO: implement drop() properly for all these resources so this manual implementation is not necessary,
+        // and the destructors can gracefully run for *all* contained types.
+
         if let Some(swapchain) = &self.swapchain {
             unsafe { self.funcs.swapchain.as_ref().unwrap().destroy_swapchain(swapchain.handle, None); }
         }

@@ -33,7 +33,7 @@ extern "system" fn vk_debug_callback(
     false as vk::Bool32
 }
 
-pub fn create_vk_instance<Window>(entry: &Entry, settings: &AppSettings<Window>) -> Option<Instance> where Window: WindowInterface {
+pub(crate) fn create_vk_instance<Window>(entry: &Entry, settings: &AppSettings<Window>) -> Option<Instance> where Window: WindowInterface {
     let app_name = CString::new(settings.name.clone()).unwrap();
     let engine_name = CString::new("Phobos").unwrap();
     let app_info = vk::ApplicationInfo {
@@ -77,7 +77,7 @@ pub fn create_vk_instance<Window>(entry: &Entry, settings: &AppSettings<Window>)
     return unsafe { entry.create_instance(&instance_info, None).ok() };
 }
 
-pub fn create_debug_messenger(funcs: &FuncPointers) -> vk::DebugUtilsMessengerEXT {
+pub(crate) fn create_debug_messenger(funcs: &FuncPointers) -> vk::DebugUtilsMessengerEXT {
     let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
         .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR)
         .message_type(vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION)
@@ -87,7 +87,7 @@ pub fn create_debug_messenger(funcs: &FuncPointers) -> vk::DebugUtilsMessengerEX
     unsafe { funcs.debug_utils.as_ref().unwrap().create_debug_utils_messenger(&create_info, None).unwrap() }
 }
 
-pub fn create_surface<Window>(settings: &AppSettings<Window>, entry: &Entry, instance: &Instance) -> Surface where Window: WindowInterface {
+pub(crate) fn create_surface<Window>(settings: &AppSettings<Window>, entry: &Entry, instance: &Instance) -> Surface where Window: WindowInterface {
     let window = settings.window.unwrap();
     let surface_handle = unsafe { ash_window::create_surface(&entry, &instance, window.raw_display_handle(), window.raw_window_handle(), None).unwrap() };
     return Surface {
@@ -134,7 +134,7 @@ fn get_queue_family_prefer_dedicated(families: &[vk::QueueFamilyProperties], que
         })
 }
 
-pub fn select_physical_device<Window>(settings: &AppSettings<Window>, surface: &Option<Surface>, funcs: &FuncPointers, instance: &Instance) -> PhysicalDevice where Window: WindowInterface {
+pub(crate) fn select_physical_device<Window>(settings: &AppSettings<Window>, surface: &Option<Surface>, funcs: &FuncPointers, instance: &Instance) -> PhysicalDevice where Window: WindowInterface {
     let devices = unsafe { instance.enumerate_physical_devices().expect("No physical devices found.") };
 
     devices.iter()
@@ -223,7 +223,7 @@ pub fn select_physical_device<Window>(settings: &AppSettings<Window>, surface: &
         .expect("No physical device matching requested capabilities found.")
 }
 
-pub fn fill_surface_details(surface: &mut Surface, physical_device: &PhysicalDevice, funcs: &FuncPointers) {
+pub(crate) fn fill_surface_details(surface: &mut Surface, physical_device: &PhysicalDevice, funcs: &FuncPointers) {
     let surface_funcs = funcs.surface.as_ref().unwrap();
     unsafe {
         surface.capabilities = surface_funcs.get_physical_device_surface_capabilities(physical_device.handle, surface.handle).unwrap();
@@ -232,7 +232,7 @@ pub fn fill_surface_details(surface: &mut Surface, physical_device: &PhysicalDev
     }
 }
 
-pub fn create_device<Window>(settings: &AppSettings<Window>, physical_device: &PhysicalDevice, instance: &Instance) -> Device where Window: WindowInterface {
+pub(crate) fn create_device<Window>(settings: &AppSettings<Window>, physical_device: &PhysicalDevice, instance: &Instance) -> Device where Window: WindowInterface {
     let mut priorities = Vec::<f32>::new();
     let queue_create_infos = physical_device.queue_families.iter()
         .enumerate()
@@ -268,7 +268,7 @@ pub fn create_device<Window>(settings: &AppSettings<Window>, physical_device: &P
     unsafe { instance.create_device(physical_device.handle, &info, None).unwrap() }
 }
 
-pub fn get_queues(physical_device: &PhysicalDevice, device: Arc<Device>) -> Vec<Queue> {
+pub(crate) fn get_queues(physical_device: &PhysicalDevice, device: Arc<Device>) -> Vec<Queue> {
     let mut counts = HashMap::new();
     physical_device.queues.iter().map(|queue| -> Queue {
         let index = counts.entry(queue.family_index).or_insert(0 as u32);
@@ -316,7 +316,7 @@ fn choose_swapchain_extent<Window>(settings: &AppSettings<Window>, surface: &Sur
     }
 }
 
-pub fn create_swapchain<Window>(device: Arc<Device>, settings: &AppSettings<Window>, surface: &Surface, funcs: &FuncPointers) -> Swapchain where Window: WindowInterface {
+pub(crate) fn create_swapchain<Window>(device: Arc<Device>, settings: &AppSettings<Window>, surface: &Surface, funcs: &FuncPointers) -> Swapchain where Window: WindowInterface {
     let format = choose_surface_format(settings, surface);
     let present_mode = choose_present_mode(settings, surface);
     let extent = choose_swapchain_extent(settings, surface);
