@@ -278,6 +278,7 @@ pub(crate) fn get_queues(physical_device: &PhysicalDevice, device: Arc<Device>) 
         let handle = unsafe { device.get_device_queue(queue.family_index, *index) };
         *counts.get_mut(&queue.family_index).unwrap() += 1;
         Queue {
+            device: device.clone(),
             handle,
             info: *queue
         }

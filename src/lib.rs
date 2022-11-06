@@ -9,6 +9,7 @@ mod window;
 mod image;
 mod frame;
 mod sync;
+mod queue;
 
 use std::ops::Deref;
 use std::sync::Arc;
@@ -22,7 +23,7 @@ pub use crate::sync::*;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
 pub enum QueueType {
     #[default]
     Graphics = vk::QueueFlags::GRAPHICS.as_raw() as isize,
@@ -140,7 +141,6 @@ pub struct PhysicalDevice {
     pub queues: Vec<QueueInfo>
 }
 
-
 /// A swapchain is an abstraction of a presentation system. It handles buffering, VSync, and acquiring images
 /// to render and present frames to.
 #[derive(Default, Derivative)]
@@ -162,8 +162,11 @@ pub struct Swapchain {
 }
 
 /// Exposes a logical command queue on the device.
-#[derive(Debug, Default)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Queue {
+    #[derivative(Debug="ignore")]
+    device: Arc<Device>,
     /// Raw [`VkQueue`](vk::Queue) handle.
     handle: vk::Queue,
     /// Information about this queue, such as supported operations, family index, etc. See also [`QueueInfo`]
@@ -183,8 +186,20 @@ pub struct FuncPointers {
 
 /// Information stored for each in-flight frame.
 #[derive(Debug)]
-pub struct PerFrame {
-    pub fence: Fence,
+struct PerFrame {
+    pub fence: Arc<Fence>,
+    /// Signaled by the GPU when a swapchain image is ready.
+    pub image_ready: Semaphore,
+    /// Signaled by the GPU when all commands for a frame have been processed.
+    /// We wait on this before presenting.
+    pub gpu_finished: Semaphore,
+}
+
+/// Information stored for each swapchain image.
+#[derive(Debug)]
+struct PerImage {
+    /// Fence of the current frame.
+    pub fence: Option<Arc<Fence>>,
 }
 
 /// Struct that stores the context of a single in-flight frame.
@@ -196,8 +211,9 @@ pub struct PerFrame {
 /// ```rs
 /// let ctx = ph::create_context(/*...*/);
 /// while running {
-///     // obtain a Future<InFlightContext>
-///     let ifc = ctx.frame.new_frame();
+///     // obtain a Future<InFlightContext>, assumes windowed context was created.
+///     let frame_manager = ctx.frame.as_ref().unwrap();
+///     let ifc = frame_manager.new_frame();
 ///     // possibly do some work that does not yet require a frame context.
 ///     // ...
 ///     // wait for our resulting frame context now that we really need it.
@@ -213,7 +229,10 @@ pub struct InFlightContext {
 #[derive(Debug)]
 pub struct FrameManager {
     per_frame: [PerFrame; FrameManager::FRAMES_IN_FLIGHT],
+    per_image: Vec<PerImage>,
     current_frame: u32,
+    current_image: u32,
+    swapchain: Swapchain,
 }
 
 /// Vulkan instance (to properly implement Drop)
@@ -231,9 +250,7 @@ pub struct DebugUtilsMessengerEXT(vk::DebugUtilsMessengerEXT, DebugUtils);
 #[derivative(Debug)]
 pub struct Context {
     /// Implements frame functionality, presentation and synchronization.
-    pub frame: FrameManager,
-    /// Swapchain for presenting. None in headless mode.
-    swapchain: Option<Swapchain>,
+    pub frame: Option<FrameManager>,
     /// Surface information and handle. None if `AppSettings::create_headless` was `true` on initialization.
     surface: Option<Surface>,
     /// Logical device command queues. Used for command buffer submission.
@@ -279,18 +296,15 @@ impl Context {
         funcs.swapchain = settings.window.map(|_| ash::extensions::khr::Swapchain::new(&instance, device.as_ref()));
         let queues = init::get_queues(&physical_device, device.clone());
 
-        let swapchain = {
+        let frame_manager = settings.window.map(|_| {
             let surface = surface.as_ref().unwrap();
             let funcs = &funcs;
-            let device = device.clone();
-            settings.window.map(move |_| init::create_swapchain(device, &settings, surface, funcs))
-        };
-
-        let frame = FrameManager::new(device.clone());
+            let swapchain = settings.window.map(|_| init::create_swapchain(device.clone(), &settings, surface, funcs)).unwrap();
+            FrameManager::new(device.clone(), swapchain)
+        });
 
         Some(Context {
-            frame,
-            swapchain,
+            frame: frame_manager,
             surface,
             queues,
             device,
@@ -302,8 +316,20 @@ impl Context {
         })
     }
 
+    /// Wait until the GPU is idle. You should generally not call this, and instead use the synchronization systems phobos exposes.
     pub fn wait_idle(&self) {
         unsafe { self.device.device_wait_idle().unwrap(); }
+    }
+
+    /// Get a queue to submit commands to. This API is subject to change in the future with the planned execution domains
+    /// feature.
+    pub fn get_queue(&self, queue_type: QueueType) -> Option<&Queue> {
+        self.queues.iter().find(|queue| queue.info.queue_type == queue_type)
+    }
+
+    /// Get a present-capable queue.
+    pub fn get_present_queue(&self) -> Option<&Queue> {
+        self.queues.iter().find(|queue| queue.info.can_present)
     }
 }
 

@@ -17,7 +17,7 @@ fn create_context() {
         .build(&event_loop)
         .unwrap();
 
-    let ctx = {
+    let mut ctx = {
         let settings = ph::AppSettings {
             version: (1, 0, 0),
             name: String::from("Phobos test app"),
@@ -45,12 +45,7 @@ fn create_context() {
     };
 
     event_loop.run(move |event, _, control_flow| {
-        block_on(async {
             *control_flow = ControlFlow::Wait;
-
-            let ifc = ctx.frame.new_frame().await;
-            println!("{:?}", ifc);
-
             match event {
                 Event::WindowEvent {
                     event: WindowEvent::CloseRequested,
@@ -58,6 +53,15 @@ fn create_context() {
                 } if window_id == window.id() => *control_flow = ControlFlow::Exit,
                 _ => (),
             }
-        });
+
+            let ifc =  {
+                let frame_manager = ctx.frame.as_mut().unwrap();
+                block_on(frame_manager.new_frame())
+            };
+
+            let frame_manager = ctx.frame.as_ref().unwrap();
+
+            frame_manager.submit(ctx.get_queue(ph::QueueType::Graphics).unwrap()).expect("submission failed");
+            frame_manager.present(ctx.get_present_queue().unwrap()).expect("present failed");
     });
 }
