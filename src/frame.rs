@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::{Device, Context, FrameManager, PerFrame};
+use crate::{Device, Context, FrameManager, PerFrame, InFlightContext};
 use crate::sync::*;
 
 impl FrameManager {
@@ -24,9 +24,14 @@ impl FrameManager {
 
     /// This function must be called at the beginning of each frame.
     /// It will return an [`InFlightContext`] object which holds all the information for this current frame.
-    /// This function blocks until there is a CPU frame available to start writing render data to.
-    pub fn wait_for_frame(&self) {
+    /// You can only start doing command recording once the resulting future is awaited.
+    pub async fn new_frame(&self) -> InFlightContext {
+        let frame = &self.per_frame[self.current_frame as usize];
+        frame.fence.wait().expect("Device lost");
 
+        
+
+        InFlightContext {}
     }
 
     pub fn present(&self) {

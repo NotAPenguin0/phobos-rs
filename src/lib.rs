@@ -187,6 +187,28 @@ pub struct PerFrame {
     pub fence: Fence,
 }
 
+/// Struct that stores the context of a single in-flight frame.
+/// You can obtain an instance of this from calling [`FrameManager::new_frame()`].
+/// All operations specific to a frame require an instance.
+/// <br>
+/// <br>
+/// # Example
+/// ```rs
+/// let ctx = ph::create_context(/*...*/);
+/// while running {
+///     // obtain a Future<InFlightContext>
+///     let ifc = ctx.frame.new_frame();
+///     // possibly do some work that does not yet require a frame context.
+///     // ...
+///     // wait for our resulting frame context now that we really need it.
+///     let ifc = futures::executor::block_on(ifc);
+/// }
+/// ```
+#[derive(Debug)]
+pub struct InFlightContext {
+
+}
+
 /// Responsible for presentation, frame-frame synchronization and per-frame resources.
 #[derive(Debug)]
 pub struct FrameManager {

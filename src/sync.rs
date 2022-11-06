@@ -1,4 +1,9 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::slice;
 use std::sync::Arc;
+use std::task::{Context, Poll};
+use ash::prelude::VkResult;
 use ash::vk;
 use crate::Device;
 
@@ -31,6 +36,17 @@ impl Fence {
     None)?
             }
         })
+    }
+}
+
+impl Fence {
+    /// Waits for the fence to be signaled with no timeout.
+    pub fn wait(&self) -> VkResult<()> {
+        unsafe { self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX) }
+    }
+
+    pub fn reset(&self) -> VkResult<()> {
+        unsafe { self.device.reset_fences(slice::from_ref(&self.handle)) }
     }
 }
 

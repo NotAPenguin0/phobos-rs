@@ -7,6 +7,8 @@ use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use winit::platform::windows::EventLoopBuilderExtWindows;
 use winit::window::{Window, WindowBuilder};
 
+use futures::executor::block_on;
+
 #[test]
 fn create_context() {
     let event_loop = EventLoopBuilder::new().with_any_thread(true).build();
@@ -43,16 +45,19 @@ fn create_context() {
     };
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        block_on(async {
+            *control_flow = ControlFlow::Wait;
 
-        ctx.frame.wait_for_frame();
+            let ifc = ctx.frame.new_frame().await;
+            println!("{:?}", ifc);
 
-        match event {
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                window_id
-            } if window_id == window.id() => *control_flow = ControlFlow::Exit,
-            _ => (),
-        }
+            match event {
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    window_id
+                } if window_id == window.id() => *control_flow = ControlFlow::Exit,
+                _ => (),
+            }
+        });
     });
 }
