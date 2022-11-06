@@ -10,8 +10,9 @@ mod image;
 mod frame;
 mod sync;
 
+use std::ops::Deref;
 use std::sync::Arc;
-use ash::{vk, Entry, Instance, Device};
+use ash::{vk, Entry};
 use ash::extensions::ext::DebugUtils;
 use window::WindowInterface;
 
@@ -83,7 +84,8 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
 }
 
 /// Contains all information about a [`VkSurfaceKHR`](vk::SurfaceKHR)
-#[derive(Default, Debug)]
+#[derive(Default, Derivative)]
+#[derivative(Debug)]
 pub struct Surface {
     /// Handle to the [`VkSurfaceKHR`](vk::SurfaceKHR)
     pub handle: vk::SurfaceKHR,
@@ -92,7 +94,10 @@ pub struct Surface {
     /// List of [`VkSurfaceFormatKHR`](vk::SurfaceFormatKHR) with all formats this surface supports.
     pub formats: Vec<vk::SurfaceFormatKHR>,
     /// List of [`VkPresentModeKHR`](vk::PresentModeKHR) with all present modes this surface supports.
-    pub present_modes: Vec<vk::PresentModeKHR>
+    pub present_modes: Vec<vk::PresentModeKHR>,
+    /// Vulkan extension functions for surface handling.
+    #[derivative(Debug="ignore")]
+    pub ext_functions: Option<ash::extensions::khr::Surface>,
 }
 
 /// Stores all information of a queue that was found on the physical device.
@@ -105,7 +110,7 @@ pub struct QueueInfo {
     /// Whether this queue is capable of presenting to a surface.
     pub can_present: bool,
     /// The queue family index.
-    family_index: u32,
+    pub family_index: u32,
 }
 
 /// Stores queried properties of a Vulkan extension.
@@ -138,7 +143,8 @@ pub struct PhysicalDevice {
 
 /// A swapchain is an abstraction of a presentation system. It handles buffering, VSync, and acquiring images
 /// to render and present frames to.
-#[derive(Default, Debug)]
+#[derive(Default, Derivative)]
+#[derivative(Debug)]
 pub struct Swapchain {
     /// Handle to the [`VkSwapchainKHR`](vk::SwapchainKHR) object.
     pub handle: vk::SwapchainKHR,
@@ -150,6 +156,9 @@ pub struct Swapchain {
     pub extent: vk::Extent2D,
     /// Swapchain images to present to.
     pub images: Vec<ImageView>,
+    /// Vulkan extension functions operating on the swapchain.
+    #[derivative(Debug="ignore")]
+    pub ext_functions: Option<ash::extensions::khr::Swapchain>,
 }
 
 /// Exposes a logical command queue on the device.
@@ -185,6 +194,14 @@ pub struct FrameManager {
     current_frame: u32,
 }
 
+/// Vulkan instance (to properly implement Drop)
+pub struct Instance(ash::Instance);
+
+/// Newtype struct to implement Drop for the VkDevice.
+pub struct Device(ash::Device);
+
+/// Newtype struct to implement Drop.
+pub struct DebugUtilsMessengerEXT(vk::DebugUtilsMessengerEXT, DebugUtils);
 
 /// Main phobos context. This stores all global Vulkan state. Interaction with the device all happens through this
 /// struct.
@@ -205,7 +222,8 @@ pub struct Context {
     /// Physical device handle and properties.
     physical_device: PhysicalDevice,
     /// handle to the [`VkDebugUtilsMessengerEXT`](vk::DebugUtilsMessengerEXT) object. None if `AppSettings::enable_validation` was `false` on initialization.
-    debug_messenger: Option<vk::DebugUtilsMessengerEXT>,
+    #[derivative(Debug="ignore")]
+    debug_messenger: Option<DebugUtilsMessengerEXT>,
     /// Extension function pointers.
     #[derivative(Debug="ignore")]
     funcs: FuncPointers,
@@ -248,7 +266,6 @@ impl Context {
 
         let frame = FrameManager::new(device.clone());
 
-
         Some(Context {
             frame,
             swapchain,
@@ -271,23 +288,51 @@ impl Context {
 impl Drop for Context {
     fn drop(&mut self) {
         self.wait_idle();
+    }
+}
 
-        // TODO: implement drop() properly for all these resources so this manual implementation is not necessary,
-        // and the destructors can gracefully run for *all* contained types.
+impl Drop for Swapchain {
+    fn drop(&mut self) {
+        unsafe { self.ext_functions.as_ref().unwrap().destroy_swapchain(self.handle, None); }
+    }
+}
 
-        if let Some(swapchain) = &self.swapchain {
-            unsafe { self.funcs.swapchain.as_ref().unwrap().destroy_swapchain(swapchain.handle, None); }
-        }
-        unsafe { self.device.destroy_device(None); }
+impl Drop for Surface {
+    fn drop(&mut self) {
+         unsafe { self.ext_functions.as_ref().unwrap().destroy_surface(self.handle, None); }
+    }
+}
 
-        if let Some(surface) = &self.surface {
-            unsafe { self.funcs.surface.as_ref().unwrap().destroy_surface(surface.handle, None); }
-        }
+impl Drop for DebugUtilsMessengerEXT {
+    fn drop(&mut self) {
+        unsafe { self.1.destroy_debug_utils_messenger(self.0, None); }
+    }
+}
 
-        if let Some(debug_messenger) = self.debug_messenger {
-            unsafe { self.funcs.debug_utils.as_ref().unwrap().destroy_debug_utils_messenger(debug_messenger, None); }
-        }
+impl Deref for Instance {
+    type Target = ash::Instance;
 
-        unsafe { self.instance.destroy_instance(None); }
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Drop for Instance {
+    fn drop(&mut self) {
+        unsafe { self.destroy_instance(None); }
+    }
+}
+
+impl Deref for Device {
+    type Target = ash::Device;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Drop for Device {
+    fn drop(&mut self) {
+        unsafe { self.destroy_device(None); }
     }
 }

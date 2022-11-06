@@ -1,6 +1,5 @@
 use std::sync::Arc;
-use ash::Device;
-use crate::{Context, FrameManager, PerFrame};
+use crate::{Device, Context, FrameManager, PerFrame};
 use crate::sync::*;
 
 impl FrameManager {

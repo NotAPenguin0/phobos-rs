@@ -3,7 +3,7 @@ use std::ffi::{CStr, CString};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use ash::{vk, Entry, Instance, Device};
+use ash::{vk, Entry};
 use ash::extensions::ext::DebugUtils;
 use ash_window;
 
@@ -74,27 +74,29 @@ pub(crate) fn create_vk_instance<Window>(entry: &Entry, settings: &AppSettings<W
         .enabled_extension_names(extensions_raw.as_slice())
         .build();
 
-    return unsafe { entry.create_instance(&instance_info, None).ok() };
+    return unsafe { Some(Instance(entry.create_instance(&instance_info, None).unwrap())) };
 }
 
-pub(crate) fn create_debug_messenger(funcs: &FuncPointers) -> vk::DebugUtilsMessengerEXT {
+pub(crate) fn create_debug_messenger(funcs: &FuncPointers) -> DebugUtilsMessengerEXT {
     let create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
         .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR)
         .message_type(vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION)
         .pfn_user_callback(Some(vk_debug_callback))
         .build();
 
-    unsafe { funcs.debug_utils.as_ref().unwrap().create_debug_utils_messenger(&create_info, None).unwrap() }
+    unsafe { DebugUtilsMessengerEXT(funcs.debug_utils.as_ref().unwrap().create_debug_utils_messenger(&create_info, None).unwrap(), funcs.debug_utils.as_ref().unwrap().clone()) }
 }
 
 pub(crate) fn create_surface<Window>(settings: &AppSettings<Window>, entry: &Entry, instance: &Instance) -> Surface where Window: WindowInterface {
     let window = settings.window.unwrap();
     let surface_handle = unsafe { ash_window::create_surface(&entry, &instance, window.raw_display_handle(), window.raw_window_handle(), None).unwrap() };
-    return Surface {
+    Surface {
         handle: surface_handle,
-        // Surface capabilities will be queried by the VkPhysicalDevice.
-        ..Default::default()
-    };
+        capabilities: Default::default(),
+        formats: vec![],
+        present_modes: vec![],
+        ext_functions: None
+    }
 }
 
 fn total_video_memory(device: &PhysicalDevice) -> usize {
@@ -230,6 +232,7 @@ pub(crate) fn fill_surface_details(surface: &mut Surface, physical_device: &Phys
         surface.formats = surface_funcs.get_physical_device_surface_formats(physical_device.handle, surface.handle).unwrap();
         surface.present_modes = surface_funcs.get_physical_device_surface_present_modes(physical_device.handle, surface.handle).unwrap();
     }
+    surface.ext_functions = funcs.surface.clone()
 }
 
 pub(crate) fn create_device<Window>(settings: &AppSettings<Window>, physical_device: &PhysicalDevice, instance: &Instance) -> Device where Window: WindowInterface {
@@ -265,7 +268,7 @@ pub(crate) fn create_device<Window>(settings: &AppSettings<Window>, physical_dev
         .build();
 
 
-    unsafe { instance.create_device(physical_device.handle, &info, None).unwrap() }
+    unsafe { Device(instance.create_device(physical_device.handle, &info, None).unwrap()) }
 }
 
 pub(crate) fn get_queues(physical_device: &PhysicalDevice, device: Arc<Device>) -> Vec<Queue> {
@@ -375,6 +378,7 @@ pub(crate) fn create_swapchain<Window>(device: Arc<Device>, settings: &AppSettin
         format,
         present_mode,
         extent,
-        images
+        images,
+        ext_functions: funcs.swapchain.clone()
     }
 }

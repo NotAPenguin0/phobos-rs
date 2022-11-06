@@ -1,7 +1,8 @@
 use std::sync::Arc;
-use ash::{Device, vk};
+use ash::vk;
 use gpu_allocator::vulkan as vk_alloc;
 
+use crate::Device;
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct ImageViewInfo {

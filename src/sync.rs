@@ -1,5 +1,6 @@
 use std::sync::Arc;
-use ash::{Device, vk};
+use ash::vk;
+use crate::Device;
 
 /// Wrapper around a [`VkFence`](vk::Fence) object.
 #[derive(Derivative)]
