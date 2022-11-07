@@ -1,8 +1,5 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::slice;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use ash::prelude::VkResult;
 use ash::vk;
 use crate::Device;

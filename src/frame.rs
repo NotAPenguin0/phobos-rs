@@ -1,8 +1,61 @@
 use std::sync::Arc;
 use ash::prelude::VkResult;
-use crate::{Device, Context, FrameManager, PerFrame, InFlightContext, Swapchain, PerImage, Queue};
+use crate::{Device, Swapchain, Queue, Error};
 use crate::sync::*;
 use ash::vk;
+
+/// Information stored for each in-flight frame.
+#[derive(Debug)]
+struct PerFrame {
+    pub fence: Arc<Fence>,
+    /// Signaled by the GPU when a swapchain image is ready.
+    pub image_ready: Semaphore,
+    /// Signaled by the GPU when all commands for a frame have been processed.
+    /// We wait on this before presenting.
+    pub gpu_finished: Semaphore,
+}
+
+/// Information stored for each swapchain image.
+#[derive(Debug)]
+struct PerImage {
+    /// Fence of the current frame.
+    pub fence: Option<Arc<Fence>>,
+}
+
+
+/// Struct that stores the context of a single in-flight frame.
+/// You can obtain an instance of this from calling [`FrameManager::new_frame()`].
+/// All operations specific to a frame require an instance.
+/// <br>
+/// <br>
+/// # Example
+/// ```rs
+/// let ctx = ph::create_context(/*...*/);
+/// while running {
+///     // obtain a Future<InFlightContext>, assumes windowed context was created.
+///     let frame_manager = ctx.frame.as_ref().unwrap();
+///     let ifc = frame_manager.new_frame();
+///     // possibly do some work that does not yet require a frame context.
+///     // ...
+///     // wait for our resulting frame context now that we really need it.
+///     let ifc = futures::executor::block_on(ifc);
+/// }
+/// ```
+#[derive(Debug)]
+pub struct InFlightContext {
+
+}
+
+/// Responsible for presentation, frame-frame synchronization and per-frame resources.
+#[derive(Debug)]
+pub struct FrameManager {
+    per_frame: [PerFrame; FrameManager::FRAMES_IN_FLIGHT],
+    per_image: Vec<PerImage>,
+    current_frame: u32,
+    current_image: u32,
+    swapchain: Swapchain,
+}
+
 
 impl FrameManager {
     /// The number of frames in flight. A frame in-flight is a frame that is rendering on the GPU or scheduled to do so.
@@ -11,30 +64,30 @@ impl FrameManager {
     pub(crate) const FRAMES_IN_FLIGHT: usize = 2;
 
     /// Initialize frame manager with per-frame data.
-    pub(crate) fn new(device: Arc<Device>, swapchain: Swapchain) -> FrameManager {
-        FrameManager {
-            per_frame: (0..Self::FRAMES_IN_FLIGHT).into_iter().map(|_| -> PerFrame {
-               PerFrame {
-                   fence: Arc::new(Fence::new(device.clone(), true).unwrap()),
-                   image_ready: Semaphore::new(device.clone()).unwrap(),
-                   gpu_finished: Semaphore::new(device.clone()).unwrap()
-               } 
-            }).collect::<Vec<PerFrame>>()
+    pub fn new(device: Arc<Device>, swapchain: Swapchain) -> Result<Self, Error> {
+        Ok(FrameManager {
+            per_frame: (0..Self::FRAMES_IN_FLIGHT).into_iter().map(|_| -> Result<PerFrame, Error> {
+               Ok(PerFrame {
+                   fence: Arc::new(Fence::new(device.clone(), true)?),
+                   image_ready: Semaphore::new(device.clone())?,
+                   gpu_finished: Semaphore::new(device.clone())?
+               })
+            }).collect::<Result<Vec<PerFrame>, Error>>()?
             .try_into()
-            .unwrap(),
+            .map_err(|_| Error::Uncategorized("Conversion to slice failed"))?,
             per_image: swapchain.images.iter().map(|_| PerImage { fence: None } ).collect(),
             current_frame: 0,
             current_image: 0,
             swapchain
-        }
+        })
     }
 
-    fn acquire_image(&self) -> u32 {
-        let ext_functions = self.swapchain.ext_functions.as_ref().unwrap();
+    fn acquire_image(&self) -> Result<u32, Error> {
+        let functions = &self.swapchain.functions;
         let frame = &self.per_frame[self.current_frame as usize];
-        frame.fence.wait().expect("Device lost");
+        frame.fence.wait()?;
         let result = unsafe {
-            ext_functions.acquire_next_image(
+            functions.acquire_next_image(
                 self.swapchain.handle,
                 u64::MAX,
                 frame.image_ready.handle,
@@ -42,21 +95,21 @@ impl FrameManager {
             )
         };
 
-        match result {
+        Ok(match result {
             Ok((index, true)) => { /* No resize required */ index },
             Ok((index, false)) => { /* Resize required (vk::Result::SUBOPTIMAL_KHR) */ /*unimplemented!()*/ index },
             Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => { /* Resize required */  unimplemented!() },
             Err(_) => { /* Some other error occurred */ panic!("Error acquiring image") }
-        }
+        })
     }
 
     /// This function must be called at the beginning of each frame.
     /// It will return an [`InFlightContext`] object which holds all the information for this current frame.
     /// You can only start doing command recording once the resulting future is awaited.
-    pub async fn new_frame(&mut self) -> InFlightContext {
+    pub async fn new_frame(&mut self) -> Result<InFlightContext, Error> {
         // Increment frame index. We do this here since this is the only mutable function in the frame loop.
         self.current_frame = (self.current_frame + 1) % self.per_frame.len() as u32;
-        self.current_image = self.acquire_image();
+        self.current_image = self.acquire_image()?;
 
         // Wait until this image is absolutely not in use anymore.
         let per_image = &mut self.per_image[self.current_image as usize];
@@ -68,7 +121,7 @@ impl FrameManager {
 
         // TODO: handle resizing here.
 
-        InFlightContext {}
+        Ok(InFlightContext {})
     }
 
     pub fn submit(&self, queue: &Queue) -> VkResult<()> {
@@ -92,8 +145,8 @@ impl FrameManager {
 
     pub fn present(&self, queue: &Queue) -> VkResult<()> {
         let per_frame = &self.per_frame[self.current_frame as usize];
-        let ext_functions = self.swapchain.ext_functions.as_ref().unwrap();
-        unsafe { ext_functions.queue_present(queue.handle,
+        let functions = &self.swapchain.functions;
+        unsafe { functions.queue_present(queue.handle(),
                      &vk::PresentInfoKHR::builder()
                          .swapchains(std::slice::from_ref(&self.swapchain.handle))
                          .wait_semaphores(std::slice::from_ref(&per_frame.gpu_finished.handle))

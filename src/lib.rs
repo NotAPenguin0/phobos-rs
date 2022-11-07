@@ -4,32 +4,35 @@ extern crate core;
 extern crate derivative;
 
 mod util;
-mod init;
 mod window;
 mod image;
 mod frame;
 mod sync;
 mod queue;
+mod error;
+mod instance;
+mod debug;
+mod surface;
+mod physical_device;
+mod device;
+mod execution_manager;
+mod swapchain;
 
-use std::ops::Deref;
-use std::sync::Arc;
-use ash::{vk, Entry};
-use ash::extensions::ext::DebugUtils;
+use ash::vk;
 use window::WindowInterface;
 
 pub use crate::image::*;
 pub use crate::frame::*;
 pub use crate::sync::*;
-
-/// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
-/// e.g. graphics queue and transfer could point to the same hardware queue.
-#[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
-pub enum QueueType {
-    #[default]
-    Graphics = vk::QueueFlags::GRAPHICS.as_raw() as isize,
-    Compute = vk::QueueFlags::COMPUTE.as_raw() as isize,
-    Transfer = vk::QueueFlags::TRANSFER.as_raw() as isize
-}
+pub use crate::error::*;
+pub use crate::instance::*;
+pub use crate::debug::*;
+pub use crate::surface::*;
+pub use crate::physical_device::*;
+pub use crate::queue::*;
+pub use crate::device::*;
+pub use crate::execution_manager::*;
+pub use crate::swapchain::*;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]
@@ -82,305 +85,4 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
     pub present_mode: Option<vk::PresentModeKHR>,
     /// Minimum requirements the selected physical device should have.
     pub gpu_requirements: GPURequirements,
-}
-
-/// Contains all information about a [`VkSurfaceKHR`](vk::SurfaceKHR)
-#[derive(Default, Derivative)]
-#[derivative(Debug)]
-pub struct Surface {
-    /// Handle to the [`VkSurfaceKHR`](vk::SurfaceKHR)
-    pub handle: vk::SurfaceKHR,
-    /// [`VkSurfaceCapabilitiesKHR`](vk::SurfaceCapabilitiesKHR) structure storing information about surface capabilities.
-    pub capabilities: vk::SurfaceCapabilitiesKHR,
-    /// List of [`VkSurfaceFormatKHR`](vk::SurfaceFormatKHR) with all formats this surface supports.
-    pub formats: Vec<vk::SurfaceFormatKHR>,
-    /// List of [`VkPresentModeKHR`](vk::PresentModeKHR) with all present modes this surface supports.
-    pub present_modes: Vec<vk::PresentModeKHR>,
-    /// Vulkan extension functions for surface handling.
-    #[derivative(Debug="ignore")]
-    pub ext_functions: Option<ash::extensions::khr::Surface>,
-}
-
-/// Stores all information of a queue that was found on the physical device.
-#[derive(Default, Debug, Copy, Clone)]
-pub struct QueueInfo {
-    /// Functionality that this queue provides.
-    pub queue_type: QueueType,
-    /// Whether this is a dedicated queue or not.
-    pub dedicated: bool,
-    /// Whether this queue is capable of presenting to a surface.
-    pub can_present: bool,
-    /// The queue family index.
-    pub family_index: u32,
-}
-
-/// Stores queried properties of a Vulkan extension.
-#[derive(Debug, Default)]
-pub struct ExtensionProperties {
-    /// Name of the extension.
-    pub name: String,
-    /// Specification version of the extension.
-    pub spec_version: u32,
-}
-
-/// A physical device abstracts away an actual device, like a graphics card or integrated graphics card.
-#[derive(Default, Debug)]
-pub struct PhysicalDevice {
-    /// Handle to the [`VkPhysicalDevice`](vk::PhysicalDevice).
-    pub handle: vk::PhysicalDevice,
-    /// [`VkPhysicalDeviceProperties`](vk::PhysicalDeviceProperties) structure with properties of this physical device.
-    pub properties: vk::PhysicalDeviceProperties,
-    /// [`VkPhysicalDeviceMemoryProperties`](vk::PhysicalDeviceMemoryProperties) structure with memory properties of the physical device, such as
-    /// available memory types and heaps.
-    pub memory_properties: vk::PhysicalDeviceMemoryProperties,
-    /// Available Vulkan extensions.
-    pub extension_properties: Vec<ExtensionProperties>,
-    /// List of [`VkQueueFamilyProperties`](vk::QueueFamilyProperties) with properties of each queue family on the device.
-    pub queue_families: Vec<vk::QueueFamilyProperties>,
-    /// List of [`QueueInfo`]  with requested queues abstracted away from the physical queues.
-    pub queues: Vec<QueueInfo>
-}
-
-/// A swapchain is an abstraction of a presentation system. It handles buffering, VSync, and acquiring images
-/// to render and present frames to.
-#[derive(Default, Derivative)]
-#[derivative(Debug)]
-pub struct Swapchain {
-    /// Handle to the [`VkSwapchainKHR`](vk::SwapchainKHR) object.
-    pub handle: vk::SwapchainKHR,
-    /// Swapchain image format.
-    pub format: vk::SurfaceFormatKHR,
-    /// Present mode. The only mode that is required by the spec to always be supported is `FIFO`.
-    pub present_mode: vk::PresentModeKHR,
-    /// Size of the swapchain images. This is effectively the window render area.
-    pub extent: vk::Extent2D,
-    /// Swapchain images to present to.
-    pub images: Vec<ImageView>,
-    /// Vulkan extension functions operating on the swapchain.
-    #[derivative(Debug="ignore")]
-    pub ext_functions: Option<ash::extensions::khr::Swapchain>,
-}
-
-/// Exposes a logical command queue on the device.
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub struct Queue {
-    #[derivative(Debug="ignore")]
-    device: Arc<Device>,
-    /// Raw [`VkQueue`](vk::Queue) handle.
-    handle: vk::Queue,
-    /// Information about this queue, such as supported operations, family index, etc. See also [`QueueInfo`]
-    info: QueueInfo,
-}
-
-/// Stores function pointers for extension functions.
-#[derive(Default)]
-pub struct FuncPointers {
-    /// Function pointers for the VK_DEBUG_UTILS_EXT extension
-    pub debug_utils: Option<DebugUtils>,
-    /// Function pointers for the VK_SURFACE_KHR extension
-    pub surface: Option<ash::extensions::khr::Surface>,
-    /// Function pointers for the VK_SWAPCHAIN_KHR extension
-    pub swapchain: Option<ash::extensions::khr::Swapchain>,
-}
-
-/// Information stored for each in-flight frame.
-#[derive(Debug)]
-struct PerFrame {
-    pub fence: Arc<Fence>,
-    /// Signaled by the GPU when a swapchain image is ready.
-    pub image_ready: Semaphore,
-    /// Signaled by the GPU when all commands for a frame have been processed.
-    /// We wait on this before presenting.
-    pub gpu_finished: Semaphore,
-}
-
-/// Information stored for each swapchain image.
-#[derive(Debug)]
-struct PerImage {
-    /// Fence of the current frame.
-    pub fence: Option<Arc<Fence>>,
-}
-
-/// Struct that stores the context of a single in-flight frame.
-/// You can obtain an instance of this from calling [`FrameManager::new_frame()`].
-/// All operations specific to a frame require an instance.
-/// <br>
-/// <br>
-/// # Example
-/// ```rs
-/// let ctx = ph::create_context(/*...*/);
-/// while running {
-///     // obtain a Future<InFlightContext>, assumes windowed context was created.
-///     let frame_manager = ctx.frame.as_ref().unwrap();
-///     let ifc = frame_manager.new_frame();
-///     // possibly do some work that does not yet require a frame context.
-///     // ...
-///     // wait for our resulting frame context now that we really need it.
-///     let ifc = futures::executor::block_on(ifc);
-/// }
-/// ```
-#[derive(Debug)]
-pub struct InFlightContext {
-
-}
-
-/// Responsible for presentation, frame-frame synchronization and per-frame resources.
-#[derive(Debug)]
-pub struct FrameManager {
-    per_frame: [PerFrame; FrameManager::FRAMES_IN_FLIGHT],
-    per_image: Vec<PerImage>,
-    current_frame: u32,
-    current_image: u32,
-    swapchain: Swapchain,
-}
-
-/// Vulkan instance (to properly implement Drop)
-pub struct Instance(ash::Instance);
-
-/// Newtype struct to implement Drop for the VkDevice.
-pub struct Device(ash::Device);
-
-/// Newtype struct to implement Drop.
-pub struct DebugUtilsMessengerEXT(vk::DebugUtilsMessengerEXT, DebugUtils);
-
-/// Main phobos context. This stores all global Vulkan state. Interaction with the device all happens through this
-/// struct.
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub struct Context {
-    /// Implements frame functionality, presentation and synchronization.
-    pub frame: Option<FrameManager>,
-    /// Surface information and handle. None if `AppSettings::create_headless` was `true` on initialization.
-    surface: Option<Surface>,
-    /// Logical device command queues. Used for command buffer submission.
-    queues: Vec<Queue>,
-    /// Logical device. This will be what is used for most Vulkan calls.
-    #[derivative(Debug="ignore")]
-    device: Arc<Device>,
-    /// Physical device handle and properties.
-    physical_device: PhysicalDevice,
-    /// handle to the [`VkDebugUtilsMessengerEXT`](vk::DebugUtilsMessengerEXT) object. None if `AppSettings::enable_validation` was `false` on initialization.
-    #[derivative(Debug="ignore")]
-    debug_messenger: Option<DebugUtilsMessengerEXT>,
-    /// Extension function pointers.
-    #[derivative(Debug="ignore")]
-    funcs: FuncPointers,
-    /// Vulkan instance
-    #[derivative(Debug="ignore")]
-    instance: Instance,
-    /// Entry point for Vulkan functions.
-    #[derivative(Debug="ignore")]
-    vk_entry: Entry,
-}
-
-impl Context {
-    pub fn new<Window>(settings: AppSettings<Window>) -> Option<Context> where Window: WindowInterface {
-        let entry = unsafe { Entry::load().unwrap() };
-        let instance = init::create_vk_instance(&entry, &settings).unwrap();
-        let mut funcs = FuncPointers {
-            debug_utils: Some(DebugUtils::new(&entry, &instance)),
-            surface: settings.window.map(|_| ash::extensions::khr::Surface::new(&entry, &instance)),
-            ..Default::default()
-        };
-
-        let debug_messenger = settings.enable_validation.then(|| init::create_debug_messenger(&funcs));
-        let mut surface = settings.window.map(|_| init::create_surface(&settings, &entry, &instance));
-        let physical_device = init::select_physical_device(&settings, &surface, &funcs, &instance);
-        if let Some(surface) = surface.as_mut() {
-            init::fill_surface_details(surface, &physical_device, &funcs);
-        }
-
-        let device = Arc::from(init::create_device(&settings, &physical_device, &instance));
-        // After creating the device we can load the VK_SWAPCHAIN_KHR extension
-        funcs.swapchain = settings.window.map(|_| ash::extensions::khr::Swapchain::new(&instance, device.as_ref()));
-        let queues = init::get_queues(&physical_device, device.clone());
-
-        let frame_manager = settings.window.map(|_| {
-            let surface = surface.as_ref().unwrap();
-            let funcs = &funcs;
-            let swapchain = settings.window.map(|_| init::create_swapchain(device.clone(), &settings, surface, funcs)).unwrap();
-            FrameManager::new(device.clone(), swapchain)
-        });
-
-        Some(Context {
-            frame: frame_manager,
-            surface,
-            queues,
-            device,
-            physical_device,
-            debug_messenger,
-            funcs,
-            instance,
-            vk_entry: entry,
-        })
-    }
-
-    /// Wait until the GPU is idle. You should generally not call this, and instead use the synchronization systems phobos exposes.
-    pub fn wait_idle(&self) {
-        unsafe { self.device.device_wait_idle().unwrap(); }
-    }
-
-    /// Get a queue to submit commands to. This API is subject to change in the future with the planned execution domains
-    /// feature.
-    pub fn get_queue(&self, queue_type: QueueType) -> Option<&Queue> {
-        self.queues.iter().find(|queue| queue.info.queue_type == queue_type)
-    }
-
-    /// Get a present-capable queue.
-    pub fn get_present_queue(&self) -> Option<&Queue> {
-        self.queues.iter().find(|queue| queue.info.can_present)
-    }
-}
-
-impl Drop for Context {
-    fn drop(&mut self) {
-        self.wait_idle();
-    }
-}
-
-impl Drop for Swapchain {
-    fn drop(&mut self) {
-        unsafe { self.ext_functions.as_ref().unwrap().destroy_swapchain(self.handle, None); }
-    }
-}
-
-impl Drop for Surface {
-    fn drop(&mut self) {
-         unsafe { self.ext_functions.as_ref().unwrap().destroy_surface(self.handle, None); }
-    }
-}
-
-impl Drop for DebugUtilsMessengerEXT {
-    fn drop(&mut self) {
-        unsafe { self.1.destroy_debug_utils_messenger(self.0, None); }
-    }
-}
-
-impl Deref for Instance {
-    type Target = ash::Instance;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Drop for Instance {
-    fn drop(&mut self) {
-        unsafe { self.destroy_instance(None); }
-    }
-}
-
-impl Deref for Device {
-    type Target = ash::Device;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Drop for Device {
-    fn drop(&mut self) {
-        unsafe { self.destroy_device(None); }
-    }
 }
