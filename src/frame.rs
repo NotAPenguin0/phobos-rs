@@ -54,6 +54,8 @@ impl FrameManager {
     /// It will return an [`InFlightContext`] object which holds all the information for this current frame.
     /// You can only start doing command recording once the resulting future is awaited.
     pub async fn new_frame(&mut self) -> InFlightContext {
+        // Increment frame index. We do this here since this is the only mutable function in the frame loop.
+        self.current_frame = (self.current_frame + 1) % self.per_frame.len() as u32;
         self.current_image = self.acquire_image();
 
         // Wait until this image is absolutely not in use anymore.
