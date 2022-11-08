@@ -47,7 +47,20 @@ pub trait IncompleteCmdBuffer {
 /// This struct represents an incomplete command buffer.
 /// This is a command buffer that has not been called [`IncompleteCommandBuffer::finish()`] on yet.
 /// Calling this method will turn it into an immutable command buffer which can then be submitted
-/// to the queue it was allocated from.
+/// to the queue it was allocated from. See also [`ExecutionManager`].
+///
+/// # Example
+/// ```
+/// use phobos::{domain, ExecutionManager};
+///
+/// let exec = ExecutionManager::new(device.clone(), &physical_device);
+/// let cmd = exec.on_domain::<domain::All>()?
+///               // record commands to this command buffer
+///               // ...
+///               // convert into a complete command buffer by calling finish().
+///               // This allows the command buffer to be submitted.
+///               .finish();
+/// ```
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct IncompleteCommandBuffer<D: ExecutionDomain> {
