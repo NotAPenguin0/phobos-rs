@@ -1,4 +1,3 @@
-use std::mem::swap;
 use ash::vk::PresentModeKHR;
 use phobos as ph;
 
@@ -11,7 +10,7 @@ use winit::window::{WindowBuilder};
 use futures::executor::block_on;
 
 #[test]
-fn main() {
+fn main() -> Result<(), ph::Error> {
     let event_loop = EventLoopBuilder::new().with_any_thread(true).build();
     let window = WindowBuilder::new()
         .with_title("Phobos test app")
@@ -41,27 +40,38 @@ fn main() {
         }
     };
 
-    let instance = ph::VkInstance::new(&settings).unwrap();
-    let debug_messenger = ph::DebugMessenger::new(&instance).unwrap();
+    let instance = ph::VkInstance::new(&settings)?;
+    let _debug_messenger = ph::DebugMessenger::new(&instance)?;
     let (surface, physical_device) = {
-        let mut surface = ph::Surface::new(&instance, &settings).unwrap();
-        let physical_device = ph::PhysicalDevice::select(&instance, Some(&surface), &settings).unwrap();
-        surface.query_details(&physical_device).unwrap();
+        let mut surface = ph::Surface::new(&instance, &settings)?;
+        let physical_device = ph::PhysicalDevice::select(&instance, Some(&surface), &settings)?;
+        surface.query_details(&physical_device)?;
         (surface, physical_device)
     };
-    let device = ph::Device::new(&instance, &physical_device, &settings).unwrap();
-    let exec = ph::ExecutionManager::new(device.clone(), &physical_device).unwrap();
-    let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface).unwrap();
-    let frame = ph::FrameManager::new(device.clone(), swapchain).unwrap();
+    let device = ph::Device::new(&instance, &physical_device, &settings)?;
+    let exec = ph::ExecutionManager::new(device.clone(), &physical_device)?;
+    let mut frame = {
+        let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
+         ph::FrameManager::new(device.clone(), swapchain)?
+    };
 
     event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Wait;
-            match event {
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    window_id
-                } if window_id == window.id() => *control_flow = ControlFlow::Exit,
-                _ => (),
-            }
+        *control_flow = ControlFlow::Wait;
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                window_id
+            } if window_id == window.id() => *control_flow = ControlFlow::Exit,
+            _ => (),
+        }
+
+        // Acquire new frame
+        let ifc = block_on(frame.new_frame()).unwrap();
+        // Do some work for this frame (nothing yet)
+
+        // Submit this frame's commands
+
+        // Present
+        frame.present(&exec).unwrap();
     });
 }

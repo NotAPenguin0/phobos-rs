@@ -1,6 +1,5 @@
 use std::sync::Arc;
-use ash::prelude::VkResult;
-use crate::{Device, Swapchain, Queue, Error};
+use crate::{Device, Swapchain, Queue, Error, ExecutionManager};
 use crate::sync::*;
 use ash::vk;
 
@@ -29,11 +28,9 @@ struct PerImage {
 /// <br>
 /// <br>
 /// # Example
-/// ```rs
-/// let ctx = ph::create_context(/*...*/);
+/// ```
 /// while running {
 ///     // obtain a Future<InFlightContext>, assumes windowed context was created.
-///     let frame_manager = ctx.frame.as_ref().unwrap();
 ///     let ifc = frame_manager.new_frame();
 ///     // possibly do some work that does not yet require a frame context.
 ///     // ...
@@ -124,10 +121,16 @@ impl FrameManager {
         Ok(InFlightContext {})
     }
 
-    pub fn submit(&self, queue: &Queue) -> VkResult<()> {
+    /// Submit this frame's commands to be processed. Note that this is the only way a frame's commands
+    /// should ever be submitted to a queue. Any other ways to submit should be synchronized properly to this
+    /// submission. The reason for this is that [`FrameManager::present`] waits on a semaphore this function's submission
+    /// will signal. Any commands submitted from somewhere else must be synchronized to this submission.
+    /// Note: it's possible this will be enforced through the type system later.
+    /// TODO: examine possibilities for this.
+    pub fn submit(&self, queue: &Queue) -> Result<(), Error> {
         // Reset frame fence
         let per_frame = &self.per_frame[self.current_frame as usize];
-        per_frame.fence.reset().expect("Device lost");
+        per_frame.fence.reset()?;
 
         let semaphores: Vec<vk::Semaphore> = vec![&per_frame.image_ready]
             .iter()
@@ -140,18 +143,24 @@ impl FrameManager {
             .wait_semaphores(semaphores.as_slice())
             .wait_dst_stage_mask(stages.as_slice())
             .build();
-        unsafe { queue.submit(std::slice::from_ref(&submit), &per_frame.fence) }
+        unsafe { Ok(queue.submit(std::slice::from_ref(&submit), &per_frame.fence)?) }
     }
 
-    pub fn present(&self, queue: &Queue) -> VkResult<()> {
+    /// Present a frame to the swapchain. This is the same as calling
+    /// `glfwSwapBuffers()` in OpenGL code.
+    pub fn present(&self, exec: &ExecutionManager) -> Result<(), Error> {
         let per_frame = &self.per_frame[self.current_frame as usize];
         let functions = &self.swapchain.functions;
-        unsafe { functions.queue_present(queue.handle(),
-                     &vk::PresentInfoKHR::builder()
-                         .swapchains(std::slice::from_ref(&self.swapchain.handle))
-                         .wait_semaphores(std::slice::from_ref(&per_frame.gpu_finished.handle))
-                         .image_indices(std::slice::from_ref(&self.current_image)))
-            .map(|_| ())
-        }
+        let queue = exec.get_present_queue();
+        if let Some(queue) = queue {
+            unsafe {
+                Ok(functions.queue_present(queue.handle(),
+                                        &vk::PresentInfoKHR::builder()
+                                            .swapchains(std::slice::from_ref(&self.swapchain.handle))
+                                            .wait_semaphores(std::slice::from_ref(&per_frame.gpu_finished.handle))
+                                            .image_indices(std::slice::from_ref(&self.current_image)))
+                    .map(|_| ())?)
+            }
+        } else { Err(Error::NoPresentQueue) }
     }
 }

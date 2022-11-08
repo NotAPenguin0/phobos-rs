@@ -3,6 +3,7 @@ use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandl
 #[cfg(feature = "winit")]
 use winit;
 
+/// Trait for windows that exposes the content width and height of a window.
 pub trait WindowSize {
     fn width(&self) -> u32;
     fn height(&self) -> u32;
@@ -47,5 +48,6 @@ impl WindowSize for winit::window::Window {
 /// Parent trait combining all requirements for a window interface. To be a window interface, a type T must implement the following traits:
 /// - [`HasRawWindowHandle`](raw_window_handle::HasRawWindowHandle)
 /// - [`HasRawDisplayHandle`](raw_window_handle::HasRawDisplayHandle)
+/// - [`WindowSize`]
 pub trait WindowInterface: HasRawWindowHandle + HasRawDisplayHandle + WindowSize {}
 impl<T: HasRawWindowHandle + HasRawDisplayHandle + WindowSize> WindowInterface for T {}

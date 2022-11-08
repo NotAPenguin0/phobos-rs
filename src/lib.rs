@@ -1,22 +1,95 @@
+//! Fast, powerful Vulkan abstraction library
+//!
+//! Phobos provides powerful Vulkan abstractions to automatically manage common issues like
+//! synchronization and resource management. It hides away a lot of boilerplate that comes with
+//! Vulkan, while still being highly flexible.
+//! <br>
+//! <br>
+//! # Example
+//!
+//! For illustrative purposes, we will use winit here. Any windowing library can be supported by implementing a few trait objects
+//! necessary to satisfy the [`window::WindowInterface`] trait.
+//! ```
+//! let event_loop = EventLoopBuilder::new().with_any_thread(true).build();
+//! let window = WindowBuilder::new()
+//!     .with_title("Phobos test app")
+//!     .build(&event_loop)
+//!     .unwrap();
+//! ```
+//! First, we will define an [`AppSettings`] structure that outlines requirements
+//! and information about our application. Phobos will use this to
+//! pick a suitable GPU to run your program on and initialize Vulkan for it.
+//! ```
+//! use phobos as ph;
+//!
+//! let settings = ph::AppSettings {
+//!     version: (1, 0, 0),
+//!     name: String::from("Phobos sample app"),
+//!     enable_validation: true,
+//!     window: Some(&window),
+//!     surface_format: None, // Use default fallback format.
+//!     present_mode: Some(PresentModeKHR::MAILBOX), // No vsync, double buffered
+//!     gpu_requirements: ph::GPURequirements {
+//!         dedicated: true,
+//!         min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.
+//!         min_dedicated_video_memory: 1 * 1024 * 1024 * 1024,
+//!         queues: vec![
+//!             // We request one of each queue, and prefer dedicated Transfer and Compute queues.
+//!             ph::QueueRequest { dedicated: false, queue_type: ph::QueueType::Graphics },
+//!             ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Transfer },
+//!             ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Compute }
+//!         ],
+//!         // For this example we won't request any extensions or extra Vulkan features.
+//!         ..Default::default()
+//!     }
+//! };
+//! ```
+//! Now we are ready to initialize the Phobos library.
+//! ```
+//! // Create Vulkan instance. This step is required.
+//! let instance = ph::VkInstance::new(&settings).unwrap();
+//! // Create a debug messenger object. This is not required, and only useful
+//! // validation layers are enabled.
+//! let debug_messenger = ph::DebugMessenger::new(&instance).unwrap();
+//! let (surface, physical_device) = {
+//!     // Create surface to render to. Not required for a compute-only context.
+//!     let mut surface = Surface::new(&instance, &settings).unwrap();
+//!     // Select a physical device based on gpu requirements we passed earlier.
+//!     let physical_device = ph::PhysicalDevice::select(&settings, Some(&surface), &settings).unwrap();
+//!     surface.query_details(&physical_device).unwrap();
+//!     (surface, physical_device)
+//! };
+//! // Create Vulkan device. This is our main interface with the Vulkan API.
+//! let device: Arc<ph::Device> = ph::Device::new(&instance, &physical_device, &settings).unwrap();
+//! // Create execution manager, needed to execute commands.
+//! let exec = ph::ExecutionManager::new(device.clone(), &physical_device).unwrap();
+//! // Create swapchain and frame manager.
+//! let mut frame = {
+//!     let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface).unwrap();
+//!     ph::FrameManager::new(device.clone(), swapchain).unwrap()
+//! };
+//! ```
+
 extern crate core;
 
 #[macro_use]
 extern crate derivative;
 
 mod util;
-mod window;
-mod image;
-mod frame;
-mod sync;
-mod queue;
-mod error;
-mod instance;
-mod debug;
-mod surface;
-mod physical_device;
-mod device;
-mod execution_manager;
-mod swapchain;
+pub mod window;
+pub mod image;
+pub mod frame;
+pub mod sync;
+pub mod queue;
+pub mod error;
+pub mod instance;
+pub mod debug;
+pub mod surface;
+pub mod physical_device;
+pub mod device;
+pub mod execution_manager;
+pub mod swapchain;
+pub mod command_buffer;
 
 use ash::vk;
 use window::WindowInterface;
@@ -33,6 +106,8 @@ pub use crate::queue::*;
 pub use crate::device::*;
 pub use crate::execution_manager::*;
 pub use crate::swapchain::*;
+pub use crate::window::*;
+pub use crate::command_buffer::*;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]

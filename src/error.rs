@@ -15,6 +15,8 @@ pub enum Error {
     NoGPU,
     /// No supported surface formats found.
     NoSurfaceFormat,
+    /// No queue was found that supports presentation.
+    NoPresentQueue,
     /// Uncategorized error.
     Uncategorized(&'static str),
 }
