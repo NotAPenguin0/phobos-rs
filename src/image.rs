@@ -86,6 +86,17 @@ pub struct ImageView {
     pub info: ImageViewInfo,
 }
 
+impl ImageViewInfo {
+    pub fn subresource_range(&self) -> vk::ImageSubresourceRange {
+        vk::ImageSubresourceRange {
+            aspect_mask: self.aspect,
+            base_mip_level: self.base_level,
+            level_count: self.level_count,
+            base_array_layer: self.base_layer,
+            layer_count: self.layer_count
+        }
+    }
+}
 
 impl Image {
     /// Construct a trivial [`ImgView`] from this [`Image`]. This is an image view that views the
@@ -142,7 +153,7 @@ impl Drop for Image {
 
 impl ImgView {
     /// Construct a non-owning [`ImgView`] from an [`ImageView`] object.
-    pub fn from_owned(view: ImageView) -> Self {
+    pub fn from_owned(view: &ImageView) -> Self {
         ImgView {
             device: view.device.clone(),
             handle: view.view,

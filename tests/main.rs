@@ -1,4 +1,5 @@
 use ash::vk::PresentModeKHR;
+use ash::vk;
 use phobos as ph;
 
 use winit;
@@ -8,7 +9,7 @@ use winit::platform::windows::EventLoopBuilderExtWindows;
 use winit::window::{WindowBuilder};
 
 use futures::executor::block_on;
-use phobos::{GraphicsCmdBuffer, IncompleteCmdBuffer};
+use phobos::{IncompleteCmdBuffer};
 
 #[test]
 fn main() -> Result<(), ph::Error> {
@@ -62,17 +63,22 @@ fn main() -> Result<(), ph::Error> {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 window_id
-            } if window_id == window.id() => *control_flow = ControlFlow::Exit,
+            } if window_id == window.id() => {
+                *control_flow = ControlFlow::Exit;
+                device.wait_idle().unwrap();
+            },
             _ => (),
         }
 
         // Acquire new frame
         let ifc = block_on(frame.new_frame(&exec)).unwrap();
         // Do some work for this frame
+        let swapchain = unsafe { frame.get_swapchain_image(&ifc).unwrap() };
         let commands =
             exec.on_domain::<ph::domain::Graphics>().unwrap()
-            // doesn't do anything yet, just a sample function
-            .draw()
+            .transition_image(&swapchain, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
+            vk::AccessFlags::empty(), vk::AccessFlags::empty())
             .finish()
             .unwrap();
         // Submit this frame's commands

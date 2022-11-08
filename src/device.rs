@@ -49,6 +49,12 @@ impl Device {
 
         Ok(Arc::new(unsafe { Device { handle: instance.instance.create_device(physical_device.handle, &info, None)? } }))
     }
+
+    /// Wait for the device to be completely idle.
+    /// This should not be used as a synchronization measure, except on exit.
+    pub fn wait_idle(&self) -> Result<(), Error> {
+        unsafe { Ok(self.device_wait_idle()?) }
+    }
 }
 
 impl Deref for Device {

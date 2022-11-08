@@ -4,7 +4,7 @@ use crate::execution_manager::domain::*;
 use crate::execution_manager::domain;
 
 use ash::vk;
-use crate::{Device, Error, ExecutionManager};
+use crate::{Device, Error, ExecutionManager, ImageView};
 
 /// Trait representing a command buffer that supports graphics commands.
 pub trait GraphicsCmdBuffer {
@@ -100,6 +100,41 @@ impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
     unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<(), Error> {
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         queue.free_command_buffer::<CommandBuffer<D>>(self.handle)
+    }
+}
+
+// Provides implementations for commands that work on all domains,
+// and other helper functions
+impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
+    /// Transitions an image layout.
+    /// Generally you will not need to call this function manually,
+    /// using the render graph api you can do most transitions automatically.
+    pub fn transition_image(self, image: &ImageView, src_stage: vk::PipelineStageFlags, dst_stage: vk::PipelineStageFlags,
+                            from: vk::ImageLayout, to: vk::ImageLayout,
+                            src_access: vk::AccessFlags, dst_access: vk::AccessFlags) -> Self {
+        let barrier = vk::ImageMemoryBarrier::builder()
+            .image(image.image.handle)
+            .subresource_range(image.info.subresource_range())
+            .src_access_mask(src_access)
+            .dst_access_mask(dst_access)
+            .old_layout(from)
+            .new_layout(to)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .build();
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                self.handle,
+                src_stage,
+                dst_stage,
+                vk::DependencyFlags::BY_REGION,
+                &[],
+                &[],
+                std::slice::from_ref(&barrier)
+            );
+        }
+
+        self
     }
 }
 

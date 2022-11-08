@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, CmdBuffer};
+use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, CmdBuffer, ImageView};
 use crate::sync::*;
 use ash::vk;
 use crate::domain::ExecutionDomain;
@@ -187,5 +187,11 @@ impl FrameManager {
                     .map(|_| ())?)
             }
         } else { Err(Error::NoPresentQueue) }
+    }
+
+    /// Get a reference to the current swapchain image.
+    /// This reference is valid as long as the swapchain is not resized.
+    pub unsafe fn get_swapchain_image(&self, _ifc: &InFlightContext) -> Result<&ImageView, Error> {
+        Ok(&self.swapchain.images[self.current_image as usize])
     }
 }

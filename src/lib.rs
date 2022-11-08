@@ -77,6 +77,7 @@ extern crate derivative;
 
 mod util;
 mod command_pool;
+mod render_pass;
 pub mod window;
 pub mod image;
 pub mod frame;
