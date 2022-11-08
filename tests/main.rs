@@ -73,7 +73,8 @@ fn main() -> Result<(), ph::Error> {
             exec.on_domain::<ph::domain::Graphics>().unwrap()
             // doesn't do anything yet, just a sample function
             .draw()
-            .finish();
+            .finish()
+            .unwrap();
         // Submit this frame's commands
         frame.submit(commands, &exec).unwrap();
         // Present

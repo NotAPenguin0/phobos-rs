@@ -73,8 +73,9 @@ impl PhysicalDevice {
                                 Some(QueueInfo {
                                     queue_type: request.queue_type,
                                     dedicated,
+                                    can_present: false,
                                     family_index: index as u32,
-                                    ..Default::default()
+                                    flags: physical_device.queue_families[index].queue_flags,
                                 })
                             } else {
                                 None

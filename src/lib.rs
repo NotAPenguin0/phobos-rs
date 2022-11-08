@@ -76,6 +76,7 @@ extern crate core;
 extern crate derivative;
 
 mod util;
+mod command_pool;
 pub mod window;
 pub mod image;
 pub mod frame;

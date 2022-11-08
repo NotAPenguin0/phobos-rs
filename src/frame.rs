@@ -129,7 +129,7 @@ impl FrameManager {
     /// will signal. Any commands submitted from somewhere else must be synchronized to this submission.
     /// Note: it's possible this will be enforced through the type system later.
     /// TODO: examine possibilities for this.
-    pub fn submit<D: ExecutionDomain>(&self, _cmd: CommandBuffer<D>, exec: &ExecutionManager) -> Result<(), Error> {
+    pub fn submit<D: ExecutionDomain>(&self, cmd: CommandBuffer<D>, exec: &ExecutionManager) -> Result<(), Error> {
         // Reset frame fence
         let per_frame = &self.per_frame[self.current_frame as usize];
         per_frame.fence.reset()?;
@@ -142,17 +142,14 @@ impl FrameManager {
 
         let submit = vk::SubmitInfo::builder()
             .signal_semaphores(std::slice::from_ref(&per_frame.gpu_finished.handle))
+            .command_buffers(std::slice::from_ref(&cmd.handle))
             .wait_semaphores(semaphores.as_slice())
             .wait_dst_stage_mask(stages.as_slice())
             .build();
 
         // Use the command buffer's domain to determine the correct queue to use.
-        let queue_type = D::QUEUE_TYPE;
-        let queue = exec.get_queue(queue_type);
-        match queue {
-            Some(queue) => unsafe { Ok(queue.submit(std::slice::from_ref(&submit), &per_frame.fence)?) },
-            None => Err(NoCapableQueue(queue_type))
-        }
+        let queue = exec.get_queue::<D>().ok_or(NoCapableQueue)?;
+        unsafe { Ok(queue.submit(std::slice::from_ref(&submit), &per_frame.fence)?) }
     }
 
     /// Present a frame to the swapchain. This is the same as calling
