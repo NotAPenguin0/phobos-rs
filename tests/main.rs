@@ -67,7 +67,7 @@ fn main() -> Result<(), ph::Error> {
         }
 
         // Acquire new frame
-        let ifc = block_on(frame.new_frame()).unwrap();
+        let ifc = block_on(frame.new_frame(&exec)).unwrap();
         // Do some work for this frame
         let commands =
             exec.on_domain::<ph::domain::Graphics>().unwrap()

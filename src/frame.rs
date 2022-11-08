@@ -1,12 +1,13 @@
 use std::sync::Arc;
-use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer};
+use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, CmdBuffer};
 use crate::sync::*;
 use ash::vk;
 use crate::domain::ExecutionDomain;
 use crate::Error::NoCapableQueue;
 
 /// Information stored for each in-flight frame.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 struct PerFrame {
     pub fence: Arc<Fence>,
     /// Signaled by the GPU when a swapchain image is ready.
@@ -14,6 +15,10 @@ struct PerFrame {
     /// Signaled by the GPU when all commands for a frame have been processed.
     /// We wait on this before presenting.
     pub gpu_finished: Semaphore,
+    /// Command buffer that was submitted this frame.
+    /// Can be deleted once this frame's data is used again.
+    #[derivative(Debug="ignore")]
+    pub command_buffer: Option<Box<dyn CmdBuffer>>
 }
 
 /// Information stored for each swapchain image.
@@ -69,7 +74,8 @@ impl FrameManager {
                Ok(PerFrame {
                    fence: Arc::new(Fence::new(device.clone(), true)?),
                    image_ready: Semaphore::new(device.clone())?,
-                   gpu_finished: Semaphore::new(device.clone())?
+                   gpu_finished: Semaphore::new(device.clone())?,
+                   command_buffer: None
                })
             }).collect::<Result<Vec<PerFrame>, Error>>()?
             .try_into()
@@ -105,7 +111,7 @@ impl FrameManager {
     /// This function must be called at the beginning of each frame.
     /// It will return an [`InFlightContext`] object which holds all the information for this current frame.
     /// You can only start doing command recording once the resulting future is awaited.
-    pub async fn new_frame(&mut self) -> Result<InFlightContext, Error> {
+    pub async fn new_frame(&mut self, exec: &ExecutionManager) -> Result<InFlightContext, Error> {
         // Increment frame index. We do this here since this is the only mutable function in the frame loop.
         self.current_frame = (self.current_frame + 1) % self.per_frame.len() as u32;
         self.current_image = self.acquire_image()?;
@@ -116,7 +122,14 @@ impl FrameManager {
             image_fence.wait().expect("Device lost.");
         }
 
+        // Grab the fence for this frame and assign it to the image.
         per_image.fence = Some(self.per_frame[self.current_frame as usize].fence.clone());
+        let mut per_frame = &mut self.per_frame[self.current_frame as usize];
+        // Delete the command buffer used the previous time this frame was allocated.
+        if let Some(cmd) = &mut per_frame.command_buffer {
+            unsafe { cmd.delete(exec)? }
+        }
+        per_frame.command_buffer = None;
 
         // TODO: handle resizing here.
 
@@ -129,9 +142,9 @@ impl FrameManager {
     /// will signal. Any commands submitted from somewhere else must be synchronized to this submission.
     /// Note: it's possible this will be enforced through the type system later.
     /// TODO: examine possibilities for this.
-    pub fn submit<D: ExecutionDomain>(&self, cmd: CommandBuffer<D>, exec: &ExecutionManager) -> Result<(), Error> {
+    pub fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: &ExecutionManager) -> Result<(), Error> {
         // Reset frame fence
-        let per_frame = &self.per_frame[self.current_frame as usize];
+        let mut per_frame = &mut self.per_frame[self.current_frame as usize];
         per_frame.fence.reset()?;
 
         let semaphores: Vec<vk::Semaphore> = vec![&per_frame.image_ready]
@@ -140,9 +153,15 @@ impl FrameManager {
             .collect();
         let stages = vec![vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
 
+        // Grab a copy of the command buffer handle for submission.
+        // We do this because we're going to move the actual command buffer into our
+        // PerFrame structure to keep it around until we can safely delete it next frame.
+        let cmd_handle = cmd.handle.clone();
+        per_frame.command_buffer = Some(Box::new(cmd));
+
         let submit = vk::SubmitInfo::builder()
             .signal_semaphores(std::slice::from_ref(&per_frame.gpu_finished.handle))
-            .command_buffers(std::slice::from_ref(&cmd.handle))
+            .command_buffers(std::slice::from_ref(&cmd_handle))
             .wait_semaphores(semaphores.as_slice())
             .wait_dst_stage_mask(stages.as_slice())
             .build();

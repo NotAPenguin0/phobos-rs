@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use ash::vk;
-use crate::{sync, Device, Error, IncompleteCmdBuffer};
+use crate::{sync, Device, Error, IncompleteCmdBuffer, CmdBuffer};
 use crate::command_pool::*;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
@@ -80,5 +80,11 @@ impl Queue {
         }.into_iter().next().ok_or(Error::Uncategorized("Command buffer allocation failed."))?;
 
         CmdBuf::new(self.device.clone(), handle, vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
+    }
+
+    /// Instantly delete a command buffer, without taking synchronization into account.
+    /// This function **must** be externally synchronized.
+    pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(&self, cmd: vk::CommandBuffer) -> Result<(), Error> {
+        Ok(self.device.free_command_buffers(self.pool.handle, std::slice::from_ref(&cmd)))
     }
 }

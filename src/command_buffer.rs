@@ -4,7 +4,7 @@ use crate::execution_manager::domain::*;
 use crate::execution_manager::domain;
 
 use ash::vk;
-use crate::{Device, Error};
+use crate::{Device, Error, ExecutionManager};
 
 /// Trait representing a command buffer that supports graphics commands.
 pub trait GraphicsCmdBuffer {
@@ -29,7 +29,14 @@ pub struct CommandBuffer<D: ExecutionDomain> {
     _domain: PhantomData<D>,
 }
 
-// TODO: probably move this to a function inside the queue.
+/// Completed command buffer
+pub trait CmdBuffer {
+    /// Delete the command buffer immediately.
+    /// This is marked unsafe because there is no guarantee that the command buffer is not in use.
+    unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<(), Error>;
+}
+
+/// Incomplete command buffer
 pub trait IncompleteCmdBuffer {
     type Domain: ExecutionDomain;
 
@@ -86,6 +93,13 @@ impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
             handle: self.handle,
             _domain: PhantomData,
         })
+    }
+}
+
+impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
+    unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<(), Error> {
+        let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
+        queue.free_command_buffer::<CommandBuffer<D>>(self.handle)
     }
 }
 
