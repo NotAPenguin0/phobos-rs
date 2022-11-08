@@ -21,8 +21,16 @@ pub trait ComputeCmdBuffer {
 
 /// This struct represents a finished command buffer. This command buffer can't be recorded to anymore.
 /// It can only be obtained by calling finish() on an incomplete command buffer;
-pub struct CommandBuffer {
+pub struct CommandBuffer<D: ExecutionDomain> {
+    _domain: PhantomData<D>,
+}
 
+// TODO: probably move this to a function inside the queue.
+pub trait IncompleteCmdBuffer {
+    type Domain: ExecutionDomain;
+
+    fn new() -> Self;
+    fn finish(self) -> CommandBuffer<Self::Domain>;
 }
 
 /// This struct represents an incomplete command buffer.
@@ -45,9 +53,23 @@ impl TransferSupport for domain::Transfer {}
 impl TransferSupport for domain::Compute {}
 impl ComputeSupport for domain::Compute {}
 
-impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
-    pub fn finish() -> CommandBuffer {
-        todo!()
+impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
+    type Domain = D;
+
+    fn new() -> Self {
+        IncompleteCommandBuffer {
+            handle: vk::CommandBuffer::null(),
+            _domain: PhantomData
+        }
+    }
+
+    /// Finish recording a command buffer and move its contents into a finished
+    /// command buffer that can be submitted
+    fn finish(self) -> CommandBuffer<D> {
+        // TODO
+        CommandBuffer {
+            _domain: PhantomData,
+        }
     }
 }
 

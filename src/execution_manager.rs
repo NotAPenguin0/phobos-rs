@@ -10,12 +10,13 @@ pub struct ExecutionManager {
 }
 
 pub mod domain {
+    use crate::IncompleteCmdBuffer;
     use super::QueueType;
     use super::IncompleteCommandBuffer;
 
     pub trait ExecutionDomain {
         const QUEUE_TYPE: QueueType;
-        type CmdBuf;
+        type CmdBuf: IncompleteCmdBuffer;
     }
 
     pub struct Graphics;
@@ -59,7 +60,10 @@ impl ExecutionManager {
 
     /// Obtain a command buffer capable of operating on the specified domain.
     pub fn on_domain<Domain: domain::ExecutionDomain>(&self) -> Result<Domain::CmdBuf, Error> {
-        todo!()
+        let queue_type = Domain::QUEUE_TYPE;
+        // Find optimal queue for domain's queue type.
+        // TODO
+        Ok(Domain::CmdBuf::new())
     }
 
     /// Obtain a reference to a queue capable of presenting.
