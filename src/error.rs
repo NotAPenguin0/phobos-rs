@@ -1,5 +1,6 @@
 use std::ffi::NulError;
 use ash;
+use crate::QueueType;
 
 #[derive(Debug)]
 pub enum Error {
@@ -17,6 +18,8 @@ pub enum Error {
     NoSurfaceFormat,
     /// No queue was found that supports presentation.
     NoPresentQueue,
+    /// No queue was found for a specific queue type. Did you forget to request it?
+    NoCapableQueue(QueueType),
     /// Uncategorized error.
     Uncategorized(&'static str),
 }

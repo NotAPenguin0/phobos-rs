@@ -70,4 +70,9 @@ impl ExecutionManager {
     pub(crate) fn get_present_queue(&self) -> Option<&Queue> {
         self.queues.iter().find(|&queue| queue.info.can_present)
     }
+
+    /// Obtain a reference to a queue of a specific type.
+    pub(crate) fn get_queue(&self, queue_type: QueueType) -> Option<&Queue> {
+        self.queues.iter().find(|&queue| queue.info.queue_type == queue_type)
+    }
 }

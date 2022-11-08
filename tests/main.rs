@@ -8,6 +8,7 @@ use winit::platform::windows::EventLoopBuilderExtWindows;
 use winit::window::{WindowBuilder};
 
 use futures::executor::block_on;
+use phobos::{GraphicsCmdBuffer, IncompleteCmdBuffer};
 
 #[test]
 fn main() -> Result<(), ph::Error> {
@@ -67,10 +68,14 @@ fn main() -> Result<(), ph::Error> {
 
         // Acquire new frame
         let ifc = block_on(frame.new_frame()).unwrap();
-        // Do some work for this frame (nothing yet)
-
+        // Do some work for this frame
+        let commands =
+            exec.on_domain::<ph::domain::Graphics>().unwrap()
+            // doesn't do anything yet, just a sample function
+            .draw()
+            .finish();
         // Submit this frame's commands
-
+        frame.submit(commands, &exec).unwrap();
         // Present
         frame.present(&exec).unwrap();
     });

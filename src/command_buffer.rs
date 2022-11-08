@@ -6,7 +6,8 @@ use ash::vk;
 
 /// Trait representing a command buffer that supports graphics commands.
 pub trait GraphicsCmdBuffer {
-
+    // doesn't do anything yet.
+    fn draw(self) -> Self;
 }
 
 /// Trait representing a command buffer that supports transfer commands.
@@ -75,6 +76,11 @@ impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<D> {
     // Methods for graphics commands
+
+    // nothing yet
+    fn draw(self) -> Self {
+        self
+    }
 }
 
 impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteCommandBuffer<D> {
