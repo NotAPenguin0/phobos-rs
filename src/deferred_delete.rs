@@ -1,6 +1,6 @@
 #[derive(Debug)]
 struct Item<T> {
-    value: T,
+    _value: T,
     // Time to live
     ttl: u32,
 }
@@ -24,7 +24,7 @@ impl<T> DeletionQueue<T> {
     /// it is pushed.
     pub fn push(&mut self, value: T) {
         self.items.push(Item {
-            value,
+            _value: value,
             ttl: self.max_ttl
         });
     }

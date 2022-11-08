@@ -145,7 +145,7 @@ impl Image {
 
 impl Drop for Image {
     fn drop(&mut self) {
-        if self.is_owned() { ;
+        if self.is_owned() {
             unsafe { self.device.destroy_image(self.handle, None); }
         }
     }

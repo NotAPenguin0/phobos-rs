@@ -58,17 +58,10 @@ fn main() -> Result<(), ph::Error> {
     };
 
     event_loop.run(move |event, _, control_flow| {
+        // Do not render a frame if Exit control flow is specified, to avoid
+        // sync issues.
+        if *control_flow == ControlFlow::Exit { return; }
         *control_flow = ControlFlow::Wait;
-        match event {
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                window_id
-            } if window_id == window.id() => {
-                *control_flow = ControlFlow::Exit;
-                device.wait_idle().unwrap();
-            },
-            _ => (),
-        }
 
         // Acquire new frame
         let ifc = block_on(frame.new_frame(&exec, &window, &surface)).unwrap();
@@ -84,5 +77,19 @@ fn main() -> Result<(), ph::Error> {
         frame.submit(commands, &exec).unwrap();
         // Present
         frame.present(&exec).unwrap();
+
+        // Note that we want to handle events after processing our current frame, so that
+        // requesting an exit doesn't attempt to render another frame, which causes
+        // sync issues.
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                window_id
+            } if window_id == window.id() => {
+                *control_flow = ControlFlow::Exit;
+                device.wait_idle().unwrap();
+            },
+            _ => (),
+        }
     });
 }

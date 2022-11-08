@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ash = "0.37.0"
+ash = { version = "0.37.0", features = ["debug"] }
 ash-window = "0.12.0"
 raw-window-handle = "0.5.0"
 gpu-allocator = "0.20.0"
@@ -14,3 +14,7 @@ smallvec = "1.10.0"
 derivative = "2.2.0"
 futures = "0.3.25"
 winit = { version = "0.27.5", optional = true }
+
+[features]
+# Logs creation and destruction of all Vulkan objects. Useful for debugging.
+log-objects = []
