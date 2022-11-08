@@ -71,11 +71,10 @@ fn main() -> Result<(), ph::Error> {
         }
 
         // Acquire new frame
-        let ifc = block_on(frame.new_frame(&exec)).unwrap();
+        let ifc = block_on(frame.new_frame(&exec, &window, &surface)).unwrap();
         // Do some work for this frame
         let swapchain = unsafe { frame.get_swapchain_image(&ifc).unwrap() };
-        let commands =
-            exec.on_domain::<ph::domain::Graphics>().unwrap()
+        let commands = exec.on_domain::<ph::domain::Graphics>().unwrap()
             .transition_image(&swapchain, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
                 vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
             vk::AccessFlags::empty(), vk::AccessFlags::empty())

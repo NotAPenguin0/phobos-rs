@@ -7,7 +7,10 @@ use crate::util;
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
 /// Vulkan API.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Device {
+    #[derivative(Debug="ignore")]
     pub(crate) handle: ash::Device
 }
 
