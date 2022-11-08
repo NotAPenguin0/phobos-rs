@@ -91,6 +91,9 @@ impl Swapchain {
 
 impl Drop for Swapchain {
     fn drop(&mut self) {
+        // We need to manually clear this list of images *before* deleting the swapchain,
+        // otherwise, the imageview handles become invalid.
+        self.images.clear();
         unsafe { self.functions.destroy_swapchain(self.handle, None); }
     }
 }

@@ -78,10 +78,10 @@ pub struct ImgView {
 pub struct ImageView {
     #[derivative(Debug="ignore")]
     pub device: Arc<Device>,
-    /// Image owned by this [`ImageView`].
-    pub image: Image,
     /// [`ImageView`] pointing to the stored image.
     pub view: vk::ImageView,
+    /// Image owned by this [`ImageView`].
+    pub image: Image,
     /// Information about the [`ImageView`].
     pub info: ImageViewInfo,
 }
@@ -105,7 +105,7 @@ impl Image {
     /// <br>
     /// # Lifetime
     /// The returned [`ImgView`] is valid as long as `self` is valid.
-    pub fn view(&self, aspect: vk::ImageAspectFlags) -> ImgView {
+    pub fn view(&self, aspect: vk::ImageAspectFlags) -> ImgView { // TODO: Result<ImgView, Error>
         let info = vk::ImageViewCreateInfo::builder()
             .view_type(vk::ImageViewType::TYPE_2D) // TODO: 3D images, cubemaps, etc
             .format(self.format)
@@ -145,7 +145,7 @@ impl Image {
 
 impl Drop for Image {
     fn drop(&mut self) {
-        if self.is_owned() {
+        if self.is_owned() { ;
             unsafe { self.device.destroy_image(self.handle, None); }
         }
     }
@@ -172,7 +172,10 @@ impl Drop for ImgView {
 }
 
 impl<'i> From<(Image, ImgView)> for ImageView {
-    fn from((image, view): (Image, ImgView)) -> Self {
+    fn from((image, mut view): (Image, ImgView)) -> Self {
+        // Mark old ImgView as no longer being an owner, as ownership is now with the ImageView
+        view.owned = false;
+
         ImageView {
             device: image.device.clone(),
             image,

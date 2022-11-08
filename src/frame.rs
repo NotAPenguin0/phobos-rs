@@ -185,7 +185,7 @@ impl FrameManager {
         self.current_image = index;
 
         if resize_required {
-
+            println!("Resize");
             let mut new_swapchain = self.resize_swapchain(window, surface)?;
             std::mem::swap(&mut new_swapchain, &mut self.swapchain);
             self.swapchain_delete.push(new_swapchain); // now old swapchain after swapping.
