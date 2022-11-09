@@ -112,7 +112,7 @@ impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
 impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
     unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<(), Error> {
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        queue.free_command_buffer::<CommandBuffer<D>>(self.handle)
+        queue.free_command_buffer::<Self>(self.handle)
     }
 }
 

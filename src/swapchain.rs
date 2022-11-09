@@ -56,7 +56,7 @@ impl Swapchain {
 
         let images: Vec<ImageView> = unsafe { functions.get_swapchain_images(swapchain)? }
             .iter()
-            .map(move |image| {
+            .map(move |image| -> Result<ImageView, Error> {
                 let image = Image {
                     device: device.clone(),
                     handle: *image,
@@ -73,11 +73,11 @@ impl Swapchain {
                     memory: None
                 };
                 // Create a trivial ImgView.
-                let view = image.view(vk::ImageAspectFlags::COLOR);
+                let view = image.view(vk::ImageAspectFlags::COLOR)?;
                 // Bundle them together into an owning ImageView
-                ImageView::from((image, view))
+                Ok(ImageView::from((image, view)))
             })
-        .collect();
+        .collect::<Result<Vec<ImageView>, Error>>()?;
         Ok(Swapchain {
             handle: swapchain,
             format,

@@ -79,6 +79,7 @@ mod util;
 mod command_pool;
 mod render_pass;
 mod deferred_delete;
+pub mod buffer;
 pub mod window;
 pub mod image;
 pub mod frame;
@@ -94,8 +95,10 @@ pub mod execution_manager;
 pub mod swapchain;
 pub mod command_buffer;
 
+use std::sync::Arc;
 use ash::vk;
 use window::WindowInterface;
+use gpu_allocator::vulkan as vk_alloc;
 
 pub use crate::image::*;
 pub use crate::frame::*;
@@ -111,6 +114,7 @@ pub use crate::execution_manager::*;
 pub use crate::swapchain::*;
 pub use crate::window::*;
 pub use crate::command_buffer::*;
+pub use crate::buffer::*;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]
@@ -163,4 +167,16 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
     pub present_mode: Option<vk::PresentModeKHR>,
     /// Minimum requirements the selected physical device should have.
     pub gpu_requirements: GPURequirements,
+}
+
+pub fn create_allocator(instance: &VkInstance, device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<vk_alloc::Allocator, Error> {
+    Ok(vk_alloc::Allocator::new(
+        &vk_alloc::AllocatorCreateDesc {
+            instance: instance.instance.clone(),
+            device: device.handle.clone(),
+            physical_device: physical_device.handle.clone(),
+            debug_settings: Default::default(),
+            buffer_device_address: false // We might change this if the bufferDeviceAddress feature gets enabled.
+        }
+    )?)
 }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use ash::vk;
 use gpu_allocator::vulkan as vk_alloc;
 
-use crate::Device;
+use crate::{Device, Error};
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct ImageViewInfo {
@@ -105,7 +105,7 @@ impl Image {
     /// <br>
     /// # Lifetime
     /// The returned [`ImgView`] is valid as long as `self` is valid.
-    pub fn view(&self, aspect: vk::ImageAspectFlags) -> ImgView { // TODO: Result<ImgView, Error>
+    pub fn view(&self, aspect: vk::ImageAspectFlags) -> Result<ImgView, Error> {
         let info = vk::ImageViewCreateInfo::builder()
             .view_type(vk::ImageViewType::TYPE_2D) // TODO: 3D images, cubemaps, etc
             .format(self.format)
@@ -119,8 +119,8 @@ impl Image {
                 .build()
             )
             .build();
-        let view_handle = unsafe { self.device.create_image_view(&info, None).unwrap() };
-        ImgView {
+        let view_handle = unsafe { self.device.create_image_view(&info, None)? };
+        Ok(ImgView {
             device: self.device.clone(),
             handle: view_handle,
             owned: true,
@@ -134,7 +134,7 @@ impl Image {
                 base_layer: 0,
                 layer_count: self.layers
             }
-        }
+        })
     }
 
     /// Whether this image resource is owned by the application or an external manager (such as the swapchain).

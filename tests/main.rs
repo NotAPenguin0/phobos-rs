@@ -51,6 +51,7 @@ fn main() -> Result<(), ph::Error> {
         (surface, physical_device)
     };
     let device = ph::Device::new(&instance, &physical_device, &settings)?;
+    let mut alloc = ph::create_allocator(&instance, device.clone(), &physical_device)?;
     let exec = ph::ExecutionManager::new(device.clone(), &physical_device)?;
     let mut frame = {
         let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;

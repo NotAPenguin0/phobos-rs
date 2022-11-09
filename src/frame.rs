@@ -144,7 +144,7 @@ impl FrameManager {
         // Now that the new swapchain is created, we still need to acquire the images again.
         new_swapchain.images = unsafe { self.swapchain.functions.get_swapchain_images(new_swapchain.handle)? }
             .iter()
-            .map(move |image| {
+            .map(move |image| -> Result<ImageView, Error> {
                 let image = Image {
                     device: self.device.clone(),
                     handle: *image,
@@ -161,11 +161,11 @@ impl FrameManager {
                     memory: None
                 };
                 // Create a trivial ImgView.
-                let view = image.view(vk::ImageAspectFlags::COLOR);
+                let view = image.view(vk::ImageAspectFlags::COLOR)?;
                 // Bundle them together into an owning ImageView
-                ImageView::from((image, view))
+                Ok(ImageView::from((image, view)))
             })
-            .collect();
+            .collect::<Result<Vec<ImageView>, Error>>()?;
 
         Ok(new_swapchain)
     }

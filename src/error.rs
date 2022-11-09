@@ -1,5 +1,7 @@
 use std::ffi::NulError;
 use ash;
+use gpu_allocator::AllocationError;
+use crate::domain::All;
 
 #[derive(Debug)]
 pub enum Error {
@@ -21,6 +23,8 @@ pub enum Error {
     NoCapableQueue,
     /// Uncategorized error.
     Uncategorized(&'static str),
+    /// Vulkan allocation error.
+    AllocationError(AllocationError),
 }
 
 impl From<ash::LoadingError> for Error {
@@ -39,4 +43,8 @@ impl From<ash::vk::Result> for Error {
     fn from(value: ash::vk::Result) -> Self {
         Error::VkError(value)
     }
+}
+
+impl From<AllocationError> for Error {
+    fn from(value: AllocationError) -> Self { Error::AllocationError(value) }
 }
