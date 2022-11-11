@@ -29,6 +29,7 @@ pub struct ImageViewInfo {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Image {
+    // TODO: Reconsider member visibility
     /// Reference to the [`VkDevice`](vk::Device).
     #[derivative(Debug="ignore")]
     pub device: Arc<Device>,
@@ -59,11 +60,14 @@ pub struct Image {
 /// - An instance of this struct must not live longer than the [`Image`] it refers to.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct ImgView {
+pub struct ImgView /* <'image, 'view> */ {
+    // TODO: pub(crate) more often instead of everything public
+    // TODO: Remove device -> Just use an &'image Image.
     /// Reference to the [`VkDevice`](vk::Device).
     #[derivative(Debug="ignore")]
     pub device: Arc<Device>,
     /// [`VkImageView`](vk::ImageView) handle.
+    // TODO: Remove owned. Use Cow<'view, vk::ImageView>. Make handle private.
     pub handle: vk::ImageView,
     /// Whether this ImgView owns the [`VkImageView`](vk::ImageView) it holds.
     pub owned: bool,
@@ -71,11 +75,14 @@ pub struct ImgView {
     pub info: ImageViewInfo,
 }
 
+// TODO: delete ImageView
+
 /// Abstraction over [`VkImageView`](vk::ImageView). An [`ImageView`] owns both the [`VkImageView`](vk::ImageView) and the [`VkImage`](vk::Image).
 /// It can be dereferenced into a non-owning [`ImgView`].
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct ImageView {
+    // TODO: Remove this device (It's already on image.device)
     #[derivative(Debug="ignore")]
     pub device: Arc<Device>,
     /// [`ImageView`] pointing to the stored image.
@@ -97,6 +104,13 @@ impl ImageViewInfo {
         }
     }
 }
+
+// Image -> VkImage
+// ImgView -> VkImageView 
+// ImageView -> Image + VkImageView
+// Problem: it's valid and reasonable to have more than one VkImageView
+// for the same image.
+// TODO: add lifetimes and reference to main image back
 
 impl Image {
     /// Construct a trivial [`ImgView`] from this [`Image`]. This is an image view that views the

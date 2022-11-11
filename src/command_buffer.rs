@@ -7,7 +7,7 @@ use ash::vk;
 use crate::{Device, Error, ExecutionManager, ImageView};
 
 /// Trait representing a command buffer that supports graphics commands.
-pub trait GraphicsCmdBuffer {
+pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     // doesn't do anything yet.
     fn draw(self) -> Self;
 }
@@ -17,9 +17,9 @@ pub trait TransferCmdBuffer {
 
 }
 
-/// Trait representing a command buffer that supports transfer commands.
-pub trait ComputeCmdBuffer {
-
+/// Trait representing a command buffer that supports compute commands.
+pub trait ComputeCmdBuffer : TransferCmdBuffer {
+    
 }
 
 /// This struct represents a finished command buffer. This command buffer can't be recorded to anymore.
@@ -69,19 +69,6 @@ pub struct IncompleteCommandBuffer<D: ExecutionDomain> {
     handle: vk::CommandBuffer,
     _domain: PhantomData<D>,
 }
-
-trait GfxSupport {}
-trait TransferSupport {}
-trait ComputeSupport {}
-
-impl GfxSupport for domain::Graphics {}
-impl GfxSupport for domain::All {}
-impl TransferSupport for domain::Graphics {}
-impl TransferSupport for domain::Transfer {}
-impl TransferSupport for domain::Compute {}
-impl TransferSupport for domain::All {}
-impl ComputeSupport for domain::Compute {}
-impl ComputeSupport for domain::All {}
 
 impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
     type Domain = D;
@@ -150,6 +137,19 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
         self
     }
 }
+
+trait GfxSupport : TransferSupport {}
+trait TransferSupport {}
+trait ComputeSupport : TransferSupport {}
+
+impl GfxSupport for domain::Graphics {}
+impl GfxSupport for domain::All {}
+impl TransferSupport for domain::Graphics {}
+impl TransferSupport for domain::Transfer {}
+impl TransferSupport for domain::Compute {}
+impl TransferSupport for domain::All {}
+impl ComputeSupport for domain::Compute {}
+impl ComputeSupport for domain::All {}
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<D> {
     // Methods for graphics commands

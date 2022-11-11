@@ -16,5 +16,6 @@ futures = "0.3.25"
 winit = { version = "0.27.5", optional = true }
 
 [features]
+default = ["winit"]
 # Logs creation and destruction of all Vulkan objects. Useful for debugging.
 log-objects = []

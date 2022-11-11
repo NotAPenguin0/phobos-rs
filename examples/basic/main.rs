@@ -11,7 +11,16 @@ use winit::window::{WindowBuilder};
 use futures::executor::block_on;
 use phobos::{IncompleteCmdBuffer};
 
-#[test]
+// TODO:
+
+// 1. CLion rust formatting
+
+fn main_loop() -> Result<(), ph::Error> {
+    // TODO: implement
+    Ok(())
+}
+
+
 fn main() -> Result<(), ph::Error> {
     let event_loop = EventLoopBuilder::new().with_any_thread(true).build();
     let window = WindowBuilder::new()
@@ -19,10 +28,15 @@ fn main() -> Result<(), ph::Error> {
         .build(&event_loop)
         .unwrap();
 
+    // TODO: Use builder pattern
+    // TODO: Better defaults (add custom Default impl)
     let settings = ph::AppSettings {
-        version: (1, 0, 0),
+        version: (1, 0, 0), // TODO: Use env! instead
         name: String::from("Phobos test app"),
         enable_validation: true,
+        // TODO: pass relevant window data instead of 
+        // interface. This would also entirely remove the dependency on
+        // winit.
         window: Some(&window),
         surface_format: None, // Use default fallback format.
         present_mode: Some(PresentModeKHR::MAILBOX),
@@ -35,10 +49,7 @@ fn main() -> Result<(), ph::Error> {
                 ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Transfer },
                 ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Compute }
             ],
-            features: Default::default(),
-            features_1_1: Default::default(),
-            features_1_2: Default::default(),
-            device_extensions: Default::default()
+            ..Default::default()
         }
     };
 
@@ -61,20 +72,41 @@ fn main() -> Result<(), ph::Error> {
     event_loop.run(move |event, _, control_flow| {
         // Do not render a frame if Exit control flow is specified, to avoid
         // sync issues.
-        if *control_flow == ControlFlow::Exit { return; }
-        *control_flow = ControlFlow::Wait;
+        if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
+        // *control_flow = ControlFlow::Wait;
 
         // Acquire new frame
+        // TODO: add swapchain image reference to ifc.
         let ifc = block_on(frame.new_frame(&exec, &window, &surface)).unwrap();
         // Do some work for this frame
+
+        // new_frame() takes closure
+        // give ifc to closure
+        // closure returns command buffer
+        // submit + present
+        // frame.new_frame(&exec, &window, &surface, async |ifc| /* -> CommandBuffer */ { ... }).await.unwrap();
+        // task.new_task(&exec, &window, &surface, async |ctx| /* -> CommandBuffer */ { ... }).await.unwrap();
+        // task.new_task(&exec, async |ctx| /* -> CommandBuffer */ { ... })
+        // auto sync tasks w semaphore/fence
+        // .then(&exec, |ctx| ... etc).await.unwrap();
+        
+        // graph.add_pass(|cmdbuf| -> cmdbuf {...})
+
+        // This is actually safe, but not great.
+        // Move to IFC for no more issue.
         let swapchain = unsafe { frame.get_swapchain_image(&ifc).unwrap() };
         let commands = exec.on_domain::<ph::domain::Graphics>().unwrap()
+            // not final, just a command to run
             .transition_image(&swapchain, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
                 vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
-            vk::AccessFlags::empty(), vk::AccessFlags::empty())
+                vk::AccessFlags::empty(), vk::AccessFlags::empty())
             .finish()
             .unwrap();
+
+        // submit() to queue outside of frame
+
         // Submit this frame's commands
+        // TODO: move this to IFC.
         frame.submit(commands, &exec).unwrap();
         // Present
         frame.present(&exec).unwrap();
@@ -92,5 +124,5 @@ fn main() -> Result<(), ph::Error> {
             },
             _ => (),
         }
-    });
+    })
 }
