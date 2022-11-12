@@ -1,7 +1,6 @@
 use std::ffi::NulError;
 use ash;
 use gpu_allocator::AllocationError;
-use crate::domain::All;
 
 #[derive(Debug)]
 pub enum Error {

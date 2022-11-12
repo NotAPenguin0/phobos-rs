@@ -75,41 +75,14 @@ fn main() -> Result<(), ph::Error> {
         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
         // *control_flow = ControlFlow::Wait;
 
-        // Acquire new frame
-        // TODO: add swapchain image reference to ifc.
-        let ifc = block_on(frame.new_frame(&exec, &window, &surface)).unwrap();
-        // Do some work for this frame
-
-        // new_frame() takes closure
-        // give ifc to closure
-        // closure returns command buffer
-        // submit + present
-        // frame.new_frame(&exec, &window, &surface, async |ifc| /* -> CommandBuffer */ { ... }).await.unwrap();
-        // task.new_task(&exec, &window, &surface, async |ctx| /* -> CommandBuffer */ { ... }).await.unwrap();
-        // task.new_task(&exec, async |ctx| /* -> CommandBuffer */ { ... })
-        // auto sync tasks w semaphore/fence
-        // .then(&exec, |ctx| ... etc).await.unwrap();
-        
-        // graph.add_pass(|cmdbuf| -> cmdbuf {...})
-
-        // This is actually safe, but not great.
-        // Move to IFC for no more issue.
-        let swapchain = unsafe { frame.get_swapchain_image(&ifc).unwrap() };
-        let commands = exec.on_domain::<ph::domain::Graphics>().unwrap()
-            // not final, just a command to run
-            .transition_image(&swapchain, vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+        block_on(frame.new_frame(&exec, &window, &surface, |ifc| {
+            exec.on_domain::<ph::domain::Graphics>()?
+            .transition_image(&ifc.swapchain_image, 
+                vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
                 vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
                 vk::AccessFlags::empty(), vk::AccessFlags::empty())
-            .finish()
-            .unwrap();
-
-        // submit() to queue outside of frame
-
-        // Submit this frame's commands
-        // TODO: move this to IFC.
-        frame.submit(commands, &exec).unwrap();
-        // Present
-        frame.present(&exec).unwrap();
+            .finish()   
+        })).unwrap();
 
         // Note that we want to handle events after processing our current frame, so that
         // requesting an exit doesn't attempt to render another frame, which causes

@@ -46,8 +46,8 @@ struct PerImage {
 /// }
 /// ```
 #[derive(Debug)]
-pub struct InFlightContext {
-
+pub struct InFlightContext<'a> {
+    pub swapchain_image: &'a ImageView
 }
 
 /// Responsible for presentation, frame-frame synchronization and per-frame resources.
@@ -170,16 +170,17 @@ impl FrameManager {
         Ok(new_swapchain)
     }
 
-    /// This function must be called at the beginning of each frame.
-    /// It will return an [`InFlightContext`] object which holds all the information for this current frame.
-    /// You can only start doing command recording once the resulting future is awaited.
-    /// Note that this function takes a window so it can properly resize the swapchain if a resize
-    /// occurs.
-    pub async fn new_frame<Window: WindowInterface>(&mut self, exec: &ExecutionManager, window: &Window, surface: &Surface) -> Result<InFlightContext, Error> {
+    /// Obtain a new frame context to run commands in.
+    /// TODO: make closure async?
+    /// aka make everything async
+    pub async fn new_frame<Window, D, F>(&mut self, exec: &ExecutionManager, window: &Window, surface: &Surface, f: F)
+        -> Result<(), Error>
+        where Window: WindowInterface, D: ExecutionDomain + 'static, F: FnOnce(InFlightContext) -> Result<CommandBuffer<D>, Error> {
+        
         // Advance deletion queue by one frame
         self.swapchain_delete.next_frame();
-
-        // Increment frame index. We do this here since this is the only mutable function in the frame loop.
+        
+        // Increment frame index.
         self.current_frame = (self.current_frame + 1) % self.per_frame.len() as u32;
         let (index, resize_required) = self.acquire_image()?;
         self.current_image = index;
@@ -209,7 +210,12 @@ impl FrameManager {
         }
         per_frame.command_buffer = None;
 
-        Ok(InFlightContext {})
+        let ifc = InFlightContext { 
+            swapchain_image: self.get_swapchain_image()?
+        };
+        let frame_commands = f(ifc)?;
+        self.submit(frame_commands, &exec)?;
+        self.present(&exec)
     }
 
     /// Submit this frame's commands to be processed. Note that this is the only way a frame's commands
@@ -218,7 +224,7 @@ impl FrameManager {
     /// will signal. Any commands submitted from somewhere else must be synchronized to this submission.
     /// Note: it's possible this will be enforced through the type system later.
     /// TODO: examine possibilities for this.
-    pub fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: &ExecutionManager) -> Result<(), Error> {
+    fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: &ExecutionManager) -> Result<(), Error> {
         // Reset frame fence
         let mut per_frame = &mut self.per_frame[self.current_frame as usize];
         per_frame.fence.reset()?;
@@ -249,7 +255,7 @@ impl FrameManager {
 
     /// Present a frame to the swapchain. This is the same as calling
     /// `glfwSwapBuffers()` in OpenGL code.
-    pub fn present(&self, exec: &ExecutionManager) -> Result<(), Error> {
+    fn present(&self, exec: &ExecutionManager) -> Result<(), Error> {
         let per_frame = &self.per_frame[self.current_frame as usize];
         let functions = &self.swapchain.functions;
         let queue = exec.get_present_queue();
@@ -273,7 +279,7 @@ impl FrameManager {
 
     /// Get a reference to the current swapchain image.
     /// This reference is valid as long as the swapchain is not resized.
-    pub unsafe fn get_swapchain_image(&self, _ifc: &InFlightContext) -> Result<&ImageView, Error> {
+    fn get_swapchain_image(&self) -> Result<&ImageView, Error> {
         Ok(&self.swapchain.images[self.current_image as usize])
     }
 }
