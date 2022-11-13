@@ -15,8 +15,18 @@ use phobos::{IncompleteCmdBuffer};
 
 // 1. CLion rust formatting
 
-fn main_loop() -> Result<(), ph::Error> {
-    // TODO: implement
+fn main_loop(frame: &mut ph::FrameManager, exec: &ph::ExecutionManager, 
+             surface: &ph::Surface, window: &winit::window::Window) -> Result<(), ph::Error> {
+
+    block_on(frame.new_frame(&exec, window, &surface, |ifc| {
+        exec.on_domain::<ph::domain::Graphics>()?
+        .transition_image(&ifc.swapchain_image, 
+            vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
+            vk::AccessFlags::empty(), vk::AccessFlags::empty())
+        .finish()   
+    }))?;
+
     Ok(())
 }
 
@@ -73,16 +83,8 @@ fn main() -> Result<(), ph::Error> {
         // Do not render a frame if Exit control flow is specified, to avoid
         // sync issues.
         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
-        // *control_flow = ControlFlow::Wait;
-
-        block_on(frame.new_frame(&exec, &window, &surface, |ifc| {
-            exec.on_domain::<ph::domain::Graphics>()?
-            .transition_image(&ifc.swapchain_image, 
-                vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
-                vk::AccessFlags::empty(), vk::AccessFlags::empty())
-            .finish()   
-        })).unwrap();
+        
+        main_loop(&mut frame, &exec, &surface, &window).unwrap();
 
         // Note that we want to handle events after processing our current frame, so that
         // requesting an exit doesn't attempt to render another frame, which causes
