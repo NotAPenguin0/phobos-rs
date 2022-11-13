@@ -36,6 +36,7 @@ struct PerImage {
 /// <br>
 /// # Example
 /// ```
+/// // TODO: Fix this example!
 /// while running {
 ///     // obtain a Future<InFlightContext>, assumes windowed context was created.
 ///     let ifc = frame_manager.new_frame();
