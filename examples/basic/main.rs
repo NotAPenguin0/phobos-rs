@@ -38,19 +38,13 @@ fn main() -> Result<(), ph::Error> {
         .build(&event_loop)
         .unwrap();
 
-    // TODO: Use builder pattern
-    // TODO: Better defaults (add custom Default impl)
-    let settings = ph::AppSettings {
-        version: (1, 0, 0), // TODO: Use env! instead
-        name: String::from("Phobos test app"),
-        enable_validation: true,
-        // TODO: pass relevant window data instead of 
-        // interface. This would also entirely remove the dependency on
-        // winit.
-        window: Some(&window),
-        surface_format: None, // Use default fallback format.
-        present_mode: Some(PresentModeKHR::MAILBOX),
-        gpu_requirements: ph::GPURequirements {
+    let settings = ph::AppBuilder::new()
+        .version((1, 0, 0))
+        .name(String::from("Phobos test app"))
+        .validation(true)
+        .window(&window) // TODO: pass window information instead of window interface to remove dependency
+        .present_mode(PresentModeKHR::MAILBOX)
+        .gpu(ph::GPURequirements {
             dedicated: true,
             min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.
             min_dedicated_video_memory: 1 * 1024 * 1024 * 1024,
@@ -60,8 +54,8 @@ fn main() -> Result<(), ph::Error> {
                 ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Compute }
             ],
             ..Default::default()
-        }
-    };
+        })
+        .build();
 
     let instance = ph::VkInstance::new(&settings)?;
     let _debug_messenger = ph::DebugMessenger::new(&instance)?;
