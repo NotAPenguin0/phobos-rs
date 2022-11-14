@@ -79,6 +79,7 @@ mod util;
 mod command_pool;
 mod render_pass;
 mod deferred_delete;
+pub mod task_graph;
 pub mod buffer;
 pub mod window;
 pub mod image;
@@ -115,6 +116,7 @@ pub use crate::swapchain::*;
 pub use crate::window::*;
 pub use crate::command_buffer::*;
 pub use crate::buffer::*;
+pub use crate::task_graph::*;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]
