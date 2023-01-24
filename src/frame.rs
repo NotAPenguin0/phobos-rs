@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, CmdBuffer, ImageView, WindowInterface, Surface, Image};
+use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, CmdBuffer, ImageView, WindowInterface, Surface, Image, SwapchainImage};
 use crate::sync::*;
 use ash::vk;
 use crate::domain::ExecutionDomain;
@@ -144,7 +144,7 @@ impl FrameManager {
         // Now that the new swapchain is created, we still need to acquire the images again.
         new_swapchain.images = unsafe { self.swapchain.functions.get_swapchain_images(new_swapchain.handle)? }
             .iter()
-            .map(move |image| -> Result<ImageView, Error> {
+            .map(move |image| -> Result<SwapchainImage, Error> {
                 let image = Image {
                     device: self.device.clone(),
                     handle: *image,
@@ -163,9 +163,9 @@ impl FrameManager {
                 // Create a trivial ImgView.
                 let view = image.view(vk::ImageAspectFlags::COLOR)?;
                 // Bundle them together into an owning ImageView
-                Ok(ImageView::from((image, view)))
+                Ok(SwapchainImage {image, view})
             })
-            .collect::<Result<Vec<ImageView>, Error>>()?;
+            .collect::<Result<Vec<SwapchainImage>, Error>>()?;
 
         Ok(new_swapchain)
     }
@@ -273,7 +273,7 @@ impl FrameManager {
 
     /// Get a reference to the current swapchain image.
     /// This reference is valid as long as the swapchain is not resized.
-    pub unsafe fn get_swapchain_image(&self, _ifc: &InFlightContext) -> Result<&ImageView, Error> {
-        Ok(&self.swapchain.images[self.current_image as usize])
+    pub unsafe fn get_swapchain_image(&self, _ifc: &InFlightContext) -> Result<ImageView, Error> {
+        Ok(self.swapchain.images[self.current_image as usize].view.clone())
     }
 }

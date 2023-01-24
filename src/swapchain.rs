@@ -3,6 +3,11 @@ use ash::vk;
 use crate::{AppSettings, Device, Error, Surface, VkInstance, WindowInterface};
 use crate::image::*;
 
+pub(crate) struct SwapchainImage {
+    pub image: Image,
+    pub view: ImageView
+}
+
 /// A swapchain is an abstraction of a presentation system. It handles buffering, VSync, and acquiring images
 /// to render and present frames to.
 #[derive(Derivative)]
@@ -11,7 +16,7 @@ pub struct Swapchain {
     /// Handle to the [`VkSwapchainKHR`](vk::SwapchainKHR) object.
     pub(crate) handle: vk::SwapchainKHR,
     /// Swapchain images to present to.
-    pub(crate) images: Vec<ImageView>,
+    pub(crate) images: Vec<SwapchainImage>,
     /// Swapchain image format.
     pub format: vk::SurfaceFormatKHR,
     /// Present mode. The only mode that is required by the spec to always be supported is `FIFO`.
@@ -54,9 +59,9 @@ impl Swapchain {
         let functions = ash::extensions::khr::Swapchain::new(&instance.instance, &device.handle);
         let swapchain = unsafe { functions.create_swapchain(&info, None)? };
 
-        let images: Vec<ImageView> = unsafe { functions.get_swapchain_images(swapchain)? }
+        let images: Vec<SwapchainImage> = unsafe { functions.get_swapchain_images(swapchain)? }
             .iter()
-            .map(move |image| -> Result<ImageView, Error> {
+            .map(move |image| -> Result<SwapchainImage, Error> {
                 let image = Image {
                     device: device.clone(),
                     handle: *image,
@@ -75,9 +80,12 @@ impl Swapchain {
                 // Create a trivial ImgView.
                 let view = image.view(vk::ImageAspectFlags::COLOR)?;
                 // Bundle them together into an owning ImageView
-                Ok(ImageView::from((image, view)))
+                Ok(SwapchainImage {
+                    image,
+                    view
+                })
             })
-        .collect::<Result<Vec<ImageView>, Error>>()?;
+        .collect::<Result<Vec<SwapchainImage>, Error>>()?;
         Ok(Swapchain {
             handle: swapchain,
             format,
