@@ -1,13 +1,15 @@
+use std::collections::HashSet;
 use std::fmt::Display;
 
 use petgraph::graph::*;
 use petgraph::visit::NodeRef;
 use petgraph;
 use petgraph::dot;
+use petgraph::dot::Dot;
 
 use crate::error::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Task {
     // TODO: Actual inputs and outputs instead of this.
     // We just use strings for testing the algorithms.
@@ -27,10 +29,21 @@ pub struct Task {
 // - This allows multiple logical bindings (tags/resource identifiers) to map to 
 //   a single physical resource (Image/Buffer).
 
+#[derive(Debug, Clone)]
+pub struct Barrier {
+    pub resource: String
+}
+
+#[derive(Debug, Clone)]
+pub enum Node {
+    Task(Task),
+    Barrier(Barrier)
+}
+
 pub struct TaskGraph {
     // u32 is the associated data with each edge.
     // We can change this to whatever we want later.
-    graph: Graph<Task, u32>,
+    graph: Graph<Node, u32>,
 
     // We must also detect cycles in the graph as errors.
 }
@@ -42,18 +55,33 @@ impl TaskGraph {
         }
     }
 
+    /// Outputs graphviz-compatible dot file for displaying the graph.
+    pub fn as_dot(&self) -> Result<Dot<&Graph<Node, u32>>, Error> {
+        Ok(petgraph::dot::Dot::with_config(&self.graph, &[petgraph::dot::Config::EdgeNoLabel]))
+    }
+
     // Tests if a task is dependent on another task.
     // Will return true if child consumes an input that parent produces
-    fn is_dependent(graph: &Graph<Task, u32>, child: NodeIndex, parent: NodeIndex) -> Result<bool, Error> {
+    fn is_dependent(graph: &Graph<Node, u32>, child: NodeIndex, parent: NodeIndex) -> Result<bool, Error> {
         let child = graph.node_weight(child).ok_or(Error::NodeNotFound)?;
         let parent = graph.node_weight(parent).ok_or(Error::NodeNotFound)?;
-        Ok(child.inputs.iter().any(|input| {
-            parent.outputs.contains(&input)
-        }))
+        if let Node::Task(child) = child {
+            if let Node::Task(parent) = parent {
+                return Ok(child.inputs.iter().any(|input| {
+                    parent.outputs.contains(&input)
+                }));
+            }
+        }
+
+        Ok(false)
+    }
+
+    fn is_task_node(graph: &Graph<Node, u32>, node: NodeIndex) -> Result<bool, Error> {
+        Ok(matches!(graph.node_weight(node).ok_or(Error::NodeNotFound)?, Node::Task(_)))
     }
 
     pub fn add_task(&mut self, task: Task) -> Result<(), Error> {
-        let node = self.graph.add_node(task);
+        let node = self.graph.add_node(Node::Task(task));
         // When adding a node, we need to update edges in the graph.
         // X = The newly added node
         // For every node Y:
@@ -82,11 +110,51 @@ impl TaskGraph {
             false => Ok(())
         }
     }
+
+    pub fn create_barrier_nodes(&mut self) {
+        // We create barrier nodes as follows:
+        // For each task node P:
+        //      - For each resource R that P produces:
+        //          - If there are no nodes that depend directly on this resource R, do nothing.
+        //          - Otherwise, add a new barrier node B, acting on the resource R.
+        //          - Then add an edge from P to B, and edges from B to each node Q that consumes the resource R directly.
+        //          - Finally, remove the edges from P to each node Q.
+        //
+        // Note that this algorithm creates too many barriers for practical usage.
+        // We will compact the amount of dependency barriers when translating this graph to a render graph
+
+        self.graph.node_indices().clone().for_each(|node| {
+            if !Self::is_task_node(&self.graph, node).unwrap() { return; }
+
+            let Node::Task(task) = self.graph.node_weight(node).cloned().unwrap() else { unimplemented!() };
+            for resource in &task.outputs {
+                // Find all nodes in the graph that depend directly on this resource
+                let consumers = self.graph.node_indices().filter(|&consumer| -> bool {
+                    let consumer = self.graph.node_weight(consumer).unwrap();
+                    match consumer {
+                        Node::Task(t) => { t.inputs.contains(&resource) }
+                        Node::Barrier(_) => false
+                    }
+                }).collect::<Vec<NodeIndex>>();
+
+                if consumers.is_empty() { return; }
+                let barrier = self.graph.add_node(Node::Barrier(Barrier{resource: resource.clone()}));
+                self.graph.update_edge(node, barrier, 0);
+                for consumer in consumers {
+                    self.graph.update_edge(barrier, consumer, 0);
+                    self.graph.remove_edge(self.graph.find_edge(node, consumer).unwrap());
+                }
+            }
+        })
+    }
 }
 
-impl Display for Task {
+impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("in: {:#?}\nout: {:#?}", &self.inputs, &self.outputs))
+        match self {
+            Node::Task(task) => f.write_fmt(format_args!("Task\nin: {:#?}\nout: {:#?}", &task.inputs, &task.outputs)),
+            Node::Barrier(barrier) => { f.write_fmt(format_args!("Barrier on {:#?}", &barrier.resource))}
+        }
     } 
 }
 

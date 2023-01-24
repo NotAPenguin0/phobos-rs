@@ -114,7 +114,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
                             src_access: vk::AccessFlags, dst_access: vk::AccessFlags) -> Self {
         let barrier = vk::ImageMemoryBarrier::builder()
             .image(image.image)
-            .subresource_range(image.info.subresource_range())
+            .subresource_range(image.subresource_range())
             .src_access_mask(src_access)
             .dst_access_mask(dst_access)
             .old_layout(from)

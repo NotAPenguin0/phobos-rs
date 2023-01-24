@@ -1,3 +1,4 @@
+#![feature(let_else)]
 //! Fast, powerful Vulkan abstraction library
 //!
 //! Phobos provides powerful Vulkan abstractions to automatically manage common issues like

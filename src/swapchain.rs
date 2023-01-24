@@ -3,6 +3,7 @@ use ash::vk;
 use crate::{AppSettings, Device, Error, Surface, VkInstance, WindowInterface};
 use crate::image::*;
 
+#[derive(Debug)]
 pub(crate) struct SwapchainImage {
     pub image: Image,
     pub view: ImageView

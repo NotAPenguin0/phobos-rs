@@ -24,7 +24,7 @@ fn main_loop(frame: &mut ph::FrameManager, exec: &ph::ExecutionManager,
             vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
             vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
             vk::AccessFlags::empty(), vk::AccessFlags::empty())
-        .finish()   
+        .finish()
     }))?;
 
     Ok(())
