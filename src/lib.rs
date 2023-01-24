@@ -79,6 +79,7 @@ mod util;
 mod command_pool;
 mod render_pass;
 mod deferred_delete;
+pub mod task_graph;
 pub mod buffer;
 pub mod window;
 pub mod image;
@@ -115,6 +116,7 @@ pub use crate::swapchain::*;
 pub use crate::window::*;
 pub use crate::command_buffer::*;
 pub use crate::buffer::*;
+pub use crate::task_graph::*;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]
@@ -149,7 +151,7 @@ pub struct GPURequirements {
 }
 
 /// Application settings used to initialize the phobos context.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct AppSettings<'a, Window> where Window: WindowInterface {
     /// Application name. Possibly displayed in debugging tools, task manager, etc.
     pub name: String,
@@ -167,6 +169,69 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
     pub present_mode: Option<vk::PresentModeKHR>,
     /// Minimum requirements the selected physical device should have.
     pub gpu_requirements: GPURequirements,
+}
+
+impl<'a, Window> Default for AppSettings<'a, Window> where Window: WindowInterface {
+    fn default() -> Self {
+        AppSettings {
+            name: String::from(""),
+            version: (0, 0, 0),
+            enable_validation: false,
+            window: None,
+            surface_format: None,
+            present_mode: None,
+            gpu_requirements: GPURequirements::default(),
+        }
+    }
+}
+
+pub struct AppBuilder<'a, Window> where Window: WindowInterface {
+    inner: AppSettings<'a, Window>,
+}
+
+impl<'a, Window> AppBuilder<'a, Window> where Window: WindowInterface {   
+    pub fn new() -> Self {
+        AppBuilder { inner: AppSettings::default() }
+    }
+
+    pub fn name(mut self, name: String) -> Self {
+        self.inner.name = name;
+        self
+    }
+
+    pub fn version(mut self, ver: (u32, u32, u32)) -> Self {
+        self.inner.version = ver;
+        self
+    }
+
+    pub fn validation(mut self, val: bool) -> Self {
+        self.inner.enable_validation = val;
+        self
+    }
+
+    pub fn window(mut self, window: &'a Window) -> Self {
+        self.inner.window = Some(window);
+        self
+    }
+
+    pub fn surface_format(mut self, format: vk::SurfaceFormatKHR) -> Self {
+        self.inner.surface_format = Some(format);
+        self
+    }
+
+    pub fn present_mode(mut self, mode: vk::PresentModeKHR) -> Self {
+        self.inner.present_mode = Some(mode);
+        self
+    }
+
+    pub fn gpu(mut self, gpu: GPURequirements) -> Self {
+        self.inner.gpu_requirements = gpu;
+        self
+    }
+
+    pub fn build(self) -> AppSettings<'a, Window> {
+        self.inner
+    }
 }
 
 pub fn create_allocator(instance: &VkInstance, device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<vk_alloc::Allocator, Error> {

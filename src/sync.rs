@@ -37,6 +37,7 @@ impl Fence {
 
     /// Waits for the fence to be signaled with no timeout.
     pub fn wait(&self) -> VkResult<()> {
+        // TODO: Rewrite as async
         unsafe { self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX) }
     }
 

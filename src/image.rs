@@ -10,6 +10,7 @@ use crate::{Device, Error};
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Image {
+    // TODO: Reconsider member visibility
     /// Reference to the [`VkDevice`](vk::Device).
     #[derivative(Debug="ignore")]
     pub device: Arc<Device>,
@@ -59,7 +60,7 @@ pub struct ImgView {
     /// First array layer in the viewed array layer range.
     pub base_layer: u32,
     /// Amount of array layers in the viewed array layer range.
-    pub layer_count: u32,
+    pub layer_count: u32
 }
 
 /// Reference-counted version of [`ImgView`].

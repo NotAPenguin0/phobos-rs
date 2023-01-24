@@ -1,7 +1,6 @@
 use std::ffi::NulError;
 use ash;
 use gpu_allocator::AllocationError;
-use crate::domain::All;
 
 #[derive(Debug)]
 pub enum Error {
@@ -21,10 +20,13 @@ pub enum Error {
     NoPresentQueue,
     /// No queue was found for requested domain. Did you forget to request it?
     NoCapableQueue,
-    /// Uncategorized error.
-    Uncategorized(&'static str),
     /// Vulkan allocation error.
     AllocationError(AllocationError),
+    /// Task graph contains a cycle and is impossible to resolve.
+    GraphHasCycle,
+    NodeNotFound,
+    /// Uncategorized error.
+    Uncategorized(&'static str),
 }
 
 impl From<ash::LoadingError> for Error {

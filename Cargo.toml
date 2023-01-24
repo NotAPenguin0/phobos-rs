@@ -13,8 +13,10 @@ gpu-allocator = "0.20.0"
 smallvec = "1.10.0"
 derivative = "2.2.0"
 futures = "0.3.25"
+petgraph = "0.6.2"
 winit = { version = "0.27.5", optional = true }
 
 [features]
+default = ["winit"]
 # Logs creation and destruction of all Vulkan objects. Useful for debugging.
 log-objects = []
