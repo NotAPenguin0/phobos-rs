@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -6,9 +7,8 @@ use phobos as ph;
 use ph::task_graph::*;
 use layout::gv;
 use layout::gv::GraphBuilder;
-use layout::topo::layout::VisualGraph;
 
-pub fn display_dot(graph: &ph::TaskGraph) {
+pub fn display_dot<R>(graph: &ph::TaskGraph<R>) where R: Debug + Eq + Clone {
     let dot = graph.as_dot().unwrap();
     let dot = format!("{}", dot);
     let mut parser = gv::DotParser::new(&dot);
@@ -30,24 +30,44 @@ pub fn display_dot(graph: &ph::TaskGraph) {
 }
 
 #[test]
+fn associated_virtual_resources() -> Result<(), ph::Error> {
+    let v1 = VirtualResource { uid: String::from("abc") };
+    let v2 = VirtualResource { uid: String::from("def*") };
+    let v3 = VirtualResource { uid: String::from("abc*") };
+    let v4 = VirtualResource { uid: String::from("def**") };
+
+    assert!(VirtualResource::are_associated(&v1, &v3));
+    assert!(VirtualResource::are_associated(&v3, &v1));
+
+    assert!(!VirtualResource::are_associated(&v1, &v2));
+    assert!(!VirtualResource::are_associated(&v1, &v4));
+
+    assert!(VirtualResource::are_associated(&v2, &v4));
+
+    Ok(())
+}
+
+#[test]
 fn test_graph() -> Result<(), ph::Error> {
-    let mut graph = ph::TaskGraph::new();
+    let mut graph = ph::TaskGraph::<String>::new();
     
     let t1 = Task {
+        identifier: String::from("Task 1"),
         inputs: vec![],
         outputs: vec![String::from("t1_out")],
     };
 
     let t2 = Task {
+        identifier: String::from("Task 2"),
         inputs: vec![String::from("t1_out")],
         outputs: vec![String::from("t2_out")]
     };
 
     let t3 = Task {
+        identifier: String::from("Task 3"),
         inputs: vec![String::from("t1_out"), String::from("t2_out")],
         outputs: vec![String::from("final")]
     };
-
     graph.add_task(t1)?;
     graph.add_task(t2)?;
     graph.add_task(t3)?;

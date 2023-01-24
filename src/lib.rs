@@ -1,4 +1,3 @@
-#![feature(let_else)]
 //! Fast, powerful Vulkan abstraction library
 //!
 //! Phobos provides powerful Vulkan abstractions to automatically manage common issues like
@@ -78,7 +77,6 @@ extern crate derivative;
 
 mod util;
 mod command_pool;
-mod render_pass;
 mod deferred_delete;
 pub mod task_graph;
 pub mod buffer;
@@ -96,6 +94,7 @@ pub mod device;
 pub mod execution_manager;
 pub mod swapchain;
 pub mod command_buffer;
+pub mod pass;
 
 use std::sync::Arc;
 use ash::vk;
