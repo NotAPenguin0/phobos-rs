@@ -25,6 +25,9 @@ pub enum Error {
     /// Task graph contains a cycle and is impossible to resolve.
     GraphHasCycle,
     NodeNotFound,
+    /// Task graph contains two nodes that act on the same resource with different usage flags.
+    /// This is impossible to resolve in an unambiguous way.
+    IllegalTaskGraph,
     /// Uncategorized error.
     Uncategorized(&'static str),
 }

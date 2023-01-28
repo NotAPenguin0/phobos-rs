@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg width="741" height="774" viewBox="0 0 741 774" xmlns="http://www.w3.org/2000/svg">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg width="1634" height="1382" viewBox="0 0 1634 1382" xmlns="http://www.w3.org/2000/svg">
 <defs>
 <marker id="startarrow" markerWidth="10" markerHeight="7"
 refX="0" refY="3.5" orient="auto">
@@ -12,40 +12,43 @@ refX="10" refY="3.5" orient="auto">
 </defs><style>
 .a14 { font-size: 14px; font-family: Times, serif; }
 </style>
-<ellipse cx="315" cy="47" rx="164" ry="17" fill="#ffffffff" 
+<ellipse cx="791" cy="47" rx="164" ry="17" fill="#5e6df7ff" 
             stroke-width="1" stroke="#000000ff"/>
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="315" y="33" class="a14"><tspan x = "315" dy="1.0em">Task: Offscreen render</tspan></text><ellipse cx="208" cy="303" rx="178" ry="17" fill="#ffffffff" 
+            x="791" y="33" class="a14"><tspan x = "791" dy="1.0em">Task: Offscreen render</tspan></text><ellipse cx="378" cy="307" rx="178" ry="17" fill="#5e6df7ff" 
             stroke-width="1" stroke="#000000ff"/>
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="208" y="289" class="a14"><tspan x = "208" dy="1.0em">Task: Postprocess render</tspan></text><ellipse cx="422" cy="559" rx="157" ry="17" fill="#ffffffff" 
+            x="378" y="293" class="a14"><tspan x = "378" dy="1.0em">Task: Postprocess render</tspan></text><ellipse cx="1209.5" cy="567" rx="157" ry="17" fill="#5e6df7ff" 
             stroke-width="1" stroke="#000000ff"/>
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="422" y="545" class="a14"><tspan x = "422" dy="1.0em">Task: Finalize output</tspan></text><ellipse cx="208" cy="175" rx="59" ry="17" fill="#ffffffff" 
-            stroke-width="1" stroke="#000000ff"/>
+            x="1209.5" y="553" class="a14"><tspan x = "1209.5" dy="1.0em">Task: Finalize output</tspan></text><rect x="37" y="158" width="682" height="38" fill="#f75e70ff" 
+            stroke-width="1" stroke="#000000ff" rx="0"  />
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="208" y="161" class="a14"><tspan x = "208" dy="1.0em">Barrier</tspan></text><ellipse cx="422" cy="431" rx="59" ry="17" fill="#ffffffff" 
-            stroke-width="1" stroke="#000000ff"/>
+            x="378" y="156" class="a14"><tspan x = "378" dy="1.0em">offscreen(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "378" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; FRAGMENT_SHADER)</tspan></text><rect x="779" y="158" width="850" height="38" fill="#f75e70ff" 
+            stroke-width="1" stroke="#000000ff" rx="0"  />
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="422" y="417" class="a14"><tspan x = "422" dy="1.0em">Barrier</tspan></text><ellipse cx="208" cy="431" rx="59" ry="17" fill="#ffffffff" 
-            stroke-width="1" stroke="#000000ff"/>
+            x="1204" y="156" class="a14"><tspan x = "1204" dy="1.0em">depth(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "1204" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; VERTEX_SHADER | FRAGMENT_SHADER)</tspan></text><rect x="30" y="418" width="696" height="38" fill="#f75e70ff" 
+            stroke-width="1" stroke="#000000ff" rx="0"  />
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="208" y="417" class="a14"><tspan x = "208" dy="1.0em">Barrier</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="140" y="225" class="a14"><tspan x = "140" dy="1.0em">offscreen</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="382" y="481" class="a14"><tspan x = "382" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="240" y="481" class="a14"><tspan x = "240" dy="1.0em">offscreen*</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="193.5" y="97" class="a14"><tspan x = "193.5" dy="1.0em">offscreen</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="382" y="353" class="a14"><tspan x = "382" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="133" y="353" class="a14"><tspan x = "133" dy="1.0em">offscreen*</tspan></text><path id="arrow0" d="M 208 192 C 208 222, 208 209, 208 239 S 208 256, 208 286 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            x="378" y="416" class="a14"><tspan x = "378" dy="1.0em">offscreen+(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "378" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; FRAGMENT_SHADER)</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="310" y="229" class="a14"><tspan x = "310" dy="1.0em">offscreen</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="1169.5" y="489" class="a14"><tspan x = "1169.5" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="718.75" y="489" class="a14"><tspan x = "718.75" dy="1.0em">offscreen+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="516.5" y="97" class="a14"><tspan x = "516.5" dy="1.0em">offscreen</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="957.5" y="97" class="a14"><tspan x = "957.5" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="751" y="229" class="a14"><tspan x = "751" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="303" y="357" class="a14"><tspan x = "303" dy="1.0em">offscreen+</tspan></text><path id="arrow0" d="M 378 196 C 378 226, 378 213, 378 243 S 378 260, 378 290 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow0" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow1" d="M 422 448 C 422 478, 422 465, 422 495 S 422 512, 422 542 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow0" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow1" d="M 1205.5833333333333 196 C 1208.0746977289455 225.8963727473464, 1209.5 213, 1209.5 243 S 1209.5 277, 1209.5 307 S 1209.5 341, 1209.5 371 S 1209.5 407, 1209.5 437 S 1209.5 473, 1209.5 503 S 1209.5 520, 1209.5 550 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow1" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow2" d="M 233.60570211536017 446.31556014376685 C 259.3516964419772 461.7150333858555, 289.254005673383 479.6005267579113, 315 495 S 368.28671174172945 526.8724257146793, 394.03270606834644 542.2718989567679 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow1" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow2" d="M 621.594696969697 456 C 650.5355386379297 463.90111913176156, 764.5977002262887 496.09279610589516, 793.75 503 S 1089.5229947404764 548.5308999720758, 1119.1737333022475 553.095295084411 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow2" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow3" d="M 300.8421158939957 63.93653425765003 C 281.60123183684203 86.953666587703, 280.74088405715366 87.98286766994703, 261.5 111 S 241.05670785366436 135.4555270535604, 221.8158237965107 158.47265938361338 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow2" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow3" d="M 738.9808596797791 63.12215486922102 C 710.3255512659152 72.0032189781183, 613.1213951465945 102.01119375086665, 584.5 111 S 466.0229058694283 148.86677100541274, 437.4469696969697 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow3" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow4" d="M 343.0044390689228 63.750318695430465 C 368.7504333955398 79.14979193751914, 422 81, 422 111 S 422 145, 422 175 S 422 209, 422 239 S 422 273, 422 303 S 422 337, 422 367 S 422 384, 422 414 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow3" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow4" d="M 843.0191403202209 63.12215486922102 C 871.6744487340848 72.0032189781183, 968.8786048534055 102.01119375086665, 997.5 111 S 1115.9770941305717 148.86677100541272, 1144.5530303030303 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow4" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow5" d="M 208 320 C 208 350, 208 337, 208 367 S 208 384, 208 414 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow4" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow5" d="M 1085.1060606060605 196 C 1055.4819469621107 200.73411985593387, 820.633284910991 238.32415329726226, 791 243 S 501.0371498873428 287.93371042908007, 471.3909957505958 292.5277875834428 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow5" startOffset="50%" text-anchor="middle" class="a14"></textPath></text></svg>
+<text><textPath href="#arrow5" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow6" d="M 378 324 C 378 354, 378 341, 378 371 S 378 388, 378 418 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            fill="transparent" />
+<text><textPath href="#arrow6" startOffset="50%" text-anchor="middle" class="a14"></textPath></text></svg>

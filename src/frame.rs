@@ -48,7 +48,7 @@ struct PerImage {
 /// ```
 #[derive(Debug)]
 pub struct InFlightContext {
-
+    pub swapchain_image: ImageView,
 }
 
 /// Responsible for presentation, frame-frame synchronization and per-frame resources.
@@ -211,7 +211,7 @@ impl FrameManager {
         }
         per_frame.command_buffer = None;
 
-        let ifc = InFlightContext {};
+        let ifc = InFlightContext { swapchain_image: unsafe { self.get_swapchain_image()? } };
 
         let frame_commands = f(ifc)?;
         self.submit(frame_commands, &exec)?;
@@ -279,8 +279,7 @@ impl FrameManager {
 
     /// Get a reference to the current swapchain image.
     /// This reference is valid as long as the swapchain is not resized.
-
-    pub unsafe fn get_swapchain_image(&self, _ifc: &InFlightContext) -> Result<ImageView, Error> {
+    unsafe fn get_swapchain_image(&self) -> Result<ImageView, Error> {
         Ok(self.swapchain.images[self.current_image as usize].view.clone())
     }
 }

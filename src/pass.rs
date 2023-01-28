@@ -1,4 +1,3 @@
-use crate::error::Error;
 use crate::GpuResource;
 
 pub struct Pass {

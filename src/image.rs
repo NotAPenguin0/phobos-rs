@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::sync::Arc;
 use ash::vk;
 use gpu_allocator::vulkan as vk_alloc;

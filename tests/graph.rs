@@ -8,8 +8,9 @@ use ph::task_graph::*;
 use layout::gv;
 use layout::gv::GraphBuilder;
 use phobos::pass::Pass;
+use phobos::pipeline::PipelineStage;
 
-pub fn display_dot<R>(graph: &ph::TaskGraph<R>, path: &str) where R: Debug + Resource + Clone {
+pub fn display_dot<R, B>(graph: &ph::TaskGraph<R, B>, path: &str) where R: Debug + Default + Resource + Clone, B: Barrier<R> + Clone {
     let dot = graph.as_dot().unwrap();
     let dot = format!("{}", dot);
     let mut parser = gv::DotParser::new(&dot);
@@ -24,8 +25,9 @@ pub fn display_dot<R>(graph: &ph::TaskGraph<R>, path: &str) where R: Debug + Res
             let mut f = File::create(Path::new(path)).unwrap();
             f.write(&svg.as_bytes()).unwrap();
         },
-        Err(_) => {
+        Err(e) => {
             parser.print_error();
+            println!("dot render error: {}", e);
         }
     }
 }
@@ -69,58 +71,73 @@ fn test_graph() -> Result<(), ph::Error> {
     let depth = VirtualResource::new(String::from("depth"));
     let swap = VirtualResource::new(String::from("swapchain"));
 
+    // Sample graph, not a model of a real render pass system.
+
     let p1 = Pass {
         name: "Offscreen render".to_string(),
         inputs: vec![],
         outputs: vec![
-            GpuResource::Image(ImageResource{
-                usage: ImageResourceUsage::Attachment,
-                resource: offscreen.clone()
-            }),
-            GpuResource::Image(ImageResource{
-                usage: ImageResourceUsage::Attachment,
-                resource: depth.clone()
-            })
+            GpuResource {
+                usage: ResourceUsage::Attachment,
+                resource: offscreen.clone(),
+                stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+            },
+            GpuResource {
+                usage: ResourceUsage::Attachment,
+                resource: depth.clone(),
+                stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT
+            }
         ]
     };
 
     let p2 = Pass {
         name: "Postprocess render".to_string(),
         inputs: vec![
-            GpuResource::Image(ImageResource{
-                usage: ImageResourceUsage::Sample,
-                resource: offscreen.clone()
-            })],
+            GpuResource {
+                usage: ResourceUsage::ShaderRead,
+                resource: offscreen.clone(),
+                stage: PipelineStage::FRAGMENT_SHADER
+            },
+            GpuResource{
+                usage: ResourceUsage::ShaderRead,
+                resource: depth.clone(),
+                stage: PipelineStage::VERTEX_SHADER,
+            }
+        ],
         outputs: vec![
-            GpuResource::Image(ImageResource{
-                usage: ImageResourceUsage::Attachment,
-                resource: offscreen.upgrade()
-            })
+            GpuResource{
+                usage: ResourceUsage::Attachment,
+                resource: offscreen.upgrade(),
+                stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT
+            }
         ]
     };
 
     // Todo: we can abstract this concept away.
-    let GpuResource::Image(p2_output) = &p2.outputs[0] else { unimplemented!() };
+    let p2_output = &p2.outputs[0] else { unimplemented!() };
     let p2_output = p2_output.resource.clone();
 
 
     let p3 = Pass {
         name: "Finalize output".to_string(),
         inputs: vec![
-            GpuResource::Image(ImageResource{
-                usage: ImageResourceUsage::Sample,
-                resource: p2_output
-            }),
-            GpuResource::Image(ImageResource{
-                usage: ImageResourceUsage::Sample,
+            GpuResource{
+                usage: ResourceUsage::ShaderRead,
+                resource: p2_output,
+                stage: PipelineStage::FRAGMENT_SHADER
+            },
+            GpuResource{
+                usage: ResourceUsage::ShaderRead,
                 resource: depth.clone(),
-            })
+                stage: PipelineStage::FRAGMENT_SHADER,
+            }
         ],
         outputs: vec![
-            GpuResource::Image(ImageResource {
-                usage: ImageResourceUsage::Attachment,
-                resource: swap.clone()
-            })
+            GpuResource {
+                usage: ResourceUsage::Attachment,
+                resource: swap.clone(),
+                stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+            }
         ]
     };
 
@@ -128,7 +145,7 @@ fn test_graph() -> Result<(), ph::Error> {
     graph.add_pass(p2)?;
     graph.add_pass(p3)?;
 
-    graph.build();
+    graph.build()?;
 
     display_dot(&graph.task_graph(), "output/2.svg");
 

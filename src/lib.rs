@@ -70,6 +70,8 @@
 //! };
 //! ```
 
+#![feature(specialization)]
+
 extern crate core;
 
 #[macro_use]
@@ -95,6 +97,7 @@ pub mod execution_manager;
 pub mod swapchain;
 pub mod command_buffer;
 pub mod pass;
+pub mod pipeline;
 
 use std::sync::Arc;
 use ash::vk;

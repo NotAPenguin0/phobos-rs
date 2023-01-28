@@ -19,8 +19,9 @@ fn main_loop(frame: &mut ph::FrameManager, exec: &ph::ExecutionManager,
              surface: &ph::Surface, window: &winit::window::Window) -> Result<(), ph::Error> {
 
     block_on(frame.new_frame(&exec, window, &surface, |ifc| {
+        // note that this is bad practice and should not be done in the real api.
         exec.on_domain::<ph::domain::Graphics>()?
-        .transition_image(&ifc.swapchain_image, 
+        .transition_image(&ifc.swapchain_image,
             vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
             vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
             vk::AccessFlags::empty(), vk::AccessFlags::empty())
