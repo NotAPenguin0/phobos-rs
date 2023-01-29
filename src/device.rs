@@ -40,6 +40,7 @@ impl Device {
 
         // Add required extensions
         extension_names.push(CString::from(ash::extensions::khr::Synchronization2::name()));
+        extension_names.push(CString::from(ash::extensions::khr::DynamicRendering::name()));
         if settings.window.is_some() {
             extension_names.push(CString::from(ash::extensions::khr::Swapchain::name()));
         }
