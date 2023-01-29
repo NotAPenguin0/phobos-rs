@@ -2,12 +2,13 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use ash::vk;
 use layout::backends::svg::SVGWriter;
 use phobos as ph;
 use ph::task_graph::*;
 use layout::gv;
 use layout::gv::GraphBuilder;
-use phobos::pass::Pass;
+use phobos::pass::{Pass, PassBuilder};
 use phobos::pipeline::PipelineStage;
 
 pub fn display_dot<R, B>(graph: &ph::TaskGraph<R, B>, path: &str) where R: Debug + Default + Resource + Clone, B: Barrier<R> + Clone {
@@ -73,73 +74,20 @@ fn test_graph() -> Result<(), ph::Error> {
 
     // Sample graph, not a model of a real render pass system.
 
-    let p1 = Pass {
-        name: "Offscreen render".to_string(),
-        inputs: vec![],
-        outputs: vec![
-            GpuResource {
-                usage: ResourceUsage::Attachment,
-                resource: offscreen.clone(),
-                stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
-            },
-            GpuResource {
-                usage: ResourceUsage::Attachment,
-                resource: depth.clone(),
-                stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT
-            }
-        ]
-    };
-
-    let p2 = Pass {
-        name: "Postprocess render".to_string(),
-        inputs: vec![
-            GpuResource {
-                usage: ResourceUsage::ShaderRead,
-                resource: offscreen.clone(),
-                stage: PipelineStage::FRAGMENT_SHADER
-            },
-            GpuResource{
-                usage: ResourceUsage::ShaderRead,
-                resource: depth.clone(),
-                stage: PipelineStage::VERTEX_SHADER,
-            }
-        ],
-        outputs: vec![
-            GpuResource{
-                usage: ResourceUsage::Attachment,
-                resource: offscreen.upgrade(),
-                stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT
-            }
-        ]
-    };
-
-    // Todo: we can abstract this concept away.
-    let p2_output = &p2.outputs[0] else { unimplemented!() };
-    let p2_output = p2_output.resource.clone();
-
-
-    let p3 = Pass {
-        name: "Finalize output".to_string(),
-        inputs: vec![
-            GpuResource{
-                usage: ResourceUsage::ShaderRead,
-                resource: p2_output,
-                stage: PipelineStage::FRAGMENT_SHADER
-            },
-            GpuResource{
-                usage: ResourceUsage::ShaderRead,
-                resource: depth.clone(),
-                stage: PipelineStage::FRAGMENT_SHADER,
-            }
-        ],
-        outputs: vec![
-            GpuResource {
-                usage: ResourceUsage::Attachment,
-                resource: swap.clone(),
-                stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
-            }
-        ]
-    };
+    // TODO: Add clear values, OR possibly do this only when binding physical resources?
+    let p1 = PassBuilder::new(String::from("Offscreen render"))
+        .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR)
+        .depth_attachment(depth.clone(), vk::AttachmentLoadOp::CLEAR)
+        .get();
+    let p2 = PassBuilder::new(String::from("Postprocess render"))
+        .color_attachment(p1.output(&offscreen).unwrap(), vk::AttachmentLoadOp::LOAD)
+        .sample_image(p1.output(&depth).unwrap(), PipelineStage::VERTEX_SHADER)
+        .get();
+    let p3 = PassBuilder::new(String::from("Finalize output"))
+        .color_attachment(swap, vk::AttachmentLoadOp::CLEAR)
+        .sample_image(p2.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
+        .sample_image(p1.output(&depth).unwrap(), PipelineStage::FRAGMENT_SHADER)
+        .get();
 
     graph.add_pass(p1)?;
     graph.add_pass(p2)?;

@@ -70,7 +70,10 @@
 //! };
 //! ```
 
-#![feature(specialization)]
+
+// We use min_specialization because specialization is not fully stable yet.
+// Some day (hopefully), specialization will replace this feature and we can remove this.
+#![feature(min_specialization)]
 
 extern crate core;
 

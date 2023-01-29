@@ -38,7 +38,7 @@ fn create_vk_instance<Window: WindowInterface>(entry: &ash::Entry, settings: &Ap
     let app_name = CString::new(settings.name.clone())?;
     let engine_name = CString::new("Phobos")?;
     let app_info = vk::ApplicationInfo {
-        api_version: vk::make_api_version(0, 1, 2, 0),
+        api_version: vk::make_api_version(0, 1, 3, 0),
         p_application_name: app_name.as_ptr(),
         p_engine_name: engine_name.as_ptr(),
         engine_version: vk::make_api_version(0,

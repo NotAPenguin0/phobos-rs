@@ -5,8 +5,6 @@ use std::collections::HashMap;
 /// Note that the task graph deals in purely virtual resources. There are no physical resources bound to the task graph.
 
 use std::fmt::{Debug, Display, Formatter};
-use std::iter::FilterMap;
-use std::mem::uninitialized;
 use ash::vk;
 
 use petgraph::graph::*;
@@ -62,6 +60,7 @@ pub struct VirtualResource {
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub enum ResourceUsage {
     #[default]
+    Nothing,
     Attachment,
     ShaderRead,
     ShaderWrite,
@@ -85,6 +84,10 @@ pub struct GpuBarrier<R = GpuResource> {
 
 pub struct GpuTaskGraph {
     graph: TaskGraph<GpuResource, GpuBarrier>,
+    // Note that this is guaranteed to be stable.
+    // This is because the only time indices are invalidated is when deleting a node, and even then only the last
+    // index is invalidated. Since the source is always the first node, this is never invalidated.
+    source: NodeIndex,
 }
 
 impl VirtualResource {
@@ -103,8 +106,13 @@ impl VirtualResource {
     /// Returns the full, original name of the resource (without potential version star symbols)
     pub fn name(&self) -> String {
         let mut name = self.uid.clone();
-        name.retain(|c| c != '*');
+        name.retain(|c| c != '+');
         name
+    }
+
+    pub fn is_source(&self) -> bool {
+        // ends_with is a bit more efficient, since we know the '+' is always at the end of a resource uid.
+        !self.uid.ends_with('+')
     }
 
     /// Two virtual resources are associated if and only if their uid's only differ by "*" symbols.
@@ -162,16 +170,18 @@ impl Resource for GpuResource {
 }
 
 impl ResourceUsage {
-    fn access(&self) -> vk::AccessFlags2 {
+    pub fn access(&self) -> vk::AccessFlags2 {
         match self {
+            ResourceUsage::Nothing => { vk::AccessFlags2::NONE }
             ResourceUsage::Attachment => { vk::AccessFlags2::COLOR_ATTACHMENT_WRITE }
             ResourceUsage::ShaderRead => { vk::AccessFlags2::SHADER_READ }
             ResourceUsage::ShaderWrite => { vk::AccessFlags2::SHADER_WRITE }
         }
     }
 
-    fn is_read(&self) -> bool {
+    pub fn is_read(&self) -> bool {
         match self {
+            ResourceUsage::Nothing => { true }
             ResourceUsage::Attachment => { false }
             ResourceUsage::ShaderRead => { true }
             ResourceUsage::ShaderWrite => { false }
@@ -182,13 +192,37 @@ impl ResourceUsage {
 impl GpuTaskGraph {
     /// Create a new task graph.
     pub fn new() -> Self {
-        GpuTaskGraph {
-            graph: TaskGraph::new()
-        }
+        let mut graph = GpuTaskGraph {
+            graph: TaskGraph::new(),
+            source: NodeIndex::default()
+        };
+
+        // insert dummy 'source' node. This node produces all initial inputs and is used for start of frame sync.
+        graph.graph.add_task(Task {
+            identifier: "_source".to_string(),
+            inputs: vec![],
+            outputs: vec![],
+        }).unwrap();
+        // ...
+        graph.source = graph.graph.graph.node_indices().next().unwrap();
+        graph
     }
-    
-    // note: pass api highly experimental and will be changed a lot.
+
     pub fn add_pass(&mut self, pass: Pass) -> Result<(), Error> {
+        // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
+        let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
+        for input in &pass.inputs {
+            if input.resource.is_source() {
+                source.outputs.push(
+                    GpuResource {
+                        usage: ResourceUsage::Nothing,
+                        resource: input.resource.clone(),
+                        stage: PipelineStage::TOP_OF_PIPE,
+                    }
+                )
+            }
+        }
+
         self.graph.add_task(Task {
             identifier: pass.name,
             inputs: pass.inputs,
@@ -296,11 +330,11 @@ impl<R, B> TaskGraph<R, B> where R: Debug + Clone + Default + Resource, B: Barri
         }
     }
 
-    fn get_edge_attributes(graph: &Graph<Node<R, B>, String>, edge: EdgeReference<String>) -> String {
+    fn get_edge_attributes(_: &Graph<Node<R, B>, String>, _: EdgeReference<String>) -> String {
         String::from("")
     }
 
-    fn get_node_attributes(graph: &Graph<Node<R, B>, String>, node: (NodeIndex, &Node<R, B>)) -> String {
+    fn get_node_attributes(_: &Graph<Node<R, B>, String>, node: (NodeIndex, &Node<R, B>)) -> String {
         match node.1 {
             Node::Task(_) => { String::from("fillcolor = \"#5e6df7\"") }
             Node::Barrier(_) => { String::from("fillcolor = \"#f75e70\" shape=box") }
@@ -418,7 +452,7 @@ impl<R, B> Display for Node<R, B> where R: Debug + Default + Resource, B: Barrie
     default fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),
-            Node::Barrier(barrier) => { f.write_fmt(format_args!("Barrier"))}
+            Node::Barrier(_) => { f.write_fmt(format_args!("Barrier"))}
         }
     }
 }

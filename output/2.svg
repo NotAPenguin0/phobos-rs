@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg width="1634" height="1382" viewBox="0 0 1634 1382" xmlns="http://www.w3.org/2000/svg">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg width="2284" height="1652" viewBox="0 0 2284 1652" xmlns="http://www.w3.org/2000/svg">
 <defs>
 <marker id="startarrow" markerWidth="10" markerHeight="7"
 refX="0" refY="3.5" orient="auto">
@@ -11,44 +11,75 @@ refX="10" refY="3.5" orient="auto">
 
 </defs><style>
 .a14 { font-size: 14px; font-family: Times, serif; }
+.a15 { font-size: 15px; font-family: Times, serif; }
 </style>
-<ellipse cx="791" cy="47" rx="164" ry="17" fill="#5e6df7ff" 
+<ellipse cx="1322.5" cy="47" rx="101" ry="17" fill="#5e6df7ff" 
             stroke-width="1" stroke="#000000ff"/>
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="791" y="33" class="a14"><tspan x = "791" dy="1.0em">Task: Offscreen render</tspan></text><ellipse cx="378" cy="307" rx="178" ry="17" fill="#5e6df7ff" 
+            x="1322.5" y="33" class="a14"><tspan x = "1322.5" dy="1.0em">Task: _source</tspan></text><ellipse cx="868" cy="307" rx="164" ry="17" fill="#5e6df7ff" 
             stroke-width="1" stroke="#000000ff"/>
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="378" y="293" class="a14"><tspan x = "378" dy="1.0em">Task: Postprocess render</tspan></text><ellipse cx="1209.5" cy="567" rx="157" ry="17" fill="#5e6df7ff" 
+            x="868" y="293" class="a14"><tspan x = "868" dy="1.0em">Task: Offscreen render</tspan></text><ellipse cx="685.25" cy="567" rx="178" ry="17" fill="#5e6df7ff" 
             stroke-width="1" stroke="#000000ff"/>
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="1209.5" y="553" class="a14"><tspan x = "1209.5" dy="1.0em">Task: Finalize output</tspan></text><rect x="37" y="158" width="682" height="38" fill="#f75e70ff" 
+            x="685.25" y="553" class="a14"><tspan x = "685.25" dy="1.0em">Task: Postprocess render</tspan></text><ellipse cx="685.25" cy="827" rx="157" ry="17" fill="#5e6df7ff" 
+            stroke-width="1" stroke="#000000ff"/>
+<text dominant-baseline="middle" text-anchor="middle" 
+            x="685.25" y="813" class="a14"><tspan x = "685.25" dy="1.0em">Task: Finalize output</tspan></text><rect x="583" y="158" width="570" height="38" fill="#f75e70ff" 
             stroke-width="1" stroke="#000000ff" rx="0"  />
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="378" y="156" class="a14"><tspan x = "378" dy="1.0em">offscreen(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "378" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; FRAGMENT_SHADER)</tspan></text><rect x="779" y="158" width="850" height="38" fill="#f75e70ff" 
+            x="868" y="156" class="a14"><tspan x = "868" dy="1.0em">offscreen( =&gt; COLOR_ATTACHMENT_WRITE)</tspan><tspan x = "868" dy="1.0em">(TOP_OF_PIPE =&gt; COLOR_ATTACHMENT_OUTPUT)</tspan></text><rect x="1321.5" y="158" width="528" height="38" fill="#f75e70ff" 
             stroke-width="1" stroke="#000000ff" rx="0"  />
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="1204" y="156" class="a14"><tspan x = "1204" dy="1.0em">depth(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "1204" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; VERTEX_SHADER | FRAGMENT_SHADER)</tspan></text><rect x="30" y="418" width="696" height="38" fill="#f75e70ff" 
+            x="1585.5" y="156" class="a14"><tspan x = "1585.5" dy="1.0em">depth( =&gt; COLOR_ATTACHMENT_WRITE)</tspan><tspan x = "1585.5" dy="1.0em">(TOP_OF_PIPE =&gt; EARLY_FRAGMENT_TESTS)</tspan></text><rect x="1709" y="678" width="570" height="38" fill="#f75e70ff" 
             stroke-width="1" stroke="#000000ff" rx="0"  />
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="378" y="416" class="a14"><tspan x = "378" dy="1.0em">offscreen+(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "378" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; FRAGMENT_SHADER)</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="310" y="229" class="a14"><tspan x = "310" dy="1.0em">offscreen</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="1169.5" y="489" class="a14"><tspan x = "1169.5" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="718.75" y="489" class="a14"><tspan x = "718.75" dy="1.0em">offscreen+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="516.5" y="97" class="a14"><tspan x = "516.5" dy="1.0em">offscreen</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="957.5" y="97" class="a14"><tspan x = "957.5" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="751" y="229" class="a14"><tspan x = "751" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
-            x="303" y="357" class="a14"><tspan x = "303" dy="1.0em">offscreen+</tspan></text><path id="arrow0" d="M 378 196 C 378 226, 378 213, 378 243 S 378 260, 378 290 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            x="1994" y="676" class="a14"><tspan x = "1994" dy="1.0em">swapchain( =&gt; COLOR_ATTACHMENT_WRITE)</tspan><tspan x = "1994" dy="1.0em">(TOP_OF_PIPE =&gt; COLOR_ATTACHMENT_OUTPUT)</tspan></text><rect x="884" y="418" width="850" height="38" fill="#f75e70ff" 
+            stroke-width="1" stroke="#000000ff" rx="0"  />
+<text dominant-baseline="middle" text-anchor="middle" 
+            x="1309" y="416" class="a14"><tspan x = "1309" dy="1.0em">offscreen+(COLOR_ATTACHMENT_WRITE =&gt; COLOR_ATTACHMENT_WRITE)</tspan><tspan x = "1309" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; COLOR_ATTACHMENT_OUTPUT)</tspan></text><rect x="30" y="418" width="794" height="38" fill="#f75e70ff" 
+            stroke-width="1" stroke="#000000ff" rx="0"  />
+<text dominant-baseline="middle" text-anchor="middle" 
+            x="427" y="416" class="a14"><tspan x = "427" dy="1.0em">depth+(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "427" dy="1.0em">(LATE_FRAGMENT_TESTS =&gt; VERTEX_SHADER | FRAGMENT_SHADER)</tspan></text><rect x="330.25" y="678" width="710" height="38" fill="#f75e70ff" 
+            stroke-width="1" stroke="#000000ff" rx="0"  />
+<text dominant-baseline="middle" text-anchor="middle" 
+            x="685.25" y="676" class="a14"><tspan x = "685.25" dy="1.0em">offscreen++(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "685.25" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; FRAGMENT_SHADER)</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="800" y="229" class="a14"><tspan x = "800" dy="1.0em">offscreen</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="922.125" y="489" class="a14"><tspan x = "922.125" dy="1.0em">offscreen+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="1271.625" y="749" class="a14"><tspan x = "1271.625" dy="1.0em">swapchain</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="603.25" y="749" class="a14"><tspan x = "603.25" dy="1.0em">offscreen++</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="1027.25" y="97" class="a14"><tspan x = "1027.25" dy="1.0em">offscreen</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="1414" y="97" class="a14"><tspan x = "1414" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="1186.75" y="229" class="a14"><tspan x = "1186.75" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="1926" y="617" class="a14"><tspan x = "1926" dy="1.0em">swapchain</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="1013.5" y="357" class="a14"><tspan x = "1013.5" dy="1.0em">offscreen+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="600.5" y="357" class="a14"><tspan x = "600.5" dy="1.0em">depth+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="509.125" y="489" class="a14"><tspan x = "509.125" dy="1.0em">depth+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="603.25" y="617" class="a14"><tspan x = "603.25" dy="1.0em">offscreen++</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="182" y="552" class="a15"><tspan x = "182" dy="1.0em">depth+</tspan></text><path id="arrow0" d="M 868 196 C 868 226, 868 213, 868 243 S 868 260, 868 290 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow0" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow1" d="M 1205.5833333333333 196 C 1208.0746977289455 225.8963727473464, 1209.5 213, 1209.5 243 S 1209.5 277, 1209.5 307 S 1209.5 341, 1209.5 371 S 1209.5 407, 1209.5 437 S 1209.5 473, 1209.5 503 S 1209.5 520, 1209.5 550 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow0" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow1" d="M 1219.217803030303 456 C 1189.8678158868854 462.2111395638174, 1026.490645350615 496.8639904590495, 997.125 503 S 789.7437646347028 545.5567905839808, 760.3561593096681 551.5874334402605 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow1" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow2" d="M 621.594696969697 456 C 650.5355386379297 463.90111913176156, 764.5977002262887 496.09279610589516, 793.75 503 S 1089.5229947404764 548.5308999720758, 1119.1737333022475 553.095295084411 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow1" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow2" d="M 1709 715.3736263736264 C 1679.246307158017 719.2099999561824, 1369.4162446607195 759.4949366566797, 1339.625 763 S 831.6167297049865 812.6848585274206, 801.7591906140294 815.6050228090959 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow2" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow3" d="M 738.9808596797791 63.12215486922102 C 710.3255512659152 72.0032189781183, 613.1213951465945 102.01119375086665, 584.5 111 S 466.0229058694283 148.86677100541274, 437.4469696969697 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow2" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow3" d="M 370.8636363636364 456 C 342.4471572764581 465.6178852295065, 232 473, 232 503 S 232 537, 232 567 S 232 601, 232 631 S 232 667, 232 697 S 232 733, 232 763 S 560.0069948161498 809.3153837136979, 589.7123221025548 813.5098480188935 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow3" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow4" d="M 843.0191403202209 63.12215486922102 C 871.6744487340848 72.0032189781183, 968.8786048534055 102.01119375086665, 997.5 111 S 1115.9770941305717 148.86677100541272, 1144.5530303030303 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow3" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow4" d="M 685.25 716 C 685.25 746, 685.25 733, 685.25 763 S 685.25 780, 685.25 810 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow4" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow5" d="M 1085.1060606060605 196 C 1055.4819469621107 200.73411985593387, 820.633284910991 238.32415329726226, 791 243 S 501.0371498873428 287.93371042908007, 471.3909957505958 292.5277875834428 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow4" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow5" d="M 1270.685413714292 61.592446742729635 C 1241.8087334229253 69.72493316142038, 1124.0974791715391 102.76542014652361, 1095.25 111 S 962.2300199715135 149.63286548682117, 933.4204545454545 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow5" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow6" d="M 378 324 C 378 354, 378 341, 378 371 S 378 388, 378 418 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow5" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow6" d="M 1355.511284909781 63.0663287773839 C 1382.4861562322405 76.1947832613186, 1427.0944660949897 97.73126406767364, 1454 111 S 1520.8315443053002 144.54282832053082, 1547.6439393939395 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow6" startOffset="50%" text-anchor="middle" class="a14"></textPath></text></svg>
+<text><textPath href="#arrow6" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow7" d="M 1388.2234848484848 196 C 1359.41886522896 204.38414507117372, 1255.784845515076 235.59960325971636, 1226.75 243 S 979.9273671225483 287.03246969799835, 950.3936498770311 292.3012025306481 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            fill="transparent" />
+<text><textPath href="#arrow7" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow8" d="M 1410.3880325909686 55.376521348953084 C 1440.2526968093948 58.2228929200317, 1994 81, 1994 111 S 1994 147, 1994 177 S 1994 213, 1994 243 S 1994 277, 1994 307 S 1994 341, 1994 371 S 1994 407, 1994 437 S 1994 473, 1994 503 S 1994 537, 1994 567 S 1994 601, 1994 631 S 1994 648, 1994 678 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            fill="transparent" />
+<text><textPath href="#arrow8" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow9" d="M 923.1582369506423 323.0096470060821 C 951.969187966569 331.37200920571615, 1059.7193401542331 362.53487888633197, 1088.5 371 S 1216.7825632688523 409.39750193081295, 1245.5227272727273 418 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            fill="transparent" />
+<text><textPath href="#arrow9" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow10" d="M 812.8417630493577 323.0096470060821 C 784.030812033431 331.37200920571615, 676.2806598457668 362.53487888633197, 647.5 371 S 519.2174367311477 409.39750193081295, 490.47727272727275 418 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            fill="transparent" />
+<text><textPath href="#arrow10" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow11" d="M 464.1723484848485 456 C 490.8851560700813 469.65378742013837, 529.3426124610729 489.484442448193, 556.125 503 S 624.6912303864133 536.9844239669347, 651.5707200494019 550.3070751842147 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            fill="transparent" />
+<text><textPath href="#arrow11" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow12" d="M 685.25 584 C 685.25 614, 685.25 601, 685.25 631 S 685.25 648, 685.25 678 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            fill="transparent" />
+<text><textPath href="#arrow12" startOffset="50%" text-anchor="middle" class="a14"></textPath></text></svg>
