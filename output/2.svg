@@ -10,8 +10,8 @@ refX="10" refY="3.5" orient="auto">
 </marker>
 
 </defs><style>
-.a14 { font-size: 14px; font-family: Times, serif; }
 .a15 { font-size: 15px; font-family: Times, serif; }
+.a14 { font-size: 14px; font-family: Times, serif; }
 </style>
 <ellipse cx="1322.5" cy="47" rx="101" ry="17" fill="#5e6df7ff" 
             stroke-width="1" stroke="#000000ff"/>

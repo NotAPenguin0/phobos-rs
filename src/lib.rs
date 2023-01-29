@@ -152,6 +152,8 @@ pub struct GPURequirements {
     pub features_1_1: vk::PhysicalDeviceVulkan11Features,
     /// Vulkan 1.2 features that are required from the physical device.
     pub features_1_2: vk::PhysicalDeviceVulkan12Features,
+    /// Vulkan 1.3 features that are required from the physical device.
+    pub features_1_3: vk::PhysicalDeviceVulkan13Features,
     /// Vulkan extensions that should be present and enabled.
     pub device_extensions: Vec<String>,
 }

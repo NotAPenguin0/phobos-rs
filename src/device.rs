@@ -45,10 +45,20 @@ impl Device {
             extension_names.push(CString::from(ash::extensions::khr::Swapchain::name()));
         }
 
+        let mut features_1_1 = settings.gpu_requirements.features_1_1;
+        let mut features_1_2 = settings.gpu_requirements.features_1_2;
+        let mut features_1_3 = settings.gpu_requirements.features_1_3;
+        // enable the dynamic rendering feature
+        features_1_3.dynamic_rendering = vk::TRUE;
+
         let extension_names_raw = util::unwrap_to_raw_strings(extension_names.as_slice());
         let info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(queue_create_infos.as_slice())
             .enabled_extension_names(extension_names_raw.as_slice())
+            .enabled_features(&settings.gpu_requirements.features)
+            .push_next(&mut features_1_1)
+            .push_next(&mut features_1_2)
+            .push_next(&mut features_1_3)
             .build();
 
 
