@@ -1,20 +1,21 @@
 use ash::vk;
 use ash::vk::AttachmentLoadOp;
-use crate::{GpuResource, ResourceUsage, VirtualResource};
+use crate::{GpuResource, IncompleteCommandBuffer, ResourceUsage, VirtualResource};
+use crate::domain::ExecutionDomain;
 use crate::pipeline::PipelineStage;
 
-#[derive(Default)]
-pub struct Pass {
+pub struct Pass<D> where D: ExecutionDomain {
     pub name: String,
     pub inputs: Vec<GpuResource>,
     pub outputs: Vec<GpuResource>,
+    pub execute: fn(&IncompleteCommandBuffer<D>) -> ()
 }
 
-pub struct PassBuilder {
-    inner: Pass,
+pub struct PassBuilder<D> where D: ExecutionDomain {
+    inner: Pass<D>,
 }
 
-impl Pass {
+impl<D> Pass<D> where D: ExecutionDomain {
     /// Returns the output virtual resource associated with the input resource.
     pub fn output(&self, resource: &VirtualResource) -> Option<VirtualResource> {
         self.outputs.iter().filter_map(|output| {
@@ -24,13 +25,30 @@ impl Pass {
     }
 }
 
-impl PassBuilder {
+impl<D> PassBuilder<D> where D: ExecutionDomain {
     pub fn new(name: String) -> Self {
         PassBuilder {
             inner: Pass {
                 name,
-                ..Default::default()
+                execute: |_| {},
+                inputs: vec![],
+                outputs: vec![]
             },
+        }
+    }
+
+    /// Create a pass for presenting to the swapchain.
+    /// Note that this doesn't actually do the presentation, it just adds the proper sync for it.
+    pub fn present(name: String, swapchain: VirtualResource) -> Pass<D> {
+        Pass {
+            name,
+            inputs: vec![GpuResource{
+                usage: ResourceUsage::Present,
+                resource: swapchain,
+                stage: PipelineStage::BOTTOM_OF_PIPE,
+            }],
+            outputs: vec![],
+            execute: |_| {}
         }
     }
 
@@ -89,7 +107,7 @@ impl PassBuilder {
         self
     }
 
-    pub fn get(self) -> Pass {
+    pub fn get(self) -> Pass<D> {
         self.inner
     }
 }

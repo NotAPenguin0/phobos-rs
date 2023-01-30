@@ -5,6 +5,7 @@ use std::collections::HashMap;
 /// Note that the task graph deals in purely virtual resources. There are no physical resources bound to the task graph.
 
 use std::fmt::{Debug, Display, Formatter};
+use std::marker::PhantomData;
 use ash::vk;
 
 use petgraph::graph::*;
@@ -12,8 +13,11 @@ use petgraph;
 use petgraph::Direction;
 use petgraph::dot::Dot;
 use petgraph::prelude::EdgeRef;
+use petgraph::visit::{IntoEdgeReferences, IntoNodeReferences};
+use crate::domain::ExecutionDomain;
 
 use crate::error::Error;
+use crate::IncompleteCommandBuffer;
 use crate::pass::Pass;
 use crate::pipeline::PipelineStage;
 
@@ -27,11 +31,9 @@ pub trait Resource {
 }
 
 /// Task in a task dependency graph. This is parametrized on a resource type.
-#[derive(Debug, Clone)]
-pub struct Task<R> where R: Resource {
-    pub identifier: String,
-    pub inputs: Vec<R>,
-    pub outputs: Vec<R>
+pub trait Task<R> where R: Resource {
+    fn inputs(&self) -> &Vec<R>;
+    fn outputs(&self) -> &Vec<R>;
 }
 
 /// Represents a barrier in the task graph.
@@ -41,13 +43,14 @@ pub trait Barrier<R> where R: Resource {
 }
 
 #[derive(Debug, Clone)]
-pub enum Node<R, B> where R: Resource + Default, B: Barrier<R> + Clone {
-    Task(Task<R>),
-    Barrier(B)
+pub enum Node<R, B, T> where R: Resource, B: Barrier<R> + Clone, T: Task<R> + Clone {
+    Task(T),
+    Barrier(B),
+    _Unreachable((!, PhantomData<R>)),
 }
 
-pub struct TaskGraph<R, B> where R: Resource + Default, B: Barrier<R> + Clone {
-    graph: Graph<Node<R, B>, String>,
+pub struct TaskGraph<R, B, T> where R: Resource + Default, B: Barrier<R> + Clone, T: Task<R> + Clone {
+    graph: Graph<Node<R, B, T>, String>,
 }
 
 
@@ -61,6 +64,7 @@ pub struct VirtualResource {
 pub enum ResourceUsage {
     #[default]
     Nothing,
+    Present,
     Attachment,
     ShaderRead,
     ShaderWrite,
@@ -82,8 +86,15 @@ pub struct GpuBarrier<R = GpuResource> {
     pub dst_stage: PipelineStage,
 }
 
-pub struct GpuTaskGraph {
-    graph: TaskGraph<GpuResource, GpuBarrier>,
+pub struct GpuTask<R, D> where R: Resource, D: ExecutionDomain {
+    pub identifier: String,
+    pub inputs: Vec<R>,
+    pub outputs: Vec<R>,
+    pub execute: fn(&IncompleteCommandBuffer<D>) -> ()
+}
+
+pub struct GpuTaskGraph<D> where D: ExecutionDomain {
+    graph: TaskGraph<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>,
     // Note that this is guaranteed to be stable.
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
     // index is invalidated. Since the source is always the first node, this is never invalidated.
@@ -169,10 +180,32 @@ impl Resource for GpuResource {
     }
 }
 
+impl<R, D> Task<R> for GpuTask<R, D> where R: Resource, D: ExecutionDomain {
+    fn inputs(&self) -> &Vec<R> {
+        &self.inputs
+    }
+
+    fn outputs(&self) -> &Vec<R> {
+        &self.outputs
+    }
+}
+
+impl<R, D> Clone for GpuTask<R, D> where R: Resource + Clone, D: ExecutionDomain {
+    fn clone(&self) -> Self {
+        Self {
+            identifier: self.identifier.clone(),
+            inputs: self.inputs.clone(),
+            outputs: self.outputs.clone(),
+            execute: self.execute.clone()
+        }
+    }
+}
+
 impl ResourceUsage {
     pub fn access(&self) -> vk::AccessFlags2 {
         match self {
             ResourceUsage::Nothing => { vk::AccessFlags2::NONE }
+            ResourceUsage::Present => { vk::AccessFlags2::NONE }
             ResourceUsage::Attachment => { vk::AccessFlags2::COLOR_ATTACHMENT_WRITE }
             ResourceUsage::ShaderRead => { vk::AccessFlags2::SHADER_READ }
             ResourceUsage::ShaderWrite => { vk::AccessFlags2::SHADER_WRITE }
@@ -182,6 +215,7 @@ impl ResourceUsage {
     pub fn is_read(&self) -> bool {
         match self {
             ResourceUsage::Nothing => { true }
+            ResourceUsage::Present => { false }
             ResourceUsage::Attachment => { false }
             ResourceUsage::ShaderRead => { true }
             ResourceUsage::ShaderWrite => { false }
@@ -189,7 +223,7 @@ impl ResourceUsage {
     }
 }
 
-impl GpuTaskGraph {
+impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
     /// Create a new task graph.
     pub fn new() -> Self {
         let mut graph = GpuTaskGraph {
@@ -198,17 +232,18 @@ impl GpuTaskGraph {
         };
 
         // insert dummy 'source' node. This node produces all initial inputs and is used for start of frame sync.
-        graph.graph.add_task(Task {
+        graph.graph.add_task(GpuTask {
             identifier: "_source".to_string(),
             inputs: vec![],
             outputs: vec![],
+            execute: |_| {}
         }).unwrap();
         // ...
         graph.source = graph.graph.graph.node_indices().next().unwrap();
         graph
     }
 
-    pub fn add_pass(&mut self, pass: Pass) -> Result<(), Error> {
+    pub fn add_pass(&mut self, pass: Pass<D>) -> Result<(), Error> {
         // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
         let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
         for input in &pass.inputs {
@@ -223,10 +258,11 @@ impl GpuTaskGraph {
             }
         }
 
-        self.graph.add_task(Task {
+        self.graph.add_task(GpuTask {
             identifier: pass.name,
             inputs: pass.inputs,
-            outputs: pass.outputs
+            outputs: pass.outputs,
+            execute: pass.execute
         })?;
 
         Ok(())
@@ -241,11 +277,11 @@ impl GpuTaskGraph {
     }
 
     /// Returns the task graph built by the GPU task graph system, useful for outputting dotfiles.
-    pub fn task_graph(&self) -> &TaskGraph<GpuResource, GpuBarrier> {
+    pub fn task_graph(&self) -> &TaskGraph<GpuResource, GpuBarrier, GpuTask<GpuResource, D>> {
         &self.graph
     }
 
-    fn barrier_src_resource(graph: &Graph<Node<GpuResource, GpuBarrier>, String>, node: NodeIndex) -> Result<&GpuResource, Error> {
+    fn barrier_src_resource(graph: &Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&GpuResource, Error> {
         let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(Error::NodeNotFound) };
         let edge = graph.edges_directed(node, Direction::Incoming).next().unwrap();
         let src_node = edge.source();
@@ -255,7 +291,7 @@ impl GpuTaskGraph {
         Ok(task.inputs.iter().find(|&input| input.uid() == barrier.resource.uid()).unwrap())
     }
 
-    fn barrier_dst_resource(graph: &Graph<Node<GpuResource, GpuBarrier>, String>, node: NodeIndex) -> Result<&GpuResource, Error> {
+    fn barrier_dst_resource(graph: &Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&GpuResource, Error> {
         // We know that:
         // 1) Each barrier has at least one outgoing edge
         // 2) During the merge, each outgoing edge from a barrier will have the same resource usage
@@ -269,10 +305,11 @@ impl GpuTaskGraph {
         Ok(task.inputs.iter().find(|&input| input.uid() == barrier.resource.uid()).unwrap())
     }
 
-    fn barriers(graph: &Graph<Node<GpuResource, GpuBarrier>, String>) -> impl Iterator<Item = (NodeIndex, &GpuBarrier)> + '_ {
+    fn barriers(graph: &Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>) -> impl Iterator<Item = (NodeIndex, &GpuBarrier)> + '_ {
         graph.node_indices().filter_map(|node| match graph.node_weight(node).unwrap() {
             Node::Task(_) => { None }
             Node::Barrier(barrier) => { Some((node, barrier)) }
+            Node::_Unreachable(_) => { unreachable!() }
         })
     }
 
@@ -310,7 +347,6 @@ impl GpuTaskGraph {
         for (src, dst, uid) in edges_to_add {
             graph.update_edge(src, dst, uid);
         }
-        graph.retain_nodes(|_, node| { !to_remove.contains(&node) });
         for node in graph.node_indices() {
             if let Node::Barrier(barrier) = graph.node_weight_mut(node).unwrap() {
                 let (stage, access) = barrier_flags.get(&node).cloned().unwrap();
@@ -318,41 +354,26 @@ impl GpuTaskGraph {
                 barrier.dst_access = access;
             }
         }
+        graph.retain_nodes(|_, node| { !to_remove.contains(&node) });
 
         Ok(())
     }
 }
 
-impl<R, B> TaskGraph<R, B> where R: Debug + Clone + Default + Resource, B: Barrier<R> + Clone {
+impl<R, B, T> TaskGraph<R, B, T> where R: Debug + Clone + Default + Resource, B: Barrier<R> + Clone, T: Task<R> + Clone {
     pub fn new() -> Self {
         TaskGraph {
             graph: Graph::new()
         }
     }
 
-    fn get_edge_attributes(_: &Graph<Node<R, B>, String>, _: EdgeReference<String>) -> String {
-        String::from("")
-    }
-
-    fn get_node_attributes(_: &Graph<Node<R, B>, String>, node: (NodeIndex, &Node<R, B>)) -> String {
-        match node.1 {
-            Node::Task(_) => { String::from("fillcolor = \"#5e6df7\"") }
-            Node::Barrier(_) => { String::from("fillcolor = \"#f75e70\" shape=box") }
-        }
-    }
-
-    /// Outputs graphviz-compatible dot file for displaying the graph.
-    pub fn as_dot(&self) -> Result<Dot<&Graph<Node<R, B>, String>>, Error> {
-        Ok(Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes))
-    }
-
-    fn is_dependent(&self, graph: &Graph<Node<R, B>, String>, child: NodeIndex, parent: NodeIndex) -> Result<Option<R>, Error> {
+    fn is_dependent(&self, graph: &Graph<Node<R, B, T>, String>, child: NodeIndex, parent: NodeIndex) -> Result<Option<R>, Error> {
         let child = graph.node_weight(child).ok_or(Error::NodeNotFound)?;
         let parent = graph.node_weight(parent).ok_or(Error::NodeNotFound)?;
         if let Node::Task(child) = child {
             if let Node::Task(parent) = parent {
-                return Ok(child.inputs.iter().find(|&input| {
-                    parent.outputs.iter().any(|output| input.is_dependency_of(&output))
+                return Ok(child.inputs().iter().find(|&input| {
+                    parent.outputs().iter().any(|output| input.is_dependency_of(&output))
                 })
                 .cloned());
             }
@@ -361,12 +382,24 @@ impl<R, B> TaskGraph<R, B> where R: Debug + Clone + Default + Resource, B: Barri
         Ok(None)
     }
 
-    fn is_task_node(graph: &Graph<Node<R, B>, String>, node: NodeIndex) -> Result<bool, Error> {
+    fn is_task_node(graph: &Graph<Node<R, B, T>, String>, node: NodeIndex) -> Result<bool, Error> {
         Ok(matches!(graph.node_weight(node).ok_or(Error::NodeNotFound)?, Node::Task(_)))
     }
 
+    fn get_edge_attributes(_: &Graph<Node<R, B, T>, String>, _: EdgeReference<String>) -> String {
+        String::from("")
+    }
+
+    fn get_node_attributes(_: &Graph<Node<R, B, T>, String>, node: (NodeIndex, &Node<R, B, T>)) -> String {
+        match node.1 {
+            Node::Task(_) => { String::from("fillcolor = \"#5e6df7\"") }
+            Node::Barrier(_) => { String::from("fillcolor = \"#f75e70\" shape=box") }
+            Node::_Unreachable(_) => { unreachable!() }
+        }
+    }
+
     /// Add a task to the task graph.
-    pub fn add_task(&mut self, task: Task<R>) -> Result<(), Error> {
+    pub fn add_task(&mut self, task: T) -> Result<(), Error> {
         let node = self.graph.add_node(Node::Task(task));
         // When adding a node, we need to update edges in the graph.
         // X = The newly added node
@@ -415,13 +448,15 @@ impl<R, B> TaskGraph<R, B> where R: Debug + Clone + Default + Resource, B: Barri
             if !Self::is_task_node(&self.graph, node).unwrap() { return; }
 
             let Node::Task(task) = self.graph.node_weight(node).cloned().unwrap() else { unimplemented!() };
-            for resource in &task.outputs {
+            for resource in task.outputs() {
                 // Find all nodes in the graph that depend directly on this resource
                 let consumers = self.graph.node_indices().filter(|&consumer| -> bool {
                     let consumer = self.graph.node_weight(consumer).unwrap();
                     match consumer {
-                        Node::Task(t) => { t.inputs.iter().any(|input| input.is_dependency_of(&resource)) }
-                        Node::Barrier(_) => false
+                        Node::Task(t) => { t.inputs().iter().any(|input| input.is_dependency_of(&resource)) }
+                        Node::Barrier(_) => false,
+
+                        Node::_Unreachable(_) => { unreachable!() }
                     }
                 }).collect::<Vec<NodeIndex>>();
 
@@ -439,29 +474,23 @@ impl<R, B> TaskGraph<R, B> where R: Debug + Clone + Default + Resource, B: Barri
     }
 }
 
-impl<> Display for Node<GpuResource, GpuBarrier> {
+pub trait GraphViz {
+    fn dot(&self) -> Result<String, Error>;
+}
+
+impl<D> GraphViz for TaskGraph<GpuResource, GpuBarrier<GpuResource>, GpuTask<GpuResource, D>> where D: ExecutionDomain {
+    fn dot(&self) -> Result<String, Error> {
+        Ok(format!("{}", Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes)))
+    }
+}
+
+impl<D> Display for Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>> where D: ExecutionDomain {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),
             Node::Barrier(barrier) => { f.write_fmt(format_args!("{}({:#?} => {:#?})\n({:#?} => {:#?})", &barrier.resource.uid(), barrier.src_access, barrier.dst_access, barrier.src_stage, barrier.dst_stage))}
+            Node::_Unreachable(_) => { unreachable!() }
         }
     }
 }
-
-impl<R, B> Display for Node<R, B> where R: Debug + Default + Resource, B: Barrier<R> + Clone {
-    default fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),
-            Node::Barrier(_) => { f.write_fmt(format_args!("Barrier"))}
-        }
-    }
-}
-
-impl<R, B> Display for TaskGraph<R, B> where R: Debug + Default + Resource, B: Barrier<R> + Clone {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let dot = petgraph::dot::Dot::new(&self.graph);
-        std::fmt::Display::fmt(&dot, f)
-    }
-}
-
 

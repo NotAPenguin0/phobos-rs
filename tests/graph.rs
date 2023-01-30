@@ -8,11 +8,12 @@ use phobos as ph;
 use ph::task_graph::*;
 use layout::gv;
 use layout::gv::GraphBuilder;
+use phobos::domain;
 use phobos::pass::{Pass, PassBuilder};
 use phobos::pipeline::PipelineStage;
 
-pub fn display_dot<R, B>(graph: &ph::TaskGraph<R, B>, path: &str) where R: Debug + Default + Resource + Clone, B: Barrier<R> + Clone {
-    let dot = graph.as_dot().unwrap();
+pub fn display_dot<G>(graph: &G, path: &str) where G: GraphViz {
+    let dot = graph.dot().unwrap();
     let dot = format!("{}", dot);
     let mut parser = gv::DotParser::new(&dot);
     match parser.process() {
@@ -66,7 +67,7 @@ impl Resource for StringResource {
 
 #[test]
 fn test_graph() -> Result<(), ph::Error> {
-    let mut graph = ph::GpuTaskGraph::new();
+    let mut graph = ph::GpuTaskGraph::<domain::All>::new();
 
     let offscreen = VirtualResource::new(String::from("offscreen"));
     let depth = VirtualResource::new(String::from("depth"));
@@ -84,18 +85,21 @@ fn test_graph() -> Result<(), ph::Error> {
         .sample_image(p1.output(&depth).unwrap(), PipelineStage::VERTEX_SHADER)
         .get();
     let p3 = PassBuilder::new(String::from("Finalize output"))
-        .color_attachment(swap, vk::AttachmentLoadOp::CLEAR)
+        .color_attachment(swap.clone(), vk::AttachmentLoadOp::CLEAR)
         .sample_image(p2.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
         .sample_image(p1.output(&depth).unwrap(), PipelineStage::FRAGMENT_SHADER)
         .get();
 
+    let p4 = PassBuilder::present(String::from("present"), p3.output(&swap).unwrap());
+
     graph.add_pass(p1)?;
     graph.add_pass(p2)?;
     graph.add_pass(p3)?;
+    graph.add_pass(p4)?;
 
     graph.build()?;
 
-    display_dot(&graph.task_graph(), "output/2.svg");
+    display_dot(graph.task_graph(), "output/2.svg");
 
     Ok(())
 }

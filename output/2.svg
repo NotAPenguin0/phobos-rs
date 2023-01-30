@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg width="2284" height="1652" viewBox="0 0 2284 1652" xmlns="http://www.w3.org/2000/svg">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg width="2284" height="1782" viewBox="0 0 2284 1782" xmlns="http://www.w3.org/2000/svg">
 <defs>
 <marker id="startarrow" markerWidth="10" markerHeight="7"
 refX="0" refY="3.5" orient="auto">
@@ -10,8 +10,8 @@ refX="10" refY="3.5" orient="auto">
 </marker>
 
 </defs><style>
-.a15 { font-size: 15px; font-family: Times, serif; }
 .a14 { font-size: 14px; font-family: Times, serif; }
+.a15 { font-size: 15px; font-family: Times, serif; }
 </style>
 <ellipse cx="1322.5" cy="47" rx="101" ry="17" fill="#5e6df7ff" 
             stroke-width="1" stroke="#000000ff"/>
@@ -25,7 +25,10 @@ refX="10" refY="3.5" orient="auto">
             x="685.25" y="553" class="a14"><tspan x = "685.25" dy="1.0em">Task: Postprocess render</tspan></text><ellipse cx="685.25" cy="827" rx="157" ry="17" fill="#5e6df7ff" 
             stroke-width="1" stroke="#000000ff"/>
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="685.25" y="813" class="a14"><tspan x = "685.25" dy="1.0em">Task: Finalize output</tspan></text><rect x="583" y="158" width="570" height="38" fill="#f75e70ff" 
+            x="685.25" y="813" class="a14"><tspan x = "685.25" dy="1.0em">Task: Finalize output</tspan></text><ellipse cx="685.25" cy="1087" rx="101" ry="17" fill="#5e6df7ff" 
+            stroke-width="1" stroke="#000000ff"/>
+<text dominant-baseline="middle" text-anchor="middle" 
+            x="685.25" y="1073" class="a14"><tspan x = "685.25" dy="1.0em">Task: present</tspan></text><rect x="583" y="158" width="570" height="38" fill="#f75e70ff" 
             stroke-width="1" stroke="#000000ff" rx="0"  />
 <text dominant-baseline="middle" text-anchor="middle" 
             x="868" y="156" class="a14"><tspan x = "868" dy="1.0em">offscreen( =&gt; COLOR_ATTACHMENT_WRITE)</tspan><tspan x = "868" dy="1.0em">(TOP_OF_PIPE =&gt; COLOR_ATTACHMENT_OUTPUT)</tspan></text><rect x="1321.5" y="158" width="528" height="38" fill="#f75e70ff" 
@@ -40,7 +43,10 @@ refX="10" refY="3.5" orient="auto">
             x="1309" y="416" class="a14"><tspan x = "1309" dy="1.0em">offscreen+(COLOR_ATTACHMENT_WRITE =&gt; COLOR_ATTACHMENT_WRITE)</tspan><tspan x = "1309" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; COLOR_ATTACHMENT_OUTPUT)</tspan></text><rect x="30" y="418" width="794" height="38" fill="#f75e70ff" 
             stroke-width="1" stroke="#000000ff" rx="0"  />
 <text dominant-baseline="middle" text-anchor="middle" 
-            x="427" y="416" class="a14"><tspan x = "427" dy="1.0em">depth+(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "427" dy="1.0em">(LATE_FRAGMENT_TESTS =&gt; VERTEX_SHADER | FRAGMENT_SHADER)</tspan></text><rect x="330.25" y="678" width="710" height="38" fill="#f75e70ff" 
+            x="427" y="416" class="a14"><tspan x = "427" dy="1.0em">depth+(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "427" dy="1.0em">(LATE_FRAGMENT_TESTS =&gt; VERTEX_SHADER | FRAGMENT_SHADER)</tspan></text><rect x="379.25" y="938" width="612" height="38" fill="#f75e70ff" 
+            stroke-width="1" stroke="#000000ff" rx="0"  />
+<text dominant-baseline="middle" text-anchor="middle" 
+            x="685.25" y="936" class="a14"><tspan x = "685.25" dy="1.0em">swapchain+(COLOR_ATTACHMENT_WRITE =&gt; )</tspan><tspan x = "685.25" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; BOTTOM_OF_PIPE)</tspan></text><rect x="330.25" y="678" width="710" height="38" fill="#f75e70ff" 
             stroke-width="1" stroke="#000000ff" rx="0"  />
 <text dominant-baseline="middle" text-anchor="middle" 
             x="685.25" y="676" class="a14"><tspan x = "685.25" dy="1.0em">offscreen++(COLOR_ATTACHMENT_WRITE =&gt; SHADER_READ)</tspan><tspan x = "685.25" dy="1.0em">(COLOR_ATTACHMENT_OUTPUT =&gt; FRAGMENT_SHADER)</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
@@ -48,6 +54,7 @@ refX="10" refY="3.5" orient="auto">
             x="922.125" y="489" class="a14"><tspan x = "922.125" dy="1.0em">offscreen+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
             x="1271.625" y="749" class="a14"><tspan x = "1271.625" dy="1.0em">swapchain</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
             x="603.25" y="749" class="a14"><tspan x = "603.25" dy="1.0em">offscreen++</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="610.25" y="1009" class="a14"><tspan x = "610.25" dy="1.0em">swapchain+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
             x="1027.25" y="97" class="a14"><tspan x = "1027.25" dy="1.0em">offscreen</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
             x="1414" y="97" class="a14"><tspan x = "1414" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
             x="1186.75" y="229" class="a14"><tspan x = "1186.75" dy="1.0em">depth</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
@@ -55,6 +62,7 @@ refX="10" refY="3.5" orient="auto">
             x="1013.5" y="357" class="a14"><tspan x = "1013.5" dy="1.0em">offscreen+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
             x="600.5" y="357" class="a14"><tspan x = "600.5" dy="1.0em">depth+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
             x="509.125" y="489" class="a14"><tspan x = "509.125" dy="1.0em">depth+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
+            x="610.25" y="877" class="a14"><tspan x = "610.25" dy="1.0em">swapchain+</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
             x="603.25" y="617" class="a14"><tspan x = "603.25" dy="1.0em">offscreen++</tspan></text><text dominant-baseline="middle" text-anchor="middle" 
             x="182" y="552" class="a15"><tspan x = "182" dy="1.0em">depth+</tspan></text><path id="arrow0" d="M 868 196 C 868 226, 868 213, 868 243 S 868 260, 868 290 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
@@ -66,20 +74,24 @@ refX="10" refY="3.5" orient="auto">
             fill="transparent" />
 <text><textPath href="#arrow3" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow4" d="M 685.25 716 C 685.25 746, 685.25 733, 685.25 763 S 685.25 780, 685.25 810 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow4" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow5" d="M 1270.685413714292 61.592446742729635 C 1241.8087334229253 69.72493316142038, 1124.0974791715391 102.76542014652361, 1095.25 111 S 962.2300199715135 149.63286548682117, 933.4204545454545 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow4" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow5" d="M 685.25 976 C 685.25 1006, 685.25 993, 685.25 1023 S 685.25 1040, 685.25 1070 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow5" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow6" d="M 1355.511284909781 63.0663287773839 C 1382.4861562322405 76.1947832613186, 1427.0944660949897 97.73126406767364, 1454 111 S 1520.8315443053002 144.54282832053082, 1547.6439393939395 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow5" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow6" d="M 1270.685413714292 61.592446742729635 C 1241.8087334229253 69.72493316142038, 1124.0974791715391 102.76542014652361, 1095.25 111 S 962.2300199715135 149.63286548682117, 933.4204545454545 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow6" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow7" d="M 1388.2234848484848 196 C 1359.41886522896 204.38414507117372, 1255.784845515076 235.59960325971636, 1226.75 243 S 979.9273671225483 287.03246969799835, 950.3936498770311 292.3012025306481 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow6" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow7" d="M 1355.511284909781 63.0663287773839 C 1382.4861562322405 76.1947832613186, 1427.0944660949897 97.73126406767364, 1454 111 S 1520.8315443053002 144.54282832053082, 1547.6439393939395 158 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow7" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow8" d="M 1410.3880325909686 55.376521348953084 C 1440.2526968093948 58.2228929200317, 1994 81, 1994 111 S 1994 147, 1994 177 S 1994 213, 1994 243 S 1994 277, 1994 307 S 1994 341, 1994 371 S 1994 407, 1994 437 S 1994 473, 1994 503 S 1994 537, 1994 567 S 1994 601, 1994 631 S 1994 648, 1994 678 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow7" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow8" d="M 1388.2234848484848 196 C 1359.41886522896 204.38414507117372, 1255.784845515076 235.59960325971636, 1226.75 243 S 979.9273671225483 287.03246969799835, 950.3936498770311 292.3012025306481 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow8" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow9" d="M 923.1582369506423 323.0096470060821 C 951.969187966569 331.37200920571615, 1059.7193401542331 362.53487888633197, 1088.5 371 S 1216.7825632688523 409.39750193081295, 1245.5227272727273 418 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow8" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow9" d="M 1410.3880325909686 55.376521348953084 C 1440.2526968093948 58.2228929200317, 1994 81, 1994 111 S 1994 147, 1994 177 S 1994 213, 1994 243 S 1994 277, 1994 307 S 1994 341, 1994 371 S 1994 407, 1994 437 S 1994 473, 1994 503 S 1994 537, 1994 567 S 1994 601, 1994 631 S 1994 648, 1994 678 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow9" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow10" d="M 812.8417630493577 323.0096470060821 C 784.030812033431 331.37200920571615, 676.2806598457668 362.53487888633197, 647.5 371 S 519.2174367311477 409.39750193081295, 490.47727272727275 418 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow9" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow10" d="M 923.1582369506423 323.0096470060821 C 951.969187966569 331.37200920571615, 1059.7193401542331 362.53487888633197, 1088.5 371 S 1216.7825632688523 409.39750193081295, 1245.5227272727273 418 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow10" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow11" d="M 464.1723484848485 456 C 490.8851560700813 469.65378742013837, 529.3426124610729 489.484442448193, 556.125 503 S 624.6912303864133 536.9844239669347, 651.5707200494019 550.3070751842147 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow10" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow11" d="M 812.8417630493577 323.0096470060821 C 784.030812033431 331.37200920571615, 676.2806598457668 362.53487888633197, 647.5 371 S 519.2174367311477 409.39750193081295, 490.47727272727275 418 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow11" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow12" d="M 685.25 584 C 685.25 614, 685.25 601, 685.25 631 S 685.25 648, 685.25 678 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+<text><textPath href="#arrow11" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow12" d="M 464.1723484848485 456 C 490.8851560700813 469.65378742013837, 529.3426124610729 489.484442448193, 556.125 503 S 624.6912303864133 536.9844239669347, 651.5707200494019 550.3070751842147 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
             fill="transparent" />
-<text><textPath href="#arrow12" startOffset="50%" text-anchor="middle" class="a14"></textPath></text></svg>
+<text><textPath href="#arrow12" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow13" d="M 685.25 844 C 685.25 874, 685.25 861, 685.25 891 S 685.25 908, 685.25 938 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            fill="transparent" />
+<text><textPath href="#arrow13" startOffset="50%" text-anchor="middle" class="a14"></textPath></text><path id="arrow14" d="M 685.25 584 C 685.25 614, 685.25 601, 685.25 631 S 685.25 648, 685.25 678 " stroke="#000000ff" stroke-width="1"   marker-end="url(#endarrow)" 
+            fill="transparent" />
+<text><textPath href="#arrow14" startOffset="50%" text-anchor="middle" class="a14"></textPath></text></svg>

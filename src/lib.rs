@@ -71,9 +71,7 @@
 //! ```
 
 
-// We use min_specialization because specialization is not fully stable yet.
-// Some day (hopefully), specialization will replace this feature and we can remove this.
-#![feature(min_specialization)]
+#![feature(never_type)]
 
 extern crate core;
 
@@ -101,6 +99,7 @@ pub mod swapchain;
 pub mod command_buffer;
 pub mod pass;
 pub mod pipeline;
+pub mod command_recorder;
 
 use std::sync::Arc;
 use ash::vk;
@@ -123,6 +122,7 @@ pub use crate::window::*;
 pub use crate::command_buffer::*;
 pub use crate::buffer::*;
 pub use crate::task_graph::*;
+pub use crate::command_recorder::*;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]
