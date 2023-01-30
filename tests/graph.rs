@@ -8,7 +8,7 @@ use phobos as ph;
 use ph::task_graph::*;
 use layout::gv;
 use layout::gv::GraphBuilder;
-use phobos::domain;
+use phobos::{domain, IncompleteCommandBuffer, record_graph};
 use phobos::pass::{Pass, PassBuilder};
 use phobos::pipeline::PipelineStage;
 

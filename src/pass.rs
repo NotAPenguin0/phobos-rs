@@ -107,6 +107,11 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
         self
     }
 
+    pub fn execute(mut self, exec: fn(&IncompleteCommandBuffer<D>) -> ()) -> Self {
+        self.inner.execute = exec;
+        self
+    }
+
     pub fn get(self) -> Pass<D> {
         self.inner
     }

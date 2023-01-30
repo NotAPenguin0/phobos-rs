@@ -50,7 +50,7 @@ pub enum Node<R, B, T> where R: Resource, B: Barrier<R> + Clone, T: Task<R> + Cl
 }
 
 pub struct TaskGraph<R, B, T> where R: Resource + Default, B: Barrier<R> + Clone, T: Task<R> + Clone {
-    graph: Graph<Node<R, B, T>, String>,
+    pub(crate) graph: Graph<Node<R, B, T>, String>,
 }
 
 
@@ -279,6 +279,14 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
     /// Returns the task graph built by the GPU task graph system, useful for outputting dotfiles.
     pub fn task_graph(&self) -> &TaskGraph<GpuResource, GpuBarrier, GpuTask<GpuResource, D>> {
         &self.graph
+    }
+
+    pub fn num_nodes(&self) -> usize {
+        self.graph.graph.node_count()
+    }
+
+    pub(crate) fn source(&self) -> NodeIndex {
+        self.source
     }
 
     fn barrier_src_resource(graph: &Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&GpuResource, Error> {
