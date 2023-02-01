@@ -123,6 +123,7 @@ pub use crate::command_buffer::*;
 pub use crate::buffer::*;
 pub use crate::task_graph::*;
 pub use crate::command_recorder::*;
+pub use crate::pass::*;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]

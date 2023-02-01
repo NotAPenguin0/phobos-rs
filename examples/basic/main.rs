@@ -1,4 +1,3 @@
-use ash::vk::PresentModeKHR;
 use ash::vk;
 use phobos as ph;
 
@@ -8,8 +7,9 @@ use winit::event_loop::{ControlFlow, EventLoopBuilder};
 use winit::platform::windows::EventLoopBuilderExtWindows;
 use winit::window::{WindowBuilder};
 
+use ph::IncompleteCmdBuffer; // TODO: Probably add this as a pub use to lib.rs
+
 use futures::executor::block_on;
-use phobos::{IncompleteCmdBuffer};
 
 // TODO:
 
@@ -17,14 +17,34 @@ use phobos::{IncompleteCmdBuffer};
 
 fn main_loop(frame: &mut ph::FrameManager, exec: &ph::ExecutionManager, 
              surface: &ph::Surface, window: &winit::window::Window) -> Result<(), ph::Error> {
+    // Define a virtual resource pointing to the swapchain
+    let swap_resource = ph::VirtualResource::new("swapchain".to_string());
+    // Define a render graph with one pass that clears the swapchain image
+    let mut graph = ph::GpuTaskGraph::<ph::domain::Graphics>::new();
+    let clear_pass = ph::PassBuilder::render(String::from("clear"))
+        .color_attachment(swap_resource.clone(),
+                          vk::AttachmentLoadOp::CLEAR,
+                        Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))
+        .get();
+    // Add another pass to handle presentation to the screen
+    let present_pass = ph::PassBuilder::present(
+        "present".to_string(),
+        // This pass uses the output from the clear pass on the swap resource as its input
+        clear_pass.output(&swap_resource).unwrap());
+    graph.add_pass(clear_pass)?;
+    graph.add_pass(present_pass)?;
+    // Build the graph, now we can bind physical resources and use it.
+    graph.build()?;
 
     block_on(frame.new_frame(&exec, window, &surface, |ifc| {
-        exec.on_domain::<ph::domain::Graphics>()?
-        .transition_image(&ifc.swapchain_image,
-            vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-            vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
-            vk::AccessFlags::empty(), vk::AccessFlags::empty())
-        .finish()
+        // create physical bindings for the render graph resources
+        let mut bindings = ph::PhysicalResourceBindings::new();
+        bindings.bind_image("swapchain".to_string(), ifc.swapchain_image.clone());
+        // create a command buffer capable of executing graphics commands
+        let mut cmd= exec.on_domain::<ph::domain::Graphics>()?;
+        // record render graph to this command buffer
+        ph::record_graph(&graph, &bindings, cmd)?
+            .finish()
     }))?;
 
     Ok(())
@@ -43,7 +63,7 @@ fn main() -> Result<(), ph::Error> {
         .name(String::from("Phobos test app"))
         .validation(true)
         .window(&window) // TODO: pass window information instead of window interface to remove dependency
-        .present_mode(PresentModeKHR::MAILBOX)
+        .present_mode(vk::PresentModeKHR::MAILBOX)
         .gpu(ph::GPURequirements {
             dedicated: true,
             min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.

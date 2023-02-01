@@ -8,7 +8,8 @@ pub struct Pass<D> where D: ExecutionDomain {
     pub name: String,
     pub inputs: Vec<GpuResource>,
     pub outputs: Vec<GpuResource>,
-    pub execute: fn(&IncompleteCommandBuffer<D>) -> ()
+    pub execute: fn(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D>,
+    pub is_renderpass: bool
 }
 
 pub struct PassBuilder<D> where D: ExecutionDomain {
@@ -26,13 +27,14 @@ impl<D> Pass<D> where D: ExecutionDomain {
 }
 
 impl<D> PassBuilder<D> where D: ExecutionDomain {
-    pub fn new(name: String) -> Self {
+    pub fn render(name: String) -> Self {
         PassBuilder {
             inner: Pass {
                 name,
-                execute: |_| {},
+                execute: |c| c,
                 inputs: vec![],
-                outputs: vec![]
+                outputs: vec![],
+                is_renderpass: true
             },
         }
     }
@@ -46,13 +48,17 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
                 usage: ResourceUsage::Present,
                 resource: swapchain,
                 stage: PipelineStage::BOTTOM_OF_PIPE,
+                layout: vk::ImageLayout::PRESENT_SRC_KHR,
+                clear_value: None,
+                load_op: None,
             }],
             outputs: vec![],
-            execute: |_| {}
+            execute: |c| c,
+            is_renderpass: false
         }
     }
 
-    pub fn color_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp) -> Self {
+    pub fn color_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Self {
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::Attachment,
             resource: resource.clone(),
@@ -63,18 +69,24 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
                 vk::AttachmentLoadOp::LOAD => PipelineStage::COLOR_ATTACHMENT_OUTPUT,
                 vk::AttachmentLoadOp::CLEAR => PipelineStage::COLOR_ATTACHMENT_OUTPUT,
                 _ => todo!()
-            }
+            },
+            layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            clear_value: None,
+            load_op: None,
         });
 
         self.inner.outputs.push(GpuResource{
             usage: ResourceUsage::Attachment,
             resource: resource.upgrade(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+            layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            clear_value: clear.map(|c| vk::ClearValue { color: c }),
+            load_op: Some(op)
         });
         self
     }
 
-    pub fn depth_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp) -> Self {
+    pub fn depth_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Self {
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::Attachment,
             resource: resource.clone(),
@@ -84,7 +96,10 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
                 vk::AttachmentLoadOp::LOAD => PipelineStage::EARLY_FRAGMENT_TESTS,
                 vk::AttachmentLoadOp::CLEAR => PipelineStage::EARLY_FRAGMENT_TESTS,
                 _ => todo!()
-            }
+            },
+            layout: vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
+            clear_value: None,
+            load_op: None,
         });
 
         self.inner.outputs.push(GpuResource {
@@ -92,22 +107,28 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
             resource: resource.upgrade(),
             // Depth/stencil writes happen in LATE_FRAGMENT_TESTS.
             // It's also legal to specify COLOR_ATTACHMENT_OUTPUT, but this is more precise.
-            stage: PipelineStage::LATE_FRAGMENT_TESTS
+            stage: PipelineStage::LATE_FRAGMENT_TESTS,
+            layout: vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
+            clear_value: clear.map(|c| vk::ClearValue { depth_stencil: c }),
+            load_op: Some(op)
         });
 
         self
     }
 
     pub fn sample_image(mut self, resource: VirtualResource, stage: PipelineStage) -> Self {
-        self.inner.inputs.push(GpuResource{
+        self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::ShaderRead,
             resource,
             stage,
+            layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            clear_value: None,
+            load_op: None
         });
         self
     }
 
-    pub fn execute(mut self, exec: fn(&IncompleteCommandBuffer<D>) -> ()) -> Self {
+    pub fn execute(mut self, exec: fn(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D>) -> Self {
         self.inner.execute = exec;
         self
     }

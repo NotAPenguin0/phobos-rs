@@ -13,7 +13,6 @@ use petgraph;
 use petgraph::Direction;
 use petgraph::dot::Dot;
 use petgraph::prelude::EdgeRef;
-use petgraph::visit::{IntoEdgeReferences, IntoNodeReferences};
 use crate::domain::ExecutionDomain;
 
 use crate::error::Error;
@@ -70,11 +69,14 @@ pub enum ResourceUsage {
     ShaderWrite,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Clone)]
 pub struct GpuResource {
     pub usage: ResourceUsage,
     pub resource: VirtualResource,
-    pub stage: PipelineStage
+    pub stage: PipelineStage,
+    pub layout: vk::ImageLayout,
+    pub clear_value: Option<vk::ClearValue>,
+    pub load_op: Option<vk::AttachmentLoadOp>
 }
 
 #[derive(Debug, Clone)]
@@ -90,7 +92,8 @@ pub struct GpuTask<R, D> where R: Resource, D: ExecutionDomain {
     pub identifier: String,
     pub inputs: Vec<R>,
     pub outputs: Vec<R>,
-    pub execute: fn(&IncompleteCommandBuffer<D>) -> ()
+    pub execute: fn(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D>,
+    pub is_renderpass: bool
 }
 
 pub struct GpuTaskGraph<D> where D: ExecutionDomain {
@@ -196,7 +199,8 @@ impl<R, D> Clone for GpuTask<R, D> where R: Resource + Clone, D: ExecutionDomain
             identifier: self.identifier.clone(),
             inputs: self.inputs.clone(),
             outputs: self.outputs.clone(),
-            execute: self.execute.clone()
+            execute: self.execute.clone(),
+            is_renderpass: self.is_renderpass.clone()
         }
     }
 }
@@ -236,7 +240,8 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
             identifier: "_source".to_string(),
             inputs: vec![],
             outputs: vec![],
-            execute: |_| {}
+            execute: |c| c,
+            is_renderpass: false,
         }).unwrap();
         // ...
         graph.source = graph.graph.graph.node_indices().next().unwrap();
@@ -253,6 +258,9 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
                         usage: ResourceUsage::Nothing,
                         resource: input.resource.clone(),
                         stage: PipelineStage::TOP_OF_PIPE,
+                        layout: vk::ImageLayout::UNDEFINED,
+                        clear_value: None,
+                        load_op: None
                     }
                 )
             }
@@ -262,7 +270,8 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
             identifier: pass.name,
             inputs: pass.inputs,
             outputs: pass.outputs,
-            execute: pass.execute
+            execute: pass.execute,
+            is_renderpass: pass.is_renderpass
         })?;
 
         Ok(())
@@ -299,7 +308,7 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
         Ok(task.inputs.iter().find(|&input| input.uid() == barrier.resource.uid()).unwrap())
     }
 
-    fn barrier_dst_resource(graph: &Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&GpuResource, Error> {
+    pub(crate) fn barrier_dst_resource(graph: &Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&GpuResource, Error> {
         // We know that:
         // 1) Each barrier has at least one outgoing edge
         // 2) During the merge, each outgoing edge from a barrier will have the same resource usage
@@ -368,7 +377,7 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
     }
 }
 
-impl<R, B, T> TaskGraph<R, B, T> where R: Debug + Clone + Default + Resource, B: Barrier<R> + Clone, T: Task<R> + Clone {
+impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier<R> + Clone, T: Task<R> + Clone {
     pub fn new() -> Self {
         TaskGraph {
             graph: Graph::new()

@@ -136,6 +136,32 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
 
         self
     }
+
+    /// vkCmdPipelineBarrier2. Prefer using this over regular pipeline barriers if possible, to make
+    /// full use of VK_KHR_SYNCHRONIZATION_2.
+    pub fn pipeline_barrier_2(self, dependency: &vk::DependencyInfo) -> Self {
+        unsafe {
+            self.device.cmd_pipeline_barrier2(self.handle, &dependency);
+        }
+
+        self
+    }
+
+    pub(crate) fn begin_rendering(self, info: &vk::RenderingInfo) -> Self {
+        unsafe {
+            self.device.cmd_begin_rendering(self.handle, &info);
+        }
+
+        self
+    }
+
+    pub(crate) fn end_rendering(self) -> Self {
+        unsafe {
+            self.device.cmd_end_rendering(self.handle);
+        }
+
+        self
+    }
 }
 
 trait GfxSupport : TransferSupport {}

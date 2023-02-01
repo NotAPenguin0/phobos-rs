@@ -28,6 +28,8 @@ pub enum Error {
     /// Task graph contains two nodes that act on the same resource with different usage flags.
     /// This is impossible to resolve in an unambiguous way.
     IllegalTaskGraph,
+    /// No resource was bound to a virtual resource
+    NoResourceBound(String),
     /// Uncategorized error.
     Uncategorized(&'static str),
 }

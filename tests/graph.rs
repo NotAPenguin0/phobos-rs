@@ -76,15 +76,15 @@ fn test_graph() -> Result<(), ph::Error> {
     // Sample graph, not a model of a real render pass system.
 
     // TODO: Add clear values, OR possibly do this only when binding physical resources?
-    let p1 = PassBuilder::new(String::from("Offscreen render"))
+    let p1 = PassBuilder::render(String::from("Offscreen render"))
         .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR)
         .depth_attachment(depth.clone(), vk::AttachmentLoadOp::CLEAR)
         .get();
-    let p2 = PassBuilder::new(String::from("Postprocess render"))
+    let p2 = PassBuilder::render(String::from("Postprocess render"))
         .color_attachment(p1.output(&offscreen).unwrap(), vk::AttachmentLoadOp::LOAD)
         .sample_image(p1.output(&depth).unwrap(), PipelineStage::VERTEX_SHADER)
         .get();
-    let p3 = PassBuilder::new(String::from("Finalize output"))
+    let p3 = PassBuilder::render(String::from("Finalize output"))
         .color_attachment(swap.clone(), vk::AttachmentLoadOp::CLEAR)
         .sample_image(p2.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
         .sample_image(p1.output(&depth).unwrap(), PipelineStage::FRAGMENT_SHADER)
