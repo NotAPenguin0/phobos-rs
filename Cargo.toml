@@ -2,6 +2,10 @@
 name = "phobos"
 version = "0.1.0"
 edition = "2021"
+license-file = "LICENSE"
+description = "Powerful abstraction library for the Vulkan API."
+repository = "https://github.com/NotAPenguin0/phobos-rs"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
