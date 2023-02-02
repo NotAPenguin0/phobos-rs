@@ -102,7 +102,7 @@ pub mod pass;
 pub mod pipeline;
 pub mod command_recorder;
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use ash::vk;
 use window::WindowInterface;
 use gpu_allocator::vulkan as vk_alloc;
@@ -245,8 +245,8 @@ impl<'a, Window> AppBuilder<'a, Window> where Window: WindowInterface {
     }
 }
 
-pub fn create_allocator(instance: &VkInstance, device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<vk_alloc::Allocator, Error> {
-    Ok(vk_alloc::Allocator::new(
+pub fn create_allocator(instance: &VkInstance, device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Arc<Mutex<vk_alloc::Allocator>>, Error> {
+    Ok(Arc::new(Mutex::new(vk_alloc::Allocator::new(
         &vk_alloc::AllocatorCreateDesc {
             instance: instance.instance.clone(),
             device: device.handle.clone(),
@@ -254,5 +254,5 @@ pub fn create_allocator(instance: &VkInstance, device: Arc<Device>, physical_dev
             debug_settings: Default::default(),
             buffer_device_address: false // We might change this if the bufferDeviceAddress feature gets enabled.
         }
-    )?)
+    )?)))
 }

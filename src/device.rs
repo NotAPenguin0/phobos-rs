@@ -11,7 +11,8 @@ use crate::util;
 #[derivative(Debug)]
 pub struct Device {
     #[derivative(Debug="ignore")]
-    pub(crate) handle: ash::Device
+    pub(crate) handle: ash::Device,
+    pub(crate) queue_families: Vec<u32>,
 }
 
 impl Device {
@@ -62,7 +63,10 @@ impl Device {
             .build();
 
 
-        Ok(Arc::new(unsafe { Device { handle: instance.instance.create_device(physical_device.handle, &info, None)? } }))
+        Ok(Arc::new(unsafe { Device {
+            handle: instance.instance.create_device(physical_device.handle, &info, None)?,
+            queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect()
+        } }))
     }
 
     /// Wait for the device to be completely idle.

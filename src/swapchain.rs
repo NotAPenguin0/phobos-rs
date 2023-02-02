@@ -76,7 +76,8 @@ impl Swapchain {
                     mip_levels: 1,
                     samples: vk::SampleCountFlags::TYPE_1,
                     // Leave memory at None since this is managed by the swapchain, not our application.
-                    memory: None
+                    memory: None,
+                    allocator: None
                 };
                 // Create a trivial ImgView.
                 let view = image.view(vk::ImageAspectFlags::COLOR)?;

@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use crate::execution_manager::domain::*;
 use crate::execution_manager::domain;
 
@@ -12,7 +12,7 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     fn viewport(self, viewport: vk::Viewport) -> Self;
     fn scissor(self, scissor: vk::Rect2D) -> Self;
     fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Self;
-    fn bind_graphics_pipeline(self, name: &str, cache: &mut PipelineCache) -> Result<Self, Error> where Self: Sized;
+    fn bind_graphics_pipeline(self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self, Error> where Self: Sized;
 }
 
 /// Trait representing a command buffer that supports transfer commands.
@@ -196,7 +196,8 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         self
     }
 
-    fn bind_graphics_pipeline(self, name: &str, cache: &mut PipelineCache) -> Result<Self, Error> {
+    fn bind_graphics_pipeline(self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self, Error> {
+        let mut cache = cache.lock().unwrap();
         let pipeline = cache.get_pipeline(name)?;
         unsafe { self.device.cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle); }
         Ok(self)

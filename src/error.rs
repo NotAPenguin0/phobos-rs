@@ -1,4 +1,5 @@
 use std::ffi::NulError;
+use std::sync::PoisonError;
 use ash;
 use ash::vk::Pipeline;
 use gpu_allocator::AllocationError;
@@ -34,6 +35,8 @@ pub enum Error {
     /// Named pipeline not registered in the pipeline cache.
     PipelineNotFound(String),
     NoVertexBinding,
+    /// Poisoned mutex
+    PoisonError,
     /// Uncategorized error.
     Uncategorized(&'static str),
 }
@@ -63,5 +66,11 @@ impl From<AllocationError> for Error {
 impl From<(Vec<ash::vk::Pipeline>, ash::vk::Result)> for Error {
     fn from(value: (Vec<Pipeline>, ash::vk::Result)) -> Self {
         Error::Uncategorized("Pipeline creation failed")
+    }
+}
+
+impl<T> From<PoisonError<T>> for Error {
+    fn from(value: PoisonError<T>) -> Self {
+        Error::PoisonError
     }
 }

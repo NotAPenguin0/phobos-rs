@@ -23,7 +23,9 @@ fn compile_shader(path: &Path, kind: shaderc::ShaderKind, output: &Path) {
 fn main() {
     println!("cargo:rerun-if-changed=examples/data/vert.glsl");
     println!("cargo:rerun-if-changed=examples/data/frag.glsl");
+    println!("cargo:rerun-if-changed=examples/data/blue.glsl");
 
     compile_shader(Path::new("examples/data/vert.glsl"), shaderc::ShaderKind::Vertex, Path::new("examples/data/vert.spv"));
     compile_shader(Path::new("examples/data/frag.glsl"), shaderc::ShaderKind::Fragment, Path::new("examples/data/frag.spv"));
+    compile_shader(Path::new("examples/data/blue.glsl"), shaderc::ShaderKind::Fragment, Path::new("examples/data/blue.spv"));
 }

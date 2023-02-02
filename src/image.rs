@@ -1,8 +1,11 @@
-use std::sync::Arc;
+use std::ptr;
+use std::sync::{Arc, Mutex};
 use ash::vk;
-use gpu_allocator::vulkan as vk_alloc;
+use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};
+use gpu_allocator::vulkan::{AllocationCreateDesc, Allocator};
 
 use crate::{Device, Error};
+use crate::util::ByteSize;
 
 /// Abstraction over a [`VkImage`](vk::Image). Stores information about size, format, etc. Additionally couples the image data together
 /// with a memory allocation.
@@ -13,6 +16,8 @@ pub struct Image {
     /// Reference to the [`VkDevice`](vk::Device).
     #[derivative(Debug="ignore")]
     pub device: Arc<Device>,
+    #[derivative(Debug="ignore")]
+    pub allocator: Option<Arc<Mutex<Allocator>>>,
     /// [`VkImage`](vk::Image) handle.
     pub handle: vk::Image,
     /// Image format
@@ -66,6 +71,67 @@ pub struct ImgView {
 pub type ImageView = Arc<ImgView>;
 
 impl Image {
+    // TODO: Allow specifying an initial layout for convenience
+    // TODO: Full wrapper around the allocator for convenience
+    pub fn new(device: Arc<Device>, alloc: Arc<Mutex<Allocator>>, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format) -> Result<Self, Error> {
+        let sharing_mode = if usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {
+            vk::SharingMode::EXCLUSIVE
+        }
+        else {
+            vk::SharingMode::CONCURRENT
+        };
+
+        let handle = unsafe { device.create_image(&vk::ImageCreateInfo {
+            s_type: vk::StructureType::IMAGE_CREATE_INFO,
+            p_next: std::ptr::null(),
+            flags: Default::default(),
+            image_type: vk::ImageType::TYPE_2D,
+            format,
+            extent: vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            samples: vk::SampleCountFlags::TYPE_1,
+            tiling: vk::ImageTiling::OPTIMAL,
+            usage,
+            sharing_mode,
+            queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families.len() as u32 } else { 0 },
+            p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families.as_ptr() } else { ptr::null() },
+            initial_layout: vk::ImageLayout::UNDEFINED,
+        }, None)? };
+
+        let requirements = unsafe { device.get_image_memory_requirements(handle) };
+
+        let memory = alloc.lock()?.allocate(&AllocationCreateDesc {
+            name: "image_",
+            requirements,
+            // TODO: Proper memory location configuration
+            location: MemoryLocation::GpuOnly,
+            linear: false,
+        })?;
+
+        unsafe { device.bind_image_memory(handle, memory.memory(), memory.offset())?; }
+
+        Ok(Self {
+            device: device.clone(),
+            allocator: Some(alloc.clone()),
+            handle,
+            format,
+            size: vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            },
+            layers: 1,
+            mip_levels: 1,
+            samples: vk::SampleCountFlags::TYPE_1,
+            memory: Some(memory),
+        })
+    }
+
     /// Construct a trivial [`ImageView`] from this [`Image`]. This is an image view that views the
     /// entire image subresource.
     /// <br>
@@ -112,6 +178,12 @@ impl Drop for Image {
     fn drop(&mut self) {
         if self.is_owned() {
             unsafe { self.device.destroy_image(self.handle, None); }
+            if let Some(memory) = &mut self.memory {
+                let memory = std::mem::take(memory);
+                if let Some(allocator) = &mut self.allocator {
+                    allocator.lock().unwrap().free(memory).unwrap();
+                }
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use ash::vk;
 use phobos as ph;
 
@@ -14,25 +15,52 @@ use winit::window::{WindowBuilder};
 use ph::IncompleteCmdBuffer; // TODO: Probably add this as a pub use to lib.rs
 
 use futures::executor::block_on;
-use phobos::GraphicsCmdBuffer;
+use phobos::{GraphicsCmdBuffer, PipelineStage};
 
 // TODO:
 
 // 1. CLion rust formatting
 
-fn main_loop(frame: &mut ph::FrameManager, pipelines: &mut ph::PipelineCache, exec: &ph::ExecutionManager,
+struct Resources {
+    pub offscreen: ph::Image,
+    pub offscreen_view: ph::ImageView
+}
+
+fn main_loop(frame: &mut ph::FrameManager, resources: &Resources, pipelines: Arc<Mutex<ph::PipelineCache>>, exec: &ph::ExecutionManager,
              surface: &ph::Surface, window: &winit::window::Window) -> Result<(), ph::Error> {
     // Define a virtual resource pointing to the swapchain
     let swap_resource = ph::VirtualResource::new("swapchain".to_string());
+    let offscreen = ph::VirtualResource::new("offscreen".to_string());
     // Define a render graph with one pass that clears the swapchain image
-    let mut graph = ph::GpuTaskGraph::<ph::domain::Graphics>::new();
-    let clear_pass = ph::PassBuilder::render(String::from("clear"))
+    let mut graph = ph::GpuTaskGraph::new();
+
+    // Render pass that renders to an offscreen attachment
+    let offscreen_pass = ph::PassBuilder::render(String::from("offscreen"))
+        .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR, Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))
+        .execute(|cmd| {
+            cmd.bind_graphics_pipeline("offscreen", pipelines.clone()).unwrap()
+                .viewport(vk::Viewport{
+                    x: 0.0,
+                    y: 0.0,
+                    width: 800.0,
+                    height: 600.0,
+                    min_depth: 0.0,
+                    max_depth: 0.0,
+                })
+                .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
+                .draw(6, 1, 0, 0)
+        })
+        .get();
+
+    // Render pass that samples the offscreen attachment, and possibly does some postprocessing to it
+    let sample_pass = ph::PassBuilder::render(String::from("sample"))
         .color_attachment(swap_resource.clone(),
                           vk::AttachmentLoadOp::CLEAR,
                         Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))
+        .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
         // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
         .execute(|cmd| {
-            cmd.bind_graphics_pipeline("simple", pipelines).unwrap()
+            cmd.bind_graphics_pipeline("sample", pipelines.clone()).unwrap()
                 .viewport(vk::Viewport{
                     x: 0.0,
                     y: 0.0,
@@ -49,8 +77,9 @@ fn main_loop(frame: &mut ph::FrameManager, pipelines: &mut ph::PipelineCache, ex
     let present_pass = ph::PassBuilder::present(
         "present".to_string(),
         // This pass uses the output from the clear pass on the swap resource as its input
-        clear_pass.output(&swap_resource).unwrap());
-    graph.add_pass(clear_pass)?;
+        sample_pass.output(&swap_resource).unwrap());
+    graph.add_pass(offscreen_pass)?;
+    graph.add_pass(sample_pass)?;
     graph.add_pass(present_pass)?;
     // Build the graph, now we can bind physical resources and use it.
     graph.build()?;
@@ -59,6 +88,7 @@ fn main_loop(frame: &mut ph::FrameManager, pipelines: &mut ph::PipelineCache, ex
         // create physical bindings for the render graph resources
         let mut bindings = ph::PhysicalResourceBindings::new();
         bindings.bind_image("swapchain".to_string(), ifc.swapchain_image.clone());
+        bindings.bind_image("offscreen".to_string(), resources.offscreen_view.clone());
         // create a command buffer capable of executing graphics commands
         let cmd = exec.on_domain::<ph::domain::Graphics>()?;
         // record render graph to this command buffer
@@ -134,11 +164,11 @@ fn main() -> Result<(), ph::Error> {
     let fragment = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
 
     // Now we can start using the pipeline builder to create our full pipeline.
-    let mut pci = ph::PipelineBuilder::new("simple".to_string())
+    let mut pci = ph::PipelineBuilder::new("sample".to_string())
         .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
         .blend_attachment_none()
         .cull_mask(vk::CullModeFlags::NONE)
-        .attach_shader(vertex)
+        .attach_shader(vertex.clone())
         .attach_shader(fragment)
         .build();
     // For now we have to manually create descriptor set and pipeline layouts, but this will be fully automated using
@@ -148,12 +178,33 @@ fn main() -> Result<(), ph::Error> {
     // Store the pipeline in the pipeline cache
     cache.create_named_pipeline(pci)?;
 
+    let frag_code = load_spirv_file(Path::new("examples/data/blue.spv"));
+    let fragment = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
+
+    let mut pci = ph::PipelineBuilder::new("offscreen".to_string())
+        .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
+        .blend_attachment_none()
+        .cull_mask(vk::CullModeFlags::NONE)
+        .attach_shader(vertex)
+        .attach_shader(fragment)
+        .build();
+    cache.create_named_pipeline(pci)?;
+    // Wrap the pipeline cache in a reference-counted mutex for safe access across the entire API.
+    let cache = Arc::new(Mutex::new(cache));
+
+    // Define some resources we will use for rendering
+    let image = ph::Image::new(device.clone(), alloc.clone(), 800, 600, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED, vk::Format::R8G8B8A8_SRGB)?;
+    let mut resources = Resources {
+        offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
+        offscreen: image,
+    };
+
     event_loop.run(move |event, _, control_flow| {
         // Do not render a frame if Exit control flow is specified, to avoid
         // sync issues.
         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
         
-        main_loop(&mut frame, &mut cache, &exec, &surface, &window).unwrap();
+        main_loop(&mut frame, &resources, cache.clone(), &exec, &surface, &window).unwrap();
 
         // Note that we want to handle events after processing our current frame, so that
         // requesting an exit doesn't attempt to render another frame, which causes
