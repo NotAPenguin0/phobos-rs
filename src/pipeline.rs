@@ -1,5 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::ffi::CString;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use ash::vk;
@@ -59,110 +60,35 @@ pub struct Pipeline {
     pub(crate) handle: vk::Pipeline
 }
 
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct VertexInputBindingDescription {
-    pub binding: u32,
-    pub stride: u32,
-    pub input_rate: vk::VertexInputRate
-}
+#[derive(Debug, Copy, Clone)]
+pub struct VertexInputBindingDescription(vk::VertexInputBindingDescription);
 
-#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct VertexInputAttributeDescription {
-    pub location: u32,
-    pub binding: u32,
-    pub format: vk::Format,
-    pub offset: u32,
-}
+#[derive(Debug, Copy, Clone)]
+pub struct VertexInputAttributeDescription(vk::VertexInputAttributeDescription);
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct PipelineInputAssemblyStateCreateInfo {
-    pub flags: vk::PipelineInputAssemblyStateCreateFlags,
-    pub topology: vk::PrimitiveTopology,
-    pub primitive_restart_enable: bool
-}
+#[derive(Debug, Copy, Clone)]
+pub struct PipelineInputAssemblyStateCreateInfo(vk::PipelineInputAssemblyStateCreateInfo);
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub struct StencilOpState {
-    pub fail_op: vk::StencilOp,
-    pub pass_op: vk::StencilOp,
-    pub depth_fail_op: vk::StencilOp,
-    pub compare_op: vk::CompareOp,
-    pub compare_mask: u32,
-    pub write_mask: u32,
-    pub reference: u32,
-}
+#[derive(Debug, Copy, Clone)]
+pub struct PipelineDepthStencilStateCreateInfo(vk::PipelineDepthStencilStateCreateInfo);
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct PipelineDepthStencilStateCreateInfo {
-    pub flags: vk::PipelineDepthStencilStateCreateFlags,
-    pub depth_test_enable: bool,
-    pub depth_write_enable: bool,
-    pub depth_compare_op: vk::CompareOp,
-    pub depth_bounds_test_enable: bool,
-    pub stencil_test_enable: bool,
-    pub front: StencilOpState,
-    pub back: StencilOpState,
-    pub min_depth_bounds: f32,
-    pub max_depth_bounds: f32,
-}
+#[derive(Debug, Copy, Clone)]
+pub struct PipelineRasterizationStateCreateInfo(vk::PipelineRasterizationStateCreateInfo);
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct PipelineRasterizationStateCreateInfo {
-    pub flags: vk::PipelineRasterizationStateCreateFlags,
-    pub depth_clamp_enable: bool,
-    pub rasterizer_discard_enable: bool,
-    pub polygon_mode: vk::PolygonMode,
-    pub cull_mode: vk::CullModeFlags,
-    pub front_face: vk::FrontFace,
-    pub depth_bias_enable: bool,
-    pub depth_bias_constant_factor: f32,
-    pub depth_bias_clamp: f32,
-    pub depth_bias_slope_factor: f32,
-    pub line_width: f32,
-}
+#[derive(Debug, Copy, Clone)]
+pub struct PipelineMultisampleStateCreateInfo(vk::PipelineMultisampleStateCreateInfo);
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct PipelineMultisampleStateCreateInfo {
-    pub flags: vk::PipelineMultisampleStateCreateFlags,
-    pub rasterization_samples: vk::SampleCountFlags,
-    pub sample_shading_enable: bool,
-    pub min_sample_shading: f32,
-    pub sample_mask:vk::SampleMask,
-    pub alpha_to_coverage_enable: bool,
-    pub alpha_to_one_enable: bool,
-}
+#[derive(Debug, Copy, Clone)]
+pub struct PipelineColorBlendAttachmentState(vk::PipelineColorBlendAttachmentState);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct PipelineColorBlendAttachmentState {
-    pub blend_enable: bool,
-    pub src_color_blend_factor: vk::BlendFactor,
-    pub dst_color_blend_factor: vk::BlendFactor,
-    pub color_blend_op: vk::BlendOp,
-    pub src_alpha_blend_factor: vk::BlendFactor,
-    pub dst_alpha_blend_factor: vk::BlendFactor,
-    pub alpha_blend_op: vk::BlendOp,
-    pub color_write_mask: vk::ColorComponentFlags,
-}
+#[derive(Debug, Copy, Clone)]
+pub struct Viewport(vk::Viewport);
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Viewport {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
-    pub min_depth: f32,
-    pub max_depth: f32,
-}
+#[derive(Debug, Copy, Clone)]
+pub struct Rect2D(vk::Rect2D);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct Rect2D {
-    pub offset_x: i32,
-    pub offset_y: i32,
-    pub width: u32,
-    pub height: u32
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+#[derive(Debug, Clone, Derivative)]
+#[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
     // TODO: Shader reflection info
     // TODO: Blend presets
@@ -179,7 +105,35 @@ pub struct PipelineCreateInfo {
     pub blend_attachments: Vec<PipelineColorBlendAttachmentState>,
     pub viewports: Vec<Viewport>,
     pub scissors: Vec<Rect2D>,
-    pub blend_enable_logic_op: bool
+    pub blend_enable_logic_op: bool,
+
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    vk_vertex_inputs: Vec<vk::VertexInputBindingDescription>,
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    vk_attributes: Vec<vk::VertexInputAttributeDescription>,
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    vertex_input_state: vk::PipelineVertexInputStateCreateInfo,
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    vk_viewports: Vec<vk::Viewport>,
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    vk_scissors: Vec<vk::Rect2D>,
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    viewport_state: vk::PipelineViewportStateCreateInfo,
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    vk_blend_attachments: Vec<vk::PipelineColorBlendAttachmentState>,
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    blend_state: vk::PipelineColorBlendStateCreateInfo,
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    vk_dynamic_state: vk::PipelineDynamicStateCreateInfo,
 }
 
 pub struct PipelineBuilder {
@@ -205,7 +159,7 @@ impl Resource for Shader {
             s_type: vk::StructureType::SHADER_MODULE_CREATE_INFO,
             p_next: std::ptr::null(),
             flags: Default::default(),
-            code_size: key.code.len(),
+            code_size: key.code.len() * 4,
             p_code: key.code.as_ptr(),
         };
 
@@ -289,13 +243,60 @@ impl Drop for PipelineLayout {
     }
 }
 
+impl PipelineCreateInfo {
+    // Shader stage not yet filled out
+    pub(crate) fn to_vk(&self, layout: vk::PipelineLayout) -> vk::GraphicsPipelineCreateInfo {
+        vk::GraphicsPipelineCreateInfo {
+            s_type: vk::StructureType::GRAPHICS_PIPELINE_CREATE_INFO,
+            p_next: std::ptr::null(),
+            flags: Default::default(),
+            stage_count: 0,
+            p_stages: std::ptr::null(),
+            p_vertex_input_state: &self.vertex_input_state,
+            p_input_assembly_state: &self.input_assembly.0,
+            p_tessellation_state: std::ptr::null(),
+            p_viewport_state: &self.viewport_state,
+            p_rasterization_state: &self.rasterizer.0,
+            p_multisample_state: &self.multisample.0,
+            p_depth_stencil_state: &self.depth_stencil.0,
+            p_color_blend_state: &self.blend_state,
+            p_dynamic_state: &self.vk_dynamic_state,
+            layout,
+            render_pass: Default::default(),
+            subpass: 0,
+            base_pipeline_handle: Default::default(),
+            base_pipeline_index: 0,
+        }
+    }
+}
+
 impl Resource for Pipeline {
     type Key = PipelineCreateInfo;
-    type ExtraParams<'a> = (&'a mut Cache<Shader>);
+    type ExtraParams<'a> = (&'a mut Cache<Shader>, &'a mut Cache<PipelineLayout>, &'a mut Cache<DescriptorSetLayout>);
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self, Error> {
-        todo!()
+    fn create(device: Arc<Device>, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self, Error> {
+        let (shaders, pipeline_layouts, set_layouts) = params;
+        let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
+        let mut pci = info.to_vk(layout.handle);
+        // Set shader create info
+        let entry = CString::new("main")?;
+        let shader_info: Vec<_> = info.shaders.iter().map(|shader| -> vk::PipelineShaderStageCreateInfo {
+            vk::PipelineShaderStageCreateInfo::builder()
+                .name(&entry)
+                .stage(shader.stage)
+                .module(shaders.get_or_create(shader, ()).unwrap().handle)
+                .build()
+        }).collect();
+        pci.stage_count = shader_info.len() as u32;
+        pci.p_stages = shader_info.as_ptr();
+
+        unsafe {
+            Ok(Self {
+                device: device.clone(),
+                handle: device.create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)?.first().cloned().unwrap(),
+            })
+        }
     }
 }
 
@@ -309,65 +310,98 @@ impl PipelineBuilder {
                 vertex_attributes: vec![],
                 shaders: vec![],
                 input_assembly: PipelineInputAssemblyStateCreateInfo {
-                    flags: Default::default(),
-                    topology: vk::PrimitiveTopology::TRIANGLE_LIST,
-                    primitive_restart_enable: false,
+                    0: vk::PipelineInputAssemblyStateCreateInfo {
+                        s_type: vk::StructureType::PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+                        p_next: std::ptr::null(),
+                        flags: Default::default(),
+                        topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                        primitive_restart_enable: vk::FALSE,
+                    }
                 },
                 depth_stencil: PipelineDepthStencilStateCreateInfo {
-                    flags: Default::default(),
-                    depth_test_enable: false,
-                    depth_write_enable: false,
-                    depth_compare_op: Default::default(),
-                    depth_bounds_test_enable: false,
-                    stencil_test_enable: false,
-                    front: StencilOpState {
-                        fail_op: Default::default(),
-                        pass_op: Default::default(),
-                        depth_fail_op: Default::default(),
-                        compare_op: Default::default(),
-                        compare_mask: 0,
-                        write_mask: 0,
-                        reference: 0,
-                    },
-                    back: StencilOpState {
-                        fail_op: Default::default(),
-                        pass_op: Default::default(),
-                        depth_fail_op: Default::default(),
-                        compare_op: Default::default(),
-                        compare_mask: 0,
-                        write_mask: 0,
-                        reference: 0,
-                    },
-                    min_depth_bounds: 0.0,
-                    max_depth_bounds: 0.0,
+                    0: vk::PipelineDepthStencilStateCreateInfo {
+                        s_type: vk::StructureType::PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+                        p_next: std::ptr::null(),
+                        flags: Default::default(),
+                        depth_test_enable: vk::FALSE,
+                        depth_write_enable: vk::FALSE,
+                        depth_compare_op: Default::default(),
+                        depth_bounds_test_enable: vk::FALSE,
+                        stencil_test_enable: vk::FALSE,
+                        front: vk::StencilOpState {
+                            fail_op: Default::default(),
+                            pass_op: Default::default(),
+                            depth_fail_op: Default::default(),
+                            compare_op: Default::default(),
+                            compare_mask: 0,
+                            write_mask: 0,
+                            reference: 0,
+                        },
+                        back: vk::StencilOpState {
+                            fail_op: Default::default(),
+                            pass_op: Default::default(),
+                            depth_fail_op: Default::default(),
+                            compare_op: Default::default(),
+                            compare_mask: 0,
+                            write_mask: 0,
+                            reference: 0,
+                        },
+                        min_depth_bounds: 0.0,
+                        max_depth_bounds: 0.0,
+                    }
                 },
                 dynamic_states: vec![],
                 rasterizer: PipelineRasterizationStateCreateInfo {
-                    flags: Default::default(),
-                    depth_clamp_enable: false,
-                    rasterizer_discard_enable: false,
-                    polygon_mode: vk::PolygonMode::FILL,
-                    cull_mode: vk::CullModeFlags::NONE,
-                    front_face: vk::FrontFace::COUNTER_CLOCKWISE,
-                    depth_bias_enable: false,
-                    depth_bias_constant_factor: 0.0,
-                    depth_bias_clamp: 0.0,
-                    depth_bias_slope_factor: 0.0,
-                    line_width: 1.0,
+                    0: vk::PipelineRasterizationStateCreateInfo {
+                        s_type: vk::StructureType::PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+                        p_next: std::ptr::null(),
+                        flags: Default::default(),
+                        depth_clamp_enable: vk::FALSE,
+                        rasterizer_discard_enable: vk::FALSE,
+                        polygon_mode: vk::PolygonMode::FILL,
+                        cull_mode: vk::CullModeFlags::NONE,
+                        front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                        depth_bias_enable: vk::FALSE,
+                        depth_bias_constant_factor: 0.0,
+                        depth_bias_clamp: 0.0,
+                        depth_bias_slope_factor: 0.0,
+                        line_width: 1.0,
+                    }
                 },
                 multisample: PipelineMultisampleStateCreateInfo {
-                    flags: Default::default(),
-                    rasterization_samples: vk::SampleCountFlags::TYPE_1,
-                    sample_shading_enable: false,
-                    min_sample_shading: 0.0,
-                    sample_mask: 0,
-                    alpha_to_coverage_enable: false,
-                    alpha_to_one_enable: false,
+                    0: vk::PipelineMultisampleStateCreateInfo {
+                        s_type: vk::StructureType::PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+                        p_next: std::ptr::null(),
+                        flags: Default::default(),
+                        rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                        sample_shading_enable: vk::FALSE,
+                        min_sample_shading: 0.0,
+                        p_sample_mask: std::ptr::null(),
+                        alpha_to_coverage_enable: vk::FALSE,
+                        alpha_to_one_enable: vk::FALSE
+                    }
                 },
                 blend_attachments: vec![],
                 viewports: vec![],
                 scissors: vec![],
                 blend_enable_logic_op: false,
+                vk_vertex_inputs: vec![],
+                vk_attributes: vec![],
+                vertex_input_state: vk::PipelineVertexInputStateCreateInfo {
+                    s_type: vk::StructureType::PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+                    p_next: std::ptr::null(),
+                    flags: Default::default(),
+                    vertex_binding_description_count: 0,
+                    p_vertex_binding_descriptions: std::ptr::null(),
+                    vertex_attribute_description_count: 0,
+                    p_vertex_attribute_descriptions: std::ptr::null(),
+                },
+                vk_viewports: vec![],
+                vk_scissors: vec![],
+                viewport_state: Default::default(),
+                vk_blend_attachments: vec![],
+                blend_state: Default::default(),
+                vk_dynamic_state: Default::default(),
             },
             vertex_binding_offsets: Default::default(),
         }
@@ -376,24 +410,26 @@ impl PipelineBuilder {
     pub fn vertex_input(mut self, binding: u32, rate: vk::VertexInputRate) -> Self {
         self.vertex_binding_offsets.insert(0, 0);
         self.inner.vertex_input_bindings.push(VertexInputBindingDescription{
-            binding,
-            stride: 0,
-            input_rate: rate,
-        });
+            0: vk::VertexInputBindingDescription {
+                binding,
+                stride: 0,
+                input_rate: rate,
+            }});
         self
     }
 
     pub fn vertex_attribute(mut self, binding: u32, location: u32, format: vk::Format) -> Result<Self, Error> {
         let offset = self.vertex_binding_offsets.get_mut(&binding).ok_or(Error::NoVertexBinding)?;
         self.inner.vertex_attributes.push(VertexInputAttributeDescription{
-            location,
-            binding,
-            format,
-            offset: *offset,
-        });
+            0: vk::VertexInputAttributeDescription {
+                location,
+                binding,
+                format,
+                offset: *offset,
+            }});
         *offset += format.byte_size() as u32;
         for binding in &mut self.inner.vertex_input_bindings {
-            binding.stride += format.byte_size() as u32;
+            binding.0.stride += format.byte_size() as u32;
         }
 
         Ok(self)
@@ -405,22 +441,22 @@ impl PipelineBuilder {
     }
 
     pub fn depth_test(mut self, enable: bool) -> Self {
-        self.inner.depth_stencil.depth_test_enable = enable;
+        self.inner.depth_stencil.0.depth_test_enable = vk::Bool32::from(enable);
         self
     }
 
     pub fn depth_write(mut self, enable: bool) -> Self {
-        self.inner.depth_stencil.depth_write_enable = enable;
+        self.inner.depth_stencil.0.depth_write_enable = vk::Bool32::from(enable);
         self
     }
 
     pub fn depth_op(mut self, op: vk::CompareOp) -> Self {
-        self.inner.depth_stencil.depth_compare_op = op;
+        self.inner.depth_stencil.0.depth_compare_op = op;
         self
     }
 
     pub fn depth_clamp(mut self, enable: bool) -> Self {
-        self.inner.rasterizer.depth_clamp_enable = enable;
+        self.inner.rasterizer.0.depth_clamp_enable = vk::Bool32::from(enable);
         self
     }
 
@@ -436,22 +472,23 @@ impl PipelineBuilder {
         // When setting a viewport dynamic state, we still need a dummy viewport to make validation shut up
         if state == vk::DynamicState::VIEWPORT {
             self.inner.viewports.push(Viewport{
-                x: 0.0,
-                y: 0.0,
-                width: 0.0,
-                height: 0.0,
-                min_depth: 0.0,
-                max_depth: 0.0,
+                0: vk::Viewport {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.0,
+                    height: 0.0,
+                    min_depth: 0.0,
+                    max_depth: 0.0,
+                }
             })
         }
         // Same with scissor state
         if state == vk::DynamicState::SCISSOR {
             self.inner.scissors.push(Rect2D{
-                offset_x: 0,
-                offset_y: 0,
-                width: 0,
-                height: 0,
-            })
+                0: vk::Rect2D {
+                    offset: Default::default(),
+                    extent: Default::default(),
+                }})
         }
 
         self
@@ -465,48 +502,69 @@ impl PipelineBuilder {
     }
 
     pub fn polygon_mode(mut self, mode: vk::PolygonMode) -> Self {
-        self.inner.rasterizer.polygon_mode = mode;
+        self.inner.rasterizer.0.polygon_mode = mode;
         self
     }
 
     pub fn cull_mask(mut self, cull: vk::CullModeFlags) -> Self {
-        self.inner.rasterizer.cull_mode = cull;
+        self.inner.rasterizer.0.cull_mode = cull;
         self
     }
 
     pub fn front_face(mut self, face: vk::FrontFace) -> Self {
-        self.inner.rasterizer.front_face = face;
+        self.inner.rasterizer.0.front_face = face;
         self
     }
 
     pub fn samples(mut self, samples: vk::SampleCountFlags) -> Self {
-        self.inner.multisample.rasterization_samples = samples;
+        self.inner.multisample.0.rasterization_samples = samples;
         self
     }
 
     pub fn sample_shading(mut self, value: f32) -> Self {
-        self.inner.multisample.sample_shading_enable = true;
-        self.inner.multisample.min_sample_shading = value;
+        self.inner.multisample.0.sample_shading_enable = vk::TRUE;
+        self.inner.multisample.0.min_sample_shading = value;
         self
     }
 
     pub fn blend_attachment_none(mut self) -> Self {
         self.inner.blend_attachments.push(PipelineColorBlendAttachmentState{
-            blend_enable: false,
-            src_color_blend_factor: vk::BlendFactor::ONE,
-            dst_color_blend_factor: vk::BlendFactor::ONE,
-            color_blend_op: vk::BlendOp::ADD,
-            src_alpha_blend_factor: vk::BlendFactor::ONE,
-            dst_alpha_blend_factor: vk::BlendFactor::ONE,
-            alpha_blend_op: vk::BlendOp::ADD,
-            color_write_mask: vk::ColorComponentFlags::RGBA,
-        });
+            0: vk::PipelineColorBlendAttachmentState {
+                blend_enable: vk::FALSE,
+                src_color_blend_factor: vk::BlendFactor::ONE,
+                dst_color_blend_factor: vk::BlendFactor::ONE,
+                color_blend_op: vk::BlendOp::ADD,
+                src_alpha_blend_factor: vk::BlendFactor::ONE,
+                dst_alpha_blend_factor: vk::BlendFactor::ONE,
+                alpha_blend_op: vk::BlendOp::ADD,
+                color_write_mask: vk::ColorComponentFlags::RGBA,
+            }});
         self
     }
 
     // todo: shader reflection
 
-    pub fn build(self) -> PipelineCreateInfo {
+    pub fn build(mut self) -> PipelineCreateInfo {
+        self.inner.vk_attributes = self.inner.vertex_attributes.iter().map(|v| v.0.clone()).collect();
+        self.inner.vk_vertex_inputs = self.inner.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
+        self.inner.vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
+            .vertex_binding_descriptions(self.inner.vk_vertex_inputs.as_slice())
+            .vertex_attribute_descriptions(self.inner.vk_attributes.as_slice())
+            .build();
+        self.inner.vk_viewports = self.inner.viewports.iter().map(|v| v.0.clone()).collect();
+        self.inner.vk_scissors = self.inner.scissors.iter().map(|v| v.0.clone()).collect();
+        self.inner.viewport_state = vk::PipelineViewportStateCreateInfo::builder()
+            .viewports(self.inner.vk_viewports.as_slice())
+            .scissors(self.inner.vk_scissors.as_slice())
+            .build();
+        self.inner.vk_blend_attachments = self.inner.blend_attachments.iter().map(|v| v.0.clone()).collect();
+        self.inner.blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
+            .logic_op_enable(self.inner.blend_enable_logic_op)
+            .attachments(self.inner.vk_blend_attachments.as_slice())
+            .build();
+        self.inner.vk_dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
+            .dynamic_states(self.inner.dynamic_states.as_slice())
+            .build();
         self.inner
     }
 }
@@ -535,7 +593,7 @@ impl PipelineCache {
             self.set_layouts.get_or_create(layout, ())?;
         }
         self.pipeline_layouts.get_or_create(&info.layout, &mut self.set_layouts)?;
-        self.pipelines.get_or_create(info, &mut self.shaders)
+        self.pipelines.get_or_create(info, (&mut self.shaders, &mut self.pipeline_layouts, &mut self.set_layouts))
     }
 
     /// Advance cache resource time to live so resources that have not been used in a while can be cleaned up
@@ -563,57 +621,115 @@ impl Hash for ShaderCreateInfo {
     }
 }
 
+impl Hash for VertexInputBindingDescription {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.binding.hash(state);
+        self.0.stride.hash(state);
+        self.0.input_rate.hash(state);
+    }
+}
+
+impl Hash for VertexInputAttributeDescription {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.location.hash(state);
+        self.0.binding.hash(state);
+        self.0.format.hash(state);
+        self.0.offset.hash(state);
+    }
+}
+
+impl Hash for PipelineInputAssemblyStateCreateInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.flags.hash(state);
+        self.0.topology.hash(state);
+        self.0.primitive_restart_enable.hash(state);
+    }
+}
+
 impl Hash for PipelineDepthStencilStateCreateInfo {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        self.flags.hash(hasher);
-        self.depth_test_enable.hash(hasher);
-        self.depth_write_enable.hash(hasher);
-        self.depth_compare_op.hash(hasher);
-        self.depth_bounds_test_enable.hash(hasher);
-        self.stencil_test_enable.hash(hasher);
-        self.front.hash(hasher);
-        self.back.hash(hasher);
-        self.min_depth_bounds.to_bits().hash(hasher);
-        self.max_depth_bounds.to_bits().hash(hasher);
+        self.0.flags.hash(hasher);
+        self.0.depth_test_enable.hash(hasher);
+        self.0.depth_write_enable.hash(hasher);
+        self.0.depth_compare_op.hash(hasher);
+        self.0.depth_bounds_test_enable.hash(hasher);
+        self.0.stencil_test_enable.hash(hasher);
+        self.0.front.compare_mask.hash(hasher);
+        self.0.front.compare_op.hash(hasher);
+        self.0.front.depth_fail_op.hash(hasher);
+        self.0.front.fail_op.hash(hasher);
+        self.0.front.pass_op.hash(hasher);
+        self.0.front.reference.hash(hasher);
+        self.0.front.write_mask.hash(hasher);
+        self.0.back.compare_mask.hash(hasher);
+        self.0.back.compare_op.hash(hasher);
+        self.0.back.depth_fail_op.hash(hasher);
+        self.0.back.fail_op.hash(hasher);
+        self.0.back.pass_op.hash(hasher);
+        self.0.back.reference.hash(hasher);
+        self.0.back.write_mask.hash(hasher);
+        self.0.min_depth_bounds.to_bits().hash(hasher);
+        self.0.max_depth_bounds.to_bits().hash(hasher);
     }
 }
 
 impl Hash for PipelineRasterizationStateCreateInfo {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        self.flags.hash(hasher);
-        self.depth_clamp_enable.hash(hasher);
-        self.rasterizer_discard_enable .hash(hasher);
-        self.polygon_mode.hash(hasher);
-        self.cull_mode.hash(hasher);
-        self.front_face.hash(hasher);
-        self.depth_bias_enable.hash(hasher);
-        self.depth_bias_constant_factor.to_bits().hash(hasher);
-        self.depth_bias_clamp.to_bits().hash(hasher);
-        self.depth_bias_slope_factor.to_bits().hash(hasher);
-        self.line_width.to_bits().hash(hasher);
+        self.0.flags.hash(hasher);
+        self.0.depth_clamp_enable.hash(hasher);
+        self.0.rasterizer_discard_enable .hash(hasher);
+        self.0.polygon_mode.hash(hasher);
+        self.0.cull_mode.hash(hasher);
+        self.0.front_face.hash(hasher);
+        self.0.depth_bias_enable.hash(hasher);
+        self.0.depth_bias_constant_factor.to_bits().hash(hasher);
+        self.0.depth_bias_clamp.to_bits().hash(hasher);
+        self.0.depth_bias_slope_factor.to_bits().hash(hasher);
+        self.0.line_width.to_bits().hash(hasher);
     }
 }
 
 impl Hash for PipelineMultisampleStateCreateInfo {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        self.flags.hash(hasher);
-        self.rasterization_samples.hash(hasher);
-        self.sample_shading_enable.hash(hasher);
-        self.min_sample_shading.to_bits().hash(hasher);
-        self.sample_mask.hash(hasher);
-        self.alpha_to_coverage_enable.hash(hasher);
-        self.alpha_to_one_enable.hash(hasher);
+        self.0.flags.hash(hasher);
+        self.0.rasterization_samples.hash(hasher);
+        self.0.sample_shading_enable.hash(hasher);
+        self.0.min_sample_shading.to_bits().hash(hasher);
+        self.0.p_sample_mask.hash(hasher);
+        self.0.alpha_to_coverage_enable.hash(hasher);
+        self.0.alpha_to_one_enable.hash(hasher);
+    }
+}
+
+impl Hash for PipelineColorBlendAttachmentState {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.src_color_blend_factor.hash(state);
+        self.0.dst_color_blend_factor.hash(state);
+        self.0.color_blend_op.hash(state);
+        self.0.src_alpha_blend_factor.hash(state);
+        self.0.dst_alpha_blend_factor.hash(state);
+        self.0.alpha_blend_op.hash(state);
+        self.0.color_write_mask.hash(state);
     }
 }
 
 impl Hash for Viewport {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
-        self.x.to_bits().hash(hasher);
-        self.y.to_bits().hash(hasher);
-        self.width.to_bits().hash(hasher);
-        self.height.to_bits().hash(hasher);
-        self.min_depth.to_bits().hash(hasher);
-        self.max_depth.to_bits().hash(hasher);
+        self.0.x.to_bits().hash(hasher);
+        self.0.y.to_bits().hash(hasher);
+        self.0.width.to_bits().hash(hasher);
+        self.0.height.to_bits().hash(hasher);
+        self.0.min_depth.to_bits().hash(hasher);
+        self.0.max_depth.to_bits().hash(hasher);
+    }
+}
+
+impl Hash for Rect2D {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.offset.x.hash(state);
+        self.0.offset.y.hash(state);
+        self.0.extent.width.hash(state);
+        self.0.extent.height.hash(state);
     }
 }
 
@@ -665,30 +781,113 @@ impl PartialEq<Self> for ShaderCreateInfo {
     }
 }
 
-impl Eq for DescriptorSetLayoutCreateInfo {
-
+impl PartialEq<Self> for VertexInputBindingDescription {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.binding == other.0.binding
+        && self.0.stride == other.0.stride
+        && self.0.input_rate == other.0.input_rate
+    }
 }
 
-impl Eq for PipelineLayoutCreateInfo {
-
+impl PartialEq<Self> for VertexInputAttributeDescription {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.location == other.0.location
+        && self.0.binding == other.0.binding
+        && self.0.format == other.0.format
+        && self.0.offset == other.0.offset
+    }
 }
 
-impl Eq for ShaderCreateInfo {
-
+impl PartialEq<Self> for PipelineInputAssemblyStateCreateInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.flags == other.0.flags
+        && self.0.topology == other.0.topology
+        && self.0.primitive_restart_enable == other.0.primitive_restart_enable
+    }
 }
 
-impl Eq for PipelineDepthStencilStateCreateInfo {
-
+impl PartialEq<Self> for PipelineDepthStencilStateCreateInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.flags == other.0.flags
+        && self.0.depth_test_enable == other.0.depth_test_enable
+        && self.0.depth_write_enable == other.0.depth_write_enable
+        && self.0.depth_compare_op == other.0.depth_compare_op
+        && self.0.depth_bounds_test_enable == other.0.depth_bounds_test_enable
+        && self.0.stencil_test_enable == other.0.stencil_test_enable
+        && self.0.min_depth_bounds == other.0.min_depth_bounds
+        && self.0.max_depth_bounds == other.0.max_depth_bounds
+    }
 }
 
-impl Eq for PipelineRasterizationStateCreateInfo {
-
+impl PartialEq<Self> for PipelineRasterizationStateCreateInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.flags == other.0.flags
+        && self.0.depth_clamp_enable == other.0.depth_clamp_enable
+        && self.0.rasterizer_discard_enable == other.0.rasterizer_discard_enable
+        && self.0.polygon_mode == other.0.polygon_mode
+        && self.0.cull_mode == other.0.cull_mode
+        && self.0.front_face == other.0.front_face
+        && self.0.depth_bias_enable == other.0.depth_bias_enable
+        && self.0.depth_bias_constant_factor == other.0.depth_bias_constant_factor
+        && self.0.depth_bias_clamp == other.0.depth_bias_clamp
+        && self.0.depth_bias_slope_factor == other.0.depth_bias_slope_factor
+        && self.0.line_width == other.0.line_width
+    }
 }
 
-impl Eq for PipelineMultisampleStateCreateInfo {
-
+impl PartialEq<Self> for PipelineMultisampleStateCreateInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.flags == other.0.flags
+        && self.0.rasterization_samples == other.0.rasterization_samples
+        && self.0.sample_shading_enable == other.0.sample_shading_enable
+        && self.0.min_sample_shading == other.0.min_sample_shading
+        && self.0.p_sample_mask == other.0.p_sample_mask
+        && self.0.alpha_to_coverage_enable == other.0.alpha_to_coverage_enable
+        && self.0.alpha_to_one_enable == other.0.alpha_to_one_enable
+    }
 }
 
-impl Eq for Viewport {
-
+impl PartialEq<Self> for PipelineColorBlendAttachmentState {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.blend_enable == other.0.blend_enable
+        && self.0.src_color_blend_factor == other.0.src_color_blend_factor
+        && self.0.dst_color_blend_factor == other.0.dst_color_blend_factor
+        && self.0.color_blend_op == other.0.color_blend_op
+        && self.0.src_alpha_blend_factor == other.0.src_alpha_blend_factor
+        && self.0.dst_alpha_blend_factor == other.0.dst_alpha_blend_factor
+        && self.0.alpha_blend_op == other.0.alpha_blend_op
+        && self.0.color_write_mask == other.0.color_write_mask
+    }
 }
+
+impl PartialEq for Viewport {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.x == other.0.x
+        && self.0.y == other.0.y
+        && self.0.width == other.0.width
+        && self.0.height == other.0.height
+        && self.0.min_depth == other.0.min_depth
+        && self.0.max_depth == other.0.max_depth
+    }
+}
+
+impl PartialEq for Rect2D {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.offset == other.0.offset
+        && self.0.extent == other.0.extent
+    }
+}
+
+impl Eq for DescriptorSetLayoutCreateInfo {}
+impl Eq for PipelineLayoutCreateInfo {}
+impl Eq for ShaderCreateInfo {}
+impl Eq for VertexInputBindingDescription {}
+impl Eq for VertexInputAttributeDescription {}
+impl Eq for PipelineInputAssemblyStateCreateInfo {}
+impl Eq for PipelineDepthStencilStateCreateInfo {}
+impl Eq for PipelineRasterizationStateCreateInfo {}
+impl Eq for PipelineMultisampleStateCreateInfo {}
+impl Eq for PipelineColorBlendAttachmentState {}
+impl Eq for Viewport {}
+impl Eq for Rect2D {}
+

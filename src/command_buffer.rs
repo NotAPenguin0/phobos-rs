@@ -4,10 +4,14 @@ use crate::execution_manager::domain::*;
 use crate::execution_manager::domain;
 
 use ash::vk;
+use ash::vk::{Rect2D, Viewport};
 use crate::{Device, Error, ExecutionManager, ImageView, PipelineCache};
 
 /// Trait representing a command buffer that supports graphics commands.
 pub trait GraphicsCmdBuffer : TransferCmdBuffer {
+    fn viewport(self, viewport: vk::Viewport) -> Self;
+    fn scissor(self, scissor: vk::Rect2D) -> Self;
+    fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Self;
     fn bind_graphics_pipeline(self, name: &str, cache: &mut PipelineCache) -> Result<Self, Error> where Self: Sized;
 }
 
@@ -177,6 +181,21 @@ impl ComputeSupport for domain::Compute {}
 impl ComputeSupport for domain::All {}
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<D> {
+    fn viewport(self, viewport: Viewport) -> Self {
+        unsafe { self.device.cmd_set_viewport(self.handle, 0, std::slice::from_ref(&viewport)); }
+        self
+    }
+
+    fn scissor(self, scissor: Rect2D) -> Self {
+        unsafe { self.device.cmd_set_scissor(self.handle, 0, std::slice::from_ref(&scissor)); }
+        self
+    }
+
+    fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Self {
+        unsafe { self.device.cmd_draw(self.handle, vertex_count, instance_count, first_vertex, first_instance); }
+        self
+    }
+
     fn bind_graphics_pipeline(self, name: &str, cache: &mut PipelineCache) -> Result<Self, Error> {
         let pipeline = cache.get_pipeline(name)?;
         unsafe { self.device.cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle); }

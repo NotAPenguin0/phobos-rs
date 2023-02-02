@@ -1,5 +1,6 @@
 use std::ffi::NulError;
 use ash;
+use ash::vk::Pipeline;
 use gpu_allocator::AllocationError;
 
 #[derive(Debug)]
@@ -57,4 +58,10 @@ impl From<ash::vk::Result> for Error {
 
 impl From<AllocationError> for Error {
     fn from(value: AllocationError) -> Self { Error::AllocationError(value) }
+}
+
+impl From<(Vec<ash::vk::Pipeline>, ash::vk::Result)> for Error {
+    fn from(value: (Vec<Pipeline>, ash::vk::Result)) -> Self {
+        Error::Uncategorized("Pipeline creation failed")
+    }
 }

@@ -89,16 +89,16 @@ pub struct GpuBarrier<R = GpuResource> {
     pub dst_stage: PipelineStage,
 }
 
-pub struct GpuTask<R, D> where R: Resource, D: ExecutionDomain {
+pub struct GpuTask<'exec, R, D> where R: Resource, D: ExecutionDomain {
     pub identifier: String,
     pub inputs: Vec<R>,
     pub outputs: Vec<R>,
-    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D>>,
+    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> + 'exec>,
     pub is_renderpass: bool
 }
 
-pub struct GpuTaskGraph<D> where D: ExecutionDomain {
-    graph: TaskGraph<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>,
+pub struct GpuTaskGraph<'exec, D> where D: ExecutionDomain {
+    pub (crate) graph: TaskGraph<GpuResource, GpuBarrier, GpuTask<'exec, GpuResource, D>>,
     // Note that this is guaranteed to be stable.
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
     // index is invalidated. Since the source is always the first node, this is never invalidated.
@@ -184,7 +184,7 @@ impl Resource for GpuResource {
     }
 }
 
-impl<R, D> Task<R> for GpuTask<R, D> where R: Resource, D: ExecutionDomain {
+impl<R, D> Task<R> for GpuTask<'_, R, D> where R: Resource, D: ExecutionDomain {
     fn inputs(&self) -> &Vec<R> {
         &self.inputs
     }
@@ -216,7 +216,7 @@ impl ResourceUsage {
     }
 }
 
-impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
+impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
     /// Create a new task graph.
     pub fn new() -> Self {
         let mut graph = GpuTaskGraph {
@@ -237,7 +237,7 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
         graph
     }
 
-    pub fn add_pass(&mut self, pass: Pass<D>) -> Result<(), Error> {
+    pub fn add_pass(&mut self, pass: Pass<'exec, D>) -> Result<(), Error> {
         // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
         let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
         for input in &pass.inputs {
@@ -279,10 +279,6 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
         &self.graph
     }
 
-    pub(crate) fn task_graph_mut(&mut self) -> &mut TaskGraph<GpuResource, GpuBarrier, GpuTask<GpuResource, D>> {
-        &mut self.graph
-    }
-
     pub fn num_nodes(&self) -> usize {
         self.graph.graph.node_count()
     }
@@ -291,7 +287,7 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
         self.source
     }
 
-    fn barrier_src_resource(graph: &Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&GpuResource, Error> {
+    fn barrier_src_resource<'a>(graph: &'a Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&'a GpuResource, Error> {
         let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(Error::NodeNotFound) };
         let edge = graph.edges_directed(node, Direction::Incoming).next().unwrap();
         let src_node = edge.source();
@@ -301,7 +297,7 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
         Ok(task.inputs.iter().find(|&input| input.uid() == barrier.resource.uid()).unwrap())
     }
 
-    pub(crate) fn barrier_dst_resource(graph: &Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&GpuResource, Error> {
+    pub(crate) fn barrier_dst_resource<'a>(graph: &'a Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&'a GpuResource, Error> {
         // We know that:
         // 1) Each barrier has at least one outgoing edge
         // 2) During the merge, each outgoing edge from a barrier will have the same resource usage
@@ -315,7 +311,7 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
         Ok(task.inputs.iter().find(|&input| input.uid() == barrier.resource.uid()).unwrap())
     }
 
-    fn barriers(graph: &Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>) -> impl Iterator<Item = (NodeIndex, &GpuBarrier)> + '_ {
+    fn barriers<'a>(graph: &'a Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>) -> impl Iterator<Item = (NodeIndex, &'a GpuBarrier)> + 'a {
         graph.node_indices().filter_map(|node| match graph.node_weight(node).unwrap() {
             Node::Task(_) => { None }
             Node::Barrier(barrier) => { Some((node, barrier)) }
@@ -492,13 +488,13 @@ pub trait GraphViz {
     fn dot(&self) -> Result<String, Error>;
 }
 
-impl<D> GraphViz for TaskGraph<GpuResource, GpuBarrier<GpuResource>, GpuTask<GpuResource, D>> where D: ExecutionDomain {
+impl<D> GraphViz for TaskGraph<GpuResource, GpuBarrier<GpuResource>, GpuTask<'_, GpuResource, D>> where D: ExecutionDomain {
     fn dot(&self) -> Result<String, Error> {
         Ok(format!("{}", Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes)))
     }
 }
 
-impl<D> Display for Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>> where D: ExecutionDomain {
+impl<D> Display for Node<GpuResource, GpuBarrier, GpuTask<'_, GpuResource, D>> where D: ExecutionDomain {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),

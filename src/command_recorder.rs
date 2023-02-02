@@ -30,12 +30,12 @@ use crate::task_graph::Resource;
 //  2) Add it to the active set.
 //  3) Add its children to the children set.
 
-fn node_children<D>(node: NodeIndex, graph: &GpuTaskGraph<D>) -> impl Iterator<Item = NodeIndex> + '_  where D: ExecutionDomain {
+fn node_children<'a, D>(node: NodeIndex, graph: &'a GpuTaskGraph<D>) -> impl Iterator<Item = NodeIndex> + 'a  where D: ExecutionDomain {
     let graph = &graph.task_graph().graph;
     graph.edges_directed(node, Outgoing).map(|edge| edge.target())
 }
 
-fn node_parents<D>(node: NodeIndex, graph: &GpuTaskGraph<D>) -> impl Iterator<Item = NodeIndex> + '_ where D: ExecutionDomain {
+fn node_parents<'a, D>(node: NodeIndex, graph: &'a GpuTaskGraph<D>) -> impl Iterator<Item = NodeIndex> + 'a where D: ExecutionDomain {
     let graph = &graph.task_graph().graph;
     graph.edges_directed(node, Incoming).map(|edge| edge.source())
 }
@@ -173,7 +173,7 @@ fn record_barrier<D>(barrier: &GpuBarrier, dst_resource: &GpuResource, bindings:
 
 fn record_node<D>(graph: &mut GpuTaskGraph<D>, node: NodeIndex, bindings: &PhysicalResourceBindings,
                   cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>, Error> where D: ExecutionDomain {
-    let graph = &mut graph.task_graph_mut().graph;
+    let graph = &mut graph.graph.graph;
     let dst_resource_res = GpuTaskGraph::barrier_dst_resource(&graph, node).cloned();
     let weight = graph.node_weight_mut(node).unwrap();
     match weight {

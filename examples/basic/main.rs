@@ -33,6 +33,16 @@ fn main_loop(frame: &mut ph::FrameManager, pipelines: &mut ph::PipelineCache, ex
         // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
         .execute(|cmd| {
             cmd.bind_graphics_pipeline("simple", pipelines).unwrap()
+                .viewport(vk::Viewport{
+                    x: 0.0,
+                    y: 0.0,
+                    width: 800.0,
+                    height: 600.0,
+                    min_depth: 0.0,
+                    max_depth: 0.0,
+                })
+                .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
+                .draw(6, 1, 0, 0)
         })
         .get();
     // Add another pass to handle presentation to the screen
@@ -72,6 +82,7 @@ fn main() -> Result<(), ph::Error> {
     let event_loop = EventLoopBuilder::new().with_any_thread(true).build();
     let window = WindowBuilder::new()
         .with_title("Phobos test app")
+        .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
         .build(&event_loop)
         .unwrap();
 
@@ -116,15 +127,14 @@ fn main() -> Result<(), ph::Error> {
     let mut cache = ph::PipelineCache::new(device.clone())?;
 
     // First, we need to load shaders
-    let vtx_code = load_spirv_file(Path::new("data/vert.spv"));
-    let frag_code = load_spirv_file(Path::new("data/frag.s~pv"));
+    let vtx_code = load_spirv_file(Path::new("examples/data/vert.spv"));
+    let frag_code = load_spirv_file(Path::new("examples/data/frag.spv"));
 
     let vertex = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::VERTEX, vtx_code);
     let fragment = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
 
     // Now we can start using the pipeline builder to create our full pipeline.
     let mut pci = ph::PipelineBuilder::new("simple".to_string())
-        .vertex_input(0, vk::VertexInputRate::VERTEX)
         .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
         .blend_attachment_none()
         .cull_mask(vk::CullModeFlags::NONE)
@@ -138,7 +148,7 @@ fn main() -> Result<(), ph::Error> {
     // Store the pipeline in the pipeline cache
     cache.create_named_pipeline(pci)?;
 
-    event_loop.run(|event, _, control_flow| {
+    event_loop.run(move |event, _, control_flow| {
         // Do not render a frame if Exit control flow is specified, to avoid
         // sync issues.
         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }

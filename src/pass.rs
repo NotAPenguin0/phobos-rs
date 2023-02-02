@@ -16,7 +16,7 @@ pub struct PassBuilder<'exec, D> where D: ExecutionDomain {
     inner: Pass<'exec, D>,
 }
 
-impl<D> Pass<D> where D: ExecutionDomain {
+impl<'exec, D> Pass<'exec, D> where D: ExecutionDomain {
     /// Returns the output virtual resource associated with the input resource.
     pub fn output(&self, resource: &VirtualResource) -> Option<VirtualResource> {
         self.outputs.iter().filter_map(|output| {
@@ -26,7 +26,7 @@ impl<D> Pass<D> where D: ExecutionDomain {
     }
 }
 
-impl<D> PassBuilder<D> where D: ExecutionDomain {
+impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
     pub fn render(name: String) -> Self {
         PassBuilder {
             inner: Pass {
@@ -41,7 +41,7 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
 
     /// Create a pass for presenting to the swapchain.
     /// Note that this doesn't actually do the presentation, it just adds the proper sync for it.
-    pub fn present(name: String, swapchain: VirtualResource) -> Pass<D> {
+    pub fn present(name: String, swapchain: VirtualResource) -> Pass<'exec, D> {
         Pass {
             name,
             inputs: vec![GpuResource{
@@ -128,12 +128,12 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
         self
     }
 
-    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> + 'static) -> Self {
+    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> + 'exec) -> Self {
         self.inner.execute = Box::new(exec);
         self
     }
 
-    pub fn get(self) -> Pass<D> {
+    pub fn get(self) -> Pass<'exec, D> {
         self.inner
     }
 }
