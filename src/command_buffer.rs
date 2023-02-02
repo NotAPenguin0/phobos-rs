@@ -4,12 +4,11 @@ use crate::execution_manager::domain::*;
 use crate::execution_manager::domain;
 
 use ash::vk;
-use crate::{Device, Error, ExecutionManager, ImageView};
+use crate::{Device, Error, ExecutionManager, ImageView, PipelineCache};
 
 /// Trait representing a command buffer that supports graphics commands.
 pub trait GraphicsCmdBuffer : TransferCmdBuffer {
-    // doesn't do anything yet.
-    fn draw(self) -> Self;
+    fn bind_graphics_pipeline(self, name: &str, cache: &mut PipelineCache) -> Result<Self, Error> where Self: Sized;
 }
 
 /// Trait representing a command buffer that supports transfer commands.
@@ -178,11 +177,10 @@ impl ComputeSupport for domain::Compute {}
 impl ComputeSupport for domain::All {}
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<D> {
-    // Methods for graphics commands
-
-    // nothing yet
-    fn draw(self) -> Self {
-        self
+    fn bind_graphics_pipeline(self, name: &str, cache: &mut PipelineCache) -> Result<Self, Error> {
+        let pipeline = cache.get_pipeline(name)?;
+        unsafe { self.device.cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle); }
+        Ok(self)
     }
 }
 

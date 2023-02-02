@@ -72,15 +72,16 @@
 
 
 #![feature(never_type)]
-
-extern crate core;
+#![feature(fn_traits)]
 
 #[macro_use]
 extern crate derivative;
+extern crate core;
 
 mod util;
 mod command_pool;
 mod deferred_delete;
+pub mod cache;
 pub mod task_graph;
 pub mod buffer;
 pub mod window;
@@ -124,6 +125,7 @@ pub use crate::buffer::*;
 pub use crate::task_graph::*;
 pub use crate::command_recorder::*;
 pub use crate::pass::*;
+pub use crate::pipeline::*;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]

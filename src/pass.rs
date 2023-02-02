@@ -1,19 +1,19 @@
+use std::sync::Arc;
 use ash::vk;
-use ash::vk::AttachmentLoadOp;
 use crate::{GpuResource, IncompleteCommandBuffer, ResourceUsage, VirtualResource};
 use crate::domain::ExecutionDomain;
 use crate::pipeline::PipelineStage;
 
-pub struct Pass<D> where D: ExecutionDomain {
+pub struct Pass<'exec, D> where D: ExecutionDomain {
     pub name: String,
     pub inputs: Vec<GpuResource>,
     pub outputs: Vec<GpuResource>,
-    pub execute: fn(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D>,
+    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> + 'exec>,
     pub is_renderpass: bool
 }
 
-pub struct PassBuilder<D> where D: ExecutionDomain {
-    inner: Pass<D>,
+pub struct PassBuilder<'exec, D> where D: ExecutionDomain {
+    inner: Pass<'exec, D>,
 }
 
 impl<D> Pass<D> where D: ExecutionDomain {
@@ -31,7 +31,7 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
         PassBuilder {
             inner: Pass {
                 name,
-                execute: |c| c,
+                execute: Box::new(|c| c),
                 inputs: vec![],
                 outputs: vec![],
                 is_renderpass: true
@@ -53,7 +53,7 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
                 load_op: None,
             }],
             outputs: vec![],
-            execute: |c| c,
+            execute: Box::new(|c| c),
             is_renderpass: false
         }
     }
@@ -128,8 +128,8 @@ impl<D> PassBuilder<D> where D: ExecutionDomain {
         self
     }
 
-    pub fn execute(mut self, exec: fn(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D>) -> Self {
-        self.inner.execute = exec;
+    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> + 'static) -> Self {
+        self.inner.execute = Box::new(exec);
         self
     }
 

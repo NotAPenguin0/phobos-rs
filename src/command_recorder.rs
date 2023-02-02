@@ -1,11 +1,10 @@
 use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 use ash::vk;
-use ash::vk::RenderingAttachmentInfo;
 use petgraph::graph::NodeIndex;
 use petgraph::{Incoming, Outgoing};
 use petgraph::prelude::EdgeRef;
-use petgraph::visit::IntoEdgesDirected;
-use crate::domain::{All, ExecutionDomain};
+use crate::domain::{ExecutionDomain};
 use crate::{Error, GpuBarrier, GpuResource, GpuTask, GpuTaskGraph, ImageView, IncompleteCommandBuffer, ResourceUsage, task_graph::Node, VirtualResource};
 use crate::task_graph::Resource;
 
@@ -111,7 +110,7 @@ fn render_area<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBin
     }
 }
 
-fn record_pass<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings, mut cmd: IncompleteCommandBuffer<D>)
+fn record_pass<D>(pass: &mut GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings, mut cmd: IncompleteCommandBuffer<D>)
     -> Result<IncompleteCommandBuffer<D>, Error> where D: ExecutionDomain  {
     if pass.is_renderpass {
         let color_info = color_attachments(&pass, &bindings)?;
@@ -129,7 +128,7 @@ fn record_pass<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBin
 
         cmd = cmd.begin_rendering(&info);
     }
-    cmd = (pass.execute)(cmd);
+    cmd = pass.execute.call_mut((cmd,));
     return if pass.is_renderpass {
         Ok(cmd.end_rendering())
     } else {
@@ -145,7 +144,7 @@ fn record_image_barrier<D>(barrier: &GpuBarrier, image: &ImageView, dst_resource
     // barrier.resource has information on srcLayout
     // dst_resource(barrier) has information on dstLayout
 
-    let mut info = vk::DependencyInfo::builder()
+    let info = vk::DependencyInfo::builder()
         .dependency_flags(vk::DependencyFlags::BY_REGION);
     let vk_barrier = vk::ImageMemoryBarrier2::builder()
         .image(image.image)
@@ -172,16 +171,16 @@ fn record_barrier<D>(barrier: &GpuBarrier, dst_resource: &GpuResource, bindings:
     }
 }
 
-fn record_node<D>(graph: &GpuTaskGraph<D>, node: NodeIndex, bindings: &PhysicalResourceBindings,
-                  cmd: IncompleteCommandBuffer<D>) -> Result<(IncompleteCommandBuffer<D>), Error> where D: ExecutionDomain {
-    let graph = &graph.task_graph().graph;
-    let weight = graph.node_weight(node).unwrap();
+fn record_node<D>(graph: &mut GpuTaskGraph<D>, node: NodeIndex, bindings: &PhysicalResourceBindings,
+                  cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>, Error> where D: ExecutionDomain {
+    let graph = &mut graph.task_graph_mut().graph;
+    let dst_resource_res = GpuTaskGraph::barrier_dst_resource(&graph, node).cloned();
+    let weight = graph.node_weight_mut(node).unwrap();
     match weight {
-        Node::Task(pass) => { record_pass(&pass, &bindings, cmd) }
+        Node::Task(pass) => { record_pass(pass, &bindings, cmd) }
         Node::Barrier(barrier) => {
             // Find destination resource in graph
-            let dst_resource = GpuTaskGraph::barrier_dst_resource(&graph, node)?;
-            record_barrier(&barrier, dst_resource, &bindings, cmd)
+            record_barrier(&barrier, &dst_resource_res?, &bindings, cmd)
         }
         Node::_Unreachable(_) => { unreachable!() }
     }
@@ -209,7 +208,7 @@ impl PhysicalResourceBindings {
     }
 }
 
-pub fn record_graph<D>(graph: &GpuTaskGraph<D>, bindings: &PhysicalResourceBindings, mut cmd: IncompleteCommandBuffer<D>)
+pub fn record_graph<D>(graph: &mut GpuTaskGraph<D>, bindings: &PhysicalResourceBindings, mut cmd: IncompleteCommandBuffer<D>)
     -> Result<IncompleteCommandBuffer<D>, Error> where D: ExecutionDomain {
     let start = graph.source();
     let mut active = HashSet::new();
@@ -221,7 +220,7 @@ pub fn record_graph<D>(graph: &GpuTaskGraph<D>, bindings: &PhysicalResourceBindi
         for child in &children {
             // If all parents of this child node are in the active set, record it.
             if node_parents(child.clone(), &graph).all(|parent| active.contains(&parent)) {
-                cmd = record_node(&graph, child.clone(), &bindings, cmd)?;
+                cmd = record_node(graph, child.clone(), &bindings, cmd)?;
                 recorded_nodes.push(child.clone());
             }
         }
@@ -231,5 +230,5 @@ pub fn record_graph<D>(graph: &GpuTaskGraph<D>, bindings: &PhysicalResourceBindi
         }
     }
 
-    Ok((cmd))
+    Ok(cmd)
 }

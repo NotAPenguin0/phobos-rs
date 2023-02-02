@@ -2,7 +2,7 @@
 name = "phobos"
 version = "0.1.0"
 edition = "2021"
-license-file = "LICENSE"
+license = "Apache-2.0"
 description = "Powerful abstraction library for the Vulkan API."
 repository = "https://github.com/NotAPenguin0/phobos-rs"
 readme = "README.md"
@@ -21,6 +21,10 @@ petgraph = "0.6.2"
 layout-rs = "0.1.1"
 winit = { version = "0.27.5", optional = true }
 bitflags = "1.3.2"
+dyn-clone = "1.0.10"
+
+[build-dependencies]
+shaderc = "0.8.2"
 
 [features]
 default = ["winit"]

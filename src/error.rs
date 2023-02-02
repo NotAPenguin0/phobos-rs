@@ -30,6 +30,9 @@ pub enum Error {
     IllegalTaskGraph,
     /// No resource was bound to a virtual resource
     NoResourceBound(String),
+    /// Named pipeline not registered in the pipeline cache.
+    PipelineNotFound(String),
+    NoVertexBinding,
     /// Uncategorized error.
     Uncategorized(&'static str),
 }

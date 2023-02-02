@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
+use std::sync::Arc;
 use ash::vk;
 
 use petgraph::graph::*;
@@ -41,14 +42,14 @@ pub trait Barrier<R> where R: Resource {
     fn resource(&self) -> &R;
 }
 
-#[derive(Debug, Clone)]
-pub enum Node<R, B, T> where R: Resource, B: Barrier<R> + Clone, T: Task<R> + Clone {
+#[derive(Debug)]
+pub enum Node<R, B, T> where R: Resource, B: Barrier<R>, T: Task<R> {
     Task(T),
     Barrier(B),
     _Unreachable((!, PhantomData<R>)),
 }
 
-pub struct TaskGraph<R, B, T> where R: Resource + Default, B: Barrier<R> + Clone, T: Task<R> + Clone {
+pub struct TaskGraph<R, B, T> where R: Resource + Default, B: Barrier<R> + Clone, T: Task<R> {
     pub(crate) graph: Graph<Node<R, B, T>, String>,
 }
 
@@ -92,7 +93,7 @@ pub struct GpuTask<R, D> where R: Resource, D: ExecutionDomain {
     pub identifier: String,
     pub inputs: Vec<R>,
     pub outputs: Vec<R>,
-    pub execute: fn(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D>,
+    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D>>,
     pub is_renderpass: bool
 }
 
@@ -193,18 +194,6 @@ impl<R, D> Task<R> for GpuTask<R, D> where R: Resource, D: ExecutionDomain {
     }
 }
 
-impl<R, D> Clone for GpuTask<R, D> where R: Resource + Clone, D: ExecutionDomain {
-    fn clone(&self) -> Self {
-        Self {
-            identifier: self.identifier.clone(),
-            inputs: self.inputs.clone(),
-            outputs: self.outputs.clone(),
-            execute: self.execute.clone(),
-            is_renderpass: self.is_renderpass.clone()
-        }
-    }
-}
-
 impl ResourceUsage {
     pub fn access(&self) -> vk::AccessFlags2 {
         match self {
@@ -240,7 +229,7 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
             identifier: "_source".to_string(),
             inputs: vec![],
             outputs: vec![],
-            execute: |c| c,
+            execute: Box::new(|c| c),
             is_renderpass: false,
         }).unwrap();
         // ...
@@ -288,6 +277,10 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
     /// Returns the task graph built by the GPU task graph system, useful for outputting dotfiles.
     pub fn task_graph(&self) -> &TaskGraph<GpuResource, GpuBarrier, GpuTask<GpuResource, D>> {
         &self.graph
+    }
+
+    pub(crate) fn task_graph_mut(&mut self) -> &mut TaskGraph<GpuResource, GpuBarrier, GpuTask<GpuResource, D>> {
+        &mut self.graph
     }
 
     pub fn num_nodes(&self) -> usize {
@@ -377,7 +370,7 @@ impl<D> GpuTaskGraph<D> where D: ExecutionDomain {
     }
 }
 
-impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier<R> + Clone, T: Task<R> + Clone {
+impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier<R> + Clone, T: Task<R> {
     pub fn new() -> Self {
         TaskGraph {
             graph: Graph::new()
@@ -447,6 +440,11 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
         }
     }
 
+    fn task_outputs(&self, node: NodeIndex) -> &Vec<R> {
+        let Node::Task(task) = self.graph.node_weight(node).unwrap() else { unimplemented!() };
+        task.outputs()
+    }
+
     /// Create a maximum set of barrier nodes for the task graph. This means that we will assume every resource that is being consumed needs its own barrier.
     /// These barriers are not yet serialized, as we only want to do that after we know which barriers are equivalent.
     pub fn create_barrier_nodes(&mut self) {
@@ -464,8 +462,7 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
         self.graph.node_indices().clone().for_each(|node| {
             if !Self::is_task_node(&self.graph, node).unwrap() { return; }
 
-            let Node::Task(task) = self.graph.node_weight(node).cloned().unwrap() else { unimplemented!() };
-            for resource in task.outputs() {
+            for resource in self.task_outputs(node).clone() {
                 // Find all nodes in the graph that depend directly on this resource
                 let consumers = self.graph.node_indices().filter(|&consumer| -> bool {
                     let consumer = self.graph.node_weight(consumer).unwrap();
@@ -477,7 +474,7 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
                     }
                 }).collect::<Vec<NodeIndex>>();
 
-                if consumers.is_empty() { return; }
+                if consumers.is_empty() { continue; }
                 for consumer in consumers {
                     let barrier = self.graph.add_node(Node::Barrier(B::new(resource.clone())));
                     self.graph.update_edge(node, barrier, resource.uid().clone());
