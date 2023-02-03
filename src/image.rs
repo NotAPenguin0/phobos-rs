@@ -5,7 +5,6 @@ use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};
 use gpu_allocator::vulkan::{AllocationCreateDesc, Allocator};
 
 use crate::{Device, Error};
-use crate::util::ByteSize;
 
 /// Abstraction over a [`VkImage`](vk::Image). Stores information about size, format, etc. Additionally couples the image data together
 /// with a memory allocation.
@@ -40,10 +39,12 @@ pub struct Image {
 /// Image views can refer to one or more array layers or mip levels of an image. Given the right extension they can also interpret the image contents in a different
 /// format.
 #[derive(Derivative)]
-#[derivative(Debug)]
+#[derivative(Debug, Hash, PartialEq, Eq)]
 pub struct ImgView {
     /// Reference to the [`VkDevice`](vk::Device)
     #[derivative(Debug="ignore")]
+    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq="ignore")]
     pub device: Arc<Device>,
     /// [`VkImageView`](vk::ImageView) handle
     pub handle: vk::ImageView,
@@ -73,6 +74,7 @@ pub type ImageView = Arc<ImgView>;
 impl Image {
     // TODO: Allow specifying an initial layout for convenience
     // TODO: Full wrapper around the allocator for convenience
+    /// Create a new simple [`VkImage`] and allocate some memory to it.
     pub fn new(device: Arc<Device>, alloc: Arc<Mutex<Allocator>>, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format) -> Result<Self, Error> {
         let sharing_mode = if usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {
             vk::SharingMode::EXCLUSIVE

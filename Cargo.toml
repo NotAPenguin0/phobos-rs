@@ -1,13 +1,11 @@
 [package]
 name = "phobos"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "Powerful abstraction library for the Vulkan API."
+description = "Fast, powerful Vulkan abstraction library"
 repository = "https://github.com/NotAPenguin0/phobos-rs"
 readme = "README.md"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 ash = { version = "0.37.0", features = ["debug"] }

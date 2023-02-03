@@ -5,13 +5,19 @@ use crate::execution_manager::domain;
 
 use ash::vk;
 use ash::vk::{Rect2D, Viewport};
-use crate::{Device, Error, ExecutionManager, ImageView, PipelineCache};
+use crate::{DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache};
 
 /// Trait representing a command buffer that supports graphics commands.
 pub trait GraphicsCmdBuffer : TransferCmdBuffer {
+    /// Sets the viewport. The equivalent of `vkCmdSetViewport`.
     fn viewport(self, viewport: vk::Viewport) -> Self;
+    /// Sets the scissor region. Equivalent of `vkCmdSetScissor`.
     fn scissor(self, scissor: vk::Rect2D) -> Self;
+    /// Record a single drawcall. Equivalent of `vkCmdDraw`.
     fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Self;
+    /// Bind a graphics pipeline with a given name. This is looked up from the given pipeline cache.
+    /// # Errors
+    /// This function can report an error in case the pipeline name is not registered in the cache.
     fn bind_graphics_pipeline(self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self, Error> where Self: Sized;
 }
 
@@ -70,6 +76,9 @@ pub struct IncompleteCommandBuffer<D: ExecutionDomain> {
     #[derivative(Debug="ignore")]
     device: Arc<Device>,
     handle: vk::CommandBuffer,
+    current_pipeline_layout: vk::PipelineLayout,
+    current_set_layouts: Vec<vk::DescriptorSetLayout>,
+    current_bindpoint: vk::PipelineBindPoint, // TODO: Note: technically not correct
     _domain: PhantomData<D>,
 }
 
@@ -84,6 +93,9 @@ impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
         Ok(IncompleteCommandBuffer {
             device: device.clone(),
             handle,
+            current_pipeline_layout: vk::PipelineLayout::null(),
+            current_set_layouts: vec![],
+            current_bindpoint: vk::PipelineBindPoint::default(),
             _domain: PhantomData
         })
     }
@@ -106,9 +118,44 @@ impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
     }
 }
 
-// Provides implementations for commands that work on all domains,
-// and other helper functions
 impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
+    /// Obtain a reference to a descriptor set inside the given cache that stores the requested bindings.
+    /// This potentially allocates a new descriptor set and writes to it.
+    /// # Lifetime
+    /// The returned descriptor set lives as long as the cache allows it to live, so it should not be stored across multiple frames.
+    /// # Errors
+    /// - This function can potentially error if allocating the descriptor set fails. The descriptor cache has builtin ways to handle
+    /// a full descriptor pool, but other errors are passed through.
+    /// - This function errors if a requested set was not specified in the current pipeline's pipeline layout.
+    /// - This function errors if no pipeline is bound.
+    pub fn get_descriptor_set<'a>(&mut self, set: u32, mut bindings: DescriptorSetBinding, cache: &'a mut DescriptorCache) -> Result<&'a DescriptorSet, Error> {
+        let layout = self.current_set_layouts.get(set as usize).ok_or(Error::NoDescriptorSetLayout)?;
+        bindings.layout = layout.clone();
+        cache.get_descriptor_set(bindings)
+    }
+
+    /// Bind a descriptor set to the command buffer. This descriptor set can be obtained by calling
+    /// [`Self::get_descriptor_set`]. Note that the index should be the same as the one used in get_descriptor_set.
+    /// To safely do this, prefer using [`Self::bind_new_descriptor_set`] to combine these two functions into one call.
+    pub fn bind_descriptor_set(self, index: u32, set: &DescriptorSet) -> Self {
+        unsafe {
+            self.device.cmd_bind_descriptor_sets(self.handle, self.current_bindpoint, self.current_pipeline_layout,
+                                     index,
+                                std::slice::from_ref(&set.handle),
+                               &[]); }
+        self
+    }
+
+    /// Obtain a descriptor set from the cache, and immediately bind it to the given index.
+    /// # Errors
+    /// - This function can error if locking the descriptor cache fails
+    /// - This function can error if allocating the descriptor set fails.
+    pub fn bind_new_descriptor_set(mut self, index: u32, bindings: DescriptorSetBinding, cache: Arc<Mutex<DescriptorCache>>) -> Result<Self, Error> {
+        let mut cache = cache.lock()?;
+        let set = self.get_descriptor_set(index, bindings, &mut cache)?;
+        Ok(self.bind_descriptor_set(index, set))
+    }
+
     /// Transitions an image layout.
     /// Generally you will not need to call this function manually,
     /// using the render graph api you can do most transitions automatically.
@@ -196,10 +243,13 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         self
     }
 
-    fn bind_graphics_pipeline(self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self, Error> {
+    fn bind_graphics_pipeline(mut self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self, Error> {
         let mut cache = cache.lock().unwrap();
         let pipeline = cache.get_pipeline(name)?;
         unsafe { self.device.cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle); }
+        self.current_bindpoint = vk::PipelineBindPoint::GRAPHICS;
+        self.current_pipeline_layout = pipeline.layout;
+        self.current_set_layouts = pipeline.set_layouts.clone();
         Ok(self)
     }
 }

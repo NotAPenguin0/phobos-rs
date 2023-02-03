@@ -23,11 +23,17 @@ use phobos::{GraphicsCmdBuffer, PipelineStage};
 
 struct Resources {
     pub offscreen: ph::Image,
-    pub offscreen_view: ph::ImageView
+    pub offscreen_view: ph::ImageView,
+    pub sampler: ph::Sampler,
 }
 
-fn main_loop(frame: &mut ph::FrameManager, resources: &Resources, pipelines: Arc<Mutex<ph::PipelineCache>>, exec: &ph::ExecutionManager,
-             surface: &ph::Surface, window: &winit::window::Window) -> Result<(), ph::Error> {
+fn main_loop(frame: &mut ph::FrameManager,
+             resources: &Resources,
+             pipelines: Arc<Mutex<ph::PipelineCache>>,
+             descriptors: Arc<Mutex<ph::DescriptorCache>>,
+             exec: &ph::ExecutionManager,
+             surface: &ph::Surface,
+             window: &winit::window::Window) -> Result<(), ph::Error> {
     // Define a virtual resource pointing to the swapchain
     let swap_resource = ph::VirtualResource::new("swapchain".to_string());
     let offscreen = ph::VirtualResource::new("offscreen".to_string());
@@ -36,8 +42,9 @@ fn main_loop(frame: &mut ph::FrameManager, resources: &Resources, pipelines: Arc
 
     // Render pass that renders to an offscreen attachment
     let offscreen_pass = ph::PassBuilder::render(String::from("offscreen"))
-        .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR, Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))
-        .execute(|cmd| {
+        .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR, Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
+        .execute(|cmd, bindings| {
+            // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
             cmd.bind_graphics_pipeline("offscreen", pipelines.clone()).unwrap()
                 .viewport(vk::Viewport{
                     x: 0.0,
@@ -50,29 +57,33 @@ fn main_loop(frame: &mut ph::FrameManager, resources: &Resources, pipelines: Arc
                 .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
                 .draw(6, 1, 0, 0)
         })
-        .get();
+        .build();
 
     // Render pass that samples the offscreen attachment, and possibly does some postprocessing to it
     let sample_pass = ph::PassBuilder::render(String::from("sample"))
         .color_attachment(swap_resource.clone(),
                           vk::AttachmentLoadOp::CLEAR,
-                        Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))
+                        Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
         .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
-        // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
-        .execute(|cmd| {
-            cmd.bind_graphics_pipeline("sample", pipelines.clone()).unwrap()
-                .viewport(vk::Viewport{
-                    x: 0.0,
-                    y: 0.0,
-                    width: 800.0,
-                    height: 600.0,
-                    min_depth: 0.0,
-                    max_depth: 0.0,
-                })
-                .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
+        .execute(|mut cmd, bindings| {
+            cmd = cmd.bind_graphics_pipeline("sample", pipelines.clone()).unwrap()
+                     .viewport(vk::Viewport{
+                        x: 0.0,
+                        y: 0.0,
+                        width: 800.0,
+                        height: 600.0,
+                        min_depth: 0.0,
+                        max_depth: 0.0,
+                    })
+                    .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } });
+            let ph::PhysicalResource::Image(offscreen_attachment) = bindings.resolve(&offscreen).unwrap() else { panic!() };
+            let set = ph::DescriptorSetBuilder::new()
+                .bind_sampled_image(0, offscreen_attachment.clone(), &resources.sampler)
+                .build();
+            cmd.bind_new_descriptor_set(0, set, descriptors.clone()).unwrap()
                 .draw(6, 1, 0, 0)
         })
-        .get();
+        .build();
     // Add another pass to handle presentation to the screen
     let present_pass = ph::PassBuilder::present(
         "present".to_string(),
@@ -171,12 +182,19 @@ fn main() -> Result<(), ph::Error> {
         .attach_shader(vertex.clone())
         .attach_shader(fragment)
         .build();
-    // For now we have to manually create descriptor set and pipeline layouts, but this will be fully automated using
-    // shader reflection in a future version
-    // Luckily, this pipeline does not use any descriptors, so we can simply do nothing!
+    // Create descriptor set layout. Note that we can automate this later using shader reflection.
+    pci.layout.set_layouts.push(ph::DescriptorSetLayoutCreateInfo {
+        bindings: vec![vk::DescriptorSetLayoutBinding {
+            binding: 0,
+            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            descriptor_count: 1,
+            stage_flags: vk::ShaderStageFlags::FRAGMENT,
+            p_immutable_samplers: std::ptr::null(),
+        }]
+    });
 
     // Store the pipeline in the pipeline cache
-    cache.create_named_pipeline(pci)?;
+    cache.lock().unwrap().create_named_pipeline(pci)?;
 
     let frag_code = load_spirv_file(Path::new("examples/data/blue.spv"));
     let fragment = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
@@ -188,23 +206,26 @@ fn main() -> Result<(), ph::Error> {
         .attach_shader(vertex)
         .attach_shader(fragment)
         .build();
-    cache.create_named_pipeline(pci)?;
-    // Wrap the pipeline cache in a reference-counted mutex for safe access across the entire API.
-    let cache = Arc::new(Mutex::new(cache));
-
+    cache.lock().unwrap().create_named_pipeline(pci)?;
     // Define some resources we will use for rendering
     let image = ph::Image::new(device.clone(), alloc.clone(), 800, 600, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED, vk::Format::R8G8B8A8_SRGB)?;
     let mut resources = Resources {
         offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
         offscreen: image,
+        sampler: ph::Sampler::default(device.clone())?
     };
+
+    let descriptor_cache = ph::DescriptorCache::new(device.clone())?;
 
     event_loop.run(move |event, _, control_flow| {
         // Do not render a frame if Exit control flow is specified, to avoid
         // sync issues.
         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
         
-        main_loop(&mut frame, &resources, cache.clone(), &exec, &surface, &window).unwrap();
+        main_loop(&mut frame, &resources, cache.clone(), descriptor_cache.clone(), &exec, &surface, &window).unwrap();
+
+        cache.lock().unwrap().next_frame();
+        descriptor_cache.lock().unwrap().next_frame();
 
         // Note that we want to handle events after processing our current frame, so that
         // requesting an exit doesn't attempt to render another frame, which causes

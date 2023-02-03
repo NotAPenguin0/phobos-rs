@@ -101,6 +101,8 @@ pub mod command_buffer;
 pub mod pass;
 pub mod pipeline;
 pub mod command_recorder;
+pub mod descriptor;
+pub mod sampler;
 
 use std::sync::{Arc, Mutex};
 use ash::vk;
@@ -126,6 +128,8 @@ pub use crate::task_graph::*;
 pub use crate::command_recorder::*;
 pub use crate::pass::*;
 pub use crate::pipeline::*;
+pub use crate::descriptor::*;
+pub use crate::sampler::*;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]

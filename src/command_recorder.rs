@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::Deref;
 use ash::vk;
 use petgraph::graph::NodeIndex;
 use petgraph::{Incoming, Outgoing};
@@ -128,7 +127,7 @@ fn record_pass<D>(pass: &mut GpuTask<GpuResource, D>, bindings: &PhysicalResourc
 
         cmd = cmd.begin_rendering(&info);
     }
-    cmd = pass.execute.call_mut((cmd,));
+    cmd = pass.execute.call_mut((cmd, bindings));
     return if pass.is_renderpass {
         Ok(cmd.end_rendering())
     } else {
@@ -186,28 +185,53 @@ fn record_node<D>(graph: &mut GpuTaskGraph<D>, node: NodeIndex, bindings: &Physi
     }
 }
 
+/// Describes any physical resource handle on the GPU.
+#[derive(Debug)]
 pub enum PhysicalResource {
     Image(ImageView)
 }
 
+/// Stores bindings from virtual resources to physical resources.
+/// # Example usage
+/// ```
+/// use ash::vk;
+/// use phobos::{Error, Image, PhysicalResourceBindings, VirtualResource};
+///
+/// let resource = VirtualResource::new(String::from("image"));
+/// let image = Image::new(/*...*/);
+/// let view = image.view(vk::ImageAspectFlags::COLOR)?;
+/// let mut bindings = PhysicalResourceBindings::new();
+/// // Bind the virtual resource to the image
+/// bindings.bind_image(String::from("image"), view.clone());
+/// // ... Later, lookup the physical image handle from a virtual resource handle
+/// let view = bindings.resolve(&resource).ok_or(Error::NoResourceBound)?;
+/// ```
+#[derive(Debug)]
 pub struct PhysicalResourceBindings {
     bindings: HashMap<String, PhysicalResource>
 }
 
 impl PhysicalResourceBindings {
+    /// Create a new physical resource binding map.
     pub fn new() -> Self {
         PhysicalResourceBindings { bindings: Default::default() }
     }
-    
+
+    /// Bind an image to all virtual resources with `name(+*)` as their uid.
     pub fn bind_image(&mut self, name: String, image: ImageView) {
         self.bindings.insert(name, PhysicalResource::Image(image));
     }
 
+    /// Resolve a virtual resource to a physical resource. Returns `None` if the resource was not found.
     pub fn resolve(&self, resource: &VirtualResource) -> Option<&PhysicalResource> {
         self.bindings.get(&resource.name())
     }
 }
 
+/// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names
+/// to actual resources.
+/// # Errors
+/// - This function can error if a virtual resource used in the graph is lacking an physical binding.
 pub fn record_graph<D>(graph: &mut GpuTaskGraph<D>, bindings: &PhysicalResourceBindings, mut cmd: IncompleteCommandBuffer<D>)
     -> Result<IncompleteCommandBuffer<D>, Error> where D: ExecutionDomain {
     let start = graph.source();

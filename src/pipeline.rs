@@ -2,7 +2,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use ash::vk;
 use crate::{Device, Error};
 use crate::cache::*;
@@ -10,37 +10,54 @@ use crate::util::ByteSize;
 
 pub type PipelineStage = ash::vk::PipelineStageFlags2;
 
+/// Shader resource object. This is managed by the pipeline cache internally.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Shader {
-    pub device: Arc<Device>,
-    pub handle: vk::ShaderModule
+    #[derivative(Debug="ignore")]
+    pub(crate) device: Arc<Device>,
+    pub(crate) handle: vk::ShaderModule
 }
 
 #[derive(Debug, Clone)]
 pub struct ShaderCreateInfo {
-    pub stage: vk::ShaderStageFlags,
-    pub code: Vec<u32>,
-    pub code_hash: u64
+    pub(crate) stage: vk::ShaderStageFlags,
+    pub(crate) code: Vec<u32>,
+    pub(crate) code_hash: u64
 }
 
-// Note: Pipeline layout, descriptor set layout and pipeline are tied together tightly,
-// When accessing a pipeline, we also have to register an access for the layouts to prevent them from being
-// deleted.
 
+/// A fully built Vulkan descriptor set layout. This is a managed resource, so it cannot be manually
+/// cloned or dropped.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct DescriptorSetLayout {
-    pub device: Arc<Device>,
-    pub handle: vk::DescriptorSetLayout
+    #[derivative(Debug="ignore")]
+    pub(crate) device: Arc<Device>,
+    pub(crate) handle: vk::DescriptorSetLayout
 }
 
+/// Describes a descriptor set layout.
+/// Generally you don't need to construct this manually, as shader reflection can infer all
+/// information necessary.
 #[derive(Debug, Clone, Default)]
 pub struct DescriptorSetLayoutCreateInfo {
     pub bindings: Vec<vk::DescriptorSetLayoutBinding>
 }
 
+/// A fully built Vulkan pipeline layout. This is a managed resource, so it cannot be manually
+/// cloned or dropped.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct PipelineLayout {
-    pub device: Arc<Device>,
-    pub handle: vk::PipelineLayout
+    #[derivative(Debug="ignore")]
+    pub(crate) device: Arc<Device>,
+    pub(crate) handle: vk::PipelineLayout,
+    pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,
 }
 
+/// Defines a range of Vulkan push constants, for manually defining a pipeline layout if you cannot
+/// use shader reflection for whatever reason.
 #[derive(Debug, Clone, Default, Copy, PartialEq, Eq, Hash)]
 pub struct PushConstantRange {
     pub stage_flags: vk::ShaderStageFlags,
@@ -48,6 +65,7 @@ pub struct PushConstantRange {
     pub size: u32,
 }
 
+/// Define a pipeline layout, this includes all descriptor bindings and push constant ranges used by the pipeline.
 #[derive(Debug, Clone, Default)]
 pub struct PipelineLayoutCreateInfo {
     pub flags: vk::PipelineLayoutCreateFlags,
@@ -55,9 +73,16 @@ pub struct PipelineLayoutCreateInfo {
     pub push_constants: Vec<PushConstantRange>,
 }
 
+/// A fully built Vulkan pipeline. This is a managed resource, so it cannot be manually
+/// cloned or dropped.
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Pipeline {
+    #[derivative(Debug="ignore")]
     device: Arc<Device>,
-    pub(crate) handle: vk::Pipeline
+    pub(crate) handle: vk::Pipeline,
+    pub(crate) layout: vk::PipelineLayout,
+    pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -87,6 +112,9 @@ pub struct Viewport(vk::Viewport);
 #[derive(Debug, Copy, Clone)]
 pub struct Rect2D(vk::Rect2D);
 
+/// Defines a full graphics pipeline. You can modify this manually, but all
+/// information is also exposed through the pipeline builder,
+/// with additional quality of life and presets.
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
@@ -136,11 +164,24 @@ pub struct PipelineCreateInfo {
     vk_dynamic_state: vk::PipelineDynamicStateCreateInfo,
 }
 
+/// Used to facilitate creating a graphics pipeline.
 pub struct PipelineBuilder {
     inner: PipelineCreateInfo,
     vertex_binding_offsets: HashMap<u32, u32>,
 }
 
+/// The main pipeline cache struct. This stores all named pipelines and shaders.
+/// To create a pipeline you should obtain a pipeline create info, and then register it using
+/// [`PipelineCache::create_named_pipeline`].
+/// # Example usage
+/// ```
+/// use phobos::{PipelineBuilder, PipelineCache};
+/// let cache = PipelineCache::new(device.clone());
+/// let pci = PipelineBuilder::new(String::from("my_pipeline"))
+///     // ... options for pipeline creation
+///     .build();
+/// cache.lock()?.create_named_pipeline(pci);
+/// ```
 pub struct PipelineCache {
     shaders: Cache<Shader>,
     set_layouts: Cache<DescriptorSetLayout>,
@@ -159,15 +200,13 @@ impl Resource for Shader {
             s_type: vk::StructureType::SHADER_MODULE_CREATE_INFO,
             p_next: std::ptr::null(),
             flags: Default::default(),
-            code_size: key.code.len() * 4,
+            code_size: key.code.len() * 4, // code_size is in bytes, but each element of `code` is 4 bytes.
             p_code: key.code.as_ptr(),
         };
 
-        Ok(unsafe {
-            Self {
+        Ok(Self {
                 device: device.clone(),
                 handle: unsafe { device.create_shader_module(&info, None)? },
-            }
         })
     }
 }
@@ -179,6 +218,7 @@ impl Drop for Shader {
 }
 
 impl ShaderCreateInfo {
+    /// Load in a spirv binary into a shader create info structure.
     pub fn from_spirv(stage: vk::ShaderStageFlags, code: Vec<u32>) -> Self {
         let mut hasher = DefaultHasher::new();
         code.hash(&mut hasher);
@@ -220,17 +260,19 @@ impl Resource for PipelineLayout {
     const MAX_TIME_TO_LIVE: u32 = 8;
 
     fn create(device: Arc<Device>, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self, Error> {
+        let set_layouts = key.set_layouts.iter().map(|info|
+            set_layout_cache.get_or_create(&info, ()).unwrap().handle
+        ).collect::<Vec<_>>();
+
         let info = vk::PipelineLayoutCreateInfo::builder()
             .flags(key.flags)
             .push_constant_ranges(key.push_constants.iter().map(|pc| pc.to_vk()).collect::<Vec<_>>().as_slice())
-            .set_layouts(key.set_layouts.iter().map(|info|
-                    set_layout_cache.get_or_create(&info, ()).unwrap().handle
-                ).collect::<Vec<_>>().as_slice()
-            )
+            .set_layouts(set_layouts.as_slice())
             .build();
         Ok(Self {
             device: device.clone(),
             handle: unsafe { device.create_pipeline_layout(&info, None)? },
+            set_layouts: set_layouts.clone()
         })
     }
 }
@@ -295,12 +337,21 @@ impl Resource for Pipeline {
             Ok(Self {
                 device: device.clone(),
                 handle: device.create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)?.first().cloned().unwrap(),
+                layout: layout.handle,
+                set_layouts: layout.set_layouts.clone(),
             })
         }
     }
 }
 
+impl Drop for Pipeline {
+    fn drop(&mut self) {
+        unsafe { self.device.destroy_pipeline(self.handle, None); }
+    }
+}
+
 impl PipelineBuilder {
+    /// Create a new empty pipeline with default settings for everything.
     pub fn new(name: String) -> Self {
         Self {
             inner: PipelineCreateInfo {
@@ -460,7 +511,7 @@ impl PipelineBuilder {
         self
     }
 
-    pub fn depth(mut self, test: bool, write: bool, clamp: bool, op: vk::CompareOp) -> Self {
+    pub fn depth(self, test: bool, write: bool, clamp: bool, op: vk::CompareOp) -> Self {
         self.depth_test(test)
             .depth_write(write)
             .depth_clamp(clamp)
@@ -544,6 +595,7 @@ impl PipelineBuilder {
 
     // todo: shader reflection
 
+    /// Build the pipeline create info structure.
     pub fn build(mut self) -> PipelineCreateInfo {
         self.inner.vk_attributes = self.inner.vertex_attributes.iter().map(|v| v.0.clone()).collect();
         self.inner.vk_vertex_inputs = self.inner.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
@@ -569,22 +621,30 @@ impl PipelineBuilder {
     }
 }
 
+// TODO: Maybe incorporate the vulkan pipeline cache api to speed up startup times?
+
 impl PipelineCache {
-    pub fn new(device: Arc<Device>) -> Result<Self, Error> {
-        Ok(Self {
+    /// Create a new empty pipeline cache.
+    pub fn new(device: Arc<Device>) -> Result<Arc<Mutex<Self>>, Error> {
+        Ok(Arc::new(Mutex::new(Self {
             shaders: Cache::new(device.clone()),
             set_layouts: Cache::new(device.clone()),
             pipeline_layouts: Cache::new(device.clone()),
             pipelines: Cache::new(device),
             named_pipelines: Default::default(),
-        })
+        })))
     }
 
+    /// Create and register a new pipeline into the cache.
     pub fn create_named_pipeline(&mut self, info: PipelineCreateInfo) -> Result<(), Error> {
         self.named_pipelines.insert(info.name.clone(), info);
         Ok(())
     }
 
+    /// Obtain a pipeline from the cache.
+    /// # Errors
+    /// - This function can fail if the requested pipeline does not exist in the cache
+    /// - This function can fail if allocating the pipeline fails.
     pub(crate) fn get_pipeline(&mut self, name: &str) -> Result<&Pipeline, Error> {
         let info = self.named_pipelines.get(name);
         let Some(info) = info else { return Err(Error::PipelineNotFound(name.to_string())); };

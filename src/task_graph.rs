@@ -6,7 +6,6 @@ use std::collections::HashMap;
 
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
-use std::sync::Arc;
 use ash::vk;
 
 use petgraph::graph::*;
@@ -17,14 +16,11 @@ use petgraph::prelude::EdgeRef;
 use crate::domain::ExecutionDomain;
 
 use crate::error::Error;
-use crate::IncompleteCommandBuffer;
+use crate::{IncompleteCommandBuffer, PhysicalResourceBindings};
 use crate::pass::Pass;
 use crate::pipeline::PipelineStage;
 
-// Current issues:
-// - If there is a barrier node with two dependent nodes, but both use the resource in a different way (e.g. layout), we should split this barrier in two barrier nodes and then serialize it.
-//      => solving this should probably be a responsibility of the translation layer.
-
+/// Represents a resource in a task graph.
 pub trait Resource {
     fn is_dependency_of(&self, lhs: &Self) -> bool;
     fn uid(&self) -> &String;
@@ -42,6 +38,7 @@ pub trait Barrier<R> where R: Resource {
     fn resource(&self) -> &R;
 }
 
+/// Represents a node in a task graph.
 #[derive(Debug)]
 pub enum Node<R, B, T> where R: Resource, B: Barrier<R>, T: Task<R> {
     Task(T),
@@ -49,6 +46,7 @@ pub enum Node<R, B, T> where R: Resource, B: Barrier<R>, T: Task<R> {
     _Unreachable((!, PhantomData<R>)),
 }
 
+/// Task graph structure, used for automatic synchronization of resource accesses.
 pub struct TaskGraph<R, B, T> where R: Resource + Default, B: Barrier<R> + Clone, T: Task<R> {
     pub(crate) graph: Graph<Node<R, B, T>, String>,
 }
@@ -60,6 +58,7 @@ pub struct VirtualResource {
     pub uid: String,
 }
 
+/// Resource usage in a task graph.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub enum ResourceUsage {
     #[default]
@@ -70,6 +69,7 @@ pub enum ResourceUsage {
     ShaderWrite,
 }
 
+/// Virtual GPU resource in a task graph.
 #[derive(Default, Clone)]
 pub struct GpuResource {
     pub usage: ResourceUsage,
@@ -80,6 +80,7 @@ pub struct GpuResource {
     pub load_op: Option<vk::AttachmentLoadOp>
 }
 
+/// GPU barrier in a task graph. Directly translates to `vkCmdPipelineBarrier()`.
 #[derive(Debug, Clone)]
 pub struct GpuBarrier<R = GpuResource> {
     pub resource: R,
@@ -89,14 +90,16 @@ pub struct GpuBarrier<R = GpuResource> {
     pub dst_stage: PipelineStage,
 }
 
+/// A task in a GPU task graph. Either a render pass, or a compute pass, etc.
 pub struct GpuTask<'exec, R, D> where R: Resource, D: ExecutionDomain {
     pub identifier: String,
     pub inputs: Vec<R>,
     pub outputs: Vec<R>,
-    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> + 'exec>,
+    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>, &PhysicalResourceBindings) -> IncompleteCommandBuffer<D> + 'exec>,
     pub is_renderpass: bool
 }
 
+/// GPU task graph, used for synchronizing resources over a single queue.
 pub struct GpuTaskGraph<'exec, D> where D: ExecutionDomain {
     pub (crate) graph: TaskGraph<GpuResource, GpuBarrier, GpuTask<'exec, GpuResource, D>>,
     // Note that this is guaranteed to be stable.
@@ -106,6 +109,7 @@ pub struct GpuTaskGraph<'exec, D> where D: ExecutionDomain {
 }
 
 impl VirtualResource {
+    /// Create a new virtual resource. Note that the name should not contain any '+' characters.
     pub fn new(uid: String) -> Self {
         VirtualResource { uid }
     }
@@ -125,12 +129,13 @@ impl VirtualResource {
         name
     }
 
+    /// Returns true if the resource is a source resource, e.g. an instance that does not depend on a previous pass.
     pub fn is_source(&self) -> bool {
         // ends_with is a bit more efficient, since we know the '+' is always at the end of a resource uid.
         !self.uid.ends_with('+')
     }
 
-    /// Two virtual resources are associated if and only if their uid's only differ by "*" symbols.
+    /// Two virtual resources are associated if and only if their uid's only differ by "+" symbols.
     pub fn are_associated(lhs: &VirtualResource, rhs: &VirtualResource) -> bool {
         // Since virtual resource uid's are constructed by appending * symbols, we can simply check whether the largest of the two strings starts with the shorter one
         let larger = if lhs.uid.len() >= rhs.uid.len() { lhs } else { rhs };
@@ -138,7 +143,7 @@ impl VirtualResource {
         larger.uid.starts_with(&smaller.uid)
     }
 
-    /// One virtual resource is older than another if it has less '*' symbols.
+    /// One virtual resource is older than another if it has less '+' symbols.
     pub fn is_older(lhs: &VirtualResource, rhs: &VirtualResource) -> bool {
         if !VirtualResource::are_associated(&lhs, &rhs) { return false; }
         lhs.uid.len() < rhs.uid.len()
@@ -229,7 +234,7 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
             identifier: "_source".to_string(),
             inputs: vec![],
             outputs: vec![],
-            execute: Box::new(|c| c),
+            execute: Box::new(|c, _| c),
             is_renderpass: false,
         }).unwrap();
         // ...
@@ -237,6 +242,9 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
         graph
     }
 
+    /// Add a pass to a task graph.
+    /// # Errors
+    /// - This function can fail if adding the pass results in a cyclic dependency in the graph.
     pub fn add_pass(&mut self, pass: Pass<'exec, D>) -> Result<(), Error> {
         // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
         let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
@@ -279,6 +287,7 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
         &self.graph
     }
 
+    /// Returns the total amount of nodes in the graph.
     pub fn num_nodes(&self) -> usize {
         self.graph.graph.node_count()
     }

@@ -26,6 +26,7 @@ pub enum Error {
     AllocationError(AllocationError),
     /// Task graph contains a cycle and is impossible to resolve.
     GraphHasCycle,
+    /// Node not found in graph. Generally this should not happen.
     NodeNotFound,
     /// Task graph contains two nodes that act on the same resource with different usage flags.
     /// This is impossible to resolve in an unambiguous way.
@@ -34,7 +35,14 @@ pub enum Error {
     NoResourceBound(String),
     /// Named pipeline not registered in the pipeline cache.
     PipelineNotFound(String),
+    /// Tried to add a vertex attribute to a vertex binding that does not exist.
     NoVertexBinding,
+    /// Tried to allocate an empty descriptor set.
+    EmptyDescriptorBinding,
+    /// No descriptor set layout was given, probably because it was not obtained through a command buffer with a valid pipeline bound.
+    NoDescriptorSetLayout,
+    /// No clear value was specified even though one was required.
+    NoClearValue,
     /// Poisoned mutex
     PoisonError,
     /// Uncategorized error.
@@ -64,13 +72,13 @@ impl From<AllocationError> for Error {
 }
 
 impl From<(Vec<ash::vk::Pipeline>, ash::vk::Result)> for Error {
-    fn from(value: (Vec<Pipeline>, ash::vk::Result)) -> Self {
+    fn from(_: (Vec<Pipeline>, ash::vk::Result)) -> Self {
         Error::Uncategorized("Pipeline creation failed")
     }
 }
 
 impl<T> From<PoisonError<T>> for Error {
-    fn from(value: PoisonError<T>) -> Self {
+    fn from(_: PoisonError<T>) -> Self {
         Error::PoisonError
     }
 }

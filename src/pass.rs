@@ -1,17 +1,18 @@
-use std::sync::Arc;
 use ash::vk;
-use crate::{GpuResource, IncompleteCommandBuffer, ResourceUsage, VirtualResource};
+use crate::{Error, GpuResource, IncompleteCommandBuffer, PhysicalResourceBindings, ResourceUsage, VirtualResource};
 use crate::domain::ExecutionDomain;
 use crate::pipeline::PipelineStage;
 
+/// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
 pub struct Pass<'exec, D> where D: ExecutionDomain {
-    pub name: String,
-    pub inputs: Vec<GpuResource>,
-    pub outputs: Vec<GpuResource>,
-    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> + 'exec>,
-    pub is_renderpass: bool
+    pub(crate) name: String,
+    pub(crate) inputs: Vec<GpuResource>,
+    pub(crate) outputs: Vec<GpuResource>,
+    pub(crate) execute: Box<dyn FnMut(IncompleteCommandBuffer<D>, &PhysicalResourceBindings) -> IncompleteCommandBuffer<D> + 'exec>,
+    pub(crate) is_renderpass: bool
 }
 
+/// Used to create [`Pass`] objects correctly.
 pub struct PassBuilder<'exec, D> where D: ExecutionDomain {
     inner: Pass<'exec, D>,
 }
@@ -27,11 +28,12 @@ impl<'exec, D> Pass<'exec, D> where D: ExecutionDomain {
 }
 
 impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
+    /// Create a new renderpass.
     pub fn render(name: String) -> Self {
         PassBuilder {
             inner: Pass {
                 name,
-                execute: Box::new(|c| c),
+                execute: Box::new(|c, _| c),
                 inputs: vec![],
                 outputs: vec![],
                 is_renderpass: true
@@ -41,6 +43,7 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
 
     /// Create a pass for presenting to the swapchain.
     /// Note that this doesn't actually do the presentation, it just adds the proper sync for it.
+    /// If you are presenting to an output of the graph, this is required.
     pub fn present(name: String, swapchain: VirtualResource) -> Pass<'exec, D> {
         Pass {
             name,
@@ -53,12 +56,14 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
                 load_op: None,
             }],
             outputs: vec![],
-            execute: Box::new(|c| c),
+            execute: Box::new(|c, _| c),
             is_renderpass: false
         }
     }
 
-    pub fn color_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Self {
+    /// Adds a color attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
+    pub fn color_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self, Error> {
+        if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() { return Err(Error::NoClearValue); }
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::Attachment,
             resource: resource.clone(),
@@ -83,9 +88,11 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
             clear_value: clear.map(|c| vk::ClearValue { color: c }),
             load_op: Some(op)
         });
-        self
+
+        Ok(self)
     }
 
+    /// Adds a depth attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
     pub fn depth_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Self {
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::Attachment,
@@ -116,6 +123,7 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
         self
     }
 
+    /// Declare that a resource will be used as a sampled image in the given pipeline stages.
     pub fn sample_image(mut self, resource: VirtualResource, stage: PipelineStage) -> Self {
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::ShaderRead,
@@ -128,12 +136,14 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
         self
     }
 
-    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> + 'exec) -> Self {
+    /// Set the function to be called when recording this pass.
+    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<D>, &PhysicalResourceBindings) -> IncompleteCommandBuffer<D> + 'exec) -> Self {
         self.inner.execute = Box::new(exec);
         self
     }
 
-    pub fn get(self) -> Pass<'exec, D> {
+    /// Obtain a built [`Pass`] object.
+    pub fn build(self) -> Pass<'exec, D> {
         self.inner
     }
 }

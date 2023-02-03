@@ -1,7 +1,6 @@
 use std::ffi::{c_char, CStr, CString};
 use std::mem::size_of;
 use ash::vk;
-use ash::vk::Format;
 
 /// Wraps a c string into a string, or an empty string if the provided c string was null.
 /// Assumes the provided c string is null terminated.
