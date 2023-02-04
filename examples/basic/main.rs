@@ -67,7 +67,7 @@ fn main_loop(frame: &mut ph::FrameManager,
         .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
         .execute(|mut cmd, bindings| {
             cmd = cmd.bind_graphics_pipeline("sample", pipelines.clone()).unwrap()
-                     .viewport(vk::Viewport{
+                    .viewport(vk::Viewport{
                         x: 0.0,
                         y: 0.0,
                         width: 800.0,
