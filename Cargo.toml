@@ -22,9 +22,10 @@ bitflags = "1.3.2"
 dyn-clone = "1.0.10"
 
 [build-dependencies]
-shaderc = { version = "0.8.2", features = ["build-from-source"] }
+shaderc = { version = "0.8.2", optional = true, features = ["build-from-source"] }
 
 [features]
 default = ["winit"]
 # Logs creation and destruction of all Vulkan objects. Useful for debugging.
 log-objects = []
+shaderc = ["dep:shaderc"]
