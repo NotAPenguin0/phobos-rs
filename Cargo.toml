@@ -31,3 +31,7 @@ default = ["winit"]
 # Logs creation and destruction of all Vulkan objects. Useful for debugging.
 log-objects = []
 shaderc = ["dep:shaderc"]
+
+# compile winit with max optimizations
+[profile.dev.package.winit]
+opt-level = 3
