@@ -5,7 +5,9 @@ use crate::execution_manager::domain;
 
 use ash::vk;
 use ash::vk::{Rect2D, Viewport};
-use crate::{DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache};
+use crate::{BufferView, DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache};
+
+use anyhow::Result;
 
 /// Trait representing a command buffer that supports graphics commands.
 pub trait GraphicsCmdBuffer : TransferCmdBuffer {
@@ -18,7 +20,10 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     /// Bind a graphics pipeline with a given name. This is looked up from the given pipeline cache.
     /// # Errors
     /// This function can report an error in case the pipeline name is not registered in the cache.
-    fn bind_graphics_pipeline(self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self, Error> where Self: Sized;
+    fn bind_graphics_pipeline(self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self> where Self: Sized;
+    /// Bind a vertex buffer to the given vertex input binding.
+    /// Equivalent of `vkCmdBindVertexBuffer`
+    fn bind_vertex_buffer(self, binding: u32, buffer: BufferView) -> Self where Self: Sized;
 }
 
 /// Trait representing a command buffer that supports transfer commands.
@@ -42,15 +47,15 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 pub trait CmdBuffer {
     /// Delete the command buffer immediately.
     /// This is marked unsafe because there is no guarantee that the command buffer is not in use.
-    unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<(), Error>;
+    unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<()>;
 }
 
 /// Incomplete command buffer
 pub trait IncompleteCmdBuffer {
     type Domain: ExecutionDomain;
 
-    fn new(device: Arc<Device>, handle: vk::CommandBuffer, flags: vk::CommandBufferUsageFlags) -> Result<Self, Error> where Self: Sized;
-    fn finish(self) -> Result<CommandBuffer<Self::Domain>, Error>;
+    fn new(device: Arc<Device>, handle: vk::CommandBuffer, flags: vk::CommandBufferUsageFlags) -> Result<Self> where Self: Sized;
+    fn finish(self) -> Result<CommandBuffer<Self::Domain>>;
 }
 
 /// This struct represents an incomplete command buffer.
@@ -85,7 +90,7 @@ pub struct IncompleteCommandBuffer<D: ExecutionDomain> {
 impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
     type Domain = D;
 
-    fn new(device: Arc<Device>, handle: vk::CommandBuffer, flags: vk::CommandBufferUsageFlags) -> Result<Self, Error> {
+    fn new(device: Arc<Device>, handle: vk::CommandBuffer, flags: vk::CommandBufferUsageFlags) -> Result<Self> {
         unsafe { device.begin_command_buffer(
             handle,
             &vk::CommandBufferBeginInfo::builder().flags(flags))?
@@ -102,7 +107,7 @@ impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
 
     /// Finish recording a command buffer and move its contents into a finished
     /// command buffer that can be submitted
-    fn finish(self) -> Result<CommandBuffer<D>, Error> {
+    fn finish(self) -> Result<CommandBuffer<D>> {
         unsafe { self.device.end_command_buffer(self.handle)? }
         Ok(CommandBuffer {
             handle: self.handle,
@@ -112,7 +117,7 @@ impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
 }
 
 impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
-    unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<(), Error> {
+    unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<()> {
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         queue.free_command_buffer::<Self>(self.handle)
     }
@@ -128,7 +133,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
     /// a full descriptor pool, but other errors are passed through.
     /// - This function errors if a requested set was not specified in the current pipeline's pipeline layout.
     /// - This function errors if no pipeline is bound.
-    pub fn get_descriptor_set<'a>(&mut self, set: u32, mut bindings: DescriptorSetBinding, cache: &'a mut DescriptorCache) -> Result<&'a DescriptorSet, Error> {
+    pub fn get_descriptor_set<'a>(&mut self, set: u32, mut bindings: DescriptorSetBinding, cache: &'a mut DescriptorCache) -> Result<&'a DescriptorSet> {
         let layout = self.current_set_layouts.get(set as usize).ok_or(Error::NoDescriptorSetLayout)?;
         bindings.layout = layout.clone();
         cache.get_descriptor_set(bindings)
@@ -150,8 +155,21 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
     /// # Errors
     /// - This function can error if locking the descriptor cache fails
     /// - This function can error if allocating the descriptor set fails.
-    pub fn bind_new_descriptor_set(mut self, index: u32, bindings: DescriptorSetBinding, cache: Arc<Mutex<DescriptorCache>>) -> Result<Self, Error> {
-        let mut cache = cache.lock()?;
+    /// # Example
+    /// ```
+    /// use phobos::{DescriptorSetBuilder, domain, ExecutionManager};
+    /// let exec = ExecutionManager::new(device.clone(), &physical_device);    ///
+    /// let cmd = exec.on_domain::<domain::All>()?
+    ///     .bind_graphics_pipeline("my_pipeline", pipeline_cache.clone())
+    ///     .bind_new_descriptor_set(0, descriptor_cache.clone(), DescriptorSetBuilder::new()
+    ///         .bind_sampled_image(0, image_view, &sampler)
+    ///         .build())
+    ///     // ...
+    ///     .finish();
+    ///
+    /// ```
+    pub fn bind_new_descriptor_set(mut self, index: u32, cache: Arc<Mutex<DescriptorCache>>, bindings: DescriptorSetBinding, ) -> Result<Self> {
+        let mut cache = cache.lock().or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?;
         let set = self.get_descriptor_set(index, bindings, &mut cache)?;
         Ok(self.bind_descriptor_set(index, set))
     }
@@ -243,7 +261,7 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         self
     }
 
-    fn bind_graphics_pipeline(mut self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self, Error> {
+    fn bind_graphics_pipeline(mut self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self> {
         let mut cache = cache.lock().unwrap();
         let pipeline = cache.get_pipeline(name)?;
         unsafe { self.device.cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle); }
@@ -251,6 +269,11 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         self.current_pipeline_layout = pipeline.layout;
         self.current_set_layouts = pipeline.set_layouts.clone();
         Ok(self)
+    }
+
+    fn bind_vertex_buffer(self, binding: u32, buffer: BufferView) -> Self where Self: Sized {
+        unsafe { self.device.cmd_bind_vertex_buffers(self.handle, binding, std::slice::from_ref(&buffer.handle), std::slice::from_ref(&buffer.offset)) };
+        self
     }
 }
 

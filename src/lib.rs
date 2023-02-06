@@ -103,9 +103,10 @@ pub mod pipeline;
 pub mod command_recorder;
 pub mod descriptor;
 pub mod sampler;
+pub mod scratch_allocator;
 
 use std::sync::{Arc, Mutex};
-use ash::vk;
+pub use ash::vk;
 use window::WindowInterface;
 use gpu_allocator::vulkan as vk_alloc;
 
@@ -130,6 +131,9 @@ pub use crate::pass::*;
 pub use crate::pipeline::*;
 pub use crate::descriptor::*;
 pub use crate::sampler::*;
+pub use crate::scratch_allocator::*;
+
+use anyhow::Result;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]
@@ -184,6 +188,14 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
     pub present_mode: Option<vk::PresentModeKHR>,
     /// Minimum requirements the selected physical device should have.
     pub gpu_requirements: GPURequirements,
+    /// Maximum per-frame size of scratch vertex buffer objects.
+    pub scratch_vbo_size: vk::DeviceSize,
+    /// Maximum per-frame size of scratch index buffer objects.
+    pub scratch_ibo_size: vk::DeviceSize,
+    /// Maximum per-frame size of scratch uniform buffer objects.
+    pub scratch_ubo_size: vk::DeviceSize,
+    /// Maximum per-frame size of scratch shader storage buffer objects.
+    pub scratch_ssbo_size: vk::DeviceSize,
 }
 
 impl<'a, Window> Default for AppSettings<'a, Window> where Window: WindowInterface {
@@ -196,6 +208,10 @@ impl<'a, Window> Default for AppSettings<'a, Window> where Window: WindowInterfa
             surface_format: None,
             present_mode: None,
             gpu_requirements: GPURequirements::default(),
+            scratch_vbo_size: 1,
+            scratch_ibo_size: 1,
+            scratch_ubo_size: 1,
+            scratch_ssbo_size: 1,
         }
     }
 }
@@ -244,12 +260,21 @@ impl<'a, Window> AppBuilder<'a, Window> where Window: WindowInterface {
         self
     }
 
+    pub fn scratch_size(mut self, size: vk::DeviceSize) -> Self {
+        self.inner.scratch_vbo_size = size;
+        self.inner.scratch_ibo_size = size;
+        self.inner.scratch_ubo_size = size;
+        self.inner.scratch_ssbo_size = size;
+
+        self
+    }
+
     pub fn build(self) -> AppSettings<'a, Window> {
         self.inner
     }
 }
 
-pub fn create_allocator(instance: &VkInstance, device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Arc<Mutex<vk_alloc::Allocator>>, Error> {
+pub fn create_allocator(instance: &VkInstance, device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Arc<Mutex<vk_alloc::Allocator>>> {
     Ok(Arc::new(Mutex::new(vk_alloc::Allocator::new(
         &vk_alloc::AllocatorCreateDesc {
             instance: instance.instance.clone(),

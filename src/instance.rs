@@ -4,6 +4,7 @@ use crate::Error;
 use crate::util;
 use crate::window::WindowInterface;
 use crate::AppSettings;
+use anyhow::Result;
 
 use std::ffi::{CString, CStr};
 use std::str::FromStr;
@@ -21,7 +22,7 @@ pub struct VkInstance {
 
 impl VkInstance {
     /// Initializes the Vulkan API.
-    pub fn new<Window: WindowInterface>(settings: &AppSettings<Window>) -> Result<Self, Error> {
+    pub fn new<Window: WindowInterface>(settings: &AppSettings<Window>) -> Result<Self> {
         let entry = unsafe { ash::Entry::load()? };
         let instance = create_vk_instance(&entry, &settings)?;
         Ok(VkInstance{ entry, instance })
@@ -34,7 +35,7 @@ impl Drop for VkInstance {
     }
 }
 
-fn create_vk_instance<Window: WindowInterface>(entry: &ash::Entry, settings: &AppSettings<Window>) -> Result<ash::Instance, Error> {
+fn create_vk_instance<Window: WindowInterface>(entry: &ash::Entry, settings: &AppSettings<Window>) -> Result<ash::Instance> {
     let app_name = CString::new(settings.name.clone())?;
     let engine_name = CString::new("Phobos")?;
     let app_info = vk::ApplicationInfo {

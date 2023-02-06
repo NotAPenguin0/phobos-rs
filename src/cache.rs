@@ -3,6 +3,8 @@ use std::hash::Hash;
 use std::sync::Arc;
 use crate::{Device, Error};
 
+use anyhow::Result;
+
 /// Trait that needs to be implemented by types managed by a [`Cache`]
 pub trait Resource {
     /// Key type used for looking up and possibly creating new resources. Must be hashable and cloneable.
@@ -13,7 +15,7 @@ pub trait Resource {
     const MAX_TIME_TO_LIVE: u32;
 
     /// Allocates a new resource to be stored in the cache. This function may error, but this error will propagate through the cache's access function.
-    fn create(device: Arc<Device>, key: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self, Error> where Self: Sized;
+    fn create(device: Arc<Device>, key: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self> where Self: Sized;
 }
 
 struct Entry<R> {
@@ -48,7 +50,7 @@ impl<R> Cache<R> where R: Resource + Sized {
     /// the cache is exists.
     /// # Errors
     /// This function can only error if the requested resource did not exist, and allocation of it failed.
-    pub fn get_or_create<'a, 'b, 's: 'b>(&'s mut self, key: &R::Key, params: R::ExtraParams<'a>) -> Result<&'b R, Error> {
+    pub fn get_or_create<'a, 'b, 's: 'b>(&'s mut self, key: &R::Key, params: R::ExtraParams<'a>) -> Result<&'b R> {
         let entry = self.store.entry(key.clone());
         let entry = match entry {
             hash_map::Entry::Occupied(entry) => { entry.into_mut() },

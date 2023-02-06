@@ -1,14 +1,15 @@
 use ash::vk;
-use crate::{Error, GpuResource, IncompleteCommandBuffer, PhysicalResourceBindings, ResourceUsage, VirtualResource};
+use crate::{Error, GpuResource, IncompleteCommandBuffer, InFlightContext, PhysicalResourceBindings, ResourceUsage, VirtualResource};
 use crate::domain::ExecutionDomain;
 use crate::pipeline::PipelineStage;
+use anyhow::Result;
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
 pub struct Pass<'exec, D> where D: ExecutionDomain {
     pub(crate) name: String,
     pub(crate) inputs: Vec<GpuResource>,
     pub(crate) outputs: Vec<GpuResource>,
-    pub(crate) execute: Box<dyn FnMut(IncompleteCommandBuffer<D>, &PhysicalResourceBindings) -> IncompleteCommandBuffer<D> + 'exec>,
+    pub(crate) execute: Box<dyn FnMut(IncompleteCommandBuffer<D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<D>>  + 'exec>,
     pub(crate) is_renderpass: bool
 }
 
@@ -33,7 +34,7 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
         PassBuilder {
             inner: Pass {
                 name,
-                execute: Box::new(|c, _| c),
+                execute: Box::new(|c, _, _| Ok(c)),
                 inputs: vec![],
                 outputs: vec![],
                 is_renderpass: true
@@ -56,14 +57,14 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
                 load_op: None,
             }],
             outputs: vec![],
-            execute: Box::new(|c, _| c),
+            execute: Box::new(|c, _, _| Ok(c)),
             is_renderpass: false
         }
     }
 
     /// Adds a color attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
-    pub fn color_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self, Error> {
-        if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() { return Err(Error::NoClearValue); }
+    pub fn color_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self> {
+        if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() { return Err(anyhow::Error::from(Error::NoClearValue)); }
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::Attachment,
             resource: resource.clone(),
@@ -137,7 +138,7 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
     }
 
     /// Set the function to be called when recording this pass.
-    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<D>, &PhysicalResourceBindings) -> IncompleteCommandBuffer<D> + 'exec) -> Self {
+    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<D>>  + 'exec) -> Self {
         self.inner.execute = Box::new(exec);
         self
     }

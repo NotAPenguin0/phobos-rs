@@ -1,5 +1,8 @@
 #version 450
 
+layout(location = 0) in vec2 iPos;
+layout(location = 1) in vec2 iUV;
+
 layout(location = 0) out vec2 UV;
 
 // Vertices for fullscreen quad
@@ -13,6 +16,6 @@ vec4 vertices[] = {
 };
 
 void main() {
-    UV = vertices[gl_VertexIndex].zw;
-    gl_Position = vec4(vertices[gl_VertexIndex].xy, 0.0, 1.0);
+    UV = iUV;
+    gl_Position = vec4(iPos, 0.0, 1.0);
 }

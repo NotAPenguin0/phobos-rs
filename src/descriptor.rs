@@ -4,6 +4,7 @@ use ash::vk;
 use crate::cache::*;
 use crate::{Device, Error, ImageView, Sampler};
 use crate::deferred_delete::DeletionQueue;
+use anyhow::Result;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct DescriptorImageInfo {
@@ -97,7 +98,7 @@ impl Resource for DescriptorSet {
     type ExtraParams<'a> = ();
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self, Error> where Self: Sized {
+    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self> where Self: Sized {
         let info = vk::DescriptorSetAllocateInfo::builder()
             .descriptor_pool(key.pool)
             .set_layouts(std::slice::from_ref(&key.layout))
@@ -164,7 +165,7 @@ impl DescriptorPoolSize {
 }
 
 impl DescriptorPool {
-    fn new(device: Arc<Device>, size: DescriptorPoolSize) -> Result<Self, Error> {
+    fn new(device: Arc<Device>, size: DescriptorPoolSize) -> Result<Self> {
         // Fold over all values to compute the sum of all sizes, this is the total amount of
         // descriptor sets that can be allocated from this pool.
         let max_sets = size.0.values().fold(0, |a, x| x + a);
@@ -200,7 +201,7 @@ impl DescriptorCache {
     /// Create a new descriptor cache object.
     /// # Errors
     /// - This can fail if creating the initial descriptor pool fails.
-    pub fn new(device: Arc<Device>) -> Result<Arc<Mutex<Self>>, Error> {
+    pub fn new(device: Arc<Device>) -> Result<Arc<Mutex<Self>>> {
         Ok(Arc::new(Mutex::new(Self {
             device: device.clone(),
             cache: Cache::new(device.clone()),
@@ -224,9 +225,9 @@ impl DescriptorCache {
     /// - This function fails if no descriptor set layout was specified in `bindings`
     /// - This function fails the the requested descriptor set has no descriptors
     /// - This function fails if allocating a descriptor set failed due to an internal error.
-    pub fn get_descriptor_set(&mut self, mut bindings: DescriptorSetBinding) -> Result<&DescriptorSet, Error> {
-        if bindings.bindings.is_empty() { return Err(Error::EmptyDescriptorBinding); }
-        if bindings.layout == vk::DescriptorSetLayout::null() { return Err(Error::NoDescriptorSetLayout); }
+    pub fn get_descriptor_set(&mut self, mut bindings: DescriptorSetBinding) -> Result<&DescriptorSet> {
+        if bindings.bindings.is_empty() { return Err(anyhow::Error::from(Error::EmptyDescriptorBinding)); }
+        if bindings.layout == vk::DescriptorSetLayout::null() { return Err(anyhow::Error::from(Error::NoDescriptorSetLayout)); }
 
         loop {
             bindings.pool = self.pool.handle;

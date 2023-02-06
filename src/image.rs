@@ -1,8 +1,8 @@
-use std::ptr;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};
 use gpu_allocator::vulkan::{AllocationCreateDesc, Allocator};
+use anyhow::Result;
 
 use crate::{Device, Error};
 
@@ -75,7 +75,7 @@ impl Image {
     // TODO: Allow specifying an initial layout for convenience
     // TODO: Full wrapper around the allocator for convenience
     /// Create a new simple [`VkImage`] and allocate some memory to it.
-    pub fn new(device: Arc<Device>, alloc: Arc<Mutex<Allocator>>, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format) -> Result<Self, Error> {
+    pub fn new(device: Arc<Device>, alloc: Arc<Mutex<Allocator>>, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format) -> Result<Self> {
         let sharing_mode = if usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {
             vk::SharingMode::EXCLUSIVE
         }
@@ -101,13 +101,13 @@ impl Image {
             usage,
             sharing_mode,
             queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families.len() as u32 } else { 0 },
-            p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families.as_ptr() } else { ptr::null() },
+            p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families.as_ptr() } else { std::ptr::null() },
             initial_layout: vk::ImageLayout::UNDEFINED,
         }, None)? };
 
         let requirements = unsafe { device.get_image_memory_requirements(handle) };
 
-        let memory = alloc.lock()?.allocate(&AllocationCreateDesc {
+        let memory = alloc.lock().or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?.allocate(&AllocationCreateDesc {
             name: "image_",
             requirements,
             // TODO: Proper memory location configuration
@@ -140,7 +140,7 @@ impl Image {
     /// <br>
     /// # Lifetime
     /// The returned [`ImageView`] is valid as long as `self` is valid.
-    pub fn view(&self, aspect: vk::ImageAspectFlags) -> Result<ImageView, Error> {
+    pub fn view(&self, aspect: vk::ImageAspectFlags) -> Result<ImageView> {
         let info = vk::ImageViewCreateInfo::builder()
             .view_type(vk::ImageViewType::TYPE_2D) // TODO: 3D images, cubemaps, etc
             .format(self.format)

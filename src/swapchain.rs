@@ -2,6 +2,7 @@ use std::sync::Arc;
 use ash::vk;
 use crate::{AppSettings, Device, Error, Surface, VkInstance, WindowInterface};
 use crate::image::*;
+use anyhow::Result;
 
 #[derive(Debug)]
 pub(crate) struct SwapchainImage {
@@ -30,7 +31,7 @@ pub struct Swapchain {
 }
 
 impl Swapchain {
-    pub fn new<Window: WindowInterface>(instance: &VkInstance, device: Arc<Device>, settings: &AppSettings<Window>, surface: &Surface) -> Result<Self, Error> {
+    pub fn new<Window: WindowInterface>(instance: &VkInstance, device: Arc<Device>, settings: &AppSettings<Window>, surface: &Surface) -> Result<Self> {
         let format = choose_surface_format(settings, surface)?;
         let present_mode = choose_present_mode(settings, surface);
         let extent = choose_swapchain_extent(settings, surface);
@@ -62,7 +63,7 @@ impl Swapchain {
 
         let images: Vec<SwapchainImage> = unsafe { functions.get_swapchain_images(swapchain)? }
             .iter()
-            .map(move |image| -> Result<SwapchainImage, Error> {
+            .map(move |image| -> Result<SwapchainImage> {
                 let image = Image {
                     device: device.clone(),
                     handle: *image,
@@ -87,7 +88,7 @@ impl Swapchain {
                     view
                 })
             })
-        .collect::<Result<Vec<SwapchainImage>, Error>>()?;
+        .collect::<Result<Vec<SwapchainImage>>>()?;
         Ok(Swapchain {
             handle: swapchain,
             format,
@@ -108,7 +109,7 @@ impl Drop for Swapchain {
     }
 }
 
-fn choose_surface_format<Window: WindowInterface>(settings: &AppSettings<Window>, surface: &Surface) -> Result<vk::SurfaceFormatKHR, Error> {
+fn choose_surface_format<Window: WindowInterface>(settings: &AppSettings<Window>, surface: &Surface) -> Result<vk::SurfaceFormatKHR> {
     // In case requested format isn't found, try this. If that one isn't found we fall back to the first available format.
     const FALLBACK_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
         format: vk::Format::B8G8R8A8_SRGB,
@@ -120,7 +121,7 @@ fn choose_surface_format<Window: WindowInterface>(settings: &AppSettings<Window>
     }
     if surface.formats.contains(&FALLBACK_FORMAT) { return Ok(FALLBACK_FORMAT); }
 
-    surface.formats.first().copied().ok_or(Error::NoSurfaceFormat)
+    surface.formats.first().copied().ok_or(anyhow::Error::from(Error::NoSurfaceFormat))
 }
 
 fn choose_present_mode<Window : WindowInterface>(settings: &AppSettings<Window>, surface: &Surface) -> vk::PresentModeKHR {

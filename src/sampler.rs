@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use ash::vk;
 use crate::{Device, Error};
+use anyhow::Result;
 
 /// Represents a vulkan sampler object.
 #[derive(Derivative)]
@@ -13,7 +14,7 @@ pub struct Sampler {
 
 impl Sampler {
     /// Create a new sampler with default settings.
-    pub fn default(device: Arc<Device>) -> Result<Self, Error> {
+    pub fn default(device: Arc<Device>) -> Result<Self> {
         let info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)

@@ -4,6 +4,7 @@ use ash::vk;
 use std::ffi::{CString, NulError};
 use crate::{PhysicalDevice, Error, VkInstance, AppSettings, WindowInterface};
 use crate::util;
+use anyhow::Result;
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
 /// Vulkan API.
@@ -13,12 +14,13 @@ pub struct Device {
     #[derivative(Debug="ignore")]
     pub(crate) handle: ash::Device,
     pub(crate) queue_families: Vec<u32>,
+    pub(crate) properties: vk::PhysicalDeviceProperties,
 }
 
 impl Device {
     /// Create a new Vulkan device. This is wrapped in an Arc because it gets passed around and stored in a
     /// lot of Vulkan-related structures.
-    pub fn new<Window: WindowInterface>(instance: &VkInstance, physical_device: &PhysicalDevice, settings: &AppSettings<Window>) -> Result<Arc<Self>, Error> {
+    pub fn new<Window: WindowInterface>(instance: &VkInstance, physical_device: &PhysicalDevice, settings: &AppSettings<Window>) -> Result<Arc<Self>> {
         let mut priorities = Vec::<f32>::new();
         let queue_create_infos = physical_device.queue_families.iter()
             .enumerate()
@@ -65,13 +67,14 @@ impl Device {
 
         Ok(Arc::new(unsafe { Device {
             handle: instance.instance.create_device(physical_device.handle, &info, None)?,
-            queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect()
+            queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
+            properties: physical_device.properties
         } }))
     }
 
     /// Wait for the device to be completely idle.
     /// This should not be used as a synchronization measure, except on exit.
-    pub fn wait_idle(&self) -> Result<(), Error> {
+    pub fn wait_idle(&self) -> Result<()> {
         unsafe { Ok(self.device_wait_idle()?) }
     }
 }

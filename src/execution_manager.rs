@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use crate::{Device, Error, PhysicalDevice, Queue, QueueType};
 use crate::command_buffer::*;
+use anyhow::Result;
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
@@ -102,16 +103,16 @@ pub mod domain {
 impl ExecutionManager {
     /// Create a new execution manager. You should only ever have on instance of this struct
     /// in your program.
-    pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self, Error> {
+    pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
         let mut counts = HashMap::new();
-        let queues: Vec<Queue> = physical_device.queues.iter().map(|queue| -> Result<Queue, Error> {
+        let queues: Vec<Queue> = physical_device.queues.iter().map(|queue| -> Result<Queue> {
             let index = counts.entry(queue.family_index).or_insert(0 as u32);
             let handle = unsafe { device.get_device_queue(queue.family_index, *index) };
             // Note that we can unwrap() here, because if this does not return Some() then our algorithm is
             // bugged and this should panic.
             *counts.get_mut(&queue.family_index).unwrap() += 1;
             Queue::new(device.clone(), handle, *queue)
-        }).collect::<Result<Vec<Queue>, Error>>()?;
+        }).collect::<Result<Vec<Queue>>>()?;
 
         Ok(ExecutionManager {
             queues
@@ -119,7 +120,7 @@ impl ExecutionManager {
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
-    pub fn on_domain<D: domain::ExecutionDomain>(&self) -> Result<D::CmdBuf, Error> {
+    pub fn on_domain<D: domain::ExecutionDomain>(&self) -> Result<D::CmdBuf> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         queue.allocate_command_buffer::<D::CmdBuf>()
     }

@@ -4,16 +4,13 @@ use petgraph::graph::NodeIndex;
 use petgraph::{Incoming, Outgoing};
 use petgraph::prelude::EdgeRef;
 use crate::domain::{ExecutionDomain};
-use crate::{Error, GpuBarrier, GpuResource, GpuTask, GpuTaskGraph, ImageView, IncompleteCommandBuffer, ResourceUsage, task_graph::Node, VirtualResource};
+use crate::{Error, GpuBarrier, GpuResource, GpuTask, GpuTaskGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource};
 use crate::task_graph::Resource;
 
-// Implementation plan:
-// 1. [Check] Get traversal working
-// 2. Record commands for barriers
-// 3. Verify correctness
-// 4. Possibly optimize away unnecessary barriers
+use anyhow::Result;
 
-// 1. Traversal
+// Traversal
+// =============
 // Algorithm as follows:
 // - Start with only the source node as an active node.
 // - Each iteration:
@@ -48,7 +45,7 @@ fn insert_in_active_set<D>(node: NodeIndex, graph: &GpuTaskGraph<D>, active: &mu
     }
 }
 
-fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<vk::RenderingAttachmentInfo>, Error>
+fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<vk::RenderingAttachmentInfo>>
     where D: ExecutionDomain {
     Ok(pass.outputs.iter().filter_map(|resource| -> Option<vk::RenderingAttachmentInfo> {
         if resource.layout != vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL { return None; }
@@ -109,8 +106,8 @@ fn render_area<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBin
     }
 }
 
-fn record_pass<D>(pass: &mut GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings, mut cmd: IncompleteCommandBuffer<D>)
-    -> Result<IncompleteCommandBuffer<D>, Error> where D: ExecutionDomain  {
+fn record_pass<D>(pass: &mut GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<D>)
+    -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain  {
     if pass.is_renderpass {
         let color_info = color_attachments(&pass, &bindings)?;
         let info = vk::RenderingInfo::builder()
@@ -127,7 +124,7 @@ fn record_pass<D>(pass: &mut GpuTask<GpuResource, D>, bindings: &PhysicalResourc
 
         cmd = cmd.begin_rendering(&info);
     }
-    cmd = pass.execute.call_mut((cmd, bindings));
+    cmd = pass.execute.call_mut((cmd, ifc, bindings))?;
     return if pass.is_renderpass {
         Ok(cmd.end_rendering())
     } else {
@@ -136,7 +133,7 @@ fn record_pass<D>(pass: &mut GpuTask<GpuResource, D>, bindings: &PhysicalResourc
 }
 
 fn record_image_barrier<D>(barrier: &GpuBarrier, image: &ImageView, dst_resource: &GpuResource, cmd: IncompleteCommandBuffer<D>)
-    -> Result<IncompleteCommandBuffer<D>, Error>
+    -> Result<IncompleteCommandBuffer<D>>
     where D: ExecutionDomain {
 
     // Image layouts:
@@ -162,21 +159,21 @@ fn record_image_barrier<D>(barrier: &GpuBarrier, image: &ImageView, dst_resource
 }
 
 fn record_barrier<D>(barrier: &GpuBarrier, dst_resource: &GpuResource, bindings: &PhysicalResourceBindings,
-                     cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>, Error> where D: ExecutionDomain{
+                     cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain{
     let physical_resource = bindings.resolve(&barrier.resource.resource);
-    let Some(resource) = physical_resource else { return Err(Error::NoResourceBound(barrier.resource.uid().clone())) };
+    let Some(resource) = physical_resource else { return Err(anyhow::Error::from(Error::NoResourceBound(barrier.resource.uid().clone()))) };
     match resource {
         PhysicalResource::Image(image) => { record_image_barrier(&barrier, image, dst_resource, cmd) }
     }
 }
 
-fn record_node<D>(graph: &mut GpuTaskGraph<D>, node: NodeIndex, bindings: &PhysicalResourceBindings,
-                  cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>, Error> where D: ExecutionDomain {
+fn record_node<D>(graph: &mut GpuTaskGraph<D>, node: NodeIndex, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext,
+                  cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain {
     let graph = &mut graph.graph.graph;
     let dst_resource_res = GpuTaskGraph::barrier_dst_resource(&graph, node).cloned();
     let weight = graph.node_weight_mut(node).unwrap();
     match weight {
-        Node::Task(pass) => { record_pass(pass, &bindings, cmd) }
+        Node::Task(pass) => { record_pass(pass, &bindings, ifc, cmd) }
         Node::Barrier(barrier) => {
             // Find destination resource in graph
             record_barrier(&barrier, &dst_resource_res?, &bindings, cmd)
@@ -232,8 +229,8 @@ impl PhysicalResourceBindings {
 /// to actual resources.
 /// # Errors
 /// - This function can error if a virtual resource used in the graph is lacking an physical binding.
-pub fn record_graph<D>(graph: &mut GpuTaskGraph<D>, bindings: &PhysicalResourceBindings, mut cmd: IncompleteCommandBuffer<D>)
-    -> Result<IncompleteCommandBuffer<D>, Error> where D: ExecutionDomain {
+pub fn record_graph<D>(graph: &mut GpuTaskGraph<D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<D>)
+    -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain {
     let start = graph.source();
     let mut active = HashSet::new();
     let mut children = HashSet::new();
@@ -244,7 +241,7 @@ pub fn record_graph<D>(graph: &mut GpuTaskGraph<D>, bindings: &PhysicalResourceB
         for child in &children {
             // If all parents of this child node are in the active set, record it.
             if node_parents(child.clone(), &graph).all(|parent| active.contains(&parent)) {
-                cmd = record_node(graph, child.clone(), &bindings, cmd)?;
+                cmd = record_node(graph, child.clone(), &bindings, ifc, cmd)?;
                 recorded_nodes.push(child.clone());
             }
         }

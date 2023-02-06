@@ -1,6 +1,7 @@
 use ash::vk;
 
 use crate::{util, VkInstance, Error};
+use anyhow::Result;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -13,7 +14,7 @@ pub struct DebugMessenger {
 impl DebugMessenger {
     /// Creates a new debug messenger. Requires the vulkan validation layers to be enabled to
     /// do anything useful.
-    pub fn new(instance: &VkInstance) -> Result<Self, Error> {
+    pub fn new(instance: &VkInstance) -> Result<Self> {
         let functions = ash::extensions::ext::DebugUtils::new(&instance.entry, &instance.instance);
         let handle = unsafe {
             functions.create_debug_utils_messenger(

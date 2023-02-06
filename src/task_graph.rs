@@ -16,9 +16,10 @@ use petgraph::prelude::EdgeRef;
 use crate::domain::ExecutionDomain;
 
 use crate::error::Error;
-use crate::{IncompleteCommandBuffer, PhysicalResourceBindings};
+use crate::{IncompleteCommandBuffer, InFlightContext, PhysicalResourceBindings};
 use crate::pass::Pass;
 use crate::pipeline::PipelineStage;
+use anyhow::Result;
 
 /// Represents a resource in a task graph.
 pub trait Resource {
@@ -95,7 +96,7 @@ pub struct GpuTask<'exec, R, D> where R: Resource, D: ExecutionDomain {
     pub identifier: String,
     pub inputs: Vec<R>,
     pub outputs: Vec<R>,
-    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>, &PhysicalResourceBindings) -> IncompleteCommandBuffer<D> + 'exec>,
+    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<D>>  + 'exec>,
     pub is_renderpass: bool
 }
 
@@ -234,7 +235,7 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
             identifier: "_source".to_string(),
             inputs: vec![],
             outputs: vec![],
-            execute: Box::new(|c, _| c),
+            execute: Box::new(|c, _, _| Ok(c)),
             is_renderpass: false,
         }).unwrap();
         // ...
@@ -245,7 +246,7 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
     /// Add a pass to a task graph.
     /// # Errors
     /// - This function can fail if adding the pass results in a cyclic dependency in the graph.
-    pub fn add_pass(&mut self, pass: Pass<'exec, D>) -> Result<(), Error> {
+    pub fn add_pass(&mut self, pass: Pass<'exec, D>) -> Result<()> {
         // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
         let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
         for input in &pass.inputs {
@@ -275,7 +276,7 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
     }
 
     /// Builds the task graph so it can be recorded into a command buffer.
-    pub fn build(&mut self) -> Result<(), Error> {
+    pub fn build(&mut self) -> Result<()> {
         self.graph.create_barrier_nodes();
         self.merge_identical_barriers()?;
 
@@ -296,8 +297,8 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
         self.source
     }
 
-    fn barrier_src_resource<'a>(graph: &'a Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&'a GpuResource, Error> {
-        let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(Error::NodeNotFound) };
+    fn barrier_src_resource<'a>(graph: &'a Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&'a GpuResource> {
+        let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(anyhow::Error::from(Error::NodeNotFound)) };
         let edge = graph.edges_directed(node, Direction::Incoming).next().unwrap();
         let src_node = edge.source();
         // An edge from a barrier always points to a task.
@@ -306,12 +307,12 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
         Ok(task.inputs.iter().find(|&input| input.uid() == barrier.resource.uid()).unwrap())
     }
 
-    pub(crate) fn barrier_dst_resource<'a>(graph: &'a Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&'a GpuResource, Error> {
+    pub(crate) fn barrier_dst_resource<'a>(graph: &'a Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&'a GpuResource> {
         // We know that:
         // 1) Each barrier has at least one outgoing edge
         // 2) During the merge, each outgoing edge from a barrier will have the same resource usage
         // Knowing this, we can simply pick the first edge in the list to determine the resource usage
-        let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(Error::NodeNotFound) };
+        let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(anyhow::Error::from(Error::NodeNotFound)) };
         let edge = graph.edges(node).next().unwrap();
         let dst_node = edge.target();
         // An edge from a barrier always points to a task.
@@ -329,7 +330,7 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
     }
 
     // Pass in the build step where identical barriers are merged into one for efficiency reasons.
-    fn merge_identical_barriers(&mut self) -> Result<(), Error> {
+    fn merge_identical_barriers(&mut self) -> Result<()> {
         let graph = &mut self.graph.graph;
         // Find a barrier that has duplicates
         let mut to_remove = Vec::new();
@@ -349,7 +350,7 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
                 let other_usage = &other_resource.usage;
                 if other_barrier.resource.uid() == barrier.resource.uid() {
                     if !other_usage.is_read() && !dst_usage.is_read() && other_usage != &dst_usage {
-                        return Err(Error::IllegalTaskGraph);
+                        return Err(anyhow::Error::from(Error::IllegalTaskGraph));
                     }
                     to_remove.push(other_node);
                     edges_to_add.push((node, graph.edges(other_node).next().unwrap().target(), other_resource.uid().clone()));
@@ -382,7 +383,7 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
         }
     }
 
-    fn is_dependent(&self, graph: &Graph<Node<R, B, T>, String>, child: NodeIndex, parent: NodeIndex) -> Result<Option<R>, Error> {
+    fn is_dependent(&self, graph: &Graph<Node<R, B, T>, String>, child: NodeIndex, parent: NodeIndex) -> Result<Option<R>> {
         let child = graph.node_weight(child).ok_or(Error::NodeNotFound)?;
         let parent = graph.node_weight(parent).ok_or(Error::NodeNotFound)?;
         if let Node::Task(child) = child {
@@ -397,7 +398,7 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
         Ok(None)
     }
 
-    fn is_task_node(graph: &Graph<Node<R, B, T>, String>, node: NodeIndex) -> Result<bool, Error> {
+    fn is_task_node(graph: &Graph<Node<R, B, T>, String>, node: NodeIndex) -> Result<bool> {
         Ok(matches!(graph.node_weight(node).ok_or(Error::NodeNotFound)?, Node::Task(_)))
     }
 
@@ -414,7 +415,7 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
     }
 
     /// Add a task to the task graph.
-    pub fn add_task(&mut self, task: T) -> Result<(), Error> {
+    pub fn add_task(&mut self, task: T) -> Result<()> {
         let node = self.graph.add_node(Node::Task(task));
         // When adding a node, we need to update edges in the graph.
         // X = The newly added node
@@ -440,7 +441,7 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
         });
 
         match petgraph::algo::is_cyclic_directed(&self.graph) {
-            true => Err(Error::GraphHasCycle),
+            true => Err(anyhow::Error::from(Error::GraphHasCycle)),
             false => Ok(())
         }
     }
@@ -494,11 +495,11 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
 }
 
 pub trait GraphViz {
-    fn dot(&self) -> Result<String, Error>;
+    fn dot(&self) -> Result<String>;
 }
 
 impl<D> GraphViz for TaskGraph<GpuResource, GpuBarrier<GpuResource>, GpuTask<'_, GpuResource, D>> where D: ExecutionDomain {
-    fn dot(&self) -> Result<String, Error> {
+    fn dot(&self) -> Result<String> {
         Ok(format!("{}", Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes)))
     }
 }

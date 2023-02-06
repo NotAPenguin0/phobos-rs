@@ -2,6 +2,7 @@ use std::sync::Arc;
 use ash::vk;
 use crate::{sync, Device, Error, IncompleteCmdBuffer, CmdBuffer};
 use crate::command_pool::*;
+use anyhow::Result;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.
@@ -45,7 +46,7 @@ pub struct Queue {
 }
 
 impl Queue {
-    pub fn new(device: Arc<Device>, handle: vk::Queue, info: QueueInfo) -> Result<Self, Error> {
+    pub fn new(device: Arc<Device>, handle: vk::Queue, info: QueueInfo) -> Result<Self> {
         // We create a transient command pool because command buffers will be allocated and deallocated
         // frequently.
         let pool = CommandPool::new(device.clone(), info.family_index, vk::CommandPoolCreateFlags::TRANSIENT)?;
@@ -71,7 +72,7 @@ impl Queue {
         self.handle
     }
 
-    pub(crate) fn allocate_command_buffer<CmdBuf: IncompleteCmdBuffer>(&self) -> Result<CmdBuf, Error> {
+    pub(crate) fn allocate_command_buffer<CmdBuf: IncompleteCmdBuffer>(&self) -> Result<CmdBuf> {
         let handle = unsafe { self.device.allocate_command_buffers(
             &vk::CommandBufferAllocateInfo::builder()
                 .command_pool(self.pool.handle)
@@ -84,7 +85,7 @@ impl Queue {
 
     /// Instantly delete a command buffer, without taking synchronization into account.
     /// This function **must** be externally synchronized.
-    pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(&self, cmd: vk::CommandBuffer) -> Result<(), Error> {
+    pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(&self, cmd: vk::CommandBuffer) -> Result<()> {
         Ok(self.device.free_command_buffers(self.pool.handle, std::slice::from_ref(&cmd)))
     }
 }

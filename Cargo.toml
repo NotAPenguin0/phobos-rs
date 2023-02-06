@@ -20,6 +20,8 @@ layout-rs = "0.1.1"
 winit = { version = "0.27.5", optional = true }
 bitflags = "1.3.2"
 dyn-clone = "1.0.10"
+anyhow = { version = "1.0.69", features = ["backtrace"] }
+thiserror = "1.0.38"
 
 [build-dependencies]
 shaderc = { version = "0.8.2", optional = true, features = ["build-from-source"] }

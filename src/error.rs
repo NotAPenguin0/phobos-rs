@@ -1,51 +1,80 @@
 use std::ffi::NulError;
+use std::fmt::{Display, Formatter};
 use std::sync::PoisonError;
 use ash;
 use ash::vk::Pipeline;
 use gpu_allocator::AllocationError;
+use thiserror::Error;
+use anyhow::Result;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
     /// Failed to load the Vulkan library
+    #[error("Failed to load Vulkan.")]
     LoadFailed(ash::LoadingError),
     /// Could not convert rust string to C-String because it has null bytes
+    #[error("Invalid C string")]
     InvalidString(NulError),
     /// Generic Vulkan error type
+    #[error("Vulkan error: `{0}`")]
     VkError(ash::vk::Result),
     /// No window context specified where one was expected.
+    #[error("Expected a window context.")]
     NoWindow,
     /// No suitable GPU found.
+    #[error("No physical device found matching requirements.")]
     NoGPU,
     /// No supported surface formats found.
+    #[error("No supported surface formats found.")]
     NoSurfaceFormat,
     /// No queue was found that supports presentation.
+    #[error("No queue found that supports presentation. Only headless mode is supported.")]
     NoPresentQueue,
     /// No queue was found for requested domain. Did you forget to request it?
+    #[error("No queue found for requested domain. Did you forget a queue request on initialization?")]
     NoCapableQueue,
     /// Vulkan allocation error.
+    #[error("Vulkan allocation error: `{0}`")]
     AllocationError(AllocationError),
     /// Task graph contains a cycle and is impossible to resolve.
+    #[error("Task graph contains cycle.")]
     GraphHasCycle,
     /// Node not found in graph. Generally this should not happen.
+    #[error("Implementation error. Node not found. Please open an issue.")]
     NodeNotFound,
     /// Task graph contains two nodes that act on the same resource with different usage flags.
     /// This is impossible to resolve in an unambiguous way.
+    #[error("Illegal task graph using the same resource in different ways.")]
     IllegalTaskGraph,
     /// No resource was bound to a virtual resource
+    #[error("No resource bound to virtual resource `{0}`")]
     NoResourceBound(String),
     /// Named pipeline not registered in the pipeline cache.
+    #[error("Named pipeline `{0}` not found.")]
     PipelineNotFound(String),
     /// Tried to add a vertex attribute to a vertex binding that does not exist.
+    #[error("Tried to add a vertex attribute to a vertex binding that does not exist.")]
     NoVertexBinding,
     /// Tried to allocate an empty descriptor set.
+    #[error("Empty descriptor set.")]
     EmptyDescriptorBinding,
     /// No descriptor set layout was given, probably because it was not obtained through a command buffer with a valid pipeline bound.
+    #[error("No descriptor set layout was given. Always create descriptor sets through a command buffer after binding a pipeline.")]
     NoDescriptorSetLayout,
     /// No clear value was specified even though one was required.
+    #[error("No clear value specified for an attachment with `VK_LOAD_OP_CLEAR`")]
     NoClearValue,
     /// Poisoned mutex
+    #[error("Poisoned mutex")]
     PoisonError,
+    /// Buffer view out of range of original buffer
+    #[error("Buffer view is not a valid range in the parent buffer.")]
+    BufferViewOutOfRange,
+    /// Mappable buffer expected
+    #[error("Requested mappable buffer, but buffer does not have a memory map")]
+    UnmappableBuffer,
     /// Uncategorized error.
+    #[error("Uncategorized error: `{0}`")]
     Uncategorized(&'static str),
 }
 

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use ash::prelude::VkResult;
 use ash::vk;
 use crate::Device;
+use anyhow::Result;
 
 /// Wrapper around a [`VkFence`](vk::Fence) object. Fences are used for CPU-GPU sync.
 #[derive(Derivative)]

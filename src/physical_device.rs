@@ -2,6 +2,7 @@ use ash::vk;
 use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
 use crate::queue::{QueueInfo, QueueType};
 use crate::util;
+use anyhow::Result;
 
 /// Stores queried properties of a Vulkan extension.
 #[derive(Debug, Default)]
@@ -32,10 +33,10 @@ pub struct PhysicalDevice {
 
 impl PhysicalDevice {
     /// Selects the best available physical device from the given requirements and parameters.
-    pub fn select<Window: WindowInterface>(instance: &VkInstance, surface: Option<&Surface>, settings: &AppSettings<Window>) -> Result<Self, Error> {
+    pub fn select<Window: WindowInterface>(instance: &VkInstance, surface: Option<&Surface>, settings: &AppSettings<Window>) -> Result<Self> {
         let devices = unsafe { instance.instance.enumerate_physical_devices()? };
         if devices.is_empty() {
-            return Err(Error::NoGPU);
+            return Err(anyhow::Error::from(Error::NoGPU));
         }
 
         devices.iter()
@@ -120,7 +121,7 @@ impl PhysicalDevice {
                 }
 
                 return Some(physical_device);
-        }).ok_or(Error::NoGPU)
+        }).ok_or(anyhow::Error::from(Error::NoGPU))
     }
 }
 

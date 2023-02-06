@@ -7,6 +7,7 @@ use ash::vk;
 use crate::{Device, Error};
 use crate::cache::*;
 use crate::util::ByteSize;
+use anyhow::Result;
 
 pub type PipelineStage = ash::vk::PipelineStageFlags2;
 
@@ -180,7 +181,7 @@ pub struct PipelineBuilder {
 /// let pci = PipelineBuilder::new(String::from("my_pipeline"))
 ///     // ... options for pipeline creation
 ///     .build();
-/// cache.lock()?.create_named_pipeline(pci);
+/// cache.or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?.create_named_pipeline(pci);
 /// ```
 pub struct PipelineCache {
     shaders: Cache<Shader>,
@@ -195,7 +196,7 @@ impl Resource for Shader {
     type ExtraParams<'a> = ();
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self, Error> {
+    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self> {
         let info = vk::ShaderModuleCreateInfo {
             s_type: vk::StructureType::SHADER_MODULE_CREATE_INFO,
             p_next: std::ptr::null(),
@@ -235,7 +236,7 @@ impl Resource for DescriptorSetLayout {
     type ExtraParams<'a> = ();
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self, Error> {
+    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self> {
         let info = vk::DescriptorSetLayoutCreateInfo::builder()
             .bindings(key.bindings.as_slice())
             .build();
@@ -259,7 +260,7 @@ impl Resource for PipelineLayout {
     type ExtraParams<'a> = &'a mut Cache<DescriptorSetLayout>;
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self, Error> {
+    fn create(device: Arc<Device>, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self> {
         let set_layouts = key.set_layouts.iter().map(|info|
             set_layout_cache.get_or_create(&info, ()).unwrap().handle
         ).collect::<Vec<_>>();
@@ -317,7 +318,7 @@ impl Resource for Pipeline {
     type ExtraParams<'a> = (&'a mut Cache<Shader>, &'a mut Cache<PipelineLayout>, &'a mut Cache<DescriptorSetLayout>);
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self, Error> {
+    fn create(device: Arc<Device>, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self> {
         let (shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
         let mut pci = info.to_vk(layout.handle);
@@ -336,7 +337,14 @@ impl Resource for Pipeline {
         unsafe {
             Ok(Self {
                 device: device.clone(),
-                handle: device.create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)?.first().cloned().unwrap(),
+                handle: device.create_graphics_pipelines(
+                    vk::PipelineCache::null(),
+                    std::slice::from_ref(&pci),
+                    None)
+                        .or_else(
+                            |(_, e)|
+                                Err(anyhow::Error::from(Error::VkError(e))))
+                    ?.first().cloned().unwrap(),
                 layout: layout.handle,
                 set_layouts: layout.set_layouts.clone(),
             })
@@ -469,7 +477,7 @@ impl PipelineBuilder {
         self
     }
 
-    pub fn vertex_attribute(mut self, binding: u32, location: u32, format: vk::Format) -> Result<Self, Error> {
+    pub fn vertex_attribute(mut self, binding: u32, location: u32, format: vk::Format) -> Result<Self> {
         let offset = self.vertex_binding_offsets.get_mut(&binding).ok_or(Error::NoVertexBinding)?;
         self.inner.vertex_attributes.push(VertexInputAttributeDescription{
             0: vk::VertexInputAttributeDescription {
@@ -625,7 +633,7 @@ impl PipelineBuilder {
 
 impl PipelineCache {
     /// Create a new empty pipeline cache.
-    pub fn new(device: Arc<Device>) -> Result<Arc<Mutex<Self>>, Error> {
+    pub fn new(device: Arc<Device>) -> Result<Arc<Mutex<Self>>> {
         Ok(Arc::new(Mutex::new(Self {
             shaders: Cache::new(device.clone()),
             set_layouts: Cache::new(device.clone()),
@@ -636,7 +644,7 @@ impl PipelineCache {
     }
 
     /// Create and register a new pipeline into the cache.
-    pub fn create_named_pipeline(&mut self, info: PipelineCreateInfo) -> Result<(), Error> {
+    pub fn create_named_pipeline(&mut self, info: PipelineCreateInfo) -> Result<()> {
         self.named_pipelines.insert(info.name.clone(), info);
         Ok(())
     }
@@ -645,9 +653,9 @@ impl PipelineCache {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn get_pipeline(&mut self, name: &str) -> Result<&Pipeline, Error> {
+    pub(crate) fn get_pipeline(&mut self, name: &str) -> Result<&Pipeline> {
         let info = self.named_pipelines.get(name);
-        let Some(info) = info else { return Err(Error::PipelineNotFound(name.to_string())); };
+        let Some(info) = info else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
         // Also put in queries for descriptor set layouts and pipeline layout to make sure they are not destroyed.
         for layout in &info.layout.set_layouts {
             self.set_layouts.get_or_create(layout, ())?;

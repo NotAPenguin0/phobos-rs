@@ -17,6 +17,8 @@ use ph::IncompleteCmdBuffer; // TODO: Probably add this as a pub use to lib.rs
 use futures::executor::block_on;
 use phobos::{GraphicsCmdBuffer, PipelineStage};
 
+use anyhow::Result;
+
 // TODO:
 
 // 1. CLion rust formatting
@@ -33,29 +35,44 @@ fn main_loop(frame: &mut ph::FrameManager,
              descriptors: Arc<Mutex<ph::DescriptorCache>>,
              exec: &ph::ExecutionManager,
              surface: &ph::Surface,
-             window: &winit::window::Window) -> Result<(), ph::Error> {
+             window: &winit::window::Window) -> Result<()> {
     // Define a virtual resource pointing to the swapchain
     let swap_resource = ph::VirtualResource::new("swapchain".to_string());
     let offscreen = ph::VirtualResource::new("offscreen".to_string());
+
+    let vertices: Vec<f32> = vec![
+        -1.0, 1.0, 0.0, 1.0,
+        -1.0, -1.0, 0.0, 0.0,
+        1.0, -1.0, 1.0, 0.0,
+        -1.0, 1.0, 0.0, 1.0,
+        1.0, -1.0, 1.0, 0.0,
+        1.0, 1.0, 1.0, 1.0
+    ];
+
     // Define a render graph with one pass that clears the swapchain image
     let mut graph = ph::GpuTaskGraph::new();
 
     // Render pass that renders to an offscreen attachment
     let offscreen_pass = ph::PassBuilder::render(String::from("offscreen"))
         .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR, Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
-        .execute(|cmd, bindings| {
+        .execute(|mut cmd, ifc, bindings| {
             // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
-            cmd.bind_graphics_pipeline("offscreen", pipelines.clone()).unwrap()
-                .viewport(vk::Viewport{
-                    x: 0.0,
-                    y: 0.0,
-                    width: 800.0,
-                    height: 600.0,
-                    min_depth: 0.0,
-                    max_depth: 0.0,
-                })
-                .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
-                .draw(6, 1, 0, 0)
+            let mut buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
+            let slice = buffer.mapped_slice::<f32>()?;
+            slice.copy_from_slice(vertices.as_slice());
+            cmd = cmd.bind_vertex_buffer(0, buffer)
+                     .bind_graphics_pipeline("offscreen", pipelines.clone())?
+                     .viewport(vk::Viewport{
+                            x: 0.0,
+                            y: 0.0,
+                            width: 800.0,
+                            height: 600.0,
+                            min_depth: 0.0,
+                            max_depth: 0.0,
+                    })
+                    .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
+                    .draw(6, 1, 0, 0);
+            Ok(cmd)
         })
         .build();
 
@@ -65,7 +82,7 @@ fn main_loop(frame: &mut ph::FrameManager,
                           vk::AttachmentLoadOp::CLEAR,
                         Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
         .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
-        .execute(|mut cmd, bindings| {
+        .execute(|mut cmd, ifc, bindings| {
             cmd = cmd.bind_graphics_pipeline("sample", pipelines.clone()).unwrap()
                     .viewport(vk::Viewport{
                         x: 0.0,
@@ -80,8 +97,8 @@ fn main_loop(frame: &mut ph::FrameManager,
             let set = ph::DescriptorSetBuilder::new()
                 .bind_sampled_image(0, offscreen_attachment.clone(), &resources.sampler)
                 .build();
-            cmd.bind_new_descriptor_set(0, set, descriptors.clone()).unwrap()
-                .draw(6, 1, 0, 0)
+            Ok(cmd.bind_new_descriptor_set(0, descriptors.clone(), set)?
+                .draw(6, 1, 0, 0))
         })
         .build();
     // Add another pass to handle presentation to the screen
@@ -95,15 +112,15 @@ fn main_loop(frame: &mut ph::FrameManager,
     // Build the graph, now we can bind physical resources and use it.
     graph.build()?;
 
-    block_on(frame.new_frame(&exec, window, &surface, |ifc| {
+    block_on(frame.new_frame(&exec, window, &surface, |mut ifc| {
         // create physical bindings for the render graph resources
         let mut bindings = ph::PhysicalResourceBindings::new();
-        bindings.bind_image("swapchain".to_string(), ifc.swapchain_image.clone());
+        bindings.bind_image("swapchain".to_string(), ifc.swapchain_image.as_ref().unwrap().clone());
         bindings.bind_image("offscreen".to_string(), resources.offscreen_view.clone());
         // create a command buffer capable of executing graphics commands
         let cmd = exec.on_domain::<ph::domain::Graphics>()?;
         // record render graph to this command buffer
-        ph::record_graph(&mut graph, &bindings, cmd)?
+        ph::record_graph(&mut graph, &bindings, &mut ifc, cmd)?
             .finish()
     }))?;
 
@@ -119,7 +136,7 @@ fn load_spirv_file(path: &Path) -> Vec<u32> {
     Vec::from(binary)
 }
 
-fn main() -> Result<(), ph::Error> {
+fn main() -> Result<()> {
     let event_loop = EventLoopBuilder::new().with_any_thread(true).build();
     let window = WindowBuilder::new()
         .with_title("Phobos test app")
@@ -133,6 +150,7 @@ fn main() -> Result<(), ph::Error> {
         .validation(true)
         .window(&window) // TODO: pass window information instead of window interface to remove dependency
         .present_mode(vk::PresentModeKHR::MAILBOX)
+        .scratch_size(1 * 1024) // 1 KiB scratch memory per buffer type per frame
         .gpu(ph::GPURequirements {
             dedicated: true,
             min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.
@@ -159,7 +177,7 @@ fn main() -> Result<(), ph::Error> {
     let exec = ph::ExecutionManager::new(device.clone(), &physical_device)?;
     let mut frame = {
         let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
-         ph::FrameManager::new(device.clone(), swapchain)?
+         ph::FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
     };
 
     // Let's build a graphics pipeline!
@@ -176,6 +194,9 @@ fn main() -> Result<(), ph::Error> {
 
     // Now we can start using the pipeline builder to create our full pipeline.
     let mut pci = ph::PipelineBuilder::new("sample".to_string())
+        .vertex_input(0, vk::VertexInputRate::VERTEX)
+        .vertex_attribute(0, 0, vk::Format::R32G32_SFLOAT)?
+        .vertex_attribute(0, 1, vk::Format::R32G32_SFLOAT)?
         .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
         .blend_attachment_none()
         .cull_mask(vk::CullModeFlags::NONE)
@@ -200,6 +221,9 @@ fn main() -> Result<(), ph::Error> {
     let fragment = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
 
     let mut pci = ph::PipelineBuilder::new("offscreen".to_string())
+        .vertex_input(0, vk::VertexInputRate::VERTEX)
+        .vertex_attribute(0, 0, vk::Format::R32G32_SFLOAT)?
+        .vertex_attribute(0, 1, vk::Format::R32G32_SFLOAT)?
         .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
         .blend_attachment_none()
         .cull_mask(vk::CullModeFlags::NONE)

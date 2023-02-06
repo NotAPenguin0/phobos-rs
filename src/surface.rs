@@ -1,5 +1,6 @@
 use ash::vk;
 use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
+use anyhow::Result;
 
 /// Contains all information about a [`VkSurfaceKHR`](vk::SurfaceKHR)
 #[derive(Derivative)]
@@ -19,7 +20,7 @@ pub struct Surface {
 }
 
 impl Surface {
-    pub fn new<Window: WindowInterface>(instance: &VkInstance, settings: &AppSettings<Window>) -> Result<Self, Error> {
+    pub fn new<Window: WindowInterface>(instance: &VkInstance, settings: &AppSettings<Window>) -> Result<Self> {
         if let Some(window) = settings.window {
             let functions = ash::extensions::khr::Surface::new(&instance.entry, &instance.instance);
             let handle = unsafe {
@@ -33,13 +34,13 @@ impl Surface {
                 present_modes: vec![]
             })
         } else {
-            Err(Error::NoWindow)
+            Err(anyhow::Error::from(Error::NoWindow))
         }
     }
 
     /// Query support for features, capabilities and formats for this surface.
     /// Because surface support varies per physical device, this function requires one to be selected.
-    pub fn query_details(&mut self, physical_device: &PhysicalDevice) -> Result<(), Error> {
+    pub fn query_details(&mut self, physical_device: &PhysicalDevice) -> Result<()> {
         unsafe {
             self.capabilities = self.functions.get_physical_device_surface_capabilities(physical_device.handle, self.handle)?;
             self.formats = self.functions.get_physical_device_surface_formats(physical_device.handle, self.handle)?;
