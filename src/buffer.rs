@@ -7,6 +7,7 @@ use crate::{Device, Error};
 use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};
 
 use anyhow::Result;
+use gpu_allocator::vulkan::AllocationScheme;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -51,6 +52,7 @@ impl Buffer {
             requirements,
             location,
             linear: true,
+            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
         })?;
 
         unsafe { device.bind_buffer_memory(handle, memory.memory(), memory.offset())? };

@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};
-use gpu_allocator::vulkan::{AllocationCreateDesc, Allocator};
+use gpu_allocator::vulkan::{AllocationCreateDesc, AllocationScheme, Allocator};
 use anyhow::Result;
 
 use crate::{Device, Error};
@@ -113,6 +113,7 @@ impl Image {
             // TODO: Proper memory location configuration
             location: MemoryLocation::GpuOnly,
             linear: false,
+            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
         })?;
 
         unsafe { device.bind_image_memory(handle, memory.memory(), memory.offset())?; }

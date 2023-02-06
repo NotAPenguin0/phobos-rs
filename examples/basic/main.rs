@@ -70,8 +70,8 @@ fn main_loop(frame: &mut ph::FrameManager,
                             min_depth: 0.0,
                             max_depth: 0.0,
                     })
-                    .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
-                    .draw(6, 1, 0, 0);
+                     .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
+                     .draw(6, 1, 0, 0);
             Ok(cmd)
         })
         .build();
@@ -245,8 +245,10 @@ fn main() -> Result<()> {
         // Do not render a frame if Exit control flow is specified, to avoid
         // sync issues.
         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
-        
+
         main_loop(&mut frame, &resources, cache.clone(), descriptor_cache.clone(), &exec, &surface, &window).unwrap();
+
+        *control_flow = ControlFlow::Poll;
 
         cache.lock().unwrap().next_frame();
         descriptor_cache.lock().unwrap().next_frame();
