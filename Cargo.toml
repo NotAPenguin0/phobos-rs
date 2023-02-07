@@ -1,6 +1,6 @@
 [package]
 name = "phobos"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 license = "Apache-2.0"
 description = "Fast, powerful Vulkan abstraction library"
@@ -41,3 +41,6 @@ shaderc = ["dep:shaderc"]
 # compile winit with max optimizations
 [profile.dev.package.winit]
 opt-level = 3
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--features debug-markers,shader-reflection"]
