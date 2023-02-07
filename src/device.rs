@@ -48,10 +48,6 @@ impl Device {
             extension_names.push(CString::from(ash::extensions::khr::Swapchain::name()));
         }
 
-        if cfg!(feature = "debug-markers") {
-            extension_names.push(CString::from(ash::extensions::ext::DebugMarker::name()));
-        }
-
         let mut features_1_1 = settings.gpu_requirements.features_1_1;
         let mut features_1_2 = settings.gpu_requirements.features_1_2;
         let mut features_1_3 = settings.gpu_requirements.features_1_3;
