@@ -6,6 +6,7 @@ use crate::{Device, Error, ImageView, Sampler};
 use crate::deferred_delete::DeletionQueue;
 use anyhow::Result;
 use crate::shader_reflection::ReflectionInfo;
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct DescriptorImageInfo {
@@ -96,8 +97,9 @@ pub struct DescriptorSetBuilder<'a> {
 ///             .build();
 /// ```
 #[cfg(not(feature="shader-reflection"))]
-pub struct DescriptorSetBuilder {
+pub struct DescriptorSetBuilder<'a> {
     inner: DescriptorSetBinding,
+    _phantom: PhantomData<&'a i32>
 }
 
 fn binding_image_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorImageInfo> {
@@ -282,6 +284,8 @@ impl<'r> DescriptorSetBuilder<'r> {
             },
             #[cfg(feature="shader-reflection")]
             reflection: None,
+            #[cfg(not(feature="shader-reflection"))]
+            _phantom: PhantomData::default(),
         }
     }
 

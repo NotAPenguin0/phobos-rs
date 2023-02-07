@@ -8,6 +8,7 @@ use crate::{Device, Error};
 use crate::cache::*;
 use crate::util::ByteSize;
 use anyhow::Result;
+#[cfg(feature="shader-reflection")]
 use crate::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
 pub type PipelineStage = ash::vk::PipelineStageFlags2;
@@ -651,18 +652,23 @@ impl PipelineCache {
     }
 
     /// Create and register a new pipeline into the cache.
+    #[cfg(feature="shader-reflection")]
     pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
-        #[cfg(feature="shader-reflection")]
         let refl = reflect_shaders(&info)?;
-
         // Using reflection, we can allow omitting the pipeline layout field.
-        #[cfg(feature="shader-reflection")]
         info.layout = build_pipeline_layout(&refl);
-
         self.named_pipelines.insert(info.name.clone(), PipelineEntry {
             info,
-            #[cfg(feature="shader-reflection")]
             reflection: refl,
+        });
+        Ok(())
+    }
+
+
+    #[cfg(not(feature="shader-reflection"))]
+    pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
+        self.named_pipelines.insert(info.name.clone(), PipelineEntry {
+            info
         });
         Ok(())
     }
