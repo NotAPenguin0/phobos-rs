@@ -43,4 +43,4 @@ shaderc = ["dep:shaderc"]
 opt-level = 3
 
 [package.metadata.docs.rs]
-rustdoc-args = ["--features debug-markers,shader-reflection"]
+rustdoc-args = ["--cfg all(feature=\"debug-markers\", feature=\"shader-reflection\")"]

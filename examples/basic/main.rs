@@ -184,7 +184,7 @@ fn main() -> Result<()> {
     let exec = ph::ExecutionManager::new(device.clone(), &physical_device)?;
     let mut frame = {
         let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
-         ph::FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
+        ph::FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
     };
 
     // Let's build a graphics pipeline!

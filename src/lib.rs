@@ -22,53 +22,63 @@
 //! ```
 //! use phobos as ph;
 //!
-//! let settings = ph::AppSettings {
-//!     version: (1, 0, 0),
-//!     name: String::from("Phobos sample app"),
-//!     enable_validation: true,
-//!     window: Some(&window),
-//!     surface_format: None, // Use default fallback format.
-//!     present_mode: Some(PresentModeKHR::MAILBOX), // No vsync, double buffered
-//!     gpu_requirements: ph::GPURequirements {
-//!         dedicated: true,
-//!         min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.
-//!         min_dedicated_video_memory: 1 * 1024 * 1024 * 1024,
-//!         queues: vec![
-//!             // We request one of each queue, and prefer dedicated Transfer and Compute queues.
-//!             ph::QueueRequest { dedicated: false, queue_type: ph::QueueType::Graphics },
-//!             ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Transfer },
-//!             ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Compute }
-//!         ],
-//!         // For this example we won't request any extensions or extra Vulkan features.
-//!         ..Default::default()
-//!     }
-//! };
+//! let settings = ph::AppBuilder::new()
+//!         .version((1, 0, 0))
+//!         .name(String::from("Phobos demo app"))
+//!         .validation(true)
+//!         .window(&window)
+//!         .present_mode(vk::PresentModeKHR::MAILBOX)
+//!         .scratch_size(1 * 1024) // 1 KiB scratch memory per buffer type per frame
+//!         .gpu(ph::GPURequirements {
+//!             dedicated: true,
+//!             min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.
+//!             min_dedicated_video_memory: 1 * 1024 * 1024 * 1024,
+//!             queues: vec![
+//!                 ph::QueueRequest { dedicated: false, queue_type: ph::QueueType::Graphics },
+//!                 ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Transfer },
+//!                 ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Compute }
+//!             ],
+//!             ..Default::default()
+//!         })
+//!         .build();
 //! ```
 //! Now we are ready to initialize the Phobos library.
 //! ```
 //! // Create Vulkan instance. This step is required.
-//! let instance = ph::VkInstance::new(&settings).unwrap();
+//! let instance = ph::VkInstance::new(&settings)?;
 //! // Create a debug messenger object. This is not required, and only useful
 //! // validation layers are enabled.
-//! let debug_messenger = ph::DebugMessenger::new(&instance).unwrap();
+//! let debug_messenger = ph::DebugMessenger::new(&instance)?;
 //! let (surface, physical_device) = {
 //!     // Create surface to render to. Not required for a compute-only context.
-//!     let mut surface = Surface::new(&instance, &settings).unwrap();
+//!     let mut surface = Surface::new(&instance, &settings)?;
 //!     // Select a physical device based on gpu requirements we passed earlier.
-//!     let physical_device = ph::PhysicalDevice::select(&settings, Some(&surface), &settings).unwrap();
-//!     surface.query_details(&physical_device).unwrap();
+//!     let physical_device = ph::PhysicalDevice::select(&settings, Some(&surface), &settings)?;
+//!     surface.query_details(&physical_device)?;
 //!     (surface, physical_device)
 //! };
 //! // Create Vulkan device. This is our main interface with the Vulkan API.
-//! let device: Arc<ph::Device> = ph::Device::new(&instance, &physical_device, &settings).unwrap();
+//! let device: Arc<ph::Device> = ph::Device::new(&instance, &physical_device, &settings)?;
+//! // Create the GPU allocator
+//! let mut alloc = ph::create_allocator(&instance, device.clone(), &physical_device)?;
 //! // Create execution manager, needed to execute commands.
-//! let exec = ph::ExecutionManager::new(device.clone(), &physical_device).unwrap();
+//! let exec = ph::ExecutionManager::new(device.clone(), &physical_device)?;
 //! // Create swapchain and frame manager.
 //! let mut frame = {
-//!     let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface).unwrap();
-//!     ph::FrameManager::new(device.clone(), swapchain).unwrap()
+//!     let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
+//!     ph::FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
 //! };
 //! ```
+//! For further example code, check out the following modules
+//! - [`pipeline`] for pipeline creation and management.
+//! - [`frame`] for managing your main loop and frame rendering logic.
+//! - [`task_graph`] for creating a task graph to record commands.
+//! - [`pass`] for defining passes inside a task graph.
+//! - [`descriptor`] for descriptor set management.
+//! - [`command_buffer`] for different Vulkan commands available.
+//! - [`scratch_allocator`] is a powerful and simple allocator for quick scratch buffers within a frame or thread context.
+//! - [`image`] for managing [`VkImage`](vk::Image) and [`VkImageView`](vk::ImageView) objects.
+//! - [`buffer`] for managing [`VkBuffer`](vk::Buffer) objects.
 
 
 #![feature(never_type)]

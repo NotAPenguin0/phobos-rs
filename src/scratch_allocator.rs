@@ -1,3 +1,28 @@
+//! The [`ScratchAllocator`] is a very simple linear allocator that can be used for scratch resources.
+//! It is exposed through the [`InFlightContext`] struct, but you can also create your own instances elsewhere.
+//!
+//! The allocator works by linearly incrementing an offset on every allocation. Deallocation is only possible by calling
+//! [`ScratchAllocator::reset`], which will free all memory and reset the offset to zero.
+//!
+//! # Example
+//!
+//! ```
+//! use ash::vk;
+//! use phobos as ph;
+//!
+//! // Create a scratch allocator with at most 1 KiB of available memory for uniform buffers
+//! let mut allocator = ph::ScratchAllocator::new(device.clone(), alloc.clone(), (1 * 1024) as vk::DeviceSize, vk::BufferUsageFlags::UNIFORM_BUFFER);
+//!
+//! // Allocate a 64 byte uniform buffer and use it
+//! let buffer = allocator.allocate(64 as vk::DeviceSize)?;
+//! // For buffer usage, check the buffer module documentation.
+//!
+//! // Once we're ready for the next batch of allocations, call reset(). This must happen
+//! // after the GPU is done using the contents of all allocated buffers.
+//! // For the allocators in the InFlightContext, this is done for you already.
+//! allocator.reset();
+//! ```
+
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex};
 use ash::vk;

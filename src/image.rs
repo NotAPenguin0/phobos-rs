@@ -1,3 +1,17 @@
+//! This module provides utilities to manage [`VkImage`](vk::Image) and [`VkImageView`](vk::ImageView) objects.
+//!
+//! # Images
+//!
+//! Images are managed through the [`Image`] struct. These images are usually backed by a memory allocation, except when
+//! they are swapchain images managed by the OS.
+//!
+//! # Image views
+//!
+//! Using [`Image::view`] you can create an [`ImageView`] that covers the entire image. Note that [`ImageView`] is in fact an
+//! `Arc<ImgView>`. The relationship between [`ImageView`] and [`ImgView`] is similar to `String` vs `str`, except that an
+//! [`ImgView`] also owns a full Vulkan resource. For this reason, we wrap it in a reference-counted `Arc` so we can safely treat it as if it were
+//! a `str` to a `String`. Most API functions will ask for an `ImageView`.
+
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};

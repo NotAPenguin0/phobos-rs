@@ -1,3 +1,68 @@
+//! This module mainly exposes the [`PassBuilder`] struct, used for correctly defining passes in a
+//! [`GpuTaskGraph`]. For documentation on how to use the task graph, refer to the [`task_graph`] module.
+//! There are a few different types of passes. Each pass must declare its inputs and outputs, and can optionally
+//! specify a closure to be executed when the pass is recorded to a command buffer. Additionally, a color can be given to each pass
+//! which will show up in debuggers like `RenderDoc` if the `debug-markers` feature is enabled.
+//!
+//! # Example
+//!
+//! In this example we will define two passes: One that writes to an offscreen texture, and one that samples from this
+//! texture to render it to the screen. This is a very simple dependency, but a very common pattern.
+//! The task graph system will ensure access is properly synchronized, and the offscreen image is properly transitioned from its
+//! initial layout before execution, to `VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL`, to `VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL`.
+//!
+//! First, we define some virtual resources.
+//! ```
+//! use phobos as ph;
+//!
+//! let offscreen = ph::VirtualResource::new("offscreen".to_string());
+//! let swapchain = ph::VirtualResource::new("swapchain".to_string());
+//! ```
+//! Now we create the offscreen pass. Note that we use [`PassBuilder::render()`] to create a render pass.
+//! This is a pass that outputs to at least one color or depth attachment by using the graphics pipeline.
+//! ```
+//! use ash::vk;
+//!
+//! let offscreen_pass = ph::PassBuilder::render("offscreen".to_string())
+//!     // All this does is make the pass show up red in graphics debuggers, if
+//!     // the debug-markers feature is enabled.
+//!     .color([1.0, 0.0, 0.0, 1.0])
+//!     // Add a single color attachment that will be cleared to red.
+//!     .color_attachment(offscreen.clone(),
+//!                       vk::AttachmentLoadOp::CLEAR,
+//!                       Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
+//!     .build();
+//!
+//! ```
+//! Next we can create the pass that will sample from this pass. To do this, we have to declare that we will sample
+//! using [`PassBuilder::sample_image`]. Note that this is only necessary for images that are used elsewhere in the frame.
+//! Regular textures for rendering do not need to be declared like this.
+//!
+//! ```
+//! use ash::vk;
+//!
+//! // This is important. The virtual resource that encodes the output of the offscreen pass is not the same as the one
+//! // we gave it in `color_attachment`. We have to look up the correct version using `Pass::output()`.
+//! let input_resource = offscreen_pass.output(&offscreen).unwrap();
+//!
+//! let sample_pass = ph::PassBuilder::render("sample".to_string())
+//!     // Let's color this pass green
+//!     .color([0.0, 1.0, 0.0, 1.0])
+//!     // Clear the swapchain to black.
+//!     .color_attachment(swapchain.clone(),
+//!                       vk::AttachmentLoadOp::CLEAR,
+//!                       Some(vk::ClearColorValue{ float32: [0.0, 0.0, 0.0, 1.0] }))?
+//!     // We sample the input resource in the fragment shader.
+//!     .sample_image(input_resource.clone(), ph::PipelineStage::FRAGMENT_SHADER)
+//!     .execute(|mut cmd, ifc, bindings| {
+//!         // Commands to sample from the input texture go here
+//!         Ok(cmd)
+//!     })
+//!     .build();
+//! ```
+//!
+//! Binding physical resources and recording is covered under the [`task_graph`] module documentation.
+
 use ash::vk;
 use crate::{Error, GpuResource, IncompleteCommandBuffer, InFlightContext, PhysicalResourceBindings, ResourceUsage, VirtualResource};
 use crate::domain::ExecutionDomain;

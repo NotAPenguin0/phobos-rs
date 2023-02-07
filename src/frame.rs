@@ -1,3 +1,60 @@
+//! This module contains all the logic responsible for managing presentation and frame synchronization. Every frame should be contained
+//! in a call to [`FrameManager::new_frame`], which takes in a closure that is called when the frame is ready to be processed.
+//! This also gives you an [`InFlightContext`] object which contains useful data relevant to the current frame's execution context,
+//! such as per-frame allocators and a view to the current swapchain image.
+//!
+//! # Example usage
+//!
+//! Example code for a main loop using `winit` and `futures::block_on` as the future executor.
+//! ```
+//! use phobos as ph;
+//! use ash::vk;
+//!
+//! let mut frame = {
+//!         let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
+//!         ph::FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
+//!  };
+//!
+//! event_loop.run(move |event, _, control_flow| {
+//!         // Do not render a frame if Exit control flow is specified, to avoid
+//!         // sync issues.
+//!         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
+//!         *control_flow = ControlFlow::Poll;
+//!
+//!         futures::executor::block_on(frame.new_frame(&exec, window, &surface, |mut ifc| {
+//!             // This closure is expected to return a command buffer with this frame's commands.
+//!             // This command buffer should at the very least transition the swapchain image to
+//!             // `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`.
+//!             // This can be done using the render graph API, or with a single command:
+//!             let cmd = exec.on_domain::<ph::domain::Graphics>()?
+//!                           .transition_image(&ifc.swapchain_image,
+//!                                 vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+//!                                 vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
+//!                                 vk::AccessFlags::empty(), vk::AccessFlags::empty())
+//!                           .finish();
+//!             Ok(cmd)
+//!         }))?;
+//!
+//!         // Advance caches to next frame to ensure resources are freed up where possible.
+//!         pipeline_cache.lock().unwrap().next_frame();
+//!         descriptor_cache.lock().unwrap().next_frame();
+//!
+//!         // Note that we want to handle events after processing our current frame, so that
+//!         // requesting an exit doesn't attempt to render another frame, which causes
+//!         // sync issues.
+//!         match event {
+//!             Event::WindowEvent {
+//!                 event: WindowEvent::CloseRequested,
+//!                 window_id
+//!             } if window_id == window.id() => {
+//!                 *control_flow = ControlFlow::Exit;
+//!                 device.wait_idle().unwrap();
+//!             },
+//!             _ => (),
+//!         }
+//! });
+//! ```
+
 use std::sync::{Arc, Mutex};
 use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, CmdBuffer, ImageView, WindowInterface, Surface, Image, SwapchainImage, ScratchAllocator, AppSettings, BufferView};
 use crate::sync::*;
@@ -36,21 +93,16 @@ struct PerImage {
 
 
 /// Struct that stores the context of a single in-flight frame.
-/// You can obtain an instance of this from calling [`FrameManager::new_frame()`].
+/// It is passed to the callback given to [`FrameManager::new_frame()`].
 /// All operations specific to a frame require an instance.
 /// <br>
 /// <br>
 /// # Example
 /// ```
-/// // TODO: Fix this example!
-/// while running {
-///     // obtain a Future<InFlightContext>, assumes windowed context was created.
-///     let ifc = frame_manager.new_frame();
-///     // possibly do some work that does not yet require a frame context.
-///     // ...
-///     // wait for our resulting frame context now that we really need it.
-///     let ifc = futures::executor::block_on(ifc);
-/// }
+/// frame.new_frame(&exec, window, &surface, |mut ifc| {
+///     // Use ifc here
+/// });
+///
 /// ```
 #[derive(Debug)]
 pub struct InFlightContext<'f> {
