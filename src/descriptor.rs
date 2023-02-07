@@ -5,6 +5,7 @@ use crate::cache::*;
 use crate::{Device, Error, ImageView, Sampler};
 use crate::deferred_delete::DeletionQueue;
 use anyhow::Result;
+#[cfg(feature="shader-reflection")]
 use crate::shader_reflection::ReflectionInfo;
 use std::marker::PhantomData;
 
