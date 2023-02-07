@@ -73,6 +73,7 @@
 
 #![feature(never_type)]
 #![feature(fn_traits)]
+#![feature(stmt_expr_attributes)]
 
 #[macro_use]
 extern crate derivative;
@@ -81,6 +82,7 @@ extern crate core;
 mod util;
 mod command_pool;
 mod deferred_delete;
+mod shader_reflection;
 pub mod cache;
 pub mod task_graph;
 pub mod buffer;

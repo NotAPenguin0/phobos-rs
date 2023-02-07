@@ -73,6 +73,14 @@ pub enum Error {
     /// Mappable buffer expected
     #[error("Requested mappable buffer, but buffer does not have a memory map")]
     UnmappableBuffer,
+    #[error("Shader does not have an entry point.")]
+    NoEntryPoint,
+    #[error("Shader uses aliased descriptor `{0}`, which is currently not supported.")]
+    AliasedDescriptor(String),
+    #[error("Missing shader reflection information in call that requires it.")]
+    NoReflectionInformation,
+    #[error("Descriptor `{0}` does not exist.")]
+    NoBinding(String),
     /// Uncategorized error.
     #[error("Uncategorized error: `{0}`")]
     Uncategorized(&'static str),
@@ -101,7 +109,7 @@ impl From<AllocationError> for Error {
 }
 
 impl From<(Vec<ash::vk::Pipeline>, ash::vk::Result)> for Error {
-    fn from(_: (Vec<Pipeline>, ash::vk::Result)) -> Self {
+    fn from(_: (Vec<ash::vk::Pipeline>, ash::vk::Result)) -> Self {
         Error::Uncategorized("Pipeline creation failed")
     }
 }

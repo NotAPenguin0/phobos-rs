@@ -97,9 +97,13 @@ fn main_loop(frame: &mut ph::FrameManager,
                     })
                     .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } });
             let ph::PhysicalResource::Image(offscreen_attachment) = bindings.resolve(&offscreen).unwrap() else { panic!() };
-            let set = ph::DescriptorSetBuilder::new()
-                .bind_sampled_image(0, offscreen_attachment.clone(), &resources.sampler)
-                .build();
+            let set = {
+                let pipelines = pipelines.lock().unwrap();
+                let reflection = pipelines.reflection_info("sample")?;
+                ph::DescriptorSetBuilder::with_reflection(&reflection)
+                    .bind_named_sampled_image("tex", offscreen_attachment.clone(), &resources.sampler)?
+                    .build()
+            };
             Ok(cmd.bind_new_descriptor_set(0, descriptors.clone(), set)?
                 .draw(6, 1, 0, 0))
         })
@@ -196,7 +200,7 @@ fn main() -> Result<()> {
     let fragment = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
 
     // Now we can start using the pipeline builder to create our full pipeline.
-    let mut pci = ph::PipelineBuilder::new("sample".to_string())
+    let pci = ph::PipelineBuilder::new("sample".to_string())
         .vertex_input(0, vk::VertexInputRate::VERTEX)
         .vertex_attribute(0, 0, vk::Format::R32G32_SFLOAT)?
         .vertex_attribute(0, 1, vk::Format::R32G32_SFLOAT)?
@@ -206,16 +210,6 @@ fn main() -> Result<()> {
         .attach_shader(vertex.clone())
         .attach_shader(fragment)
         .build();
-    // Create descriptor set layout. Note that we can automate this later using shader reflection.
-    pci.layout.set_layouts.push(ph::DescriptorSetLayoutCreateInfo {
-        bindings: vec![vk::DescriptorSetLayoutBinding {
-            binding: 0,
-            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-            descriptor_count: 1,
-            stage_flags: vk::ShaderStageFlags::FRAGMENT,
-            p_immutable_samplers: std::ptr::null(),
-        }]
-    });
 
     // Store the pipeline in the pipeline cache
     cache.lock().unwrap().create_named_pipeline(pci)?;
@@ -223,7 +217,7 @@ fn main() -> Result<()> {
     let frag_code = load_spirv_file(Path::new("examples/data/blue.spv"));
     let fragment = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
 
-    let mut pci = ph::PipelineBuilder::new("offscreen".to_string())
+    let pci = ph::PipelineBuilder::new("offscreen".to_string())
         .vertex_input(0, vk::VertexInputRate::VERTEX)
         .vertex_attribute(0, 0, vk::Format::R32G32_SFLOAT)?
         .vertex_attribute(0, 1, vk::Format::R32G32_SFLOAT)?

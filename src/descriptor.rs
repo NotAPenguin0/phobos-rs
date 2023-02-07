@@ -5,6 +5,7 @@ use crate::cache::*;
 use crate::{Device, Error, ImageView, Sampler};
 use crate::deferred_delete::DeletionQueue;
 use anyhow::Result;
+use crate::shader_reflection::ReflectionInfo;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct DescriptorImageInfo {
@@ -77,8 +78,26 @@ pub struct DescriptorCache {
 ///             .bind_sampled_image(0, my_image_view.clone(), &my_sampler)
 ///             .build();
 /// ```
+#[cfg(feature="shader-reflection")]
+pub struct DescriptorSetBuilder<'a> {
+    inner: DescriptorSetBinding,
+    reflection: Option<&'a ReflectionInfo>
+}
+
+
+/// This structure is used to build up `DescriptorSetBinding` objects for requesting descriptor sets.
+/// # Example usage
+/// ```
+/// use phobos::DescriptorSetBuilder;
+/// // Create a descriptor set with a single binding, and bind `my_image_view` together with
+/// // `my_sampler` as a combined image sampler.
+/// let set = DescriptorSetBuilder::new()
+///             .bind_sampled_image(0, my_image_view.clone(), &my_sampler)
+///             .build();
+/// ```
+#[cfg(not(feature="shader-reflection"))]
 pub struct DescriptorSetBuilder {
-    inner: DescriptorSetBinding
+    inner: DescriptorSetBinding,
 }
 
 fn binding_image_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorImageInfo> {
@@ -253,7 +272,7 @@ impl DescriptorCache {
     }
 }
 
-impl DescriptorSetBuilder {
+impl<'r> DescriptorSetBuilder<'r> {
     pub fn new() -> Self {
         Self {
             inner: DescriptorSetBinding {
@@ -261,6 +280,20 @@ impl DescriptorSetBuilder {
                 bindings: vec![],
                 layout: vk::DescriptorSetLayout::null(),
             },
+            #[cfg(feature="shader-reflection")]
+            reflection: None,
+        }
+    }
+
+    #[cfg(feature="shader-reflection")]
+    pub fn with_reflection(info: &'r ReflectionInfo) -> Self {
+        Self {
+            inner: DescriptorSetBinding {
+                pool: vk::DescriptorPool::null(),
+                bindings: vec![],
+                layout: vk::DescriptorSetLayout::null(),
+            },
+            reflection: Some(info),
         }
     }
 
@@ -276,6 +309,12 @@ impl DescriptorSetBuilder {
             }) ],
         });
         self
+    }
+
+    pub fn bind_named_sampled_image(mut self, name: &str, image: ImageView, sampler: &Sampler) -> Result<Self> {
+        let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
+        let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
+        Ok(self.bind_sampled_image(binding.binding, image, sampler))
     }
 
     pub fn build(self) -> DescriptorSetBinding {
