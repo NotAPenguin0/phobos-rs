@@ -7,6 +7,7 @@ use anyhow::Result;
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
 pub struct Pass<'exec, D> where D: ExecutionDomain {
     pub(crate) name: String,
+    pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<GpuResource>,
     pub(crate) outputs: Vec<GpuResource>,
     pub(crate) execute: Box<dyn FnMut(IncompleteCommandBuffer<D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<D>>  + 'exec>,
@@ -34,6 +35,7 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
         PassBuilder {
             inner: Pass {
                 name,
+                color: None,
                 execute: Box::new(|c, _, _| Ok(c)),
                 inputs: vec![],
                 outputs: vec![],
@@ -48,6 +50,7 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
     pub fn present(name: String, swapchain: VirtualResource) -> Pass<'exec, D> {
         Pass {
             name,
+            color: None,
             inputs: vec![GpuResource{
                 usage: ResourceUsage::Present,
                 resource: swapchain,
@@ -60,6 +63,12 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
             execute: Box::new(|c, _, _| Ok(c)),
             is_renderpass: false
         }
+    }
+
+    #[cfg(feature="debug-markers")]
+    pub fn color(mut self, color: [f32; 4]) -> Self {
+        self.inner.color = Some(color);
+        self
     }
 
     /// Adds a color attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.

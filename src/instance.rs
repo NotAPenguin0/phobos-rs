@@ -66,6 +66,10 @@ fn create_vk_instance<Window: WindowInterface>(entry: &ash::Entry, settings: &Ap
         );
     }
 
+    if cfg!(feature = "debug-markers") {
+        extensions.push(CString::from(ash::extensions::ext::DebugReport::name()));
+    }
+
     let layers_raw = util::unwrap_to_raw_strings(layers.as_slice());
     let extensions_raw = util::unwrap_to_raw_strings(extensions.as_slice());
 

@@ -4,8 +4,7 @@ use crate::execution_manager::domain::*;
 use crate::execution_manager::domain;
 
 use ash::vk;
-use ash::vk::{Rect2D, Viewport};
-use crate::{BufferView, DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache};
+use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache};
 
 use anyhow::Result;
 
@@ -230,6 +229,21 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
 
         self
     }
+
+    #[cfg(feature="debug-markers")]
+    pub fn begin_label(self, label: vk::DebugUtilsLabelEXT, debug: &DebugMessenger) -> Self {
+        unsafe {
+            debug.functions.cmd_begin_debug_utils_label(self.handle, &label);
+        }
+        self
+    }
+
+    pub fn end_label(self, debug: &DebugMessenger) -> Self {
+        unsafe {
+            debug.functions.cmd_end_debug_utils_label(self.handle);
+        }
+        self
+    }
 }
 
 trait GfxSupport : TransferSupport {}
@@ -246,12 +260,12 @@ impl ComputeSupport for domain::Compute {}
 impl ComputeSupport for domain::All {}
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<D> {
-    fn viewport(self, viewport: Viewport) -> Self {
+    fn viewport(self, viewport: vk::Viewport) -> Self {
         unsafe { self.device.cmd_set_viewport(self.handle, 0, std::slice::from_ref(&viewport)); }
         self
     }
 
-    fn scissor(self, scissor: Rect2D) -> Self {
+    fn scissor(self, scissor: vk::Rect2D) -> Self {
         unsafe { self.device.cmd_set_scissor(self.handle, 0, std::slice::from_ref(&scissor)); }
         self
     }

@@ -8,7 +8,7 @@ use anyhow::Result;
 pub struct DebugMessenger {
     handle: vk::DebugUtilsMessengerEXT,
     #[derivative(Debug="ignore")]
-    functions: ash::extensions::ext::DebugUtils,
+    pub(crate) functions: ash::extensions::ext::DebugUtils,
 }
 
 impl DebugMessenger {

@@ -30,6 +30,8 @@ shaderc = { version = "0.8.2", optional = true, features = ["build-from-source"]
 default = ["winit"]
 # Logs creation and destruction of all Vulkan objects. Useful for debugging.
 log-objects = []
+# Automatically insert debug markers at pass begin and end.
+debug-markers = []
 shaderc = ["dep:shaderc"]
 
 # compile winit with max optimizations

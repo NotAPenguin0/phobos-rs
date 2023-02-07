@@ -1,10 +1,12 @@
 use std::collections::{HashMap, HashSet};
+use std::ffi::CString;
+use std::fmt::Debug;
 use ash::vk;
 use petgraph::graph::NodeIndex;
 use petgraph::{Incoming, Outgoing};
 use petgraph::prelude::EdgeRef;
 use crate::domain::{ExecutionDomain};
-use crate::{Error, GpuBarrier, GpuResource, GpuTask, GpuTaskGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource};
+use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, GpuTaskGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource};
 use crate::task_graph::Resource;
 
 use anyhow::Result;
@@ -106,8 +108,26 @@ fn render_area<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBin
     }
 }
 
-fn record_pass<D>(pass: &mut GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<D>)
+#[cfg(feature="debug-markers")]
+fn annotate_pass<D>(pass: &GpuTask<GpuResource, D>, debug: &DebugMessenger, mut cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain {
+    let name = CString::new(pass.identifier.clone())?;
+    let label = vk::DebugUtilsLabelEXT::builder()
+        .label_name(&name)
+        .color(pass.color.unwrap_or([1.0, 1.0, 1.0, 1.0]))
+        .build();
+    Ok(cmd.begin_label(label, debug))
+}
+
+#[cfg(not(feature="debug-markers"))]
+fn annotate_pass<D>(_: &GpuTask<GpuResource, D>, _: &DebugMessenger, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain { Ok(cmd) }
+
+fn record_pass<D>(pass: &mut GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<D>, debug: Option<&DebugMessenger>)
     -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain  {
+
+    if let Some(debug) = debug {
+        cmd = annotate_pass(&pass, debug, cmd)?;
+    }
+
     if pass.is_renderpass {
         let color_info = color_attachments(&pass, &bindings)?;
         let info = vk::RenderingInfo::builder()
@@ -124,12 +144,20 @@ fn record_pass<D>(pass: &mut GpuTask<GpuResource, D>, bindings: &PhysicalResourc
 
         cmd = cmd.begin_rendering(&info);
     }
+
     cmd = pass.execute.call_mut((cmd, ifc, bindings))?;
-    return if pass.is_renderpass {
-        Ok(cmd.end_rendering())
-    } else {
-        Ok(cmd)
+
+    if pass.is_renderpass {
+        cmd = cmd.end_rendering()
     }
+
+    if let Some(debug) = debug {
+        if cfg!(feature="debug-markers") {
+            cmd = cmd.end_label(debug);
+        }
+    }
+
+    Ok(cmd)
 }
 
 fn record_image_barrier<D>(barrier: &GpuBarrier, image: &ImageView, dst_resource: &GpuResource, cmd: IncompleteCommandBuffer<D>)
@@ -168,12 +196,12 @@ fn record_barrier<D>(barrier: &GpuBarrier, dst_resource: &GpuResource, bindings:
 }
 
 fn record_node<D>(graph: &mut GpuTaskGraph<D>, node: NodeIndex, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext,
-                  cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain {
+                  cmd: IncompleteCommandBuffer<D>, debug: Option<&DebugMessenger>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain {
     let graph = &mut graph.graph.graph;
     let dst_resource_res = GpuTaskGraph::barrier_dst_resource(&graph, node).cloned();
     let weight = graph.node_weight_mut(node).unwrap();
     match weight {
-        Node::Task(pass) => { record_pass(pass, &bindings, ifc, cmd) }
+        Node::Task(pass) => { record_pass(pass, &bindings, ifc, cmd, debug) }
         Node::Barrier(barrier) => {
             // Find destination resource in graph
             record_barrier(&barrier, &dst_resource_res?, &bindings, cmd)
@@ -229,7 +257,7 @@ impl PhysicalResourceBindings {
 /// to actual resources.
 /// # Errors
 /// - This function can error if a virtual resource used in the graph is lacking an physical binding.
-pub fn record_graph<D>(graph: &mut GpuTaskGraph<D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<D>)
+pub fn record_graph<D>(graph: &mut GpuTaskGraph<D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<D>, debug: Option<&DebugMessenger>)
     -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain {
     let start = graph.source();
     let mut active = HashSet::new();
@@ -241,7 +269,7 @@ pub fn record_graph<D>(graph: &mut GpuTaskGraph<D>, bindings: &PhysicalResourceB
         for child in &children {
             // If all parents of this child node are in the active set, record it.
             if node_parents(child.clone(), &graph).all(|parent| active.contains(&parent)) {
-                cmd = record_node(graph, child.clone(), &bindings, ifc, cmd)?;
+                cmd = record_node(graph, child.clone(), &bindings, ifc, cmd, debug)?;
                 recorded_nodes.push(child.clone());
             }
         }

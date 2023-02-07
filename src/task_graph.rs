@@ -94,6 +94,7 @@ pub struct GpuBarrier<R = GpuResource> {
 /// A task in a GPU task graph. Either a render pass, or a compute pass, etc.
 pub struct GpuTask<'exec, R, D> where R: Resource, D: ExecutionDomain {
     pub identifier: String,
+    pub color: Option<[f32; 4]>,
     pub inputs: Vec<R>,
     pub outputs: Vec<R>,
     pub execute: Box<dyn FnMut(IncompleteCommandBuffer<D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<D>>  + 'exec>,
@@ -233,6 +234,7 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
         // insert dummy 'source' node. This node produces all initial inputs and is used for start of frame sync.
         graph.graph.add_task(GpuTask {
             identifier: "_source".to_string(),
+            color: None,
             inputs: vec![],
             outputs: vec![],
             execute: Box::new(|c, _, _| Ok(c)),
@@ -266,6 +268,7 @@ impl<'exec, D> GpuTaskGraph<'exec, D> where D: ExecutionDomain {
 
         self.graph.add_task(GpuTask {
             identifier: pass.name,
+            color: pass.color,
             inputs: pass.inputs,
             outputs: pass.outputs,
             execute: pass.execute,

@@ -33,6 +33,7 @@ fn main_loop(frame: &mut ph::FrameManager,
              resources: &Resources,
              pipelines: Arc<Mutex<ph::PipelineCache>>,
              descriptors: Arc<Mutex<ph::DescriptorCache>>,
+             debug: &ph::DebugMessenger,
              exec: &ph::ExecutionManager,
              surface: &ph::Surface,
              window: &winit::window::Window) -> Result<()> {
@@ -54,6 +55,7 @@ fn main_loop(frame: &mut ph::FrameManager,
 
     // Render pass that renders to an offscreen attachment
     let offscreen_pass = ph::PassBuilder::render(String::from("offscreen"))
+        .color([1.0, 0.0, 0.0, 1.0])
         .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR, Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
         .execute(|mut cmd, ifc, bindings| {
             // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
@@ -78,6 +80,7 @@ fn main_loop(frame: &mut ph::FrameManager,
 
     // Render pass that samples the offscreen attachment, and possibly does some postprocessing to it
     let sample_pass = ph::PassBuilder::render(String::from("sample"))
+        .color([0.0, 1.0, 0.0, 1.0])
         .color_attachment(swap_resource.clone(),
                           vk::AttachmentLoadOp::CLEAR,
                         Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
@@ -120,7 +123,7 @@ fn main_loop(frame: &mut ph::FrameManager,
         // create a command buffer capable of executing graphics commands
         let cmd = exec.on_domain::<ph::domain::Graphics>()?;
         // record render graph to this command buffer
-        ph::record_graph(&mut graph, &bindings, &mut ifc, cmd)?
+        ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, Some(debug))?
             .finish()
     }))?;
 
@@ -165,7 +168,7 @@ fn main() -> Result<()> {
         .build();
 
     let instance = ph::VkInstance::new(&settings)?;
-    let _debug_messenger = ph::DebugMessenger::new(&instance)?;
+    let debug_messenger = ph::DebugMessenger::new(&instance)?;
     let (surface, physical_device) = {
         let mut surface = ph::Surface::new(&instance, &settings)?;
         let physical_device = ph::PhysicalDevice::select(&instance, Some(&surface), &settings)?;
@@ -246,7 +249,7 @@ fn main() -> Result<()> {
         // sync issues.
         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
 
-        main_loop(&mut frame, &resources, cache.clone(), descriptor_cache.clone(), &exec, &surface, &window).unwrap();
+        main_loop(&mut frame, &resources, cache.clone(), descriptor_cache.clone(), &debug_messenger, &exec, &surface, &window).unwrap();
 
         *control_flow = ControlFlow::Poll;
 
