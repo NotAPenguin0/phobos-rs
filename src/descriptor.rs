@@ -315,6 +315,7 @@ impl<'r> DescriptorSetBuilder<'r> {
         self
     }
 
+    #[cfg(feature="shader-reflection")]
     pub fn bind_named_sampled_image(mut self, name: &str, image: ImageView, sampler: &Sampler) -> Result<Self> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
         let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
