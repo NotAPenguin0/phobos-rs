@@ -34,7 +34,7 @@ fn main_loop(frame: &mut ph::FrameManager,
              pipelines: Arc<Mutex<ph::PipelineCache>>,
              descriptors: Arc<Mutex<ph::DescriptorCache>>,
              debug: &ph::DebugMessenger,
-             exec: &ph::ExecutionManager,
+             exec: Arc<ph::ExecutionManager>,
              surface: &ph::Surface,
              window: &winit::window::Window) -> Result<()> {
     // Define a virtual resource pointing to the swapchain
@@ -119,7 +119,7 @@ fn main_loop(frame: &mut ph::FrameManager,
     // Build the graph, now we can bind physical resources and use it.
     graph.build()?;
 
-    block_on(frame.new_frame(&exec, window, &surface, |mut ifc| {
+    block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {
         // create physical bindings for the render graph resources
         let mut bindings = ph::PhysicalResourceBindings::new();
         bindings.bind_image("swapchain".to_string(), ifc.swapchain_image.as_ref().unwrap().clone());
@@ -243,7 +243,15 @@ fn main() -> Result<()> {
         // sync issues.
         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
 
-        main_loop(&mut frame, &resources, cache.clone(), descriptor_cache.clone(), &debug_messenger, &exec, &surface, &window).unwrap();
+        main_loop(
+            &mut frame,
+            &resources,
+            cache.clone(),
+            descriptor_cache.clone(),
+            &debug_messenger,
+            exec.clone(),
+            &surface,
+            &window).unwrap();
 
         *control_flow = ControlFlow::Poll;
 

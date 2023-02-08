@@ -1,4 +1,33 @@
-// TODO: Module-level docs for buffer API
+//! Similarly to the [`image`] module, this module exposes two types: [`Buffer`] and [`BufferView`]. The difference here is that a
+//! [`BufferView`] does not own a vulkan resource, so it cane be freely copied around as long as the owning [`Buffer`] lives.
+//!
+//! It also exposes some utilities for writing to memory-mapped buffers. For this you can use [`BufferView::mapped_slice`]. This only succeeds
+//! if the buffer was allocated from a mappable heap (one that has the `HOST_VISIBLE` bit set).
+//!
+//! # Example
+//!
+//! ```
+//! use ash::vk;
+//! use gpu_allocator::MemoryLocation;
+//! use phobos as ph;
+//! // Allocate a new buffer
+//! let buf = Buffer::new(device.clone(),
+//!                       alloc.clone(),
+//!                       // 16 bytes large
+//!                       16 as vk::DeviceSize,
+//!                       // We will use this buffer as a uniform buffer only
+//!                       vk::BufferUsageFlags::UNIFORM_BUFFER,
+//!                       // CpuToGpu will always set HOST_VISIBLE and HOST_COHERENT, and try to set DEVICE_LOCAL.
+//!                       // Usually this resides on the PCIe BAR.
+//!                       MemoryLocation::CpuToGpu);
+//! // Obtain a buffer view to the entire buffer.
+//! let mut view = buf.view_full();
+//! // Obtain a slice of floats
+//! let slice = view.mapped_slice::<f32>()?;
+//! // Write some arbitrary data
+//! let data = [1.0, 0.0, 1.0, 1.0];
+//! slice.copy_from_slice(&data);
+//! ```
 
 use std::ffi::c_void;
 use std::ptr::NonNull;
@@ -24,7 +53,7 @@ pub struct Buffer {
     pub size: vk::DeviceSize,
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct BufferView {
     pub(crate) handle: vk::Buffer,
     pub(crate) pointer: Option<NonNull<c_void>>,

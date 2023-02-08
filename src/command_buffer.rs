@@ -20,12 +20,12 @@
 //! be submitted to the execution manager.
 
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use crate::execution_manager::domain::*;
 use crate::execution_manager::domain;
 
 use ash::vk;
-use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache};
+use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache, Queue};
 
 use anyhow::Result;
 
@@ -71,10 +71,14 @@ pub trait CmdBuffer {
 }
 
 /// Incomplete command buffer
-pub trait IncompleteCmdBuffer {
+pub trait IncompleteCmdBuffer<'q> {
     type Domain: ExecutionDomain;
 
-    fn new(device: Arc<Device>, handle: vk::CommandBuffer, flags: vk::CommandBufferUsageFlags) -> Result<Self> where Self: Sized;
+    fn new(device: Arc<Device>,
+           queue_lock: MutexGuard<'q, Queue>,
+           handle: vk::CommandBuffer,
+           flags: vk::CommandBufferUsageFlags)
+        -> Result<Self> where Self: Sized;
     fn finish(self) -> Result<CommandBuffer<Self::Domain>>;
 }
 
@@ -97,20 +101,21 @@ pub trait IncompleteCmdBuffer {
 /// ```
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct IncompleteCommandBuffer<D: ExecutionDomain> {
+pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     #[derivative(Debug="ignore")]
     device: Arc<Device>,
     handle: vk::CommandBuffer,
+    queue_lock: MutexGuard<'q, Queue>,
     current_pipeline_layout: vk::PipelineLayout,
     current_set_layouts: Vec<vk::DescriptorSetLayout>,
     current_bindpoint: vk::PipelineBindPoint, // TODO: Note: technically not correct
     _domain: PhantomData<D>,
 }
 
-impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
+impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer<'q, D> {
     type Domain = D;
 
-    fn new(device: Arc<Device>, handle: vk::CommandBuffer, flags: vk::CommandBufferUsageFlags) -> Result<Self> {
+    fn new(device: Arc<Device>, queue_lock: MutexGuard<'q, Queue>, handle: vk::CommandBuffer, flags: vk::CommandBufferUsageFlags) -> Result<Self> {
         unsafe { device.begin_command_buffer(
             handle,
             &vk::CommandBufferBeginInfo::builder().flags(flags))?
@@ -118,6 +123,7 @@ impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
         Ok(IncompleteCommandBuffer {
             device: device.clone(),
             handle,
+            queue_lock,
             current_pipeline_layout: vk::PipelineLayout::null(),
             current_set_layouts: vec![],
             current_bindpoint: vk::PipelineBindPoint::default(),
@@ -136,14 +142,14 @@ impl<D: ExecutionDomain> IncompleteCmdBuffer for IncompleteCommandBuffer<D> {
     }
 }
 
-impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
+impl<'q, D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
     unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<()> {
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         queue.free_command_buffer::<Self>(self.handle)
     }
 }
 
-impl<D: ExecutionDomain> IncompleteCommandBuffer<D> {
+impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     /// Obtain a reference to a descriptor set inside the given cache that stores the requested bindings.
     /// This potentially allocates a new descriptor set and writes to it.
     /// # Lifetime
@@ -280,7 +286,7 @@ impl TransferSupport for domain::All {}
 impl ComputeSupport for domain::Compute {}
 impl ComputeSupport for domain::All {}
 
-impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<D> {
+impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D> {
     fn viewport(self, viewport: vk::Viewport) -> Self {
         unsafe { self.device.cmd_set_viewport(self.handle, 0, std::slice::from_ref(&viewport)); }
         self
@@ -312,10 +318,10 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     }
 }
 
-impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteCommandBuffer<D> {
+impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteCommandBuffer<'_, D> {
     // Methods for transfer commands
 }
 
-impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommandBuffer<D> {
+impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D> {
     // Methods for compute commands
 }

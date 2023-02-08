@@ -70,21 +70,21 @@ use crate::pipeline::PipelineStage;
 use anyhow::Result;
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
-pub struct Pass<'exec, D> where D: ExecutionDomain {
+pub struct Pass<'exec, 'q, D> where D: ExecutionDomain {
     pub(crate) name: String,
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<GpuResource>,
     pub(crate) outputs: Vec<GpuResource>,
-    pub(crate) execute: Box<dyn FnMut(IncompleteCommandBuffer<D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<D>>  + 'exec>,
+    pub(crate) execute: Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>>  + 'exec>,
     pub(crate) is_renderpass: bool
 }
 
 /// Used to create [`Pass`] objects correctly.
-pub struct PassBuilder<'exec, D> where D: ExecutionDomain {
-    inner: Pass<'exec, D>,
+pub struct PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
+    inner: Pass<'exec, 'q, D>,
 }
 
-impl<'exec, D> Pass<'exec, D> where D: ExecutionDomain {
+impl<'exec, 'q, D> Pass<'exec, 'q, D> where D: ExecutionDomain {
     /// Returns the output virtual resource associated with the input resource.
     pub fn output(&self, resource: &VirtualResource) -> Option<VirtualResource> {
         self.outputs.iter().filter_map(|output| {
@@ -94,7 +94,7 @@ impl<'exec, D> Pass<'exec, D> where D: ExecutionDomain {
     }
 }
 
-impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
+impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
     /// Create a new renderpass.
     pub fn render(name: String) -> Self {
         PassBuilder {
@@ -112,7 +112,7 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
     /// Create a pass for presenting to the swapchain.
     /// Note that this doesn't actually do the presentation, it just adds the proper sync for it.
     /// If you are presenting to an output of the graph, this is required.
-    pub fn present(name: String, swapchain: VirtualResource) -> Pass<'exec, D> {
+    pub fn present(name: String, swapchain: VirtualResource) -> Pass<'exec, 'q, D> {
         Pass {
             name,
             color: None,
@@ -212,13 +212,13 @@ impl<'exec, D> PassBuilder<'exec, D> where D: ExecutionDomain {
     }
 
     /// Set the function to be called when recording this pass.
-    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<D>>  + 'exec) -> Self {
+    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>>  + 'exec) -> Self {
         self.inner.execute = Box::new(exec);
         self
     }
 
     /// Obtain a built [`Pass`] object.
-    pub fn build(self) -> Pass<'exec, D> {
+    pub fn build(self) -> Pass<'exec, 'q, D> {
         self.inner
     }
 }

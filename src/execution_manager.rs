@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 use crate::{Device, Error, PhysicalDevice, Queue, QueueType};
 use crate::command_buffer::*;
 use anyhow::Result;
@@ -32,7 +32,8 @@ use anyhow::Result;
 /// // frame context (such as on another thread).
 /// ```
 pub struct ExecutionManager {
-    pub(crate) queues: Vec<Queue>,
+    device: Arc<Device>,
+    pub(crate) queues: Vec<Mutex<Queue>>,
 }
 
 pub mod domain {
@@ -49,7 +50,7 @@ pub mod domain {
         fn queue_is_compatible(queue: &Queue) -> bool;
         /// Type of the command buffer that will be submitted to this domain.
         /// This type must implement the [`IncompleteCmdBuffer`] trait.
-        type CmdBuf: IncompleteCmdBuffer;
+        type CmdBuf<'q>: IncompleteCmdBuffer<'q>;
     }
 
     /// Supports all operations (graphics, transfer and compute).
@@ -72,7 +73,7 @@ pub mod domain {
             queue.info.queue_type == QueueType::Graphics
         }
 
-        type CmdBuf = IncompleteCommandBuffer<Graphics>;
+        type CmdBuf<'q> = IncompleteCommandBuffer<'q, Graphics>;
     }
 
     impl ExecutionDomain for Transfer {
@@ -80,7 +81,7 @@ pub mod domain {
             queue.info.queue_type == QueueType::Transfer
         }
 
-        type CmdBuf = IncompleteCommandBuffer<Transfer>;
+        type CmdBuf<'q> = IncompleteCommandBuffer<'q, Transfer>;
     }
 
     impl ExecutionDomain for Compute {
@@ -88,7 +89,7 @@ pub mod domain {
             queue.info.queue_type == QueueType::Compute
         }
 
-        type CmdBuf = IncompleteCommandBuffer<Compute>;
+        type CmdBuf<'q> = IncompleteCommandBuffer<'q, Compute>;
     }
 
     impl ExecutionDomain for All {
@@ -96,42 +97,46 @@ pub mod domain {
             queue.info.flags.contains(vk::QueueFlags::COMPUTE | vk::QueueFlags::GRAPHICS | vk::QueueFlags::TRANSFER)
         }
 
-        type CmdBuf = IncompleteCommandBuffer<All>;
+        type CmdBuf<'q> = IncompleteCommandBuffer<'q, All>;
     }
 }
 
 impl ExecutionManager {
     /// Create a new execution manager. You should only ever have on instance of this struct
     /// in your program.
-    pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
+    pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Arc<Self>> {
         let mut counts = HashMap::new();
-        let queues: Vec<Queue> = physical_device.queues.iter().map(|queue| -> Result<Queue> {
+        let queues = physical_device.queues.iter().map(|queue| -> Result<Mutex<Queue>> {
             let index = counts.entry(queue.family_index).or_insert(0 as u32);
             let handle = unsafe { device.get_device_queue(queue.family_index, *index) };
             // Note that we can unwrap() here, because if this does not return Some() then our algorithm is
             // bugged and this should panic.
             *counts.get_mut(&queue.family_index).unwrap() += 1;
-            Queue::new(device.clone(), handle, *queue)
-        }).collect::<Result<Vec<Queue>>>()?;
+            Ok(Mutex::new(Queue::new(device.clone(), handle, *queue)?))
+        }).collect::<Result<Vec<Mutex<Queue>>>>()?;
 
-        Ok(ExecutionManager {
+        Ok(Arc::new(ExecutionManager {
+            device: device.clone(),
             queues
-        })
+        }))
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
-    pub fn on_domain<D: domain::ExecutionDomain>(&self) -> Result<D::CmdBuf> {
+    pub fn on_domain<'q, D: domain::ExecutionDomain>(&'q self) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        queue.allocate_command_buffer::<D::CmdBuf>()
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue)
     }
 
     /// Obtain a reference to a queue capable of presenting.
-    pub(crate) fn get_present_queue(&self) -> Option<&Queue> {
-        self.queues.iter().find(|&queue| queue.info.can_present)
+    pub(crate) fn get_present_queue(&self) -> Option<MutexGuard<Queue>> {
+        self.queues.iter().find(|&queue| queue.lock().unwrap().info.can_present.clone()).map(|q| q.lock().unwrap())
     }
 
     /// Obtain a reference to a queue matching predicate.
-    pub(crate) fn get_queue<D: domain::ExecutionDomain>(&self) -> Option<&Queue> {
-        self.queues.iter().find(|&q| D::queue_is_compatible(&q))
+    pub(crate) fn get_queue<D: domain::ExecutionDomain>(&self) -> Option<MutexGuard<Queue>> {
+        self.queues.iter().find(|&q| {
+            let q = q.lock().unwrap();
+            D::queue_is_compatible(&*q)
+        }).map(|q| q.lock().unwrap())
     }
 }

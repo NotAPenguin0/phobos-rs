@@ -21,7 +21,7 @@
 //!         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
 //!         *control_flow = ControlFlow::Poll;
 //!
-//!         futures::executor::block_on(frame.new_frame(&exec, window, &surface, |mut ifc| {
+//!         futures::executor::block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {
 //!             // This closure is expected to return a command buffer with this frame's commands.
 //!             // This command buffer should at the very least transition the swapchain image to
 //!             // `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`.
@@ -241,7 +241,7 @@ impl FrameManager {
     /// Obtain a new frame context to run commands in.
     /// TODO: make closure async?
     /// aka make everything async
-    pub async fn new_frame<Window, D, F>(&mut self, exec: &ExecutionManager, window: &Window, surface: &Surface, f: F)
+    pub async fn new_frame<Window, D, F>(&mut self, exec: Arc<ExecutionManager>, window: &Window, surface: &Surface, f: F)
         -> Result<()>
         where Window: WindowInterface, D: ExecutionDomain + 'static, F: FnOnce(InFlightContext) -> Result<CommandBuffer<D>> {
         
@@ -277,24 +277,26 @@ impl FrameManager {
 
         // Grab the fence for this frame and assign it to the image.
         per_image.fence = Some(self.per_frame[self.current_frame as usize].fence.clone());
-        let mut per_frame = &mut self.per_frame[self.current_frame as usize];
-        // Delete the command buffer used the previous time this frame was allocated.
-        if let Some(cmd) = &mut per_frame.command_buffer {
-            unsafe { cmd.delete(exec)? }
-        }
-        per_frame.command_buffer = None;
-        let image = self.swapchain.images[self.current_image as usize].view.clone();
-        let ifc = InFlightContext {
-            swapchain_image: Some(image),
-            vertex_allocator: &mut per_frame.vertex_allocator,
-            index_allocator: &mut per_frame.index_allocator,
-            uniform_allocator: &mut per_frame.uniform_allocator,
-            storage_allocator: &mut per_frame.storage_allocator,
-        };
+        let frame_commands = {
+            let mut per_frame = &mut self.per_frame[self.current_frame as usize];
+            // Delete the command buffer used the previous time this frame was allocated.
+            if let Some(cmd) = &mut per_frame.command_buffer {
+                unsafe { cmd.delete(exec.as_ref())? }
+            }
+            per_frame.command_buffer = None;
+            let image = self.swapchain.images[self.current_image as usize].view.clone();
 
-        let frame_commands = f(ifc)?;
-        self.submit(frame_commands, &exec)?;
-        self.present(&exec)
+            let ifc = InFlightContext {
+                swapchain_image: Some(image),
+                vertex_allocator: &mut per_frame.vertex_allocator,
+                index_allocator: &mut per_frame.index_allocator,
+                uniform_allocator: &mut per_frame.uniform_allocator,
+                storage_allocator: &mut per_frame.storage_allocator,
+            };
+            f(ifc)?
+        };
+        self.submit(frame_commands, exec.clone())?;
+        self.present(exec)
     }
 
     /// Submit this frame's commands to be processed. Note that this is the only way a frame's commands
@@ -303,7 +305,7 @@ impl FrameManager {
     /// will signal. Any commands submitted from somewhere else must be synchronized to this submission.
     /// Note: it's possible this will be enforced through the type system later.
     /// TODO: examine possibilities for this.
-    fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: &ExecutionManager) -> Result<()> {
+    fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: Arc<ExecutionManager>) -> Result<()> {
         // Reset frame fence
         let mut per_frame = &mut self.per_frame[self.current_frame as usize];
         per_frame.fence.reset()?;
@@ -334,7 +336,7 @@ impl FrameManager {
 
     /// Present a frame to the swapchain. This is the same as calling
     /// `glfwSwapBuffers()` in OpenGL code.
-    fn present(&self, exec: &ExecutionManager) -> Result<()> {
+    fn present(&self, exec: Arc<ExecutionManager>) -> Result<()> {
         let per_frame = &self.per_frame[self.current_frame as usize];
         let functions = &self.swapchain.functions;
         let queue = exec.get_present_queue();
