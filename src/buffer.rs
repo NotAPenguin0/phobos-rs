@@ -1,3 +1,5 @@
+// TODO: Module-level docs for buffer API
+
 use std::ffi::c_void;
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex};

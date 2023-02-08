@@ -1,6 +1,6 @@
 [package]
 name = "phobos"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2021"
 license = "Apache-2.0"
 description = "Fast, powerful Vulkan abstraction library"
@@ -28,7 +28,7 @@ spirv_cross = { version = "0.23.1", optional = true, features = ["glsl"] }
 shaderc = { version = "0.8.2", optional = true, features = ["build-from-source"] }
 
 [features]
-default = ["winit"]
+default = ["winit", "debug-markers", "shader-reflection"]
 # Logs creation and destruction of all Vulkan objects. Useful for debugging.
 log-objects = []
 # Automatically insert debug markers at pass begin and end.
@@ -41,6 +41,3 @@ shaderc = ["dep:shaderc"]
 # compile winit with max optimizations
 [profile.dev.package.winit]
 opt-level = 3
-
-[package.metadata.docs.rs]
-rustdoc-args = ["--cfg all(feature=\"debug-markers\", feature=\"shader-reflection\")"]
