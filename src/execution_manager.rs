@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
-use crate::{Device, Error, PhysicalDevice, Queue, QueueType};
+use crate::{Device, Error, Fence, PhysicalDevice, Queue, QueueType};
 use crate::command_buffer::*;
 use anyhow::Result;
+use ash::vk;
+use crate::deferred_delete::DeletionQueue;
+use crate::domain::ExecutionDomain;
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
@@ -133,12 +136,37 @@ impl ExecutionManager {
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue)
     }
 
+    // Submit a command buffer to its queue. TODO: Add semaphores
+    pub fn submit<'f, 'q, D: domain::ExecutionDomain + 'f>(exec: Arc<ExecutionManager>, mut cmd: CommandBuffer<D>) -> Result<Fence<'f>> {
+        let fence = Fence::new(exec.device.clone(), false)?;
+
+        let info = vk::SubmitInfo {
+            s_type: vk::StructureType::SUBMIT_INFO,
+            p_next: std::ptr::null(),
+            wait_semaphore_count: 0,
+            p_wait_semaphores: std::ptr::null(),
+            p_wait_dst_stage_mask: std::ptr::null(),
+            command_buffer_count: 1,
+            p_command_buffers: &cmd.handle,
+            signal_semaphore_count: 0,
+            p_signal_semaphores: std::ptr::null(),
+        };
+
+        let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
+        unsafe { queue.submit(std::slice::from_ref(&info), Some(&fence))?; }
+
+        let exec = exec.clone();
+        Ok(fence.with_cleanup(move || {
+            unsafe { cmd.delete(exec.clone()).unwrap(); }
+        }))
+    }
+
     /// Obtain a reference to a queue capable of presenting.
     pub(crate) fn get_present_queue(&self) -> Option<MutexGuard<Queue>> {
         self.queues.iter().find(|&queue| queue.lock().unwrap().info.can_present.clone()).map(|q| q.lock().unwrap())
     }
 
-    pub(crate) fn try_get_queue<D: domain::ExecutionDomain>(&self) -> TryLockResult<MutexGuard<Queue>> {
+    pub fn try_get_queue<D: domain::ExecutionDomain>(&self) -> TryLockResult<MutexGuard<Queue>> {
         let q = self.queues.iter().find(|&q| {
             let q = q.try_lock();
             match q {
@@ -153,7 +181,7 @@ impl ExecutionManager {
     }
 
     /// Obtain a reference to a queue matching predicate.
-    pub(crate) fn get_queue<D: domain::ExecutionDomain>(&self) -> Option<MutexGuard<Queue>> {
+    pub fn get_queue<D: domain::ExecutionDomain>(&self) -> Option<MutexGuard<Queue>> {
         self.queues.iter().find(|&q| {
             let q = q.lock().unwrap();
             D::queue_is_compatible(&*q)

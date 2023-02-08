@@ -56,7 +56,7 @@ use ash::vk;
 
 use petgraph::graph::*;
 use petgraph;
-use petgraph::Direction;
+use petgraph::{Direction, Incoming};
 use petgraph::dot::Dot;
 use petgraph::prelude::EdgeRef;
 use crate::domain::ExecutionDomain;
@@ -471,6 +471,13 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
             Node::Barrier(_) => { String::from("fillcolor = \"#f75e70\" shape=box") }
             Node::_Unreachable(_) => { unreachable!() }
         }
+    }
+
+    /// Return all source nodes in the graph, these are the nodes with no parent node.
+    pub fn sources<'a>(&'a self) -> impl Iterator<Item = NodeIndex> + 'a {
+        self.graph.node_indices().filter(|node| {
+            self.graph.edges_directed(node.clone(), Incoming).next().is_none()
+        })
     }
 
     /// Add a task to the task graph.

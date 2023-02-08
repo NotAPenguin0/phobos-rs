@@ -116,6 +116,7 @@ pub mod command_recorder;
 pub mod descriptor;
 pub mod sampler;
 pub mod scratch_allocator;
+pub mod thread_context;
 
 use std::sync::{Arc, Mutex};
 pub use ash::vk;
@@ -144,6 +145,7 @@ pub use crate::pipeline::*;
 pub use crate::descriptor::*;
 pub use crate::sampler::*;
 pub use crate::scratch_allocator::*;
+pub use crate::thread_context::*;
 
 use anyhow::Result;
 

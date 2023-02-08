@@ -70,6 +70,8 @@ pub enum Error {
     /// Buffer view out of range of original buffer
     #[error("Buffer view is not a valid range in the parent buffer.")]
     BufferViewOutOfRange,
+    #[error("Buffer copy has invalid buffer views as range.")]
+    InvalidBufferCopy,
     /// Mappable buffer expected
     #[error("Requested mappable buffer, but buffer does not have a memory map")]
     UnmappableBuffer,

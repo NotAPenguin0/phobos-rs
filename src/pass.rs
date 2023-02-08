@@ -95,6 +95,22 @@ impl<'exec, 'q, D> Pass<'exec, 'q, D> where D: ExecutionDomain {
 }
 
 impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
+
+    /// Create a new pass for generic commands. Does not support commands that are located inside a renderpass.
+    pub fn new(name: String) -> Self {
+        PassBuilder {
+            inner: Pass {
+                name,
+                color: None,
+                execute: Box::new(|c, _, _| Ok(c)),
+                inputs: vec![],
+                outputs: vec![],
+                is_renderpass: false
+            },
+        }
+    }
+
+
     /// Create a new renderpass.
     pub fn render(name: String) -> Self {
         PassBuilder {

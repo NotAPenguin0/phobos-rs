@@ -264,10 +264,16 @@ impl PhysicalResourceBindings {
 /// - This function can error if a virtual resource used in the graph is lacking an physical binding.
 pub fn record_graph<'a, 'exec, 'q, D>(graph: &'a mut GpuTaskGraph<'exec, 'q, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>)
     -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
-    let start = graph.source();
     let mut active = HashSet::new();
     let mut children = HashSet::new();
-    insert_in_active_set(start, &graph, &mut active, &mut children);
+    for start in graph.graph.sources() {
+        insert_in_active_set(start, &graph, &mut active, &mut children);
+    }
+    // Record each initial active node.
+    for node in &active {
+        cmd = record_node(graph, node.clone(), &bindings, ifc, cmd, debug)?;
+    }
+
     while active.len() != graph.num_nodes() {
         // For each node that is a child of an active node
         let mut recorded_nodes = Vec::new();

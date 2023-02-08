@@ -15,18 +15,21 @@ use winit::window::{WindowBuilder};
 use ph::IncompleteCmdBuffer; // TODO: Probably add this as a pub use to lib.rs
 
 use futures::executor::block_on;
-use phobos::{Error, GraphicsCmdBuffer, PipelineStage};
+use phobos::{CmdBuffer, Error, ExecutionManager, GraphicsCmdBuffer, PipelineStage, TransferCmdBuffer};
 
 use anyhow::Result;
+use gpu_allocator::MemoryLocation;
+use gpu_allocator::vulkan::Allocator;
 
 // TODO:
 
-// 1. CLion rust formatting
+// 1. Enforce graph building in API.
 
 struct Resources {
     pub offscreen: ph::Image,
     pub offscreen_view: ph::ImageView,
     pub sampler: ph::Sampler,
+    pub vertex_buffer: ph::Buffer,
 }
 
 fn main_loop(frame: &mut ph::FrameManager,
@@ -129,7 +132,7 @@ fn main_loop(frame: &mut ph::FrameManager,
         let cmd2 = exec.try_on_domain::<ph::domain::Graphics>();
         match cmd2 {
             Err(_) => { /* good, queue should be locked */ }
-            _=> { panic!("Queue should be locked") }
+            _ => { panic!("Queue should be locked") }
         }
         // record render graph to this command buffer
         ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, Some(debug))?
@@ -146,6 +149,50 @@ fn load_spirv_file(path: &Path) -> Vec<u32> {
     f.read(&mut buffer).expect("buffer overflow");
     let (_, binary, _) = unsafe { buffer.align_to::<u32>() };
     Vec::from(binary)
+}
+
+fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec: Arc<ph::ExecutionManager>) -> Result<ph::GpuFuture<'static, ph::Buffer>> {
+    let data: Vec<f32> = vec![
+        -1.0, 1.0, 0.0, 1.0,
+        -1.0, -1.0, 0.0, 0.0,
+        1.0, -1.0, 1.0, 0.0,
+        -1.0, 1.0, 0.0, 1.0,
+        1.0, -1.0, 1.0, 0.0,
+        1.0, 1.0, 1.0, 1.0
+    ];
+
+    // This function will upload some data to a device local buffer using a staging buffer
+    let staging = ph::Buffer::new(device.clone(), allocator.clone(), (data.len() * std::mem::size_of::<f32>()) as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, MemoryLocation::CpuToGpu)?;
+    let mut staging = staging.view_full();
+    staging.mapped_slice()?.copy_from_slice(data.as_slice());
+
+    let buffer = ph::Buffer::new_device_local(device.clone(), allocator.clone(), staging.size, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER)?;
+    let view = buffer.view_full();
+
+    // Create an out of frame context.
+    let mut ctx = ph::ThreadContext::new(device.clone(), allocator.clone(), None)?;
+
+    // Because why not, we'll try to use the render graph API. Note that because of the virtual resource system,
+    // we could define this entire graph once and then re-use it for every buffer copy!
+    // We won't do this here to keep the example short (and because at the time of writing buffers are not implemented in the virtual resource system yet).
+    let mut graph = ph::GpuTaskGraph::new();
+    let pass = ph::PassBuilder::new("copy".to_owned())
+        .execute(|cmd, mut ifc, _| {
+            cmd.copy_buffer(&staging, &view)
+        })
+        .build();
+
+    graph.add_pass(pass)?;
+    graph.build()?;
+
+    let mut cmd = exec.on_domain::<ph::domain::Transfer>()?;
+    let mut ifc = ctx.get_ifc();
+    let bindings = ph::PhysicalResourceBindings::new();
+    // Record graph to a command buffer, then finish it.
+    let mut cmd = ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
+
+    let fence = ExecutionManager::submit(exec.clone(), cmd)?;
+    Ok(fence.attach_value(buffer))
 }
 
 fn main() -> Result<()> {
@@ -238,7 +285,8 @@ fn main() -> Result<()> {
     let mut resources = Resources {
         offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
         offscreen: image,
-        sampler: ph::Sampler::default(device.clone())?
+        sampler: ph::Sampler::default(device.clone())?,
+        vertex_buffer: block_on(upload_buffer(device.clone(), alloc.clone(), exec.clone())?)
     };
 
     let descriptor_cache = ph::DescriptorCache::new(device.clone())?;

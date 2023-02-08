@@ -64,8 +64,12 @@ impl Queue {
     /// <br>
     /// # Thread safety
     /// This function is **not yet** thread safe! This function is marked as unsafe for now to signal this.
-    pub unsafe fn submit(&self, submits: &[vk::SubmitInfo], fence: &sync::Fence) -> Result<(), vk::Result> {
-        self.device.queue_submit(self.handle, submits, fence.handle)
+    pub unsafe fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&sync::Fence>) -> Result<(), vk::Result> {
+        let fence = match fence {
+            None => { vk::Fence::null() }
+            Some(fence) => { fence.handle }
+        };
+        self.device.queue_submit(self.handle, submits, fence)
     }
 
     pub fn handle(&self) -> vk::Queue {

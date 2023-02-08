@@ -48,7 +48,7 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {
-
+    fn copy_buffer(self, src: &BufferView, dst: &BufferView) -> Result<Self> where Self: Sized;
 }
 
 /// Trait representing a command buffer that supports compute commands.
@@ -67,7 +67,7 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 pub trait CmdBuffer {
     /// Delete the command buffer immediately.
     /// This is marked unsafe because there is no guarantee that the command buffer is not in use.
-    unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<()>;
+    unsafe fn delete(&mut self, exec: Arc<ExecutionManager>) -> Result<()>;
 }
 
 /// Incomplete command buffer
@@ -143,9 +143,11 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
 }
 
 impl<'q, D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
-    unsafe fn delete(&mut self, exec: &ExecutionManager) -> Result<()> {
+    unsafe fn delete(&mut self, exec: Arc<ExecutionManager>) -> Result<()> {
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        queue.free_command_buffer::<Self>(self.handle)
+        let handle = self.handle;
+        self.handle = vk::CommandBuffer::null();
+        queue.free_command_buffer::<Self>(handle)
     }
 }
 
@@ -319,6 +321,21 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
 }
 
 impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteCommandBuffer<'_, D> {
+    fn copy_buffer(self, src: &BufferView, dst: &BufferView) -> Result<Self> {
+        if src.size != dst.size {
+            return Err(Error::InvalidBufferCopy.into());
+        }
+
+        let copy = vk::BufferCopy {
+            src_offset: src.offset,
+            dst_offset: dst.offset,
+            size: src.size
+        };
+
+        unsafe { self.device.cmd_copy_buffer(self.handle, src.handle, dst.handle, std::slice::from_ref(&copy)); }
+
+        Ok(self)
+    }
     // Methods for transfer commands
 }
 

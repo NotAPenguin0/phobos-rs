@@ -66,8 +66,8 @@ use anyhow::Result;
 /// Information stored for each in-flight frame.
 #[derive(Derivative)]
 #[derivative(Debug)]
-struct PerFrame {
-    pub fence: Arc<Fence>,
+struct PerFrame<'f> {
+    pub fence: Arc<Fence<'f>>,
     /// Signaled by the GPU when a swapchain image is ready.
     pub image_ready: Semaphore,
     /// Signaled by the GPU when all commands for a frame have been processed.
@@ -86,13 +86,13 @@ struct PerFrame {
 
 /// Information stored for each swapchain image.
 #[derive(Debug)]
-struct PerImage {
+struct PerImage<'f> {
     /// Fence of the current frame.
-    pub fence: Option<Arc<Fence>>,
+    pub fence: Option<Arc<Fence<'f>>>,
 }
 
 
-/// Struct that stores the context of a single in-flight frame.
+/// Struct that stores the context of a single execution scope, for example a frame or an async task.
 /// It is passed to the callback given to [`FrameManager::new_frame()`].
 /// All operations specific to a frame require an instance.
 /// <br>
@@ -104,6 +104,8 @@ struct PerImage {
 /// });
 ///
 /// ```
+///
+/// Another way to acquire an instance of this struct is through a [`ThreadContext`].
 #[derive(Debug)]
 pub struct InFlightContext<'f> {
     pub swapchain_image: Option<ImageView>,
@@ -116,17 +118,17 @@ pub struct InFlightContext<'f> {
 /// Responsible for presentation, frame-frame synchronization and per-frame resources.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct FrameManager {
+pub struct FrameManager<'f> {
     device: Arc<Device>,
-    per_frame: [PerFrame; FrameManager::FRAMES_IN_FLIGHT],
-    per_image: Vec<PerImage>,
+    per_frame: [PerFrame<'f>; FrameManager::FRAMES_IN_FLIGHT],
+    per_image: Vec<PerImage<'f>>,
     current_frame: u32,
     current_image: u32,
     swapchain: Swapchain,
     swapchain_delete: DeletionQueue<Swapchain>,
 }
 
-impl FrameManager {
+impl FrameManager<'_> {
     /// The number of frames in flight. A frame in-flight is a frame that is rendering on the GPU or scheduled to do so.
     /// With two frames in flight, we can prepare a frame on the CPU while one frame is rendering on the GPU.
     /// This gives a good amount of parallelization while avoiding input lag.
@@ -281,7 +283,7 @@ impl FrameManager {
             let mut per_frame = &mut self.per_frame[self.current_frame as usize];
             // Delete the command buffer used the previous time this frame was allocated.
             if let Some(cmd) = &mut per_frame.command_buffer {
-                unsafe { cmd.delete(exec.as_ref())? }
+                unsafe { cmd.delete(exec.clone())? }
             }
             per_frame.command_buffer = None;
             let image = self.swapchain.images[self.current_image as usize].view.clone();
@@ -331,7 +333,7 @@ impl FrameManager {
 
         // Use the command buffer's domain to determine the correct queue to use.
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        unsafe { Ok(queue.submit(std::slice::from_ref(&submit), &per_frame.fence)?) }
+        unsafe { Ok(queue.submit(std::slice::from_ref(&submit), Some(&per_frame.fence))?) }
     }
 
     /// Present a frame to the swapchain. This is the same as calling
