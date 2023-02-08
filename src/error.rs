@@ -81,6 +81,8 @@ pub enum Error {
     NoReflectionInformation,
     #[error("Descriptor `{0}` does not exist.")]
     NoBinding(String),
+    #[error("Returned as a result from ExecutionManager::try_on_domain to indicate the queue is currently locked.")]
+    QueueLocked,
     /// Uncategorized error.
     #[error("Uncategorized error: `{0}`")]
     Uncategorized(&'static str),

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use crate::{Device, Error, PhysicalDevice, Queue, QueueType};
 use crate::command_buffer::*;
 use anyhow::Result;
@@ -121,6 +121,12 @@ impl ExecutionManager {
         }))
     }
 
+    /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
+    pub fn try_on_domain<'q, D: domain::ExecutionDomain>(&'q self) -> Result<D::CmdBuf<'q>> {
+        let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue)
+    }
+
     /// Obtain a command buffer capable of operating on the specified domain.
     pub fn on_domain<'q, D: domain::ExecutionDomain>(&'q self) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
@@ -130,6 +136,20 @@ impl ExecutionManager {
     /// Obtain a reference to a queue capable of presenting.
     pub(crate) fn get_present_queue(&self) -> Option<MutexGuard<Queue>> {
         self.queues.iter().find(|&queue| queue.lock().unwrap().info.can_present.clone()).map(|q| q.lock().unwrap())
+    }
+
+    pub(crate) fn try_get_queue<D: domain::ExecutionDomain>(&self) -> TryLockResult<MutexGuard<Queue>> {
+        let q = self.queues.iter().find(|&q| {
+            let q = q.try_lock();
+            match q {
+                Ok(queue) => { D::queue_is_compatible(&*queue) }
+                Err(_) => { false }
+            }
+        });
+        match q {
+            None => { Err(TryLockError::WouldBlock) }
+            Some(q) => { Ok(q.lock()?) }
+        }
     }
 
     /// Obtain a reference to a queue matching predicate.
