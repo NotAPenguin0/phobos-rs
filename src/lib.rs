@@ -89,7 +89,7 @@
 extern crate derivative;
 extern crate core;
 
-mod util;
+pub mod util;
 mod command_pool;
 mod deferred_delete;
 mod shader_reflection;
@@ -146,6 +146,7 @@ pub use crate::descriptor::*;
 pub use crate::sampler::*;
 pub use crate::scratch_allocator::*;
 pub use crate::thread_context::*;
+pub use crate::util::*;
 
 use anyhow::Result;
 

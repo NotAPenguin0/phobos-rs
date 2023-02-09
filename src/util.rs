@@ -1,7 +1,11 @@
 use std::ffi::{c_char, CStr, CString};
 use std::mem::size_of;
+use std::sync::{Arc, Mutex};
 use ash::vk;
 use anyhow::Result;
+use gpu_allocator::MemoryLocation;
+use gpu_allocator::vulkan::Allocator;
+use crate::{Buffer, Device, domain, ExecutionManager, GpuFuture, IncompleteCmdBuffer, PassBuilder, PassGraph, PhysicalResourceBindings, record_graph, ThreadContext, TransferCmdBuffer};
 
 /// Wraps a c string into a string, or an empty string if the provided c string was null.
 /// Assumes the provided c string is null terminated.
@@ -31,4 +35,38 @@ impl ByteSize for vk::Format {
             _ => { todo!() }
         }
     }
+}
+
+/// Perform a staged upload to a GPU buffer. Returns a future that can be awaited to obtain the resulting buffer.
+pub fn staged_buffer_upload<T>(device: Arc<Device>, allocator: Arc<Mutex<Allocator>>, exec: Arc<ExecutionManager>, data: &[T]) -> Result<GpuFuture<Buffer>> where T: Copy {
+    let staging = Buffer::new(device.clone(), allocator.clone(), (data.len() * std::mem::size_of::<T>()) as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, MemoryLocation::CpuToGpu)?;
+    let mut staging = staging.view_full();
+    staging.mapped_slice()?.copy_from_slice(data);
+
+    let buffer = Buffer::new_device_local(device.clone(), allocator.clone(), staging.size, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER)?;
+    let view = buffer.view_full();
+
+    let mut ctx = ThreadContext::new(device.clone(), allocator.clone(), None)?;
+
+    // TODO: Figure out a way to share these graphs, safely.
+    let mut graph = PassGraph::new();
+    let pass = PassBuilder::new("copy".to_owned())
+        .execute(|cmd, mut ifc, _| {
+            cmd.copy_buffer(&staging, &view)
+        })
+        .build();
+
+    graph.add_pass(pass)?;
+    let mut graph = graph.build()?;
+
+    let mut cmd = exec.on_domain::<domain::Transfer>()?;
+    let mut ifc = ctx.get_ifc();
+    let bindings = PhysicalResourceBindings::new();
+    let mut cmd = record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
+
+    let fence = ExecutionManager::submit(exec.clone(), cmd)?
+        .with_cleanup(move || {
+            drop(staging);
+        });
+    Ok(fence.attach_value(buffer))
 }

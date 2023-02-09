@@ -152,6 +152,7 @@ fn load_spirv_file(path: &Path) -> Vec<u32> {
     Vec::from(binary)
 }
 
+// Note that this is implemented in ph::staged_upload, which should be preferred for correct behaviour.
 fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec: Arc<ph::ExecutionManager>) -> Result<ph::GpuFuture<'static, ph::Buffer>> {
     let data: Vec<f32> = vec![
         -1.0, 1.0, 0.0, 1.0,
@@ -161,7 +162,6 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
         1.0, -1.0, 1.0, 0.0,
         1.0, 1.0, 1.0, 1.0
     ];
-
     // This function will upload some data to a device local buffer using a staging buffer
     let staging = ph::Buffer::new(device.clone(), allocator.clone(), (data.len() * std::mem::size_of::<f32>()) as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, MemoryLocation::CpuToGpu)?;
     let mut staging = staging.view_full();
@@ -290,11 +290,19 @@ fn main() -> Result<()> {
     cache.lock().unwrap().create_named_pipeline(pci)?;
     // Define some resources we will use for rendering
     let image = ph::Image::new(device.clone(), alloc.clone(), 800, 600, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED, vk::Format::R8G8B8A8_SRGB)?;
+    let data: Vec<f32> = vec![
+        -1.0, 1.0, 0.0, 1.0,
+        -1.0, -1.0, 0.0, 0.0,
+        1.0, -1.0, 1.0, 0.0,
+        -1.0, 1.0, 0.0, 1.0,
+        1.0, -1.0, 1.0, 0.0,
+        1.0, 1.0, 1.0, 1.0
+    ];
     let mut resources = Resources {
         offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
         offscreen: image,
         sampler: ph::Sampler::default(device.clone())?,
-        vertex_buffer: block_on(upload_buffer(device.clone(), alloc.clone(), exec.clone())?)
+        vertex_buffer: block_on(ph::staged_buffer_upload(device.clone(), alloc.clone(), exec.clone(), data.as_slice())?)
     };
 
     let descriptor_cache = ph::DescriptorCache::new(device.clone())?;
