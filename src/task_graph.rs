@@ -18,9 +18,10 @@
 //! // Define a pass that will handle the layout transition to `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`.
 //! // This is required in your main frame graph.
 //! let present_pass = ph::PassBuilder::present("present".to_string(), swap_resource);
-//! let mut graph = ph::GpuTaskGraph::<ph::domain::Graphics>::new();
+//! let mut graph = ph::PassGraph::<ph::domain::Graphics>::new();
 //! graph.add_pass(present_pass)?;
-//! graph.build()?;
+//! // Build the graph and obtain a BuiltPassGraph.
+//! let mut graph = graph.build()?;
 //! ```
 //!
 //! For more complex passes, see the [`pass`] module documentation.
@@ -52,6 +53,7 @@ use std::collections::HashMap;
 
 use std::fmt::{Debug, Display, Formatter};
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use ash::vk;
 
 use petgraph::graph::*;
@@ -148,12 +150,30 @@ pub struct GpuTask<'exec, 'q, R, D> where R: Resource, D: ExecutionDomain {
 }
 
 /// GPU task graph, used for synchronizing resources over a single queue.
-pub struct GpuTaskGraph<'exec, 'q, D> where D: ExecutionDomain {
-    pub (crate) graph: TaskGraph<GpuResource, GpuBarrier, GpuTask<'exec, 'q, GpuResource, D>>,
+pub struct PassGraph<'exec, 'q, D> where D: ExecutionDomain {
+    pub(crate) graph: TaskGraph<GpuResource, GpuBarrier, GpuTask<'exec, 'q, GpuResource, D>>,
     // Note that this is guaranteed to be stable.
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
     // index is invalidated. Since the source is always the first node, this is never invalidated.
     source: NodeIndex,
+}
+
+pub struct BuiltPassGraph<'exec, 'q, D> where D: ExecutionDomain {
+    graph: PassGraph<'exec, 'q, D>,
+}
+
+impl<'exec, 'q, D> Deref for BuiltPassGraph<'exec, 'q, D> where D: ExecutionDomain {
+    type Target = PassGraph<'exec, 'q, D>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.graph
+    }
+}
+
+impl<'exec, 'q, D> DerefMut for BuiltPassGraph<'exec, 'q, D> where D: ExecutionDomain {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.graph
+    }
 }
 
 impl VirtualResource {
@@ -279,10 +299,10 @@ macro_rules! barriers {
     }
 }
 
-impl<'exec, 'q, D> GpuTaskGraph<'exec, 'q, D> where D: ExecutionDomain {
+impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     /// Create a new task graph.
     pub fn new() -> Self {
-        let mut graph = GpuTaskGraph {
+        let mut graph = PassGraph {
             graph: TaskGraph::new(),
             source: NodeIndex::default()
         };
@@ -335,11 +355,13 @@ impl<'exec, 'q, D> GpuTaskGraph<'exec, 'q, D> where D: ExecutionDomain {
     }
 
     /// Builds the task graph so it can be recorded into a command buffer.
-    pub fn build(&mut self) -> Result<()> {
+    pub fn build(mut self) -> Result<BuiltPassGraph<'exec, 'q, D>> {
         self.graph.create_barrier_nodes();
         self.merge_identical_barriers()?;
 
-        Ok(())
+        Ok(BuiltPassGraph {
+            graph: self,
+        })
     }
 
     /// Returns the task graph built by the GPU task graph system, useful for outputting dotfiles.

@@ -55,7 +55,7 @@ fn main_loop(frame: &mut ph::FrameManager,
     ];
 
     // Define a render graph with one pass that clears the swapchain image
-    let mut graph = ph::GpuTaskGraph::new();
+    let mut graph = ph::PassGraph::new();
 
     // Render pass that renders to an offscreen attachment
     let offscreen_pass = ph::PassBuilder::render(String::from("offscreen"))
@@ -121,7 +121,7 @@ fn main_loop(frame: &mut ph::FrameManager,
     graph.add_pass(sample_pass)?;
     graph.add_pass(present_pass)?;
     // Build the graph, now we can bind physical resources and use it.
-    graph.build()?;
+    let mut graph= graph.build()?;
 
     block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {
         // create physical bindings for the render graph resources
@@ -176,7 +176,7 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
     // Because why not, we'll try to use the render graph API. Note that because of the virtual resource system,
     // we could define this entire graph once and then re-use it for every buffer copy!
     // We won't do this here to keep the example short (and because at the time of writing buffers are not implemented in the virtual resource system yet).
-    let mut graph = ph::GpuTaskGraph::new();
+    let mut graph = ph::PassGraph::new();
     let pass = ph::PassBuilder::new("copy".to_owned())
         .execute(|cmd, mut ifc, _| {
             cmd.copy_buffer(&staging, &view)
@@ -184,7 +184,7 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
         .build();
 
     graph.add_pass(pass)?;
-    graph.build()?;
+    let mut graph = graph.build()?;
 
     let mut cmd = exec.on_domain::<ph::domain::Transfer>()?;
     let mut ifc = ctx.get_ifc();

@@ -67,7 +67,7 @@ impl Resource for StringResource {
 
 #[test]
 fn test_graph() -> Result<(), ph::Error> {
-    let mut graph = ph::GpuTaskGraph::<domain::All>::new();
+    let mut graph = ph::PassGraph::<domain::All>::new();
 
     let offscreen = VirtualResource::new(String::from("offscreen"));
     let depth = VirtualResource::new(String::from("depth"));

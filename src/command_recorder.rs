@@ -6,10 +6,11 @@ use petgraph::graph::NodeIndex;
 use petgraph::{Incoming, Outgoing};
 use petgraph::prelude::EdgeRef;
 use crate::domain::{ExecutionDomain};
-use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, GpuTaskGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource};
+use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, PassGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource, BuiltPassGraph};
 use crate::task_graph::Resource;
 
 use anyhow::Result;
+use petgraph::data::DataMapMut;
 
 // Traversal
 // =============
@@ -42,7 +43,7 @@ macro_rules! parents {
 
 fn insert_in_active_set<'a, 'e, 'q, D>(
     node: NodeIndex,
-    graph: &'a GpuTaskGraph<'e, 'q, D>,
+    graph: &'a PassGraph<'e, 'q, D>,
     active: &mut HashSet<NodeIndex>,
     children: &mut HashSet<NodeIndex>) where D: ExecutionDomain {
     children.remove(&node);
@@ -200,10 +201,10 @@ fn record_barrier<'q, D>(barrier: &GpuBarrier, dst_resource: &GpuResource, bindi
     }
 }
 
-fn record_node<'exec, 'q, D>(graph: &mut GpuTaskGraph<'exec, 'q, D>, node: NodeIndex, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext,
-                  cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
+fn record_node<'exec, 'q, D>(graph: &mut BuiltPassGraph<'exec, 'q, D>, node: NodeIndex, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext,
+                             cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
     let graph = &mut graph.graph.graph;
-    let dst_resource_res = GpuTaskGraph::barrier_dst_resource(&graph, node).cloned();
+    let dst_resource_res = PassGraph::barrier_dst_resource(&graph, node).cloned();
     let weight = graph.node_weight_mut(node).unwrap();
     match weight {
         Node::Task(pass) => { record_pass(pass, &bindings, ifc, cmd, debug) }
@@ -262,8 +263,8 @@ impl PhysicalResourceBindings {
 /// to actual resources.
 /// # Errors
 /// - This function can error if a virtual resource used in the graph is lacking an physical binding.
-pub fn record_graph<'a, 'exec, 'q, D>(graph: &'a mut GpuTaskGraph<'exec, 'q, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>)
-    -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
+pub fn record_graph<'a, 'exec, 'q, D>(graph: &'a mut BuiltPassGraph<'exec, 'q, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>)
+                                      -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
     let mut active = HashSet::new();
     let mut children = HashSet::new();
     for start in graph.graph.sources() {
