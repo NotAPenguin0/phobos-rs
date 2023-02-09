@@ -24,6 +24,7 @@ use gpu_allocator::vulkan::Allocator;
 // TODO:
 
 // 1. Enforce graph building in API.
+// 2. Possibly annotate BufferView with lifetime
 
 struct Resources {
     pub offscreen: ph::Image,
@@ -191,7 +192,14 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
     // Record graph to a command buffer, then finish it.
     let mut cmd = ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
 
-    let fence = ExecutionManager::submit(exec.clone(), cmd)?;
+    let fence = ExecutionManager::submit(exec.clone(), cmd)?
+        // Remember to attach cleanup for the staging buffer so it does not get dropped at the end of the function,
+        // but after the future completes
+        // We can possibly make the compiler enforce this in the future using lifetimes later, but I'm not sure
+        // how yet.
+        .with_cleanup(move || {
+            drop(staging);
+        });
     Ok(fence.attach_value(buffer))
 }
 

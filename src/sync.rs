@@ -9,6 +9,11 @@ use ash::vk;
 use crate::Device;
 use anyhow::Result;
 
+struct CleanupFnLink<'f> {
+    pub f: Box<dyn FnMut() -> () + 'f>,
+    pub next: Option<Box<CleanupFnLink<'f>>>
+}
+
 /// Wrapper around a [`VkFence`](vk::Fence) object. Fences are used for CPU-GPU sync.
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -17,7 +22,7 @@ pub struct Fence<'f> {
     device: Arc<Device>,
     waker: Option<Waker>,
     #[derivative(Debug="ignore")]
-    cleanup_fn: Option<Box<dyn FnMut() -> () + 'f>>,
+    first_cleanup_fn: Option<Box<CleanupFnLink<'f>>>,
     pub handle: vk::Fence,
 }
 
@@ -42,7 +47,7 @@ impl<'f> Fence<'f> {
         Ok(Fence {
             device: device.clone(),
             waker: None,
-            cleanup_fn: None,
+            first_cleanup_fn: None,
             handle: unsafe {
                 device.create_fence(&vk::FenceCreateInfo::builder()
                         .flags(if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() }),
@@ -61,10 +66,25 @@ impl<'f> Fence<'f> {
         unsafe { self.device.reset_fences(slice::from_ref(&self.handle)) }
     }
 
-    // TODO: Chain cleanup calls?
-    pub(crate) fn with_cleanup(mut self, f: impl FnMut() -> () + 'f) -> Self {
-        self.cleanup_fn = Some(Box::new(f));
-        self
+    /// Add a function to the front of the chain of functions to be called when this fence runs to completion ***AS A FUTURE***.
+    /// TODO: Possibly also call this after Self::wait()
+    pub fn with_cleanup(mut self, f: impl FnMut() -> () + 'f) -> Self {
+        if self.first_cleanup_fn.is_some() {
+            let mut head = Box::new(CleanupFnLink {
+                f: Box::new(f),
+                next: None
+            });
+            let mut fun = self.first_cleanup_fn.take().unwrap();
+            head.next = Some(fun);
+            self.first_cleanup_fn = Some(head);
+            self
+        } else {
+            self.first_cleanup_fn = Some(Box::new(CleanupFnLink {
+                f: Box::new(f),
+                next: None
+            }));
+            self
+        }
     }
 
     pub fn attach_value<T>(self, value: T) -> GpuFuture<'f, T> {
@@ -86,8 +106,11 @@ impl Future for Fence<'_> {
         let status = unsafe { self.device.get_fence_status(self.handle).unwrap() };
 
         if status {
-            if let Some(f) = &mut self.cleanup_fn {
-                f.call_mut(());
+            // Call the whole chain of cleanup functions.
+            let mut f = &mut self.first_cleanup_fn;
+            while let Some(func) = f {
+                func.f.call_mut(());
+                f = &mut func.next;
             }
             Poll::Ready(())
         } else {
@@ -95,7 +118,7 @@ impl Future for Fence<'_> {
             std::thread::spawn(move || {
                     // We will try to poll every millisecond.
                     // TODO: measure, possibly configure
-                    std::thread::sleep(Duration::from_millis(1));
+                    std::thread::sleep(Duration::from_millis(5));
                     waker.wake();
                     return;
             });
