@@ -79,6 +79,7 @@
 //! - [`scratch_allocator`] is a powerful and simple allocator for quick scratch buffers within a frame or thread context.
 //! - [`image`] for managing [`VkImage`](vk::Image) and [`VkImageView`](vk::ImageView) objects.
 //! - [`buffer`] for managing [`VkBuffer`](vk::Buffer) objects.
+//! - [`util`] for various utilities and common patterns using the Phobos/Vulkan API.
 
 
 #![feature(never_type)]
