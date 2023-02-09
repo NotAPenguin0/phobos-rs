@@ -42,8 +42,8 @@ fn main_loop(frame: &mut ph::FrameManager,
              surface: &ph::Surface,
              window: &winit::window::Window) -> Result<()> {
     // Define a virtual resource pointing to the swapchain
-    let swap_resource = ph::VirtualResource::new("swapchain".to_string());
-    let offscreen = ph::VirtualResource::new("offscreen".to_string());
+    let swap_resource = ph::VirtualResource::image("swapchain".to_string());
+    let offscreen = ph::VirtualResource::image("offscreen".to_string());
 
     let vertices: Vec<f32> = vec![
         -1.0, 1.0, 0.0, 1.0,

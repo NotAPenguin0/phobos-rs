@@ -14,7 +14,7 @@
 //! use phobos as ph;
 //!
 //! // Define a virtual resource for the swapchain
-//! let swap_resource = ph::VirtualResource::new("swapchain".to_string());
+//! let swap_resource = ph::VirtualResource::image("swapchain".to_string());
 //! // Define a pass that will handle the layout transition to `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`.
 //! // This is required in your main frame graph.
 //! let present_pass = ph::PassBuilder::present("present".to_string(), swap_resource);
@@ -101,10 +101,18 @@ pub struct TaskGraph<R, B, T> where R: Resource + Default, B: Barrier<R> + Clone
 }
 
 
+#[derive(Debug, Default, Copy, Clone)]
+pub enum ResourceType {
+    #[default]
+    Image,
+    Buffer,
+}
+
 /// Represents a virtual resource in the system, uniquely identified by a string.
 #[derive(Debug, Default, Clone)]
 pub struct VirtualResource {
     pub uid: String,
+    pub ty: ResourceType,
 }
 
 /// Resource usage in a task graph.
@@ -177,16 +185,22 @@ impl<'exec, 'q, D> DerefMut for BuiltPassGraph<'exec, 'q, D> where D: ExecutionD
 }
 
 impl VirtualResource {
-    /// Create a new virtual resource. Note that the name should not contain any '+' characters.
-    pub fn new(uid: String) -> Self {
-        VirtualResource { uid }
+    /// Create a new image virtual resource. Note that the name should not contain any '+' characters.
+    pub fn image(uid: String) -> Self {
+        VirtualResource { uid, ty: ResourceType::Image }
+    }
+
+    /// Create a new buffer virtual resource. Note that the name should not contain any '+' characters.
+    pub fn buffer(uid: String) -> Self {
+        VirtualResource { uid, ty: ResourceType::Buffer }
     }
 
     /// 'Upgrades' the resource to a new version of itself. This is used to obtain the virtual resource name of an input resource after
     /// a task completes.
     pub fn upgrade(&self) -> Self {
         VirtualResource {
-            uid: self.uid.clone() + "+"
+            uid: self.uid.clone() + "+",
+            ty: self.ty
         }
     }
 

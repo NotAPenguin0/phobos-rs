@@ -6,7 +6,7 @@ use petgraph::graph::NodeIndex;
 use petgraph::{Incoming, Outgoing};
 use petgraph::prelude::EdgeRef;
 use crate::domain::{ExecutionDomain};
-use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, PassGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource, BuiltPassGraph};
+use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, PassGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource, BuiltPassGraph, BufferView};
 use crate::task_graph::Resource;
 
 use anyhow::Result;
@@ -192,12 +192,31 @@ fn record_image_barrier<'q, D>(barrier: &GpuBarrier, image: &ImageView, dst_reso
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
+fn record_buffer_barrier<'q, D>(barrier: &GpuBarrier, buffer: &BufferView, dst_resource: &GpuResource, cmd: IncompleteCommandBuffer<'q, D>)
+    -> Result<IncompleteCommandBuffer<'q, D>>
+    where D: ExecutionDomain {
+
+    let info = vk::DependencyInfo::builder()
+        .dependency_flags(vk::DependencyFlags::BY_REGION);
+    // Since every driver implements buffer barriers as global memory barriers, we will do the same.
+    let vk_barrier = vk::MemoryBarrier2::builder()
+        .src_access_mask(barrier.src_access)
+        .dst_access_mask(barrier.dst_access)
+        .src_stage_mask(barrier.src_stage)
+        .dst_stage_mask(barrier.dst_stage)
+        .build();
+    let dependency = info.memory_barriers(std::slice::from_ref(&vk_barrier)).build();
+
+    Ok(cmd.pipeline_barrier_2(&dependency))
+}
+
 fn record_barrier<'q, D>(barrier: &GpuBarrier, dst_resource: &GpuResource, bindings: &PhysicalResourceBindings,
                      cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain{
     let physical_resource = bindings.resolve(&barrier.resource.resource);
     let Some(resource) = physical_resource else { return Err(anyhow::Error::from(Error::NoResourceBound(barrier.resource.uid().clone()))) };
     match resource {
         PhysicalResource::Image(image) => { record_image_barrier(&barrier, image, dst_resource, cmd) }
+        PhysicalResource::Buffer(buffer) => { record_buffer_barrier(&barrier, buffer, dst_resource, cmd) }
     }
 }
 
@@ -219,7 +238,8 @@ fn record_node<'exec, 'q, D>(graph: &mut BuiltPassGraph<'exec, 'q, D>, node: Nod
 /// Describes any physical resource handle on the GPU.
 #[derive(Debug)]
 pub enum PhysicalResource {
-    Image(ImageView)
+    Image(ImageView),
+    Buffer(BufferView),
 }
 
 /// Stores bindings from virtual resources to physical resources.
@@ -252,6 +272,8 @@ impl PhysicalResourceBindings {
     pub fn bind_image(&mut self, name: String, image: ImageView) {
         self.bindings.insert(name, PhysicalResource::Image(image));
     }
+
+    pub fn bind_buffer(&mut self, name: String, buffer: BufferView) { self.bindings.insert(name, PhysicalResource::Buffer(buffer)); }
 
     /// Resolve a virtual resource to a physical resource. Returns `None` if the resource was not found.
     pub fn resolve(&self, resource: &VirtualResource) -> Option<&PhysicalResource> {
