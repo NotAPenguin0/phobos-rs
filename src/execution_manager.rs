@@ -34,6 +34,7 @@ use crate::domain::ExecutionDomain;
 /// // or to the execution manager for submitting commands outside of a
 /// // frame context (such as on another thread).
 /// ```
+#[derive(Debug)]
 pub struct ExecutionManager {
     device: Arc<Device>,
     pub(crate) queues: Vec<Mutex<Queue>>,
