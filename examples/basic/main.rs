@@ -129,15 +129,16 @@ fn main_loop(frame: &mut ph::FrameManager,
         bindings.bind_image("swapchain".to_string(), ifc.swapchain_image.as_ref().unwrap().clone());
         bindings.bind_image("offscreen".to_string(), resources.offscreen_view.clone());
         // create a command buffer capable of executing graphics commands
-        let cmd = exec.on_domain::<ph::domain::Graphics>()?;
+        let cmd = exec.on_domain::<ph::domain::Graphics>().unwrap();
         let cmd2 = exec.try_on_domain::<ph::domain::Graphics>();
         match cmd2 {
             Err(_) => { /* good, queue should be locked */ }
             _ => { panic!("Queue should be locked") }
         }
         // record render graph to this command buffer
-        ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, Some(debug))?
-            .finish()
+        let cmd = ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, Some(debug)).unwrap()
+            .finish();
+        async { cmd }
     }))?;
 
     Ok(())

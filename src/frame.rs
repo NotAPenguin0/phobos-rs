@@ -55,6 +55,7 @@
 //! });
 //! ```
 
+use std::future::Future;
 use std::sync::{Arc, Mutex};
 use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, CmdBuffer, ImageView, WindowInterface, Surface, Image, SwapchainImage, ScratchAllocator, AppSettings, BufferView};
 use crate::sync::*;
@@ -241,11 +242,13 @@ impl FrameManager<'_> {
     }
 
     /// Obtain a new frame context to run commands in.
-    /// TODO: make closure async?
-    /// aka make everything async
-    pub async fn new_frame<Window, D, F>(&mut self, exec: Arc<ExecutionManager>, window: &Window, surface: &Surface, f: F)
+    pub async fn new_frame<Window, D, F, Fut>(&mut self, exec: Arc<ExecutionManager>, window: &Window, surface: &Surface, f: F)
         -> Result<()>
-        where Window: WindowInterface, D: ExecutionDomain + 'static, F: FnOnce(InFlightContext) -> Result<CommandBuffer<D>> {
+        where
+            Window: WindowInterface,
+            D: ExecutionDomain + 'static,
+            F: FnOnce(InFlightContext) -> Fut,
+            Fut: Future<Output = Result<CommandBuffer<D>>> {
         
         // Advance deletion queue by one frame
         self.swapchain_delete.next_frame();
@@ -274,7 +277,7 @@ impl FrameManager<'_> {
         // Wait until this image is absolutely not in use anymore.
         let per_image = &mut self.per_image[self.current_image as usize];
         if let Some(image_fence) = per_image.fence.as_ref() {
-            image_fence.wait()?;
+            image_fence.wait()? // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
         }
 
         // Grab the fence for this frame and assign it to the image.
@@ -295,7 +298,7 @@ impl FrameManager<'_> {
                 uniform_allocator: &mut per_frame.uniform_allocator,
                 storage_allocator: &mut per_frame.storage_allocator,
             };
-            f(ifc)?
+            f(ifc).await?
         };
         self.submit(frame_commands, exec.clone())?;
         self.present(exec)
