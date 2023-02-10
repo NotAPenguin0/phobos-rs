@@ -15,7 +15,7 @@ use winit::window::{WindowBuilder};
 use ph::IncompleteCmdBuffer; // TODO: Probably add this as a pub use to lib.rs
 
 use futures::executor::block_on;
-use phobos::{CmdBuffer, Error, ExecutionManager, GraphicsCmdBuffer, PipelineStage, TransferCmdBuffer};
+use phobos::{CmdBuffer, Error, GraphicsCmdBuffer, PipelineStage, TransferCmdBuffer};
 
 use anyhow::Result;
 use gpu_allocator::MemoryLocation;
@@ -117,11 +117,11 @@ fn main_loop(frame: &mut ph::FrameManager,
         "present".to_string(),
         // This pass uses the output from the clear pass on the swap resource as its input
         sample_pass.output(&swap_resource).unwrap());
-    graph.add_pass(offscreen_pass)?;
-    graph.add_pass(sample_pass)?;
-    graph.add_pass(present_pass)?;
+    let mut graph = graph.add_pass(offscreen_pass)?
+        .add_pass(sample_pass)?
+        .add_pass(present_pass)?
     // Build the graph, now we can bind physical resources and use it.
-    let mut graph= graph.build()?;
+        .build()?;
 
     block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {
         // create physical bindings for the render graph resources
@@ -152,7 +152,7 @@ fn load_spirv_file(path: &Path) -> Vec<u32> {
     Vec::from(binary)
 }
 
-// Note that this is implemented in ph::staged_upload, which should be preferred for correct behaviour.
+// Note that this is implemented in the graph library, which should be preferred for correct behaviour.
 fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec: Arc<ph::ExecutionManager>) -> Result<ph::GpuFuture<'static, ph::Buffer>> {
     let data: Vec<f32> = vec![
         -1.0, 1.0, 0.0, 1.0,
@@ -183,8 +183,7 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
         })
         .build();
 
-    graph.add_pass(pass)?;
-    let mut graph = graph.build()?;
+    let mut graph = graph.add_pass(pass)?.build()?;
 
     let mut cmd = exec.on_domain::<ph::domain::Transfer>()?;
     let mut ifc = ctx.get_ifc();
@@ -192,7 +191,7 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
     // Record graph to a command buffer, then finish it.
     let mut cmd = ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
 
-    let fence = ExecutionManager::submit(exec.clone(), cmd)?
+    let fence = ph::ExecutionManager::submit(exec.clone(), cmd)?
         // Remember to attach cleanup for the staging buffer so it does not get dropped at the end of the function,
         // but after the future completes
         // We can possibly make the compiler enforce this in the future using lifetimes later, but I'm not sure
@@ -298,6 +297,7 @@ fn main() -> Result<()> {
         1.0, -1.0, 1.0, 0.0,
         1.0, 1.0, 1.0, 1.0
     ];
+
     let mut resources = Resources {
         offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
         offscreen: image,

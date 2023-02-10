@@ -116,7 +116,7 @@ impl Future for Fence<'_> {
         } else {
             let waker = self.waker.clone().unwrap();
             std::thread::spawn(move || {
-                    // We will try to poll every millisecond.
+                    // We will try to poll every 5 milliseconds.
                     // TODO: measure, possibly configure
                     std::thread::sleep(Duration::from_millis(5));
                     waker.wake();

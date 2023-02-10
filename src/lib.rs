@@ -79,7 +79,7 @@
 //! - [`scratch_allocator`] is a powerful and simple allocator for quick scratch buffers within a frame or thread context.
 //! - [`image`] for managing [`VkImage`](vk::Image) and [`VkImageView`](vk::ImageView) objects.
 //! - [`buffer`] for managing [`VkBuffer`](vk::Buffer) objects.
-//! - [`util`] for various utilities and common patterns using the Phobos/Vulkan API.
+//! - [`util`] for various utilities and common patterns like buffer uploads.
 
 
 #![feature(never_type)]
@@ -150,6 +150,7 @@ pub use crate::thread_context::*;
 pub use crate::util::*;
 
 use anyhow::Result;
+
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]

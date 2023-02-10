@@ -338,7 +338,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     /// Add a pass to a task graph.
     /// # Errors
     /// - This function can fail if adding the pass results in a cyclic dependency in the graph.
-    pub fn add_pass(&mut self, pass: Pass<'exec, 'q, D>) -> Result<()> {
+    pub fn add_pass(mut self, pass: Pass<'exec, 'q, D>) -> Result<Self> {
         // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
         let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
         for input in &pass.inputs {
@@ -365,7 +365,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
             is_renderpass: pass.is_renderpass
         })?;
 
-        Ok(())
+        Ok(self)
     }
 
     /// Builds the task graph so it can be recorded into a command buffer.

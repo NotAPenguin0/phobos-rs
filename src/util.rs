@@ -56,7 +56,7 @@ pub fn staged_buffer_upload<T>(device: Arc<Device>, allocator: Arc<Mutex<Allocat
         })
         .build();
 
-    graph.add_pass(pass)?;
+    graph = graph.add_pass(pass)?;
     let mut graph = graph.build()?;
 
     let mut cmd = exec.on_domain::<domain::Transfer>()?;
