@@ -148,6 +148,7 @@ pub use crate::sampler::*;
 pub use crate::scratch_allocator::*;
 pub use crate::thread_context::*;
 pub use crate::util::*;
+pub use vk_alloc::Allocator;
 
 use anyhow::Result;
 
