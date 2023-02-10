@@ -227,7 +227,8 @@ pub struct PipelineBuilder {
     vertex_binding_offsets: HashMap<u32, u32>,
 }
 
-struct PipelineEntry<P> {
+#[derive(Debug)]
+struct PipelineEntry<P> where P: std::fmt::Debug {
     pub info: P,
     #[cfg(feature="shader-reflection")]
     pub reflection: ReflectionInfo,

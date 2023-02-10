@@ -21,6 +21,7 @@ pub(crate) struct BindingInfo {
 }
 
 #[cfg(feature="shader-reflection")]
+#[derive(Debug)]
 pub struct ReflectionInfo {
     pub(crate) bindings: HashMap<String, BindingInfo>
 }
