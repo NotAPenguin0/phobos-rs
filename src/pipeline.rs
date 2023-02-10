@@ -245,6 +245,7 @@ struct PipelineEntry<P> {
 ///     .build();
 /// cache.or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?.create_named_pipeline(pci);
 /// ```
+#[derive(Debug)]
 pub struct PipelineCache {
     shaders: Cache<Shader>,
     set_layouts: Cache<DescriptorSetLayout>,
