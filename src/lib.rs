@@ -119,6 +119,12 @@ pub mod sampler;
 pub mod scratch_allocator;
 pub mod thread_context;
 
+pub use IncompleteCmdBuffer;
+pub use CmdBuffer;
+pub use GraphicsCmdBuffer;
+pub use TransferCmdBuffer;
+pub use ComputeCmdBuffer;
+
 use std::sync::{Arc, Mutex};
 pub use ash::vk;
 use window::WindowInterface;
