@@ -129,7 +129,7 @@ pub use ComputeCmdBuffer;
 use std::sync::{Arc, Mutex};
 pub use ash::vk;
 use window::WindowInterface;
-use gpu_allocator::vulkan as vk_alloc;
+pub use gpu_allocator::vulkan as vk_alloc;
 
 pub use crate::image::*;
 pub use crate::frame::*;
