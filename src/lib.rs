@@ -130,6 +130,7 @@ use std::sync::{Arc, Mutex};
 pub use ash::vk;
 use window::WindowInterface;
 pub use gpu_allocator::vulkan as vk_alloc;
+pub use gpu_allocator::MemoryLocation;
 
 pub use crate::image::*;
 pub use crate::frame::*;
