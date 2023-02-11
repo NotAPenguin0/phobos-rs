@@ -273,6 +273,10 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         }
         self
     }
+
+    pub unsafe fn handle(&self) -> vk::CommandBuffer {
+        self.handle
+    }
 }
 
 trait GfxSupport : TransferSupport {}
