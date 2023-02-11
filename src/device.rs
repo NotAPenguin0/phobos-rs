@@ -82,6 +82,10 @@ impl Device {
     pub fn wait_idle(&self) -> Result<()> {
         unsafe { Ok(self.device_wait_idle()?) }
     }
+
+    pub unsafe fn ash_device(&self) -> ash::Device {
+        self.handle.clone()
+    }
 }
 
 impl Deref for Device {
