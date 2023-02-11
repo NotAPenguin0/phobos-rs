@@ -2,6 +2,7 @@ use ash::vk;
 
 use crate::{util, VkInstance, Error};
 use anyhow::Result;
+use ash::vk::DebugUtilsMessageSeverityFlagsEXT;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -44,15 +45,41 @@ extern "system" fn vk_debug_callback(
     let message_id_name = unsafe { util::wrap_c_str(callback_data.p_message_id_name) };
     let message = unsafe { util::wrap_c_str(callback_data.p_message) };
 
-    // TODO: switch out logging with log crate: https://docs.rs/log
-
-    println!("[{:?}] [{:?}]: {} ({}): {}",
-             severity,
-             msg_type,
-             message_id_name,
-             &message_id_number.to_string(),
-             message
-    );
+    match severity {
+        vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE => {
+             trace!("[{:?}]: {} ({}): {}",
+                 msg_type,
+                 message_id_name,
+                 &message_id_number.to_string(),
+                 message
+             );
+        },
+        vk::DebugUtilsMessageSeverityFlagsEXT::INFO => {
+             info!("[{:?}]: {} ({}): {}",
+                 msg_type,
+                 message_id_name,
+                 &message_id_number.to_string(),
+                 message
+             );
+        },
+        vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
+             warn!("[{:?}]: {} ({}): {}",
+                 msg_type,
+                 message_id_name,
+                 &message_id_number.to_string(),
+                 message
+             );
+        },
+        vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
+            error!("[{:?}]: {} ({}): {}",
+                 msg_type,
+                 message_id_name,
+                 &message_id_number.to_string(),
+                 message
+            );
+        },
+        _ => { unimplemented!() }
+    };
 
     false as vk::Bool32
 }

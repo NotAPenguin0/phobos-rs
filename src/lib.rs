@@ -88,6 +88,7 @@
 
 #[macro_use]
 extern crate derivative;
+#[macro_use] extern crate log;
 extern crate core;
 
 pub mod util;
