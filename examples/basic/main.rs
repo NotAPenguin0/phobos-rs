@@ -138,7 +138,7 @@ fn main_loop(frame: &mut ph::FrameManager,
         // record render graph to this command buffer
         let cmd = ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, Some(debug)).unwrap()
             .finish();
-        async { cmd }
+        cmd
     }))?;
 
     Ok(())

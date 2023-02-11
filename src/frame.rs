@@ -241,8 +241,69 @@ impl FrameManager<'_> {
         Ok(new_swapchain)
     }
 
+    pub async fn new_frame<Window, D, F>(&mut self, exec: Arc<ExecutionManager>, window: &Window, surface: &Surface, f: F)
+                                        -> Result<()>
+        where
+            Window: WindowInterface,
+            D: ExecutionDomain + 'static,
+            F: FnOnce(InFlightContext) -> Result<CommandBuffer<D>> {
+
+        // Advance deletion queue by one frame
+        self.swapchain_delete.next_frame();
+
+        // Advance per-frame allocator to the next frame
+        self.per_frame[self.current_frame as usize].vertex_allocator.reset();
+        self.per_frame[self.current_frame as usize].index_allocator.reset();
+        self.per_frame[self.current_frame as usize].uniform_allocator.reset();
+        self.per_frame[self.current_frame as usize].storage_allocator.reset();
+
+        // Increment frame index.
+        self.current_frame = (self.current_frame + 1) % self.per_frame.len() as u32;
+        let (index, resize_required) = self.acquire_image()?;
+        self.current_image = index;
+
+        if resize_required {
+            let mut new_swapchain = self.resize_swapchain(window, surface)?;
+            std::mem::swap(&mut new_swapchain, &mut self.swapchain);
+            self.swapchain_delete.push(new_swapchain); // now old swapchain after swapping.
+
+            // Acquire image again. Note that this won't wait on the same fence again is it is never reset.
+            let (index, _) = self.acquire_image()?;
+            self.current_image = index;
+        }
+
+        // Wait until this image is absolutely not in use anymore.
+        let per_image = &mut self.per_image[self.current_image as usize];
+        if let Some(image_fence) = per_image.fence.as_ref() {
+            image_fence.wait()? // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
+        }
+
+        // Grab the fence for this frame and assign it to the image.
+        per_image.fence = Some(self.per_frame[self.current_frame as usize].fence.clone());
+        let frame_commands = {
+            let mut per_frame = &mut self.per_frame[self.current_frame as usize];
+            // Delete the command buffer used the previous time this frame was allocated.
+            if let Some(cmd) = &mut per_frame.command_buffer {
+                unsafe { cmd.delete(exec.clone())? }
+            }
+            per_frame.command_buffer = None;
+            let image = self.swapchain.images[self.current_image as usize].view.clone();
+
+            let ifc = InFlightContext {
+                swapchain_image: Some(image),
+                vertex_allocator: &mut per_frame.vertex_allocator,
+                index_allocator: &mut per_frame.index_allocator,
+                uniform_allocator: &mut per_frame.uniform_allocator,
+                storage_allocator: &mut per_frame.storage_allocator,
+            };
+            f(ifc)?
+        };
+        self.submit(frame_commands, exec.clone())?;
+        self.present(exec)
+    }
+
     /// Obtain a new frame context to run commands in.
-    pub async fn new_frame<Window, D, F, Fut>(&mut self, exec: Arc<ExecutionManager>, window: &Window, surface: &Surface, f: F)
+    pub async fn new_async_frame<Window, D, F, Fut>(&mut self, exec: Arc<ExecutionManager>, window: &Window, surface: &Surface, f: F)
         -> Result<()>
         where
             Window: WindowInterface,
