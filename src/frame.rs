@@ -429,6 +429,10 @@ impl FrameManager<'_> {
     unsafe fn get_swapchain_image(&self) -> Result<ImageView> {
         Ok(self.swapchain.images[self.current_image as usize].view.clone())
     }
+
+    pub unsafe fn get_swapchain(&self) -> &Swapchain {
+        &self.swapchain
+    }
 }
 
 impl<'f> InFlightContext<'f> {

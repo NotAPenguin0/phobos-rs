@@ -98,6 +98,14 @@ impl Swapchain {
             functions,
         })
     }
+
+    pub unsafe fn loader(&self) -> ash::extensions::khr::Swapchain {
+        self.functions.clone()
+    }
+
+    pub unsafe fn handle(&self) -> vk::SwapchainKHR {
+        self.handle
+    }
 }
 
 impl Drop for Swapchain {
