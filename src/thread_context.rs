@@ -32,6 +32,7 @@ impl ThreadContext {
     pub fn get_ifc(&mut self) -> InFlightContext {
         InFlightContext {
             swapchain_image: None,
+            swapchain_image_index: None,
             vertex_allocator: &mut self.vbo_allocator,
             index_allocator: &mut self.ibo_allocator,
             uniform_allocator: &mut self.ubo_allocator,

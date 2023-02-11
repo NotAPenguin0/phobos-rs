@@ -110,6 +110,7 @@ struct PerImage<'f> {
 #[derive(Debug)]
 pub struct InFlightContext<'f> {
     pub swapchain_image: Option<ImageView>,
+    pub swapchain_image_index: Option<usize>,
     pub(crate) vertex_allocator: &'f mut ScratchAllocator,
     pub(crate) index_allocator: &'f mut ScratchAllocator,
     pub(crate) uniform_allocator: &'f mut ScratchAllocator,
@@ -291,6 +292,7 @@ impl FrameManager<'_> {
 
             let ifc = InFlightContext {
                 swapchain_image: Some(image),
+                swapchain_image_index: Some(self.current_image as usize),
                 vertex_allocator: &mut per_frame.vertex_allocator,
                 index_allocator: &mut per_frame.index_allocator,
                 uniform_allocator: &mut per_frame.uniform_allocator,
@@ -354,6 +356,7 @@ impl FrameManager<'_> {
 
             let ifc = InFlightContext {
                 swapchain_image: Some(image),
+                swapchain_image_index: Some(self.current_image as usize),
                 vertex_allocator: &mut per_frame.vertex_allocator,
                 index_allocator: &mut per_frame.index_allocator,
                 uniform_allocator: &mut per_frame.uniform_allocator,
