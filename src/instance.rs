@@ -57,6 +57,11 @@ fn create_vk_instance<Window: WindowInterface>(entry: &ash::Entry, settings: &Ap
         extensions.push(CString::from(ash::extensions::ext::DebugUtils::name()));
     }
 
+    info!("Enabled instance extensions:");
+    for ext in &extensions {
+        info!("{:?}", ext);
+    }
+
     if let Some(window) = settings.window {
         extensions.extend(
             ash_window::enumerate_required_extensions(window.raw_display_handle())?

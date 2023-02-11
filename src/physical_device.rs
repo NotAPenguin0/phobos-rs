@@ -1,3 +1,4 @@
+use std::ffi::CStr;
 use ash::vk;
 use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
 use crate::queue::{QueueInfo, QueueType};
@@ -120,6 +121,9 @@ impl PhysicalDevice {
                     return None;
                 }
 
+                let name = unsafe { CStr::from_ptr(physical_device.properties.device_name.as_ptr()) };
+                info!("Picked physical device {:?}, driver version {:?}.", name, physical_device.properties.driver_version);
+                info!("Device has {} bytes of available video memory, of which {} are device local.", total_video_memory(&physical_device), total_device_memory(&physical_device));
                 return Some(physical_device);
         }).ok_or(anyhow::Error::from(Error::NoGPU))
     }

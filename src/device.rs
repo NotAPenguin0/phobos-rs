@@ -48,6 +48,11 @@ impl Device {
             extension_names.push(CString::from(ash::extensions::khr::Swapchain::name()));
         }
 
+        info!("Enabled device extensions:");
+        for ext in &extension_names {
+            info!("{:?}", ext);
+        }
+
         let mut features_1_1 = settings.gpu_requirements.features_1_1;
         let mut features_1_2 = settings.gpu_requirements.features_1_2;
         let mut features_1_3 = settings.gpu_requirements.features_1_3;

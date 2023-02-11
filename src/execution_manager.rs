@@ -119,6 +119,12 @@ impl ExecutionManager {
             Ok(Mutex::new(Queue::new(device.clone(), handle, *queue)?))
         }).collect::<Result<Vec<Mutex<Queue>>>>()?;
 
+        info!("Created device queues:");
+        for queue in &queues {
+            let lock = queue.lock().unwrap();
+            info!("Queue #{:?}({}) supports {:?} (dedicated: {}, can present: {})", lock.info.queue_type, lock.info.family_index, lock.info.flags, lock.info.dedicated, lock.info.can_present)
+        }
+
         Ok(Arc::new(ExecutionManager {
             device: device.clone(),
             queues
