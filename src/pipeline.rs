@@ -62,6 +62,7 @@ use crate::{Device, Error};
 use crate::cache::*;
 use crate::util::ByteSize;
 use anyhow::Result;
+use crate::command_buffer::RenderingInfo;
 #[cfg(feature="shader-reflection")]
 use crate::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
@@ -163,6 +164,14 @@ pub struct PipelineMultisampleStateCreateInfo(vk::PipelineMultisampleStateCreate
 #[derive(Debug, Copy, Clone)]
 pub struct PipelineColorBlendAttachmentState(vk::PipelineColorBlendAttachmentState);
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct PipelineRenderingInfo {
+    pub view_mask: u32,
+    pub color_formats: Vec<vk::Format>,
+    pub depth_format: Option<vk::Format>,
+    pub stencil_format: Option<vk::Format>,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Viewport(vk::Viewport);
 
@@ -191,6 +200,7 @@ pub struct PipelineCreateInfo {
     pub viewports: Vec<Viewport>,
     pub scissors: Vec<Rect2D>,
     pub blend_enable_logic_op: bool,
+    pub rendering_info: PipelineRenderingInfo,
 
     #[derivative(PartialEq="ignore")]
     #[derivative(Hash="ignore")]
@@ -219,6 +229,9 @@ pub struct PipelineCreateInfo {
     #[derivative(PartialEq="ignore")]
     #[derivative(Hash="ignore")]
     vk_dynamic_state: vk::PipelineDynamicStateCreateInfo,
+    #[derivative(PartialEq="ignore")]
+    #[derivative(Hash="ignore")]
+    vk_rendering_state: vk::PipelineRenderingCreateInfo,
 }
 
 /// Used to facilitate creating a graphics pipeline.
@@ -355,7 +368,7 @@ impl PipelineCreateInfo {
     pub(crate) fn to_vk(&self, layout: vk::PipelineLayout) -> vk::GraphicsPipelineCreateInfo {
         vk::GraphicsPipelineCreateInfo {
             s_type: vk::StructureType::GRAPHICS_PIPELINE_CREATE_INFO,
-            p_next: std::ptr::null(),
+            p_next: unsafe { (&self.vk_rendering_state as *const _) as *const std::ffi::c_void },
             flags: Default::default(),
             stage_count: 0,
             p_stages: std::ptr::null(),
@@ -508,6 +521,12 @@ impl PipelineBuilder {
                 viewports: vec![],
                 scissors: vec![],
                 blend_enable_logic_op: false,
+                rendering_info: PipelineRenderingInfo {
+                    view_mask: 0,
+                    color_formats: vec![],
+                    depth_format: None,
+                    stencil_format: None,
+                },
                 vk_vertex_inputs: vec![],
                 vk_attributes: vec![],
                 vertex_input_state: vk::PipelineVertexInputStateCreateInfo {
@@ -525,6 +544,7 @@ impl PipelineBuilder {
                 vk_blend_attachments: vec![],
                 blend_state: Default::default(),
                 vk_dynamic_state: Default::default(),
+                vk_rendering_state: Default::default(),
             },
             vertex_binding_offsets: Default::default(),
         }
@@ -689,6 +709,12 @@ impl PipelineBuilder {
         self.inner.vk_dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
             .dynamic_states(self.inner.dynamic_states.as_slice())
             .build();
+        self.inner.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
+            .view_mask(self.inner.rendering_info.view_mask)
+            .color_attachment_formats(self.inner.rendering_info.color_formats.as_slice())
+            .depth_attachment_format(self.inner.rendering_info.depth_format.unwrap_or(vk::Format::UNDEFINED))
+            .stencil_attachment_format(self.inner.rendering_info.stencil_format.unwrap_or(vk::Format::UNDEFINED))
+            .build();
         self.inner
     }
 }
@@ -738,9 +764,10 @@ impl PipelineCache {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn get_pipeline(&mut self, name: &str) -> Result<&Pipeline> {
-        let entry = self.named_pipelines.get(name);
+    pub(crate) fn get_pipeline(&mut self, name: &str, rendering_info: &PipelineRenderingInfo) -> Result<&Pipeline> {
+        let entry = self.named_pipelines.get_mut(name);
         let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
+        entry.info.rendering_info = rendering_info.clone();
         // Also put in queries for descriptor set layouts and pipeline layout to make sure they are not destroyed.
         for layout in &entry.info.layout.set_layouts {
             self.set_layouts.get_or_create(layout, ())?;

@@ -85,6 +85,8 @@ pub enum Error {
     NoBinding(String),
     #[error("Returned as a result from ExecutionManager::try_on_domain to indicate the queue is currently locked.")]
     QueueLocked,
+    #[error("Tried to obtain a graphics pipeline outside of a render pass.")]
+    NoRenderpass,
     /// Uncategorized error.
     #[error("Uncategorized error: `{0}`")]
     Uncategorized(&'static str),

@@ -11,6 +11,7 @@ use crate::task_graph::Resource;
 
 use anyhow::Result;
 use petgraph::data::DataMapMut;
+use crate::command_buffer::{RenderingAttachmentInfo, RenderingInfo};
 
 // Traversal
 // =============
@@ -53,48 +54,48 @@ fn insert_in_active_set<'a, 'e, 'q, D>(
     }
 }
 
-fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<vk::RenderingAttachmentInfo>>
+fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<RenderingAttachmentInfo>>
     where D: ExecutionDomain {
-    Ok(pass.outputs.iter().filter_map(|resource| -> Option<vk::RenderingAttachmentInfo> {
+    Ok(pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
         if resource.layout != vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL { return None; }
-
-        let mut info = vk::RenderingAttachmentInfo::builder();
-        if let Some(clear_value) = resource.clear_value {
-            info = info.clear_value(clear_value);
-        }
         let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
             // TODO: handle or report this error better
             panic!("No resource bound");
         };
         // Attachment should always have a load op set, or our library is bugged
-        let info = info.load_op(resource.load_op.unwrap())
-            .image_layout(resource.layout)
-            .image_view(image.handle)
-            .store_op(vk::AttachmentStoreOp::STORE)
-            .build();
+        let info = RenderingAttachmentInfo {
+            image_view: image.clone(),
+            image_layout: resource.layout,
+            resolve_mode: None,
+            resolve_image_view: None,
+            resolve_image_layout: None,
+            load_op: resource.load_op.unwrap(),
+            store_op: vk::AttachmentStoreOp::STORE,
+            clear_value: resource.clear_value.unwrap_or(vk::ClearValue::default()),
+        };
         Some(info)
     }).collect())
 }
 
 fn depth_attachment<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings)
-    -> Option<vk::RenderingAttachmentInfo> where D: ExecutionDomain {
-    pass.outputs.iter().filter_map(|resource| -> Option<vk::RenderingAttachmentInfo> {
+    -> Option<RenderingAttachmentInfo> where D: ExecutionDomain {
+    pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
         if resource.layout != vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL { return None; }
 
-        let mut info = vk::RenderingAttachmentInfo::builder();
-        if let Some(clear_value) = resource.clear_value {
-            info = info.clear_value(clear_value);
-        }
         let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
             // TODO: handle or report this error better
             panic!("No resource bound");
         };
-        // Attachment should always have a load op set, or our library is bugged
-        let info = info.load_op(resource.load_op.unwrap())
-            .image_layout(resource.layout)
-            .image_view(image.handle)
-            .store_op(vk::AttachmentStoreOp::STORE)
-            .build();
+        let info = RenderingAttachmentInfo {
+            image_view: image.clone(),
+            image_layout: resource.layout,
+            resolve_mode: None,
+            resolve_image_view: None,
+            resolve_image_layout: None,
+            load_op: resource.load_op.unwrap(),
+            store_op: vk::AttachmentStoreOp::STORE,
+            clear_value: resource.clear_value.unwrap_or(vk::ClearValue::default()),
+        };
         Some(info)
     }).next()
 }
@@ -135,19 +136,16 @@ fn record_pass<'exec, 'q, D>(pass: &mut GpuTask<'exec, 'q, GpuResource, D>, bind
     }
 
     if pass.is_renderpass {
-        let color_info = color_attachments(&pass, &bindings)?;
-        let info = vk::RenderingInfo::builder()
-            .layer_count(1) // TODO: multilayer rendering fix
-            .color_attachments(color_info.as_slice())
-            .render_area(render_area(&pass, &bindings));
-        let depth_info = depth_attachment(&pass, &bindings);
-        let info = if let Some(depth) = &depth_info {
-            info.depth_attachment(&depth)
-                .build()
-        } else {
-            info.build()
+        let info = RenderingInfo {
+            flags: Default::default(),
+            render_area: render_area(&pass, &bindings),
+            layer_count: 1, // TODO: Multilayer rendering fix
+            view_mask: 0,
+            color_attachments: color_attachments(&pass, &bindings)?,
+            depth_attachment: depth_attachment(&pass, &bindings),
+            stencil_attachment: None, // TODO: Stencil
         };
-
+        let depth_info = depth_attachment(&pass, &bindings);
         cmd = cmd.begin_rendering(&info);
     }
 

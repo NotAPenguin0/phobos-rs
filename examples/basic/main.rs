@@ -120,7 +120,7 @@ fn main_loop(frame: &mut ph::FrameManager,
     let mut graph = graph.add_pass(offscreen_pass)?
         .add_pass(sample_pass)?
         .add_pass(present_pass)?
-    // Build the graph, now we can bind physical resources and use it.
+        // Build the graph, now we can bind physical resources and use it.
         .build()?;
 
     block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {

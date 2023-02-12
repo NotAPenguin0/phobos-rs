@@ -25,9 +25,30 @@ use crate::execution_manager::domain::*;
 use crate::execution_manager::domain;
 
 use ash::vk;
-use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache, Queue};
+use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache, PipelineRenderingInfo, Queue};
 
 use anyhow::Result;
+
+pub(crate) struct RenderingAttachmentInfo {
+    pub image_view: ImageView,
+    pub image_layout: vk::ImageLayout,
+    pub resolve_mode: Option<vk::ResolveModeFlags>,
+    pub resolve_image_view: Option<ImageView>,
+    pub resolve_image_layout: Option<vk::ImageLayout>,
+    pub load_op: vk::AttachmentLoadOp,
+    pub store_op: vk::AttachmentStoreOp,
+    pub clear_value: vk::ClearValue,
+}
+
+pub(crate) struct RenderingInfo {
+    pub flags: vk::RenderingFlags,
+    pub render_area: vk::Rect2D,
+    pub layer_count: u32,
+    pub view_mask: u32,
+    pub color_attachments: Vec<RenderingAttachmentInfo>,
+    pub depth_attachment: Option<RenderingAttachmentInfo>,
+    pub stencil_attachment: Option<RenderingAttachmentInfo>,
+}
 
 /// Trait representing a command buffer that supports graphics commands.
 pub trait GraphicsCmdBuffer : TransferCmdBuffer {
@@ -109,6 +130,7 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     current_pipeline_layout: vk::PipelineLayout,
     current_set_layouts: Vec<vk::DescriptorSetLayout>,
     current_bindpoint: vk::PipelineBindPoint, // TODO: Note: technically not correct
+    current_rendering_state: Option<PipelineRenderingInfo>,
     _domain: PhantomData<D>,
 }
 
@@ -127,6 +149,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
             current_pipeline_layout: vk::PipelineLayout::null(),
             current_set_layouts: vec![],
             current_bindpoint: vk::PipelineBindPoint::default(),
+            current_rendering_state: None,
             _domain: PhantomData
         })
     }
@@ -243,18 +266,67 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self
     }
 
-    pub(crate) fn begin_rendering(self, info: &vk::RenderingInfo) -> Self {
+    pub(crate) fn begin_rendering(mut self, info: &RenderingInfo) -> Self {
+        let map_attachment = |attachment: &RenderingAttachmentInfo| {
+            vk::RenderingAttachmentInfo {
+                s_type: vk::StructureType::RENDERING_ATTACHMENT_INFO,
+                p_next: std::ptr::null(),
+                image_view: attachment.image_view.handle,
+                image_layout: attachment.image_layout,
+                resolve_mode: attachment.resolve_mode.unwrap_or(vk::ResolveModeFlagsKHR::NONE),
+                resolve_image_view: match &attachment.resolve_image_view {
+                    Some(view) => view.handle,
+                    None => vk::ImageView::null()
+                },
+                resolve_image_layout: attachment.resolve_image_layout.unwrap_or(vk::ImageLayout::UNDEFINED),
+                load_op: attachment.load_op,
+                store_op: attachment.store_op,
+                clear_value: attachment.clear_value,
+            }
+        };
+
+        let color_attachments = info.color_attachments.iter().map(map_attachment)
+            .collect::<Vec<_>>();
+        let depth_attachment = info.depth_attachment.as_ref().map(map_attachment);
+        let stencil_attachment = info.stencil_attachment.as_ref().map(map_attachment);
+        let vk_info = vk::RenderingInfo {
+            s_type: vk::StructureType::RENDERING_INFO,
+            p_next: std::ptr::null(),
+            flags: info.flags,
+            render_area: info.render_area,
+            layer_count: info.layer_count,
+            view_mask: info.view_mask,
+            color_attachment_count: color_attachments.len() as u32,
+            p_color_attachments: color_attachments.as_ptr(),
+            p_depth_attachment: match depth_attachment {
+                Some(attachment) => &attachment,
+                None => std::ptr::null()
+            },
+            p_stencil_attachment: match stencil_attachment {
+                Some(attachment) => &attachment,
+                None => std::ptr::null()
+            },
+        };
+
         unsafe {
-            self.device.cmd_begin_rendering(self.handle, &info);
+            self.device.cmd_begin_rendering(self.handle, &vk_info);
         }
+
+        self.current_rendering_state = Some(PipelineRenderingInfo {
+            view_mask: info.view_mask,
+            color_formats: info.color_attachments.iter().map(|attachment| attachment.image_view.format).collect(),
+            depth_format: info.depth_attachment.as_ref().map(|attachment| attachment.image_view.format),
+            stencil_format: info.stencil_attachment.as_ref().map(|attachment| attachment.image_view.format),
+        });
 
         self
     }
 
-    pub(crate) fn end_rendering(self) -> Self {
+    pub(crate) fn end_rendering(mut self) -> Self {
         unsafe {
             self.device.cmd_end_rendering(self.handle);
         }
+        self.current_rendering_state = None;
 
         self
     }
@@ -310,7 +382,8 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
 
     fn bind_graphics_pipeline(mut self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self> {
         let mut cache = cache.lock().unwrap();
-        let pipeline = cache.get_pipeline(name)?;
+        let Some(rendering_state) = &self.current_rendering_state else { return Err(Error::NoRenderpass.into()) };
+        let pipeline = cache.get_pipeline(name, &rendering_state)?;
         unsafe { self.device.cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle); }
         self.current_bindpoint = vk::PipelineBindPoint::GRAPHICS;
         self.current_pipeline_layout = pipeline.layout;
