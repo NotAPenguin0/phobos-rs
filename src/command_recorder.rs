@@ -267,11 +267,11 @@ impl PhysicalResourceBindings {
     }
 
     /// Bind an image to all virtual resources with `name(+*)` as their uid.
-    pub fn bind_image(&mut self, name: String, image: ImageView) {
-        self.bindings.insert(name, PhysicalResource::Image(image));
+    pub fn bind_image(&mut self, name: impl Into<String>, image: ImageView) {
+        self.bindings.insert(name.into(), PhysicalResource::Image(image));
     }
 
-    pub fn bind_buffer(&mut self, name: String, buffer: BufferView) { self.bindings.insert(name, PhysicalResource::Buffer(buffer)); }
+    pub fn bind_buffer(&mut self, name: impl Into<String>, buffer: BufferView) { self.bindings.insert(name.into(), PhysicalResource::Buffer(buffer)); }
 
     /// Resolve a virtual resource to a physical resource. Returns `None` if the resource was not found.
     pub fn resolve(&self, resource: &VirtualResource) -> Option<&PhysicalResource> {

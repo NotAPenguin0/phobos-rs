@@ -251,8 +251,8 @@ impl<'a, Window> AppBuilder<'a, Window> where Window: WindowInterface {
         AppBuilder { inner: AppSettings::default() }
     }
 
-    pub fn name(mut self, name: String) -> Self {
-        self.inner.name = name;
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.inner.name = name.into();
         self
     }
 

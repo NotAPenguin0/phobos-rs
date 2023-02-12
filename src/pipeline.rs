@@ -437,10 +437,10 @@ impl Drop for Pipeline {
 
 impl PipelineBuilder {
     /// Create a new empty pipeline with default settings for everything.
-    pub fn new(name: String) -> Self {
+    pub fn new(name: impl Into<String>) -> Self {
         Self {
             inner: PipelineCreateInfo {
-                name,
+                name: name.into(),
                 layout: Default::default(),
                 vertex_input_bindings: vec![],
                 vertex_attributes: vec![],

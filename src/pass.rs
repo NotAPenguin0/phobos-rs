@@ -97,10 +97,10 @@ impl<'exec, 'q, D> Pass<'exec, 'q, D> where D: ExecutionDomain {
 impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
 
     /// Create a new pass for generic commands. Does not support commands that are located inside a renderpass.
-    pub fn new(name: String) -> Self {
+    pub fn new(name: impl Into<String>) -> Self {
         PassBuilder {
             inner: Pass {
-                name,
+                name: name.into(),
                 color: None,
                 execute: Box::new(|c, _, _| Ok(c)),
                 inputs: vec![],
@@ -112,10 +112,10 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
 
 
     /// Create a new renderpass.
-    pub fn render(name: String) -> Self {
+    pub fn render(name: impl Into<String>) -> Self {
         PassBuilder {
             inner: Pass {
-                name,
+                name: name.into(),
                 color: None,
                 execute: Box::new(|c, _, _| Ok(c)),
                 inputs: vec![],
@@ -128,9 +128,9 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
     /// Create a pass for presenting to the swapchain.
     /// Note that this doesn't actually do the presentation, it just adds the proper sync for it.
     /// If you are presenting to an output of the graph, this is required.
-    pub fn present(name: String, swapchain: VirtualResource) -> Pass<'exec, 'q, D> {
+    pub fn present(name: impl Into<String>, swapchain: VirtualResource) -> Pass<'exec, 'q, D> {
         Pass {
-            name,
+            name: name.into(),
             color: None,
             inputs: vec![GpuResource{
                 usage: ResourceUsage::Present,
@@ -154,6 +154,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
 
     /// Adds a color attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
     pub fn color_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self> {
+        if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach color attachment to a pass that is not a renderpass").into()) }
         if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() { return Err(anyhow::Error::from(Error::NoClearValue)); }
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::Attachment,
@@ -184,7 +185,8 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
     }
 
     /// Adds a depth attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
-    pub fn depth_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Self {
+    pub fn depth_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Result<Self> {
+        if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach depth attachment to a pass that is not a renderpass").into()) }
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::Attachment,
             resource: resource.clone(),
@@ -211,7 +213,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
             load_op: Some(op)
         });
 
-        self
+        Ok(self)
     }
 
     /// Declare that a resource will be used as a sampled image in the given pipeline stages.

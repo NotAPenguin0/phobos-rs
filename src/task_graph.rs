@@ -186,13 +186,13 @@ impl<'exec, 'q, D> DerefMut for BuiltPassGraph<'exec, 'q, D> where D: ExecutionD
 
 impl VirtualResource {
     /// Create a new image virtual resource. Note that the name should not contain any '+' characters.
-    pub fn image(uid: String) -> Self {
-        VirtualResource { uid, ty: ResourceType::Image }
+    pub fn image(uid: impl Into<String>) -> Self {
+        VirtualResource { uid: uid.into(), ty: ResourceType::Image }
     }
 
     /// Create a new buffer virtual resource. Note that the name should not contain any '+' characters.
-    pub fn buffer(uid: String) -> Self {
-        VirtualResource { uid, ty: ResourceType::Buffer }
+    pub fn buffer(uid: impl Into<String>) -> Self {
+        VirtualResource { uid: uid.into(), ty: ResourceType::Buffer }
     }
 
     /// 'Upgrades' the resource to a new version of itself. This is used to obtain the virtual resource name of an input resource after
