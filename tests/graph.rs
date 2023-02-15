@@ -75,7 +75,6 @@ fn test_graph() -> Result<(), ph::Error> {
 
     // Sample graph, not a model of a real render pass system.
 
-    // TODO: Add clear values, OR possibly do this only when binding physical resources?
     let p1 = PassBuilder::render(String::from("Offscreen render"))
         .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR)
         .depth_attachment(depth.clone(), vk::AttachmentLoadOp::CLEAR)

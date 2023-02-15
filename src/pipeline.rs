@@ -184,7 +184,6 @@ pub struct Rect2D(vk::Rect2D);
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
-    // TODO: Shader reflection info
     // TODO: Blend presets
     pub name: String,
     pub layout: PipelineLayoutCreateInfo,
@@ -758,6 +757,10 @@ impl PipelineCache {
     #[cfg(feature="shader-reflection")]
     pub fn reflection_info(&self, name: &str) -> Result<&ReflectionInfo> {
         Ok(&self.named_pipelines.get(name).unwrap().reflection)
+    }
+
+    pub fn pipeline_info(&self, name: &str) -> Option<&PipelineCreateInfo> {
+        self.named_pipelines.get(name).map(|entry| &entry.info)
     }
 
     /// Obtain a pipeline from the cache.
