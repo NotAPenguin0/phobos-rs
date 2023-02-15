@@ -713,12 +713,14 @@ impl PipelineBuilder {
         self
     }
 
-    // todo: shader reflection
-
     /// Build the pipeline create info structure.
     pub fn build(mut self) -> PipelineCreateInfo {
         self.inner.build_inner();
         self.inner
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.inner.name
     }
 }
 
