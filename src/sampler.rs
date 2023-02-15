@@ -9,7 +9,7 @@ use anyhow::Result;
 pub struct Sampler {
     #[derivative(Debug="ignore")]
     device: Arc<Device>,
-    pub(crate) handle: vk::Sampler,
+    pub handle: vk::Sampler,
 }
 
 impl Sampler {
