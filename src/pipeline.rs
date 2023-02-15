@@ -363,6 +363,35 @@ impl Drop for PipelineLayout {
 }
 
 impl PipelineCreateInfo {
+    pub fn build_inner(&mut self) -> () {
+        self.vk_attributes = self.vertex_attributes.iter().map(|v| v.0.clone()).collect();
+        self.vk_vertex_inputs = self.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
+        self.vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
+            .vertex_binding_descriptions(self.vk_vertex_inputs.as_slice())
+            .vertex_attribute_descriptions(self.vk_attributes.as_slice())
+            .build();
+        self.vk_viewports = self.viewports.iter().map(|v| v.0.clone()).collect();
+        self.vk_scissors = self.scissors.iter().map(|v| v.0.clone()).collect();
+        self.viewport_state = vk::PipelineViewportStateCreateInfo::builder()
+            .viewports(self.vk_viewports.as_slice())
+            .scissors(self.vk_scissors.as_slice())
+            .build();
+        self.vk_blend_attachments = self.blend_attachments.iter().map(|v| v.0.clone()).collect();
+        self.blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
+            .logic_op_enable(self.blend_enable_logic_op)
+            .attachments(self.vk_blend_attachments.as_slice())
+            .build();
+        self.vk_dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
+            .dynamic_states(self.dynamic_states.as_slice())
+            .build();
+        self.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
+            .view_mask(self.rendering_info.view_mask)
+            .color_attachment_formats(self.rendering_info.color_formats.as_slice())
+            .depth_attachment_format(self.rendering_info.depth_format.unwrap_or(vk::Format::UNDEFINED))
+            .stencil_attachment_format(self.rendering_info.stencil_format.unwrap_or(vk::Format::UNDEFINED))
+            .build();
+    }
+
     // Shader stage not yet filled out
     pub(crate) fn to_vk(&self, layout: vk::PipelineLayout) -> vk::GraphicsPipelineCreateInfo {
         vk::GraphicsPipelineCreateInfo {
@@ -688,32 +717,7 @@ impl PipelineBuilder {
 
     /// Build the pipeline create info structure.
     pub fn build(mut self) -> PipelineCreateInfo {
-        self.inner.vk_attributes = self.inner.vertex_attributes.iter().map(|v| v.0.clone()).collect();
-        self.inner.vk_vertex_inputs = self.inner.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
-        self.inner.vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
-            .vertex_binding_descriptions(self.inner.vk_vertex_inputs.as_slice())
-            .vertex_attribute_descriptions(self.inner.vk_attributes.as_slice())
-            .build();
-        self.inner.vk_viewports = self.inner.viewports.iter().map(|v| v.0.clone()).collect();
-        self.inner.vk_scissors = self.inner.scissors.iter().map(|v| v.0.clone()).collect();
-        self.inner.viewport_state = vk::PipelineViewportStateCreateInfo::builder()
-            .viewports(self.inner.vk_viewports.as_slice())
-            .scissors(self.inner.vk_scissors.as_slice())
-            .build();
-        self.inner.vk_blend_attachments = self.inner.blend_attachments.iter().map(|v| v.0.clone()).collect();
-        self.inner.blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
-            .logic_op_enable(self.inner.blend_enable_logic_op)
-            .attachments(self.inner.vk_blend_attachments.as_slice())
-            .build();
-        self.inner.vk_dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
-            .dynamic_states(self.inner.dynamic_states.as_slice())
-            .build();
-        self.inner.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
-            .view_mask(self.inner.rendering_info.view_mask)
-            .color_attachment_formats(self.inner.rendering_info.color_formats.as_slice())
-            .depth_attachment_format(self.inner.rendering_info.depth_format.unwrap_or(vk::Format::UNDEFINED))
-            .stencil_attachment_format(self.inner.rendering_info.stencil_format.unwrap_or(vk::Format::UNDEFINED))
-            .build();
+        self.inner.build_inner();
         self.inner
     }
 }
