@@ -79,7 +79,7 @@ pub struct Shader {
 
 #[derive(Debug, Clone)]
 pub struct ShaderCreateInfo {
-    pub(crate) stage: vk::ShaderStageFlags,
+    pub stage: vk::ShaderStageFlags,
     pub(crate) code: Vec<u32>,
     pub(crate) code_hash: u64
 }
