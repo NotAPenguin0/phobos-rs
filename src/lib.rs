@@ -91,9 +91,7 @@ extern crate derivative;
 #[macro_use] extern crate log;
 extern crate core;
 
-pub mod util;
 mod command_pool;
-mod deferred_delete;
 mod shader_reflection;
 pub mod cache;
 pub mod task_graph;
@@ -118,7 +116,9 @@ pub mod command_recorder;
 pub mod descriptor;
 pub mod sampler;
 pub mod scratch_allocator;
+pub mod deferred_delete;
 pub mod thread_context;
+pub mod util;
 
 pub use IncompleteCmdBuffer;
 pub use CmdBuffer;
@@ -156,6 +156,7 @@ pub use crate::sampler::*;
 pub use crate::scratch_allocator::*;
 pub use crate::thread_context::*;
 pub use crate::util::*;
+pub use crate::deferred_delete::*;
 pub use vk_alloc::Allocator;
 
 use anyhow::Result;
