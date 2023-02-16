@@ -363,6 +363,15 @@ impl Drop for PipelineLayout {
 }
 
 impl PipelineCreateInfo {
+    pub fn build_rendering_state(&mut self) -> () {
+        self.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
+            .view_mask(self.rendering_info.view_mask)
+            .color_attachment_formats(self.rendering_info.color_formats.as_slice())
+            .depth_attachment_format(self.rendering_info.depth_format.unwrap_or(vk::Format::UNDEFINED))
+            .stencil_attachment_format(self.rendering_info.stencil_format.unwrap_or(vk::Format::UNDEFINED))
+            .build();
+    }
+
     pub fn build_inner(&mut self) -> () {
         self.vk_attributes = self.vertex_attributes.iter().map(|v| v.0.clone()).collect();
         self.vk_vertex_inputs = self.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
@@ -384,12 +393,7 @@ impl PipelineCreateInfo {
         self.vk_dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
             .dynamic_states(self.dynamic_states.as_slice())
             .build();
-        self.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
-            .view_mask(self.rendering_info.view_mask)
-            .color_attachment_formats(self.rendering_info.color_formats.as_slice())
-            .depth_attachment_format(self.rendering_info.depth_format.unwrap_or(vk::Format::UNDEFINED))
-            .stencil_attachment_format(self.rendering_info.stencil_format.unwrap_or(vk::Format::UNDEFINED))
-            .build();
+        self.build_rendering_state();
     }
 
     // Shader stage not yet filled out
@@ -777,6 +781,7 @@ impl PipelineCache {
         let entry = self.named_pipelines.get_mut(name);
         let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
         entry.info.rendering_info = rendering_info.clone();
+        entry.info.build_rendering_state();
         // Also put in queries for descriptor set layouts and pipeline layout to make sure they are not destroyed.
         for layout in &entry.info.layout.set_layouts {
             self.set_layouts.get_or_create(layout, ())?;
