@@ -1,11 +1,13 @@
 [package]
 name = "phobos"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Fast, powerful Vulkan abstraction library"
 repository = "https://github.com/NotAPenguin0/phobos-rs"
 readme = "README.md"
+keywords = ["graphics", "vulkan"]
+categories = ["graphics"]
 
 [dependencies]
 ash = { version = "0.37.0", features = ["debug"] }
