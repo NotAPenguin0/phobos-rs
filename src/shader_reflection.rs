@@ -52,7 +52,7 @@ fn find_sampled_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &S
         let binding = ast.get_decoration(image.id, Decoration::Binding)?;
         let set = ast.get_decoration(image.id, Decoration::DescriptorSet)?;
         let ty = ast.get_type(image.type_id)?;
-        let Type::SampledImage { array} = ty else { unimplemented!() };
+        let Type::SampledImage { array, .. } = ty else { unimplemented!() };
         let count = if array.len() > 0 {
             if array[0] == 0 {
                 4096 // Max unbounded array size. If this is ever exceeded, I'll fix it.
