@@ -85,7 +85,7 @@ fn find_uniform_buffers(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &
             stage,
             count: 1,
             ty: vk::DescriptorType::UNIFORM_BUFFER
-        })
+        });
     }
     Ok(())
 }
