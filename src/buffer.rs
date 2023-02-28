@@ -53,7 +53,7 @@ pub struct Buffer {
     pub size: vk::DeviceSize,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BufferView {
     pub(crate) handle: vk::Buffer,
     pub(crate) pointer: Option<NonNull<c_void>>,

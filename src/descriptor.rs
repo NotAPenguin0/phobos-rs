@@ -48,7 +48,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use crate::cache::*;
-use crate::{Device, Error, ImageView, IncompleteCommandBuffer, Sampler};
+use crate::{BufferView, Device, Error, ImageView, IncompleteCommandBuffer, Sampler};
 use crate::deferred_delete::DeletionQueue;
 use anyhow::Result;
 #[cfg(feature="shader-reflection")]
@@ -63,8 +63,14 @@ pub(crate) struct DescriptorImageInfo {
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub(crate) struct DescriptorBufferInfo {
+    pub buffer: BufferView,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum DescriptorContents {
     Image(DescriptorImageInfo),
+    Buffer(DescriptorBufferInfo),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -161,6 +167,18 @@ fn binding_image_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorImageInf
     .collect()
 }
 
+fn binding_buffer_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorBufferInfo> {
+    binding.descriptors.iter().map(|descriptor| {
+        let DescriptorContents::Buffer(buffer) = descriptor else { panic!("Missing descriptor type case?") };
+        vk::DescriptorBufferInfo {
+            buffer: buffer.buffer.handle,
+            offset: buffer.buffer.offset,
+            range: buffer.buffer.size,
+        }
+    })
+    .collect()
+}
+
 impl Resource for DescriptorSet {
     type Key = DescriptorSetBinding;
     type ExtraParams<'a> = ();
@@ -187,9 +205,11 @@ impl Resource for DescriptorSet {
             };
             // Now fill in the actual write info, based on the correct type
             let mut image_info = Vec::new();
+            let mut buffer_info = Vec::new();
             match binding.ty {
                 vk::DescriptorType::COMBINED_IMAGE_SAMPLER => { image_info = binding_image_info(&binding); write.p_image_info = image_info.as_ptr(); },
                 vk::DescriptorType::SAMPLED_IMAGE => { image_info = binding_image_info(&binding); write.p_image_info = image_info.as_ptr(); },
+                vk::DescriptorType::UNIFORM_BUFFER => { buffer_info = binding_buffer_info(&binding); write.p_buffer_info = buffer_info.as_ptr(); },
                 _ => { todo!(); }
             }
             write
@@ -367,6 +387,25 @@ impl<'r> DescriptorSetBuilder<'r> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
         let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
         Ok(self.bind_sampled_image(binding.binding, image, sampler))
+    }
+
+    pub fn bind_uniform_buffer(mut self, binding: u32, buffer: BufferView) -> Self {
+        self.inner.bindings.push(DescriptorBinding {
+            binding,
+            ty: vk::DescriptorType::UNIFORM_BUFFER,
+            descriptors: vec![ DescriptorContents::Buffer(DescriptorBufferInfo {
+                buffer,
+            }) ],
+        });
+
+        self
+    }
+
+    #[cfg(feature="shader-reflection")]
+    pub fn bind_named_uniform_buffer(mut self, name: &str, buffer: BufferView) -> Result<Self> {
+        let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
+        let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
+        Ok(self.bind_uniform_buffer(binding.binding, buffer))
     }
 
     pub fn build(self) -> DescriptorSetBinding {
