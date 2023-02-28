@@ -78,7 +78,7 @@ fn find_sampled_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &S
 fn find_uniform_buffers(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
     for buffer in &resources.uniform_buffers {
         let binding = ast.get_decoration(buffer.id, Decoration::Binding)?;
-        let set = ast.get_decoration(binding.id, Decoration::DescriptorSet)?;
+        let set = ast.get_decoration(buffer.id, Decoration::DescriptorSet)?;
         info.bindings.insert(ast.get_name(buffer.id)?, BindingInfo {
             set,
             binding,
