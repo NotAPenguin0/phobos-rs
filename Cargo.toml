@@ -40,6 +40,8 @@ debug-markers = []
 # pipeline layout information.
 shader-reflection = ["dep:spirv_cross"]
 shaderc = ["dep:shaderc"]
+# Use hlsl instead of glsl for shader reflection
+hlsl = []
 
 # compile winit with max optimizations
 [profile.dev.package.winit]

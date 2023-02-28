@@ -2,13 +2,17 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use anyhow::Result;
 use ash::vk;
+
 #[cfg(feature="shader-reflection")]
 use spirv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
 
 use crate::{DescriptorSetLayoutCreateInfo, Error, PipelineCreateInfo, PipelineLayoutCreateInfo};
 
-#[cfg(feature="shader-reflection")]
+#[cfg(all(feature="shader-reflection", not(feature="hlsl")))]
 type Ast = spirv_cross::spirv::Ast<spirv_cross::glsl::Target>;
+
+#[cfg(all(feature="shader-reflection", feature="hlsl"))]
+type Ast = spirv_cross::spirv::Ast<spirv_cross::hlsl::Target>;
 
 #[cfg(feature="shader-reflection")]
 #[derive(Debug, Copy, Clone)]
