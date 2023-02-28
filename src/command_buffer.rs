@@ -58,6 +58,8 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     fn scissor(self, scissor: vk::Rect2D) -> Self;
     /// Record a single drawcall. Equivalent of `vkCmdDraw`.
     fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Self;
+    /// Record a single indexed drawcall. Equivalent of `vkCmdDrawIndexed`
+    fn draw_indexed(self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Self;
     /// Bind a graphics pipeline with a given name. This is looked up from the given pipeline cache.
     /// # Errors
     /// This function can report an error in case the pipeline name is not registered in the cache.
@@ -65,6 +67,8 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     /// Bind a vertex buffer to the given vertex input binding.
     /// Equivalent of `vkCmdBindVertexBuffer`
     fn bind_vertex_buffer(self, binding: u32, buffer: BufferView) -> Self where Self: Sized;
+    /// Bind an index buffer. Equivalent of `vkCmdBindIndexBuffer`
+    fn bind_index_buffer(self, buffer: BufferView, ty: vk::IndexType) -> Self where Self: Sized;
 }
 
 /// Trait representing a command buffer that supports transfer commands.
@@ -380,6 +384,11 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         self
     }
 
+    fn draw_indexed(self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Self {
+        unsafe { self.device.cmd_draw_indexed(self.handle, index_count, instance_count, first_index, vertex_offset, first_instance) }
+        self
+    }
+
     fn bind_graphics_pipeline(mut self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self> {
         let mut cache = cache.lock().unwrap();
         let Some(rendering_state) = &self.current_rendering_state else { return Err(Error::NoRenderpass.into()) };
@@ -393,6 +402,11 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
 
     fn bind_vertex_buffer(self, binding: u32, buffer: BufferView) -> Self where Self: Sized {
         unsafe { self.device.cmd_bind_vertex_buffers(self.handle, binding, std::slice::from_ref(&buffer.handle), std::slice::from_ref(&buffer.offset)) };
+        self
+    }
+
+    fn bind_index_buffer(self, buffer: BufferView, ty: vk::IndexType) -> Self where Self: Sized {
+        unsafe { self.device.cmd_bind_index_buffer(self.handle, buffer.handle, buffer.offset, ty); }
         self
     }
 }
