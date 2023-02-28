@@ -75,6 +75,22 @@ fn find_sampled_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &S
 }
 
 #[cfg(feature="shader-reflection")]
+fn find_uniform_buffers(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+    for buffer in &resources.uniform_buffers {
+        let binding = ast.get_decoration(buffer.id, Decoration::Binding)?;
+        let set = ast.get_decoration(binding.id, Decoration::DescriptorSet)?;
+        info.bindings.insert(ast.get_name(buffer.id)?, BindingInfo {
+            set,
+            binding,
+            stage,
+            count: 1,
+            ty: vk::DescriptorType::UNIFORM_BUFFER
+        })
+    }
+    Ok(())
+}
+
+#[cfg(feature="shader-reflection")]
 fn reflect_module(module: spirv_cross::spirv::Module) -> Result<ReflectionInfo> {
     let mut ast: Ast = Ast::parse(&module)?;
     let resources = ast.get_shader_resources()?;
@@ -82,6 +98,7 @@ fn reflect_module(module: spirv_cross::spirv::Module) -> Result<ReflectionInfo> 
 
     let mut info = ReflectionInfo { bindings: Default::default() };
     find_sampled_images(&mut ast, stage, &resources, &mut info)?;
+    find_uniform_buffers(&mut ast, stage, &resources, &mut info)?;
     Ok(info)
 }
 
