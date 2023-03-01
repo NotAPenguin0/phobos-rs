@@ -64,7 +64,7 @@
 //! Binding physical resources and recording is covered under the [`task_graph`] module documentation.
 
 use ash::vk;
-use crate::{Error, GpuResource, IncompleteCommandBuffer, InFlightContext, PhysicalResourceBindings, ResourceUsage, VirtualResource};
+use crate::{AttachmentType, Error, GpuResource, IncompleteCommandBuffer, InFlightContext, PhysicalResourceBindings, ResourceUsage, VirtualResource};
 use crate::domain::ExecutionDomain;
 use crate::pipeline::PipelineStage;
 use anyhow::Result;
@@ -157,7 +157,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
         if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach color attachment to a pass that is not a renderpass").into()) }
         if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() { return Err(anyhow::Error::from(Error::NoClearValue)); }
         self.inner.inputs.push(GpuResource {
-            usage: ResourceUsage::Attachment,
+            usage: ResourceUsage::Attachment(AttachmentType::Color),
             resource: resource.clone(),
             // from https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineStageFlagBits2.html.
             // 'Load' and 'Clear' operations happen in COLOR_ATTACHMENT_OUTPUT,
@@ -173,7 +173,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
         });
 
         self.inner.outputs.push(GpuResource{
-            usage: ResourceUsage::Attachment,
+            usage: ResourceUsage::Attachment(AttachmentType::Color),
             resource: resource.upgrade(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
@@ -188,7 +188,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
     pub fn depth_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Result<Self> {
         if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach depth attachment to a pass that is not a renderpass").into()) }
         self.inner.inputs.push(GpuResource {
-            usage: ResourceUsage::Attachment,
+            usage: ResourceUsage::Attachment(AttachmentType::Depth),
             resource: resource.clone(),
             stage: match op {
                 // from https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineStageFlagBits2.html.
@@ -203,7 +203,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
         });
 
         self.inner.outputs.push(GpuResource {
-            usage: ResourceUsage::Attachment,
+            usage: ResourceUsage::Attachment(AttachmentType::Depth),
             resource: resource.upgrade(),
             // Depth/stencil writes happen in LATE_FRAGMENT_TESTS.
             // It's also legal to specify COLOR_ATTACHMENT_OUTPUT, but this is more precise.

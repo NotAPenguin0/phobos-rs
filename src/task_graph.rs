@@ -115,13 +115,20 @@ pub struct VirtualResource {
     pub ty: ResourceType,
 }
 
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
+pub enum AttachmentType {
+    #[default]
+    Color,
+    Depth
+}
+
 /// Resource usage in a task graph.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub enum ResourceUsage {
     #[default]
     Nothing,
     Present,
-    Attachment,
+    Attachment(AttachmentType),
     ShaderRead,
     ShaderWrite,
 }
@@ -286,7 +293,8 @@ impl ResourceUsage {
         match self {
             ResourceUsage::Nothing => { vk::AccessFlags2::NONE }
             ResourceUsage::Present => { vk::AccessFlags2::NONE }
-            ResourceUsage::Attachment => { vk::AccessFlags2::COLOR_ATTACHMENT_WRITE }
+            ResourceUsage::Attachment(AttachmentType::Color) => { vk::AccessFlags2::COLOR_ATTACHMENT_WRITE }
+            ResourceUsage::Attachment(AttachmentType::Depth) => { vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE }
             ResourceUsage::ShaderRead => { vk::AccessFlags2::SHADER_READ }
             ResourceUsage::ShaderWrite => { vk::AccessFlags2::SHADER_WRITE }
         }
@@ -296,7 +304,7 @@ impl ResourceUsage {
         match self {
             ResourceUsage::Nothing => { true }
             ResourceUsage::Present => { false }
-            ResourceUsage::Attachment => { false }
+            ResourceUsage::Attachment(_) => { false }
             ResourceUsage::ShaderRead => { true }
             ResourceUsage::ShaderWrite => { false }
         }

@@ -102,7 +102,10 @@ fn depth_attachment<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResour
 
 fn render_area<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> vk::Rect2D where D: ExecutionDomain {
     let resource = pass.outputs.iter().filter(|resource|
-        resource.usage == ResourceUsage::Attachment
+        match resource.usage {
+            ResourceUsage::Attachment(_) => true,
+            _ => false,
+        }
     ).next().unwrap();
     let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
         // TODO: handle or report this error better
