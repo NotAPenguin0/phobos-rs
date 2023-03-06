@@ -10,7 +10,7 @@ use crate::Device;
 use anyhow::Result;
 
 struct CleanupFnLink<'f> {
-    pub f: Box<dyn FnMut() -> () + 'f>,
+    pub f: Box<dyn FnOnce() -> () + 'f>,
     pub next: Option<Box<CleanupFnLink<'f>>>
 }
 
@@ -68,7 +68,7 @@ impl<'f> Fence<'f> {
 
     /// Add a function to the front of the chain of functions to be called when this fence runs to completion ***AS A FUTURE***.
     /// TODO: Possibly also call this after Self::wait()
-    pub fn with_cleanup(mut self, f: impl FnMut() -> () + 'f) -> Self {
+    pub fn with_cleanup(mut self, f: impl FnOnce() -> () + 'f) -> Self {
         if self.first_cleanup_fn.is_some() {
             let mut head = Box::new(CleanupFnLink {
                 f: Box::new(f),
@@ -107,10 +107,11 @@ impl Future for Fence<'_> {
 
         if status {
             // Call the whole chain of cleanup functions.
-            let mut f = &mut self.first_cleanup_fn;
-            while let Some(func) = f {
-                func.f.call_mut(());
-                f = &mut func.next;
+            let mut f = self.first_cleanup_fn.take();
+            while let Some(_) = f {
+                let mut func = f.take().unwrap();
+                func.f.call_once(());
+                f = func.next
             }
             Poll::Ready(())
         } else {

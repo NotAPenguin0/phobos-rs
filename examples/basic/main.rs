@@ -164,8 +164,8 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
         1.0, 1.0, 1.0, 1.0
     ];
     // This function will upload some data to a device local buffer using a staging buffer
-    let staging = ph::Buffer::new(device.clone(), allocator.clone(), (data.len() * std::mem::size_of::<f32>()) as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, MemoryLocation::CpuToGpu)?;
-    let mut staging = staging.view_full();
+    let staging_buffer = ph::Buffer::new(device.clone(), allocator.clone(), (data.len() * std::mem::size_of::<f32>()) as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, MemoryLocation::CpuToGpu)?;
+    let mut staging = staging_buffer.view_full();
     staging.mapped_slice()?.copy_from_slice(data.as_slice());
 
     let buffer = ph::Buffer::new_device_local(device.clone(), allocator.clone(), staging.size, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER)?;
@@ -198,7 +198,7 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
         // We can possibly make the compiler enforce this in the future using lifetimes later, but I'm not sure
         // how yet.
         .with_cleanup(move || {
-            drop(staging);
+            drop(staging_buffer);
         });
     Ok(fence.attach_value(buffer))
 }
