@@ -717,6 +717,21 @@ impl PipelineBuilder {
         self
     }
 
+    pub fn blend_additive_unmasked(mut self, src: vk::BlendFactor, dst: vk::BlendFactor, src_alpha: vk::BlendFactor, dst_alpha: vk::BlendFactor) -> Self {
+        self.inner.blend_attachments.push(PipelineColorBlendAttachmentState{
+            0: vk::PipelineColorBlendAttachmentState {
+                blend_enable: vk::TRUE,
+                src_color_blend_factor: src,
+                dst_color_blend_factor: dst,
+                color_blend_op: vk::BlendOp::ADD,
+                src_alpha_blend_factor: src_alpha,
+                dst_alpha_blend_factor: dst_alpha,
+                alpha_blend_op: vk::BlendOp::ADD,
+                color_write_mask: vk::ColorComponentFlags::RGBA,
+            }});
+        self
+    }
+
     /// Build the pipeline create info structure.
     pub fn build(mut self) -> PipelineCreateInfo {
         self.inner.build_inner();
