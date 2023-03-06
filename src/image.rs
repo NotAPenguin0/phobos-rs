@@ -13,6 +13,7 @@
 //! a `str` to a `String`. Most API functions will ask for an `ImageView`.
 
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
 use ash::vk;
 use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};
 use gpu_allocator::vulkan::{AllocationCreateDesc, AllocationScheme, Allocator};
@@ -79,7 +80,9 @@ pub struct ImgView {
     /// First array layer in the viewed array layer range.
     pub base_layer: u32,
     /// Amount of array layers in the viewed array layer range.
-    pub layer_count: u32
+    pub layer_count: u32,
+    /// Unique ID for this image view, because vk handles may be reused.
+    pub id: u64,
 }
 
 /// Reference-counted version of [`ImgView`].
@@ -181,7 +184,8 @@ impl Image {
             base_level: 0,
             level_count: self.mip_levels,
             base_layer: 0,
-            layer_count: self.layers
+            layer_count: self.layers,
+            id: ImgView::get_new_id(),
         }))
     }
 
@@ -206,6 +210,11 @@ impl Drop for Image {
 }
 
 impl ImgView {
+    fn get_new_id() -> u64 {
+        static COUNTER: AtomicU64 = AtomicU64::new(1);
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    }
+
     pub fn subresource_range(&self) -> vk::ImageSubresourceRange {
         vk::ImageSubresourceRange {
             aspect_mask: self.aspect,
