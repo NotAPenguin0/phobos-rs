@@ -131,7 +131,7 @@ fn merge_push_constants(reflected_shaders: &[ReflectionInfo]) -> Result<Vec<Push
         for range in &shader.push_constants {
             pc.stage_flags = range.stage_flags;
             pc.offset = pc.offset.min(range.offset);
-            pc.size += pc.size;
+            pc.size += range.size;
         }
         if pc.size != 0 {
             result.push(pc);
