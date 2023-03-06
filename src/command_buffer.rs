@@ -28,6 +28,7 @@ use ash::vk;
 use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBinding, Device, Error, ExecutionManager, ImageView, PipelineCache, PipelineRenderingInfo, Queue};
 
 use anyhow::Result;
+use ash::vk::{Filter, Offset3D};
 
 pub(crate) struct RenderingAttachmentInfo {
     pub image_view: ImageView,
@@ -69,6 +70,8 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     fn bind_vertex_buffer(self, binding: u32, buffer: BufferView) -> Self where Self: Sized;
     /// Bind an index buffer. Equivalent of `vkCmdBindIndexBuffer`
     fn bind_index_buffer(self, buffer: BufferView, ty: vk::IndexType) -> Self where Self: Sized;
+
+    fn blit_image(self, src: &ImageView, dst: &ImageView, src_offsets: &[vk::Offset3D; 2], dst_offsets: &[vk::Offset3D; 2], filter: vk::Filter) -> Self where Self: Sized;
 }
 
 /// Trait representing a command buffer that supports transfer commands.
@@ -408,6 +411,36 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
 
     fn bind_index_buffer(self, buffer: BufferView, ty: vk::IndexType) -> Self where Self: Sized {
         unsafe { self.device.cmd_bind_index_buffer(self.handle, buffer.handle, buffer.offset, ty); }
+        self
+    }
+
+    fn blit_image(self, src: &ImageView, dst: &ImageView, src_offsets: &[Offset3D; 2], dst_offsets: &[Offset3D; 2], filter: Filter) -> Self where Self: Sized {
+        let blit = vk::ImageBlit {
+            src_subresource: vk::ImageSubresourceLayers {
+                aspect_mask: src.aspect,
+                mip_level: src.base_level,
+                base_array_layer: src.base_layer,
+                layer_count: src.layer_count,
+            },
+            src_offsets: *src_offsets,
+            dst_subresource: vk::ImageSubresourceLayers {
+                aspect_mask: dst.aspect,
+                mip_level: dst.base_level,
+                base_array_layer: dst.base_layer,
+                layer_count: dst.layer_count,
+            },
+            dst_offsets: *dst_offsets
+        };
+
+        unsafe {
+            self.device.cmd_blit_image(
+            self.handle,
+            src.image,
+            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+            dst.image,
+            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            std::slice::from_ref(&blit), filter);
+        }
         self
     }
 }
