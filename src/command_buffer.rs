@@ -276,7 +276,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
 
     pub fn push_constants<T: Copy>(self, stage: vk::ShaderStageFlags, offset: u32, data: &[T]) -> Self {
         unsafe {
-            let data = std::mem::transmute(data);
+            let (_, data, _) = data.align_to::<u8>();
             self.device.cmd_push_constants(self.handle, self.current_pipeline_layout, stage, offset, data);
         };
         self
