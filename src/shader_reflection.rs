@@ -6,7 +6,7 @@ use ash::vk;
 #[cfg(feature="shader-reflection")]
 use spirv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
 
-use crate::{DescriptorSetLayoutCreateInfo, Error, PipelineCreateInfo, PipelineLayoutCreateInfo};
+use crate::{DescriptorSetLayoutCreateInfo, Error, PipelineCreateInfo, PipelineLayoutCreateInfo, PushConstantRange};
 
 #[cfg(all(feature="shader-reflection", not(feature="hlsl")))]
 type Ast = spirv_cross::spirv::Ast<spirv_cross::glsl::Target>;
@@ -27,7 +27,8 @@ pub(crate) struct BindingInfo {
 #[cfg(feature="shader-reflection")]
 #[derive(Debug)]
 pub struct ReflectionInfo {
-    pub(crate) bindings: HashMap<String, BindingInfo>
+    pub(crate) bindings: HashMap<String, BindingInfo>,
+    pub(crate) push_constants: Vec<PushConstantRange>,
 }
 
 #[cfg(feature="shader-reflection")]
@@ -91,15 +92,53 @@ fn find_uniform_buffers(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &
 }
 
 #[cfg(feature="shader-reflection")]
+fn find_push_constants(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+    for pc in &resources.push_constant_buffers {
+        let ranges = ast.get_active_buffer_ranges(pc.id)?;
+        for range in ranges {
+            info.push_constants.push(PushConstantRange {
+                stage_flags: stage,
+                offset: range.offset as u32,
+                size: range.range as u32,
+            })
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature="shader-reflection")]
 fn reflect_module(module: spirv_cross::spirv::Module) -> Result<ReflectionInfo> {
     let mut ast: Ast = Ast::parse(&module)?;
     let resources = ast.get_shader_resources()?;
     let stage = get_shader_stage(&ast)?;
 
-    let mut info = ReflectionInfo { bindings: Default::default() };
+    let mut info = ReflectionInfo { bindings: Default::default(), push_constants: Default::default() };
     find_sampled_images(&mut ast, stage, &resources, &mut info)?;
     find_uniform_buffers(&mut ast, stage, &resources, &mut info)?;
+    find_push_constants(&mut ast, stage, &resources, &mut info)?;
     Ok(info)
+}
+
+#[cfg(feature="shader-reflection")]
+fn merge_push_constants(reflected_shaders: &[ReflectionInfo]) -> Result<Vec<PushConstantRange>> {
+    let mut result = Vec::new();
+    for shader in reflected_shaders {
+        let mut pc = PushConstantRange {
+            stage_flags: Default::default(),
+            offset: u32::MAX,
+            size: 0,
+        };
+        for range in &shader.push_constants {
+            pc.stage_flags = range.stage_flags;
+            pc.offset = pc.offset.min(range.offset);
+            pc.size += pc.size;
+        }
+        if pc.size != 0 {
+            result.push(pc);
+        }
+    }
+
+    Ok(result)
 }
 
 #[cfg(feature="shader-reflection")]
@@ -131,7 +170,8 @@ pub(crate) fn reflect_shaders(info: &PipelineCreateInfo) -> Result<ReflectionInf
             }
 
             acc
-        })
+        }),
+        push_constants: merge_push_constants(&reflected_shaders)?
     })
 }
 
@@ -140,7 +180,7 @@ pub fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCreateInfo 
     let mut layout = PipelineLayoutCreateInfo {
         flags: Default::default(),
         set_layouts: vec![],
-        push_constants: vec![],
+        push_constants: info.push_constants.clone(),
     };
 
     let mut sets: HashMap<u32, DescriptorSetLayoutCreateInfo> = HashMap::new();

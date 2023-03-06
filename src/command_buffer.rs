@@ -274,6 +274,14 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self
     }
 
+    pub fn push_constants<T: Copy>(self, stage: vk::ShaderStageFlags, offset: u32, data: &[T]) -> Self {
+        unsafe {
+            let data = std::mem::transmute(data);
+            self.device.cmd_push_constants(self.handle, self.current_pipeline_layout, stage, offset, data);
+        };
+        self
+    }
+
     pub(crate) fn begin_rendering(mut self, info: &RenderingInfo) -> Self {
         let map_attachment = |attachment: &RenderingAttachmentInfo| {
             vk::RenderingAttachmentInfo {
@@ -347,6 +355,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self
     }
 
+    #[cfg(feature="debug-markers")]
     pub fn end_label(self, debug: &DebugMessenger) -> Self {
         unsafe {
             debug.functions.cmd_end_debug_utils_label(self.handle);
