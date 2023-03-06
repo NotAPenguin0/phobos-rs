@@ -341,9 +341,10 @@ impl Resource for PipelineLayout {
             set_layout_cache.get_or_create(&info, ()).unwrap().handle
         ).collect::<Vec<_>>();
 
+        let pc = key.push_constants.iter().map(|pc| pc.to_vk()).collect::<Vec<_>>();
         let info = vk::PipelineLayoutCreateInfo::builder()
             .flags(key.flags)
-            .push_constant_ranges(key.push_constants.iter().map(|pc| pc.to_vk()).collect::<Vec<_>>().as_slice())
+            .push_constant_ranges(pc.as_slice())
             .set_layouts(set_layouts.as_slice())
             .build();
         Ok(Self {
