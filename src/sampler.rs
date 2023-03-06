@@ -37,6 +37,13 @@ impl Sampler {
             handle: unsafe { device.create_sampler(&info, None)? },
         })
     }
+
+    pub fn new(device: Arc<Device>, info: vk::SamplerCreateInfo) -> Result<Self> {
+        Ok(Self {
+            device: device.clone(),
+            handle: unsafe { device.create_sampler(&info, None)? }
+        })
+    }
 }
 
 impl Drop for Sampler {
