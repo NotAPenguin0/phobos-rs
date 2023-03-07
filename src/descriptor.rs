@@ -368,7 +368,7 @@ impl<'r> DescriptorSetBuilder<'r> {
         }
     }
 
-    pub fn resolve_and_bind_sampled_image(mut self, binding: u32, resource: &VirtualResource, sampler: &Sampler, bindings: &PhysicalResourceBindings) -> Result<Self> {
+    pub fn resolve_and_bind_sampled_image(mut self, binding: u32, resource: VirtualResource, sampler: &Sampler, bindings: &PhysicalResourceBindings) -> Result<Self> {
         if let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource) {
             Ok(self.bind_sampled_image(binding, image.clone(), sampler))
         } else {
