@@ -48,7 +48,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use crate::cache::*;
-use crate::{BufferView, Device, Error, ImageView, IncompleteCommandBuffer, Sampler};
+use crate::{BufferView, Device, Error, ImageView, IncompleteCommandBuffer, PhysicalResource, PhysicalResourceBindings, Sampler, VirtualResource};
 use crate::deferred_delete::DeletionQueue;
 use anyhow::Result;
 #[cfg(feature="shader-reflection")]
@@ -365,6 +365,14 @@ impl<'r> DescriptorSetBuilder<'r> {
                 layout: vk::DescriptorSetLayout::null(),
             },
             reflection: Some(info),
+        }
+    }
+
+    pub fn resolve_and_bind_sampled_image(mut self, binding: u32, resource: &VirtualResource, sampler: &Sampler, bindings: &PhysicalResourceBindings) -> Result<Self> {
+        if let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource) {
+            Ok(self.bind_sampled_image(binding, image.clone(), sampler))
+        } else {
+            Err(Error::NoResourceBound(resource.uid.clone()).into())
         }
     }
 
