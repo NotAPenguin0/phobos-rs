@@ -92,7 +92,7 @@ impl Image {
     // TODO: Allow specifying an initial layout for convenience
     // TODO: Full wrapper around the allocator for convenience
     /// Create a new simple [`VkImage`] and allocate some memory to it.
-    pub fn new(device: Arc<Device>, alloc: Arc<Mutex<Allocator>>, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format) -> Result<Self> {
+    pub fn new(device: Arc<Device>, alloc: Arc<Mutex<Allocator>>, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format, samples: vk::SampleCountFlags) -> Result<Self> {
         let sharing_mode = if usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {
             vk::SharingMode::EXCLUSIVE
         }
@@ -113,7 +113,7 @@ impl Image {
             },
             mip_levels: 1,
             array_layers: 1,
-            samples: vk::SampleCountFlags::TYPE_1,
+            samples,
             tiling: vk::ImageTiling::OPTIMAL,
             usage,
             sharing_mode,
@@ -147,7 +147,7 @@ impl Image {
             },
             layers: 1,
             mip_levels: 1,
-            samples: vk::SampleCountFlags::TYPE_1,
+            samples,
             memory: Some(memory),
         })
     }
