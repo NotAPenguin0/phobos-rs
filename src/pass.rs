@@ -92,6 +92,10 @@ impl<'exec, 'q, D> Pass<'exec, 'q, D> where D: ExecutionDomain {
             else { None }
         }).next()
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
