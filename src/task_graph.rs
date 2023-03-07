@@ -218,6 +218,11 @@ impl VirtualResource {
         name
     }
 
+    /// Returns the version of a resource, the larger this the more recent the version of the resource is.
+    pub fn version(&self) -> usize {
+        self.uid.matches("+").count()
+    }
+
     /// Returns true if the resource is a source resource, e.g. an instance that does not depend on a previous pass.
     pub fn is_source(&self) -> bool {
         // ends_with is a bit more efficient, since we know the '+' is always at the end of a resource uid.
