@@ -20,3 +20,12 @@ jobs:
       run: rustup default nightly
     - name: Build
       run: cargo build --verbose
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Nightly
+      run: rustup default nightly
+    - name: Build
+      run: cargo build --verbose
