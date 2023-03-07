@@ -19,6 +19,7 @@
 //! be converted into a [`CommandBuffer`] by calling [`IncompleteCommandBuffer::finish`]. This turns it into a complete commad buffer, which can
 //! be submitted to the execution manager.
 
+use std::default::Default;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, MutexGuard};
 use crate::execution_manager::domain::*;
@@ -53,6 +54,8 @@ pub(crate) struct RenderingInfo {
 
 /// Trait representing a command buffer that supports graphics commands.
 pub trait GraphicsCmdBuffer : TransferCmdBuffer {
+    /// Automatically set viewport and scissor region to the entire render area
+    fn full_viewport_scissor(self) -> Self;
     /// Sets the viewport. The equivalent of `vkCmdSetViewport`.
     fn viewport(self, viewport: vk::Viewport) -> Self;
     /// Sets the scissor region. Equivalent of `vkCmdSetScissor`.
@@ -139,6 +142,7 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     current_set_layouts: Vec<vk::DescriptorSetLayout>,
     current_bindpoint: vk::PipelineBindPoint, // TODO: Note: technically not correct
     current_rendering_state: Option<PipelineRenderingInfo>,
+    current_render_area: vk::Rect2D,
     _domain: PhantomData<D>,
 }
 
@@ -158,6 +162,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
             current_set_layouts: vec![],
             current_bindpoint: vk::PipelineBindPoint::default(),
             current_rendering_state: None,
+            current_render_area: Default::default(),
             _domain: PhantomData
         })
     }
@@ -334,6 +339,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
             depth_format: info.depth_attachment.as_ref().map(|attachment| attachment.image_view.format),
             stencil_format: info.stencil_attachment.as_ref().map(|attachment| attachment.image_view.format),
         });
+        self.current_render_area = info.render_area;
 
         self
     }
@@ -343,6 +349,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
             self.device.cmd_end_rendering(self.handle);
         }
         self.current_rendering_state = None;
+        self.current_render_area = vk::Rect2D::default();
 
         self
     }
@@ -382,6 +389,20 @@ impl ComputeSupport for domain::Compute {}
 impl ComputeSupport for domain::All {}
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D> {
+    fn full_viewport_scissor(self) -> Self {
+        let area = self.current_render_area;
+        self.viewport(vk::Viewport {
+            x: area.offset.x as f32,
+            y: area.offset.y as f32,
+            width: area.extent.width as f32,
+            height: area.extent.height as f32,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        })
+        .scissor(area)
+    }
+
+
     fn viewport(self, viewport: vk::Viewport) -> Self {
         unsafe { self.device.cmd_set_viewport(self.handle, 0, std::slice::from_ref(&viewport)); }
         self
