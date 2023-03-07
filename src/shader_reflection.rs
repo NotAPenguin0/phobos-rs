@@ -4,15 +4,15 @@ use anyhow::Result;
 use ash::vk;
 
 #[cfg(feature="shader-reflection")]
-use spirv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
+use spv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
 
 use crate::{DescriptorSetLayoutCreateInfo, Error, PipelineCreateInfo, PipelineLayoutCreateInfo, PushConstantRange};
 
 #[cfg(all(feature="shader-reflection", not(feature="hlsl")))]
-type Ast = spirv_cross::spirv::Ast<spirv_cross::glsl::Target>;
+type Ast = spv_cross::spirv::Ast<spv_cross::glsl::Target>;
 
 #[cfg(all(feature="shader-reflection", feature="hlsl"))]
-type Ast = spirv_cross::spirv::Ast<spirv_cross::hlsl::Target>;
+type Ast = spv_cross::spirv::Ast<spv_cross::hlsl::Target>;
 
 #[cfg(feature="shader-reflection")]
 #[derive(Debug, Copy, Clone)]
@@ -107,7 +107,7 @@ fn find_push_constants(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &S
 }
 
 #[cfg(feature="shader-reflection")]
-fn reflect_module(module: spirv_cross::spirv::Module) -> Result<ReflectionInfo> {
+fn reflect_module(module: spv_cross::spirv::Module) -> Result<ReflectionInfo> {
     let mut ast: Ast = Ast::parse(&module)?;
     let resources = ast.get_shader_resources()?;
     let stage = get_shader_stage(&ast)?;
@@ -145,7 +145,7 @@ fn merge_push_constants(reflected_shaders: &[ReflectionInfo]) -> Result<Vec<Push
 pub(crate) fn reflect_shaders(info: &PipelineCreateInfo) -> Result<ReflectionInfo> {
     let mut reflected_shaders = Vec::new();
     for shader in &info.shaders {
-        let module = spirv_cross::spirv::Module::from_words(shader.code.as_slice());
+        let module = spv_cross::spirv::Module::from_words(shader.code.as_slice());
         reflected_shaders.push(reflect_module(module)?);
     }
 
