@@ -237,7 +237,7 @@ fn record_node<'exec, 'q, D>(graph: &mut BuiltPassGraph<'exec, 'q, D>, node: Nod
 }
 
 /// Describes any physical resource handle on the GPU.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PhysicalResource {
     Image(ImageView),
     Buffer(BufferView),
@@ -274,7 +274,14 @@ impl PhysicalResourceBindings {
         self.bindings.insert(name.into(), PhysicalResource::Image(image));
     }
 
+    /// Bind a buffer to all virtual resources with this name as their uid.
     pub fn bind_buffer(&mut self, name: impl Into<String>, buffer: BufferView) { self.bindings.insert(name.into(), PhysicalResource::Buffer(buffer)); }
+
+    /// Alias a resource by giving it an alternative name
+    pub fn alias(&mut self, new_name: impl Into<String>, resource: &str) -> Result<()> {
+        self.bindings.insert(new_name.into(), self.bindings.get(resource).ok_or(Error::NoResourceBound(resource.to_owned()))?.clone());
+        Ok(())
+    }
 
     /// Resolve a virtual resource to a physical resource. Returns `None` if the resource was not found.
     pub fn resolve(&self, resource: &VirtualResource) -> Option<&PhysicalResource> {
