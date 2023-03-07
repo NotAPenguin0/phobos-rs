@@ -1,0 +1,2 @@
+- Follow the code of conduct
+- Create an issue and a PR
