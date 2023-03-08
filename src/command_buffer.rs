@@ -319,12 +319,12 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
             view_mask: info.view_mask,
             color_attachment_count: color_attachments.len() as u32,
             p_color_attachments: color_attachments.as_ptr(),
-            p_depth_attachment: match depth_attachment {
-                Some(attachment) => &attachment,
+            p_depth_attachment: match &depth_attachment {
+                Some(attachment) => attachment,
                 None => std::ptr::null()
             },
-            p_stencil_attachment: match stencil_attachment {
-                Some(attachment) => &attachment,
+            p_stencil_attachment: match &stencil_attachment {
+                Some(attachment) => attachment,
                 None => std::ptr::null()
             },
         };
