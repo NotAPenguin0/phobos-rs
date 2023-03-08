@@ -139,7 +139,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
             inputs: vec![GpuResource{
                 usage: ResourceUsage::Present,
                 resource: swapchain,
-                stage: PipelineStage::BOTTOM_OF_PIPE,
+                stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
                 layout: vk::ImageLayout::PRESENT_SRC_KHR,
                 clear_value: None,
                 load_op: None,
