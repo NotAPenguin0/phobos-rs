@@ -55,7 +55,7 @@ fn main_loop(frame: &mut ph::FrameManager,
     ];
 
     // Define a render graph with one pass that clears the swapchain image
-    let mut graph = ph::PassGraph::new();
+    let mut graph = ph::PassGraph::new(Some(swap_resource.clone()));
 
     // Render pass that renders to an offscreen attachment
     let offscreen_pass = ph::PassBuilder::render(String::from("offscreen"))
@@ -177,7 +177,7 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
     // Because why not, we'll try to use the render graph API. Note that because of the virtual resource system,
     // we could define this entire graph once and then re-use it for every buffer copy!
     // We won't do this here to keep the example short (and because at the time of writing buffers are not implemented in the virtual resource system yet).
-    let mut graph = ph::PassGraph::new();
+    let mut graph = ph::PassGraph::new(None);
     let pass = ph::PassBuilder::new("copy".to_owned())
         .execute(|cmd, mut ifc, _| {
             cmd.copy_buffer(&staging, &view)
@@ -289,7 +289,7 @@ fn main() -> Result<()> {
         .build();
     cache.lock().unwrap().create_named_pipeline(pci)?;
     // Define some resources we will use for rendering
-    let image = ph::Image::new(device.clone(), alloc.clone(), 800, 600, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED, vk::Format::R8G8B8A8_SRGB)?;
+    let image = ph::Image::new(device.clone(), alloc.clone(), 800, 600, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED, vk::Format::R8G8B8A8_SRGB, vk::SampleCountFlags::TYPE_1)?;
     let data: Vec<f32> = vec![
         -1.0, 1.0, 0.0, 1.0,
         -1.0, -1.0, 0.0, 0.0,
