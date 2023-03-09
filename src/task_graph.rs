@@ -45,6 +45,7 @@
 //!                 .finish();
 //! ```
 
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 /// # Task graph system
 ///
@@ -101,7 +102,7 @@ pub struct TaskGraph<R, B, T> where R: Resource + Default, B: Barrier<R> + Clone
 }
 
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, Hash)]
 pub enum ResourceType {
     #[default]
     Image,
@@ -109,7 +110,7 @@ pub enum ResourceType {
 }
 
 /// Represents a virtual resource in the system, uniquely identified by a string.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Hash)]
 pub struct VirtualResource {
     pub uid: String,
     pub ty: ResourceType,
@@ -172,6 +173,7 @@ pub struct PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     // index is invalidated. Since the source is always the first node, this is never invalidated.
     source: NodeIndex,
     swapchain: Option<VirtualResource>,
+    last_usages: HashMap<String, (usize, PipelineStage)>,
 }
 
 pub struct BuiltPassGraph<'exec, 'q, D> where D: ExecutionDomain {
@@ -335,6 +337,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
             graph: TaskGraph::new(),
             source: NodeIndex::default(),
             swapchain,
+            last_usages: Default::default(),
         };
 
         // insert dummy 'source' node. This node produces all initial inputs and is used for start of frame sync.
@@ -355,31 +358,32 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     /// # Errors
     /// - This function can fail if adding the pass results in a cyclic dependency in the graph.
     pub fn add_pass(mut self, pass: Pass<'exec, 'q, D>) -> Result<Self> {
-        // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
-        let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
-        for input in &pass.inputs {
-            if input.resource.is_source() {
-                source.outputs.push(
-                    GpuResource {
-                        usage: ResourceUsage::Nothing,
-                        resource: input.resource.clone(),
-                        stage: match &self.swapchain {
-                            None => { PipelineStage::COLOR_ATTACHMENT_OUTPUT }
-                            // Our swapchain semaphore waits at COLOR_ATTACHMENT_OUTPUT, so we need to provide the same stage here.
-                            Some(swap) => {
-                                if VirtualResource::are_associated(&input.resource, swap) {
-                                    PipelineStage::COLOR_ATTACHMENT_OUTPUT // must match semaphore stage
-                                } else {
-                                    PipelineStage::COLOR_ATTACHMENT_OUTPUT
-                                }
-                            }
-                        },
-                        layout: vk::ImageLayout::UNDEFINED,
-                        clear_value: None,
-                        load_op: None
-                    }
-                )
+        {
+            // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
+            // Note that we dont actually fill the pipeline stages yet, we do that later
+            let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
+            for input in &pass.inputs {
+                if input.resource.is_source() {
+                    source.outputs.push(
+                        GpuResource {
+                            usage: ResourceUsage::Nothing,
+                            resource: input.resource.clone(),
+                            stage: PipelineStage::NONE, // We will set this later!
+                            layout: vk::ImageLayout::UNDEFINED,
+                            clear_value: None,
+                            load_op: None
+                        }
+                    )
+                }
             }
+        }
+
+        for input in &pass.inputs {
+            self.update_last_usage(&input.resource, input.stage)?;
+        }
+
+        for output in &pass.outputs {
+            self.update_last_usage(&output.resource, output.stage)?;
         }
 
         self.graph.add_task(GpuTask {
@@ -396,6 +400,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
 
     /// Builds the task graph so it can be recorded into a command buffer.
     pub fn build(mut self) -> Result<BuiltPassGraph<'exec, 'q, D>> {
+        self.set_source_stages()?;
         self.graph.create_barrier_nodes();
         self.merge_identical_barriers()?;
 
@@ -416,6 +421,22 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
 
     pub(crate) fn source(&self) -> NodeIndex {
         self.source
+    }
+
+    fn update_last_usage(&mut self, resource: &VirtualResource, stage: PipelineStage) -> Result<()> {
+        let entry = self.last_usages.entry(resource.name());
+        match entry {
+            Entry::Occupied(mut entry) => {
+                let version = resource.version();
+                if version > entry.get().0 {
+                    entry.insert((version, stage));
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert((resource.version(), stage));
+            }
+        };
+        Ok(())
     }
 
     fn barrier_src_resource<'a>(graph: &'a Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&'a GpuResource> {
@@ -449,6 +470,24 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
             Node::_Unreachable(_) => { unreachable!() }
         })
     }*/
+
+    /// Set source barrier stages to the *last* usage in the frame, for cross-frame sync
+    fn set_source_stages(&mut self) -> Result<()> {
+        let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
+        // For each output, look for the last usage of this resource in the frame.
+        for output in &mut source.outputs {
+            // Will only succeed if swapchain is set and this resource is the swapchain
+            let default = VirtualResource::image("__none__internal__");
+            if VirtualResource::are_associated(&output.resource, self.swapchain.as_ref().unwrap_or(&default)) {
+                output.stage = PipelineStage::COLOR_ATTACHMENT_OUTPUT;
+            }
+            else {
+                let (_, stage) = self.last_usages.get(&output.resource.name()).unwrap();
+                output.stage = *stage;
+            }
+        }
+        Ok(())
+    }
 
     // Pass in the build step where identical barriers are merged into one for efficiency reasons.
     fn merge_identical_barriers(&mut self) -> Result<()> {
