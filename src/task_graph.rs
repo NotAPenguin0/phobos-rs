@@ -364,13 +364,13 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
                         usage: ResourceUsage::Nothing,
                         resource: input.resource.clone(),
                         stage: match &self.swapchain {
-                            None => { PipelineStage::TOP_OF_PIPE }
+                            None => { PipelineStage::COLOR_ATTACHMENT_OUTPUT }
                             // Our swapchain semaphore waits at COLOR_ATTACHMENT_OUTPUT, so we need to provide the same stage here.
                             Some(swap) => {
                                 if VirtualResource::are_associated(&input.resource, swap) {
                                     PipelineStage::COLOR_ATTACHMENT_OUTPUT // must match semaphore stage
                                 } else {
-                                    PipelineStage::TOP_OF_PIPE
+                                    PipelineStage::COLOR_ATTACHMENT_OUTPUT
                                 }
                             }
                         },
