@@ -53,7 +53,7 @@ pub fn staged_buffer_upload<T>(device: Arc<Device>, allocator: Arc<Mutex<Allocat
     let mut ctx = ThreadContext::new(device.clone(), allocator.clone(), None)?;
 
     // TODO: Figure out a way to share these graphs, safely.
-    let mut graph = PassGraph::new();
+    let mut graph = PassGraph::new(None);
     let pass = PassBuilder::new("copy".to_owned())
         .execute(|cmd, mut ifc, _| {
             cmd.copy_buffer(&staging, &view)

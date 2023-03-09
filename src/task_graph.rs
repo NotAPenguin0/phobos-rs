@@ -171,6 +171,7 @@ pub struct PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
     // index is invalidated. Since the source is always the first node, this is never invalidated.
     source: NodeIndex,
+    swapchain: Option<VirtualResource>,
 }
 
 pub struct BuiltPassGraph<'exec, 'q, D> where D: ExecutionDomain {
@@ -327,11 +328,13 @@ macro_rules! barriers {
 }
 
 impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
-    /// Create a new task graph.
-    pub fn new() -> Self {
+    /// Create a new task graph. If rendering to a swapchain, also give it the virtual resource you are planning to use for this.
+    /// This is necessary for proper sync
+    pub fn new(swapchain: Option<VirtualResource>) -> Self {
         let mut graph = PassGraph {
             graph: TaskGraph::new(),
-            source: NodeIndex::default()
+            source: NodeIndex::default(),
+            swapchain,
         };
 
         // insert dummy 'source' node. This node produces all initial inputs and is used for start of frame sync.
@@ -360,7 +363,17 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
                     GpuResource {
                         usage: ResourceUsage::Nothing,
                         resource: input.resource.clone(),
-                        stage: PipelineStage::TOP_OF_PIPE,
+                        stage: match &self.swapchain {
+                            None => { PipelineStage::TOP_OF_PIPE }
+                            // Our swapchain semaphore waits at COLOR_ATTACHMENT_OUTPUT, so we need to provide the same stage here.
+                            Some(swap) => {
+                                if VirtualResource::are_associated(&input.resource, swap) {
+                                    PipelineStage::COLOR_ATTACHMENT_OUTPUT
+                                } else {
+                                    PipelineStage::TOP_OF_PIPE
+                                }
+                            }
+                        },
                         layout: vk::ImageLayout::UNDEFINED,
                         clear_value: None,
                         load_op: None
