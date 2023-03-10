@@ -67,7 +67,14 @@ impl PhysicalDevice {
                                 match request.queue_type {
                                     QueueType::Graphics => vk::QueueFlags::COMPUTE,
                                     QueueType::Compute => vk::QueueFlags::GRAPHICS,
-                                    QueueType::Transfer => vk::QueueFlags::COMPUTE | vk::QueueFlags::GRAPHICS
+                                    QueueType::Transfer => vk::QueueFlags::COMPUTE
+                                        | vk::QueueFlags::GRAPHICS
+                                        // In later nvidia drivers, these queues are now exposed with high family indices.
+                                        // Using them will probably not hurt performance, but we still avoid them as renderdoc does not currently
+                                        // support OPTICAL_FLOW_NV
+                                        | vk::QueueFlags::OPTICAL_FLOW_NV
+                                        | vk::QueueFlags::VIDEO_DECODE_KHR
+                                        | vk::QueueFlags::VIDEO_ENCODE_KHR
                                 }
                             } else { vk::QueueFlags::default() };
 
