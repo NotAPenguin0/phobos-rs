@@ -24,15 +24,18 @@ impl Device {
         let mut priorities = Vec::<f32>::new();
         let queue_create_infos = physical_device.queue_families.iter()
             .enumerate()
-            .map(|(index, _)| {
+            .flat_map(|(index, _)| {
                 let count = physical_device.queues.iter().filter(|queue| queue.family_index == index as u32).count();
+                if count == 0 {
+                    return None;
+                }
                 priorities.resize(usize::max(priorities.len(), count), 1.0);
-                vk::DeviceQueueCreateInfo {
+                Some(vk::DeviceQueueCreateInfo {
                     queue_family_index: index as u32,
                     queue_count: count as u32,
                     p_queue_priorities: priorities.as_ptr(),
                     ..Default::default()
-                }
+                })
             })
             .collect::<Vec<_>>();
         let mut extension_names: Vec<CString> = settings.gpu_requirements.device_extensions.iter()
