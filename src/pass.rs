@@ -226,7 +226,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::Attachment(AttachmentType::Resolve(src.clone())),
             resource: dst.clone(),
-            stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
+            stage: PipelineStage::RESOLVE,
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             clear_value: None,
             load_op: None,
