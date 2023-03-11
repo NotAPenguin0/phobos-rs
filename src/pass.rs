@@ -224,7 +224,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
     /// TODO: Add check for existence of src
     pub fn resolve(mut self, src: VirtualResource, dst: VirtualResource) -> Self {
         self.inner.inputs.push(GpuResource {
-            usage: ResourceUsage::Attachment(AttachmentType::Resolve(src)),
+            usage: ResourceUsage::Attachment(AttachmentType::Resolve(src.clone())),
             resource: dst,
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
