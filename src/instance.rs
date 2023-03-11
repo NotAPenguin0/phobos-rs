@@ -1,6 +1,5 @@
 use ash;
 use ash::vk;
-use crate::Error;
 use crate::util;
 use crate::window::WindowInterface;
 use crate::AppSettings;

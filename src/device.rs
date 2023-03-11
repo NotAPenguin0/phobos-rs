@@ -2,7 +2,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use ash::vk;
 use std::ffi::{CString, NulError};
-use crate::{PhysicalDevice, Error, VkInstance, AppSettings, WindowInterface};
+use crate::{PhysicalDevice, VkInstance, AppSettings, WindowInterface};
 use crate::util;
 use anyhow::Result;
 

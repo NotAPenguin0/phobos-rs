@@ -55,7 +55,7 @@ pub fn staged_buffer_upload<T>(device: Arc<Device>, allocator: Arc<Mutex<Allocat
     // TODO: Figure out a way to share these graphs, safely.
     let mut graph = PassGraph::new(None);
     let pass = PassBuilder::new("copy".to_owned())
-        .execute(|cmd, mut ifc, _| {
+        .execute(|cmd, _, _| {
             cmd.copy_buffer(&staging, &view)
         })
         .build();
@@ -63,10 +63,10 @@ pub fn staged_buffer_upload<T>(device: Arc<Device>, allocator: Arc<Mutex<Allocat
     graph = graph.add_pass(pass)?;
     let mut graph = graph.build()?;
 
-    let mut cmd = exec.on_domain::<domain::Transfer>()?;
+    let cmd = exec.on_domain::<domain::Transfer>()?;
     let mut ifc = ctx.get_ifc();
     let bindings = PhysicalResourceBindings::new();
-    let mut cmd = record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
+    let cmd = record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
 
     let fence = ExecutionManager::submit(exec.clone(), cmd)?
         .with_cleanup(move || {

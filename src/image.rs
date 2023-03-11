@@ -159,19 +159,23 @@ impl Image {
     /// # Lifetime
     /// The returned [`ImageView`] is valid as long as `self` is valid.
     pub fn view(&self, aspect: vk::ImageAspectFlags) -> Result<ImageView> {
-        let info = vk::ImageViewCreateInfo::builder()
-            .view_type(vk::ImageViewType::TYPE_2D) // TODO: 3D images, cubemaps, etc
-            .format(self.format)
-            .image(self.handle)
-            .subresource_range(vk::ImageSubresourceRange::builder()
-                .aspect_mask(aspect)
-                .base_mip_level(0)
-                .level_count(self.mip_levels)
-                .base_array_layer(0)
-                .layer_count(self.layers)
-                .build()
-            )
-            .build();
+        let info = vk::ImageViewCreateInfo {
+            s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
+            p_next: std::ptr::null(),
+            flags: Default::default(),
+            image: self.handle,
+            view_type: vk::ImageViewType::TYPE_2D, // TODO: 3D images, cubemaps, etc
+            format: self.format,
+            components: vk::ComponentMapping::default(),
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: aspect,
+                base_mip_level: 0,
+                level_count: self.mip_levels,
+                base_array_layer: 0,
+                layer_count: self.layers,
+            },
+        };
+
         let view_handle = unsafe { self.device.create_image_view(&info, None)? };
         Ok(ImageView::new(ImgView{
             device: self.device.clone(),

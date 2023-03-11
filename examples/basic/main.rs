@@ -15,7 +15,7 @@ use winit::window::{WindowBuilder};
 use ph::IncompleteCmdBuffer; // TODO: Probably add this as a pub use to lib.rs
 
 use futures::executor::block_on;
-use phobos::{CmdBuffer, Error, GraphicsCmdBuffer, PipelineStage, TransferCmdBuffer};
+use phobos::{GraphicsCmdBuffer, PipelineStage, TransferCmdBuffer};
 
 use anyhow::Result;
 use gpu_allocator::MemoryLocation;
@@ -27,9 +27,11 @@ use gpu_allocator::vulkan::Allocator;
 // 2. Possibly annotate BufferView with lifetime
 
 struct Resources {
+    #[allow(dead_code)]
     pub offscreen: ph::Image,
     pub offscreen_view: ph::ImageView,
     pub sampler: ph::Sampler,
+    #[allow(dead_code)]
     pub vertex_buffer: ph::Buffer,
 }
 
@@ -55,13 +57,13 @@ fn main_loop(frame: &mut ph::FrameManager,
     ];
 
     // Define a render graph with one pass that clears the swapchain image
-    let mut graph = ph::PassGraph::new(Some(swap_resource.clone()));
+    let graph = ph::PassGraph::new(Some(swap_resource.clone()));
 
     // Render pass that renders to an offscreen attachment
     let offscreen_pass = ph::PassBuilder::render(String::from("offscreen"))
         .color([1.0, 0.0, 0.0, 1.0])
         .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR, Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
-        .execute(|mut cmd, ifc, bindings| {
+        .execute(|mut cmd, ifc, _bindings| {
             // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
             let mut buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
             let slice = buffer.mapped_slice::<f32>()?;
@@ -89,7 +91,7 @@ fn main_loop(frame: &mut ph::FrameManager,
                           vk::AttachmentLoadOp::CLEAR,
                         Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
         .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
-        .execute(|mut cmd, ifc, bindings| {
+        .execute(|mut cmd, _ifc, bindings| {
             cmd = cmd.bind_graphics_pipeline("sample", pipelines.clone()).unwrap()
                     .viewport(vk::Viewport{
                         x: 0.0,
@@ -154,6 +156,7 @@ fn load_spirv_file(path: &Path) -> Vec<u32> {
 }
 
 // Note that this is implemented in the graph library, which should be preferred for correct behaviour.
+#[allow(dead_code)]
 fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec: Arc<ph::ExecutionManager>) -> Result<ph::GpuFuture<'static, ph::Buffer>> {
     let data: Vec<f32> = vec![
         -1.0, 1.0, 0.0, 1.0,
@@ -177,20 +180,20 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
     // Because why not, we'll try to use the render graph API. Note that because of the virtual resource system,
     // we could define this entire graph once and then re-use it for every buffer copy!
     // We won't do this here to keep the example short (and because at the time of writing buffers are not implemented in the virtual resource system yet).
-    let mut graph = ph::PassGraph::new(None);
+    let graph = ph::PassGraph::new(None);
     let pass = ph::PassBuilder::new("copy".to_owned())
-        .execute(|cmd, mut ifc, _| {
+        .execute(|cmd, _ifc, _| {
             cmd.copy_buffer(&staging, &view)
         })
         .build();
 
     let mut graph = graph.add_pass(pass)?.build()?;
 
-    let mut cmd = exec.on_domain::<ph::domain::Transfer>()?;
+    let cmd = exec.on_domain::<ph::domain::Transfer>()?;
     let mut ifc = ctx.get_ifc();
     let bindings = ph::PhysicalResourceBindings::new();
     // Record graph to a command buffer, then finish it.
-    let mut cmd = ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
+    let cmd = ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
 
     let fence = ph::ExecutionManager::submit(exec.clone(), cmd)?
         // Remember to attach cleanup for the staging buffer so it does not get dropped at the end of the function,
@@ -240,7 +243,7 @@ fn main() -> Result<()> {
         (surface, physical_device)
     };
     let device = ph::Device::new(&instance, &physical_device, &settings)?;
-    let mut alloc = ph::create_allocator(&instance, device.clone(), &physical_device)?;
+    let alloc = ph::create_allocator(&instance, device.clone(), &physical_device)?;
     let exec = ph::ExecutionManager::new(device.clone(), &physical_device)?;
     let mut frame = {
         let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
@@ -250,7 +253,7 @@ fn main() -> Result<()> {
     // Let's build a graphics pipeline!
 
     // We create a pipeline cache to store our pipeline and associated resources in.
-    let mut cache = ph::PipelineCache::new(device.clone())?;
+    let cache = ph::PipelineCache::new(device.clone())?;
 
     // First, we need to load shaders
     let vtx_code = load_spirv_file(Path::new("examples/data/vert.spv"));
@@ -299,7 +302,7 @@ fn main() -> Result<()> {
         1.0, 1.0, 1.0, 1.0
     ];
 
-    let mut resources = Resources {
+    let resources = Resources {
         offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
         offscreen: image,
         sampler: ph::Sampler::default(device.clone())?,

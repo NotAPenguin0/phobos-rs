@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use ash::vk;
-use crate::{Device, Error};
+use crate::{Device};
 use anyhow::Result;
 
 /// Represents a vulkan sampler object.

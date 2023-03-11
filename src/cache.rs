@@ -1,7 +1,7 @@
 use std::collections::{hash_map, HashMap};
 use std::hash::Hash;
 use std::sync::Arc;
-use crate::{Device, Error};
+use crate::{Device};
 
 use anyhow::Result;
 

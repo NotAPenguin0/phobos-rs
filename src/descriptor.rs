@@ -48,12 +48,11 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use crate::cache::*;
-use crate::{BufferView, Device, Error, ImageView, IncompleteCommandBuffer, PhysicalResource, PhysicalResourceBindings, Sampler, VirtualResource};
+use crate::{BufferView, Device, Error, ImageView, PhysicalResource, PhysicalResourceBindings, Sampler, VirtualResource};
 use crate::deferred_delete::DeletionQueue;
 use anyhow::Result;
 #[cfg(feature="shader-reflection")]
 use crate::shader_reflection::ReflectionInfo;
-use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct DescriptorImageInfo {
@@ -195,10 +194,13 @@ impl Resource for DescriptorSet {
     const MAX_TIME_TO_LIVE: u32 = 8;
 
     fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self> where Self: Sized {
-        let info = vk::DescriptorSetAllocateInfo::builder()
-            .descriptor_pool(key.pool)
-            .set_layouts(std::slice::from_ref(&key.layout))
-            .build();
+        let info = vk::DescriptorSetAllocateInfo {
+            s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
+            p_next: std::ptr::null(),
+            descriptor_pool: key.pool,
+            descriptor_set_count: 1,
+            p_set_layouts: &key.layout,
+        };
         let set = unsafe { device.allocate_descriptor_sets(&info) }?.first().cloned().unwrap();
         let writes = key.bindings.iter().map(|binding| {
             let mut write = WriteDescriptorSet {
@@ -291,11 +293,14 @@ impl DescriptorPool {
             }
         }).collect::<Vec<vk::DescriptorPoolSize>>();
 
-        let info = vk::DescriptorPoolCreateInfo::builder()
-            .flags(flags)
-            .max_sets(max_sets)
-            .pool_sizes(pool_sizes.as_slice())
-            .build();
+        let info = vk::DescriptorPoolCreateInfo {
+            s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
+            p_next: std::ptr::null(),
+            flags,
+            max_sets,
+            pool_size_count: pool_sizes.len() as u32,
+            p_pool_sizes: pool_sizes.as_ptr(),
+        };
 
         Ok(Self{
             device: device.clone(),
@@ -394,7 +399,7 @@ impl<'r> DescriptorSetBuilder<'r> {
         }
     }
 
-    pub fn resolve_and_bind_sampled_image(mut self, binding: u32, resource: VirtualResource, sampler: &Sampler, bindings: &PhysicalResourceBindings) -> Result<Self> {
+    pub fn resolve_and_bind_sampled_image(self, binding: u32, resource: VirtualResource, sampler: &Sampler, bindings: &PhysicalResourceBindings) -> Result<Self> {
         if let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource) {
             Ok(self.bind_sampled_image(binding, image.clone(), sampler))
         } else {
@@ -417,7 +422,7 @@ impl<'r> DescriptorSetBuilder<'r> {
     }
 
     #[cfg(feature="shader-reflection")]
-    pub fn bind_named_sampled_image(mut self, name: &str, image: ImageView, sampler: &Sampler) -> Result<Self> {
+    pub fn bind_named_sampled_image(self, name: &str, image: ImageView, sampler: &Sampler) -> Result<Self> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
         let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
         Ok(self.bind_sampled_image(binding.binding, image, sampler))
@@ -436,7 +441,7 @@ impl<'r> DescriptorSetBuilder<'r> {
     }
 
     #[cfg(feature="shader-reflection")]
-    pub fn bind_named_uniform_buffer(mut self, name: &str, buffer: BufferView) -> Result<Self> {
+    pub fn bind_named_uniform_buffer(self, name: &str, buffer: BufferView) -> Result<Self> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
         let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
         Ok(self.bind_uniform_buffer(binding.binding, buffer))

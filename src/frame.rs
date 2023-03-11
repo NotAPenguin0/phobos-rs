@@ -196,21 +196,28 @@ impl FrameManager<'_> {
 
         let image_count = self.swapchain.images.len();
 
-        new_swapchain.handle = unsafe { self.swapchain.functions.create_swapchain(
-            &vk::SwapchainCreateInfoKHR::builder()
-                .old_swapchain(self.swapchain.handle)
-                .surface(surface.handle)
-                .image_format(self.swapchain.format.format)
-                .image_color_space(self.swapchain.format.color_space)
-                .image_extent(new_swapchain.extent)
-                .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
-                .image_array_layers(1)
-                .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
-                .min_image_count(image_count as u32)
-                .clipped(true)
-                .pre_transform(surface.capabilities.current_transform)
-                .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE),
-            None)? };
+        let info = vk::SwapchainCreateInfoKHR {
+            s_type: vk::StructureType::SWAPCHAIN_CREATE_INFO_KHR,
+            p_next: std::ptr::null(),
+            flags: Default::default(),
+            surface: surface.handle,
+            min_image_count: image_count as u32,
+            image_format: self.swapchain.format.format,
+            image_color_space: self.swapchain.format.color_space,
+            image_extent: new_swapchain.extent,
+            image_array_layers: 1,
+            image_usage: vk::ImageUsageFlags::COLOR_ATTACHMENT,
+            image_sharing_mode: vk::SharingMode::EXCLUSIVE,
+            queue_family_index_count: 0,
+            p_queue_family_indices: std::ptr::null(),
+            pre_transform: surface.capabilities.current_transform,
+            composite_alpha: vk::CompositeAlphaFlagsKHR::OPAQUE,
+            present_mode: self.swapchain.present_mode,
+            clipped: vk::TRUE,
+            old_swapchain: self.swapchain.handle,
+        };
+
+        new_swapchain.handle = unsafe { self.swapchain.functions.create_swapchain(&info, None)? };
 
         // Now that the new swapchain is created, we still need to acquire the images again.
         new_swapchain.images = unsafe { self.swapchain.functions.get_swapchain_images(new_swapchain.handle)? }
@@ -393,12 +400,17 @@ impl FrameManager<'_> {
         let cmd_handle = cmd.handle.clone();
         per_frame.command_buffer = Some(Box::new(cmd));
 
-        let submit = vk::SubmitInfo::builder()
-            .signal_semaphores(std::slice::from_ref(&per_frame.gpu_finished.handle))
-            .command_buffers(std::slice::from_ref(&cmd_handle))
-            .wait_semaphores(semaphores.as_slice())
-            .wait_dst_stage_mask(stages.as_slice())
-            .build();
+        let submit = vk::SubmitInfo {
+            s_type: vk::StructureType::SUBMIT_INFO,
+            p_next: std::ptr::null(),
+            wait_semaphore_count: semaphores.len() as u32,
+            p_wait_semaphores: semaphores.as_ptr(),
+            p_wait_dst_stage_mask: stages.as_ptr(),
+            command_buffer_count: 1,
+            p_command_buffers: &cmd_handle,
+            signal_semaphore_count: 1,
+            p_signal_semaphores: &per_frame.gpu_finished.handle,
+        };
 
         // Use the command buffer's domain to determine the correct queue to use.
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
@@ -412,25 +424,32 @@ impl FrameManager<'_> {
         let functions = &self.swapchain.functions;
         let queue = exec.get_present_queue();
         if let Some(queue) = queue {
-            unsafe {
-                let result = functions.queue_present(queue.handle(),
-                                        &vk::PresentInfoKHR::builder()
-                                            .swapchains(std::slice::from_ref(&self.swapchain.handle))
-                                            .wait_semaphores(std::slice::from_ref(&per_frame.gpu_finished.handle))
-                                            .image_indices(std::slice::from_ref(&self.current_image)))
-                    .map(|_| ());
-                // We will ignore OUT_OF_DATE_KHR here
-                match result {
-                    Ok(_) => Ok(()),
-                    Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => Ok(()),
-                    Err(e) => Err(anyhow::Error::from(Error::from(e)))
-                }
+            let info = vk::PresentInfoKHR {
+                s_type: vk::StructureType::PRESENT_INFO_KHR,
+                p_next: std::ptr::null(),
+                wait_semaphore_count: 1,
+                p_wait_semaphores: &per_frame.gpu_finished.handle,
+                swapchain_count: 1,
+                p_swapchains: &self.swapchain.handle,
+                p_image_indices: &self.current_image,
+                p_results: std::ptr::null_mut(),
+            };
+            let result = unsafe {
+               functions.queue_present(queue.handle(), &info)
+                   .map(|_| ())
+            };
+            // We will ignore OUT_OF_DATE_KHR here
+            match result {
+                Ok(_) => Ok(()),
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => Ok(()),
+                Err(e) => Err(anyhow::Error::from(Error::from(e)))
             }
         } else { Err(anyhow::Error::from(Error::NoPresentQueue)) }
     }
 
     /// Get a reference to the current swapchain image.
     /// This reference is valid as long as the swapchain is not resized.
+    #[allow(dead_code)]
     unsafe fn get_swapchain_image(&self) -> Result<ImageView> {
         Ok(self.swapchain.images[self.current_image as usize].view.clone())
     }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use ash::vk;
-use crate::{Device, Error};
+use crate::{Device};
 
 use anyhow::Result;
 
@@ -14,10 +14,13 @@ pub struct CommandPool {
 
 impl CommandPool {
     pub fn new(device: Arc<Device>, family: u32, flags: vk::CommandPoolCreateFlags) -> Result<Self> {
-        let handle = unsafe { device.create_command_pool(&vk::CommandPoolCreateInfo::builder()
-            .queue_family_index(family)
-            .flags(flags),
-        None)? };
+        let info = vk::CommandPoolCreateInfo {
+            s_type: vk::StructureType::COMMAND_POOL_CREATE_INFO,
+            p_next: std::ptr::null(),
+            flags,
+            queue_family_index: family,
+        };
+        let handle = unsafe { device.create_command_pool(&info, None)? };
 
         Ok(CommandPool {
             device: device.clone(),

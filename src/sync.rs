@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::slice;
 use std::sync::{Arc};
-use std::task::{Context, Poll, Waker};
+use std::task::{Context, Poll};
 use std::time::Duration;
 use ash::prelude::VkResult;
 use ash::vk;
@@ -20,7 +20,6 @@ struct CleanupFnLink<'f> {
 pub struct Fence<'f> {
     #[derivative(Debug="ignore")]
     device: Arc<Device>,
-    waker: Option<Waker>,
     #[derivative(Debug="ignore")]
     first_cleanup_fn: Option<Box<CleanupFnLink<'f>>>,
     pub handle: vk::Fence,
@@ -29,7 +28,6 @@ pub struct Fence<'f> {
 pub struct GpuFuture<'f, T> {
     value: Option<T>,
     fence: Fence<'f>,
-    waker: Option<Waker>,
 }
 
 /// Wrapper around a [`VkSemaphore`](vk::Semaphore) object. Semaphores are used for GPU-GPU sync.
@@ -44,14 +42,16 @@ pub struct Semaphore {
 impl<'f> Fence<'f> {
     /// Create a new fence, possibly in the singaled status.
     pub fn new(device: Arc<Device>, signaled: bool) -> Result<Self, vk::Result> {
+        let info = vk::FenceCreateInfo {
+            s_type: vk::StructureType::FENCE_CREATE_INFO,
+            p_next: std::ptr::null(),
+            flags: if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() },
+        };
         Ok(Fence {
             device: device.clone(),
-            waker: None,
             first_cleanup_fn: None,
             handle: unsafe {
-                device.create_fence(&vk::FenceCreateInfo::builder()
-                        .flags(if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() }),
-    None)?
+                device.create_fence(&info, None)?
             }
         })
     }
@@ -74,7 +74,7 @@ impl<'f> Fence<'f> {
                 f: Box::new(f),
                 next: None
             });
-            let mut fun = self.first_cleanup_fn.take().unwrap();
+            let fun = self.first_cleanup_fn.take().unwrap();
             head.next = Some(fun);
             self.first_cleanup_fn = Some(head);
             self
@@ -91,7 +91,6 @@ impl<'f> Fence<'f> {
         GpuFuture {
             value: Some(value),
             fence: self,
-            waker: None,
         }
     }
 }
@@ -102,20 +101,19 @@ impl Future for Fence<'_> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.waker = Some(ctx.waker().clone());
         let status = unsafe { self.device.get_fence_status(self.handle).unwrap() };
 
         if status {
             // Call the whole chain of cleanup functions.
             let mut f = self.first_cleanup_fn.take();
             while let Some(_) = f {
-                let mut func = f.take().unwrap();
+                let func = f.take().unwrap();
                 func.f.call_once(());
                 f = func.next
             }
             Poll::Ready(())
         } else {
-            let waker = self.waker.clone().unwrap();
+            let waker = ctx.waker().clone();
             std::thread::spawn(move || {
                     // We will try to poll every 5 milliseconds.
                     // TODO: measure, possibly configure
@@ -148,10 +146,15 @@ impl<T> Future for GpuFuture<'_, T> {
 
 impl Semaphore {
     pub fn new(device: Arc<Device>) -> Result<Self, vk::Result> {
+        let info = vk::SemaphoreCreateInfo {
+            s_type: vk::StructureType::SEMAPHORE_CREATE_INFO,
+            p_next: std::ptr::null(),
+            flags: Default::default(),
+        };
         Ok(Semaphore {
             device: device.clone(),
             handle: unsafe {
-                device.create_semaphore(&vk::SemaphoreCreateInfo::builder(), None)?
+                device.create_semaphore(&info, None)?
             }
         })
     }

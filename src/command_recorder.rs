@@ -6,11 +6,10 @@ use petgraph::graph::NodeIndex;
 use petgraph::{Incoming, Outgoing};
 use petgraph::prelude::EdgeRef;
 use crate::domain::{ExecutionDomain};
-use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, PassGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource, BuiltPassGraph, BufferView};
+use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, PassGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource, BuiltPassGraph, BufferView, AttachmentType};
 use crate::task_graph::Resource;
 
 use anyhow::Result;
-use petgraph::data::DataMapMut;
 use crate::command_buffer::{RenderingAttachmentInfo, RenderingInfo};
 
 // Traversal
@@ -54,21 +53,43 @@ fn insert_in_active_set<'a, 'e, 'q, D>(
     }
 }
 
+fn find_resolve_attachment<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings, resource: &GpuResource) -> Option<ImageView>
+    where D: ExecutionDomain {
+    pass.outputs.iter().find(|output| {
+        match &output.usage {
+            ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => {
+                VirtualResource::are_associated(&resource.resource, &resolve)
+            },
+            _ => false
+        }
+    })
+    .map(|resolve| {
+        let Some(PhysicalResource::Image(image)) = bindings.resolve(&resolve.resource) else {
+            // TODO: handle or report this error better
+            panic!("No resource bound");
+        };
+        image
+    }).cloned()
+}
+
 fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<RenderingAttachmentInfo>>
     where D: ExecutionDomain {
     Ok(pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
-        if resource.layout != vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL { return None; }
+        if !matches!(resource.usage, ResourceUsage::Attachment(AttachmentType::Color))  {
+            return None;
+        }
         let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
             // TODO: handle or report this error better
             panic!("No resource bound");
         };
+        let resolve = find_resolve_attachment(&pass, bindings, resource);
         // Attachment should always have a load op set, or our library is bugged
         let info = RenderingAttachmentInfo {
             image_view: image.clone(),
             image_layout: resource.layout,
-            resolve_mode: None,
-            resolve_image_view: None,
-            resolve_image_layout: None,
+            resolve_mode: resolve.is_some().then(|| vk::ResolveModeFlags::AVERAGE),
+            resolve_image_layout: resolve.is_some().then(|| vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+            resolve_image_view: resolve,
             load_op: resource.load_op.unwrap(),
             store_op: vk::AttachmentStoreOp::STORE,
             clear_value: resource.clear_value.unwrap_or(vk::ClearValue::default()),
@@ -119,12 +140,14 @@ fn render_area<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBin
 }
 
 #[cfg(feature="debug-markers")]
-fn annotate_pass<'q, D>(pass: &GpuTask<GpuResource, D>, debug: &DebugMessenger, mut cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
+fn annotate_pass<'q, D>(pass: &GpuTask<GpuResource, D>, debug: &DebugMessenger, cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
     let name = CString::new(pass.identifier.clone())?;
-    let label = vk::DebugUtilsLabelEXT::builder()
-        .label_name(&name)
-        .color(pass.color.unwrap_or([1.0, 1.0, 1.0, 1.0]))
-        .build();
+    let label = vk::DebugUtilsLabelEXT {
+        s_type: vk::StructureType::DEBUG_UTILS_LABEL_EXT,
+        p_next: std::ptr::null(),
+        p_label_name: name.as_ptr(),
+        color: pass.color.unwrap_or([1.0, 1.0, 1.0, 1.0]),
+    };
     Ok(cmd.begin_label(label, debug))
 }
 
@@ -148,7 +171,6 @@ fn record_pass<'exec, 'q, D>(pass: &mut GpuTask<'exec, 'q, GpuResource, D>, bind
             depth_attachment: depth_attachment(&pass, &bindings),
             stencil_attachment: None, // TODO: Stencil
         };
-        let depth_info = depth_attachment(&pass, &bindings);
         cmd = cmd.begin_rendering(&info);
     }
 
@@ -175,38 +197,61 @@ fn record_image_barrier<'q, D>(barrier: &GpuBarrier, image: &ImageView, dst_reso
     // barrier.resource has information on srcLayout
     // dst_resource(barrier) has information on dstLayout
 
-    let info = vk::DependencyInfo::builder()
-        .dependency_flags(vk::DependencyFlags::BY_REGION);
-    let vk_barrier = vk::ImageMemoryBarrier2::builder()
-        .image(image.image)
-        .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-        .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-        .src_access_mask(barrier.src_access)
-        .dst_access_mask(barrier.dst_access)
-        .src_stage_mask(barrier.src_stage)
-        .dst_stage_mask(barrier.dst_stage)
-        .old_layout(barrier.resource.layout)
-        .new_layout(dst_resource.layout)
-        .subresource_range(image.subresource_range())
-        .build();
-    let dependency = info.image_memory_barriers(std::slice::from_ref(&vk_barrier)).build();
+    let vk_barrier = vk::ImageMemoryBarrier2 {
+        s_type: vk::StructureType::IMAGE_MEMORY_BARRIER_2,
+        p_next: std::ptr::null(),
+        src_stage_mask: barrier.src_stage,
+        src_access_mask: barrier.src_access,
+        dst_stage_mask: barrier.dst_stage,
+        dst_access_mask: barrier.dst_access,
+        old_layout: barrier.resource.layout,
+        new_layout: dst_resource.layout,
+        src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+        dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+        image: image.image,
+        subresource_range: image.subresource_range(),
+    };
+
+    let dependency = vk::DependencyInfo {
+        s_type: vk::StructureType::DEPENDENCY_INFO,
+        p_next: std::ptr::null(),
+        dependency_flags: vk::DependencyFlags::BY_REGION,
+        memory_barrier_count: 0,
+        p_memory_barriers: std::ptr::null(),
+        buffer_memory_barrier_count: 0,
+        p_buffer_memory_barriers: std::ptr::null(),
+        image_memory_barrier_count: 1,
+        p_image_memory_barriers: &vk_barrier,
+    };
+
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
-fn record_buffer_barrier<'q, D>(barrier: &GpuBarrier, buffer: &BufferView, dst_resource: &GpuResource, cmd: IncompleteCommandBuffer<'q, D>)
+fn record_buffer_barrier<'q, D>(barrier: &GpuBarrier, _buffer: &BufferView, _dst_resource: &GpuResource, cmd: IncompleteCommandBuffer<'q, D>)
     -> Result<IncompleteCommandBuffer<'q, D>>
     where D: ExecutionDomain {
 
-    let info = vk::DependencyInfo::builder()
-        .dependency_flags(vk::DependencyFlags::BY_REGION);
     // Since every driver implements buffer barriers as global memory barriers, we will do the same.
-    let vk_barrier = vk::MemoryBarrier2::builder()
-        .src_access_mask(barrier.src_access)
-        .dst_access_mask(barrier.dst_access)
-        .src_stage_mask(barrier.src_stage)
-        .dst_stage_mask(barrier.dst_stage)
-        .build();
-    let dependency = info.memory_barriers(std::slice::from_ref(&vk_barrier)).build();
+    let vk_barrier = vk::MemoryBarrier2 {
+        s_type: vk::StructureType::MEMORY_BARRIER_2,
+        p_next: std::ptr::null(),
+        src_stage_mask: barrier.src_stage,
+        src_access_mask: barrier.src_access,
+        dst_stage_mask: barrier.dst_stage,
+        dst_access_mask: barrier.dst_access,
+    };
+
+    let dependency = vk::DependencyInfo {
+        s_type: vk::StructureType::DEPENDENCY_INFO,
+        p_next: std::ptr::null(),
+        dependency_flags: vk::DependencyFlags::BY_REGION,
+        memory_barrier_count: 1,
+        p_memory_barriers: &vk_barrier,
+        buffer_memory_barrier_count: 0,
+        p_buffer_memory_barriers: std::ptr::null(),
+        image_memory_barrier_count:0 ,
+        p_image_memory_barriers: std::ptr::null(),
+    };
 
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
