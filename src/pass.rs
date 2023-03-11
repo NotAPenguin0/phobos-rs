@@ -225,7 +225,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
     pub fn resolve(mut self, src: VirtualResource, dst: VirtualResource) -> Self {
         self.inner.inputs.push(GpuResource {
             usage: ResourceUsage::Attachment(AttachmentType::Resolve(src.clone())),
-            resource: dst,
+            resource: dst.clone(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             clear_value: None,
