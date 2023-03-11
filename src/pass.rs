@@ -220,7 +220,9 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
         Ok(self)
     }
 
-    pub fn resolve(mut self, src: VirtualResource, dst: VirtualResource) {
+    /// Resolves src into dst
+    /// TODO: Add check for existence of src
+    pub fn resolve(mut self, src: VirtualResource, dst: VirtualResource) -> Self {
         self.inner.outputs.push(GpuResource {
             usage: ResourceUsage::Attachment(AttachmentType::Resolve(src)),
             resource: dst.upgrade(),
@@ -228,7 +230,9 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             clear_value: None,
             load_op: Some(vk::AttachmentLoadOp::DONT_CARE),
-        })
+        });
+
+        self
     }
 
     /// Declare that a resource will be used as a sampled image in the given pipeline stages.
