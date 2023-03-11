@@ -160,7 +160,7 @@ impl Image {
     /// The returned [`ImageView`] is valid as long as `self` is valid.
     pub fn view(&self, aspect: vk::ImageAspectFlags) -> Result<ImageView> {
         let info = vk::ImageViewCreateInfo {
-            s_type: vk::StructureType::IMAGE_CREATE_INFO,
+            s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
             p_next: std::ptr::null(),
             flags: Default::default(),
             image: self.handle,
