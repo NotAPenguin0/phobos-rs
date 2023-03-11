@@ -385,7 +385,7 @@ impl FrameManager<'_> {
             .iter()
             .map(|sem| sem.handle)
             .collect();
-        let stages = vec![vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT | vk::PipelineStageFlags::FRAGMENT_SHADER | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS];
+        let stages = vec![vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
 
         // Grab a copy of the command buffer handle for submission.
         // We do this because we're going to move the actual command buffer into our
