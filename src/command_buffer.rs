@@ -150,9 +150,14 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
     type Domain = D;
 
     fn new(device: Arc<Device>, queue_lock: MutexGuard<'q, Queue>, handle: vk::CommandBuffer, flags: vk::CommandBufferUsageFlags) -> Result<Self> {
-        unsafe { device.begin_command_buffer(
-            handle,
-            &vk::CommandBufferBeginInfo::builder().flags(flags))?
+        unsafe {
+            let begin_info = vk::CommandBufferBeginInfo {
+                s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
+                p_next: std::ptr::null(),
+                flags,
+                p_inheritance_info: std::ptr::null(),
+            };
+            device.begin_command_buffer(handle, &begin_info)?;
         };
         Ok(IncompleteCommandBuffer {
             device: device.clone(),
@@ -244,16 +249,18 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     pub fn transition_image(self, image: &ImageView, src_stage: vk::PipelineStageFlags, dst_stage: vk::PipelineStageFlags,
                             from: vk::ImageLayout, to: vk::ImageLayout,
                             src_access: vk::AccessFlags, dst_access: vk::AccessFlags) -> Self {
-        let barrier = vk::ImageMemoryBarrier::builder()
-            .image(image.image)
-            .subresource_range(image.subresource_range())
-            .src_access_mask(src_access)
-            .dst_access_mask(dst_access)
-            .old_layout(from)
-            .new_layout(to)
-            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .build();
+        let barrier = vk::ImageMemoryBarrier {
+            s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
+            p_next: std::ptr::null(),
+            src_access_mask: src_access,
+            dst_access_mask: dst_access,
+            old_layout: from,
+            new_layout: to,
+            src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            image: image.image,
+            subresource_range: image.subresource_range(),
+        };
         unsafe {
             self.device.cmd_pipeline_barrier(
                 self.handle,

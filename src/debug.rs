@@ -2,7 +2,6 @@ use ash::vk;
 
 use crate::{util, VkInstance, Error};
 use anyhow::Result;
-use ash::vk::DebugUtilsMessageSeverityFlagsEXT;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -17,13 +16,16 @@ impl DebugMessenger {
     /// do anything useful.
     pub fn new(instance: &VkInstance) -> Result<Self> {
         let functions = ash::extensions::ext::DebugUtils::new(&instance.entry, &instance.instance);
-        let handle = unsafe {
-            functions.create_debug_utils_messenger(
-                &vk::DebugUtilsMessengerCreateInfoEXT::builder()
-                .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR)
-                .message_type(vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION)
-                .pfn_user_callback(Some(vk_debug_callback)), None)?
+        let info = vk::DebugUtilsMessengerCreateInfoEXT {
+            s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+            p_next: std::ptr::null(),
+            flags: Default::default(),
+            message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+            message_type: vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
+            pfn_user_callback: Some(vk_debug_callback),
+            p_user_data: std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
         };
+        let handle = unsafe { functions.create_debug_utils_messenger(&info, None)? };
         Ok(DebugMessenger { handle, functions })
     }
 }

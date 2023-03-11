@@ -44,14 +44,17 @@ pub struct Semaphore {
 impl<'f> Fence<'f> {
     /// Create a new fence, possibly in the singaled status.
     pub fn new(device: Arc<Device>, signaled: bool) -> Result<Self, vk::Result> {
+        let info = vk::FenceCreateInfo {
+            s_type: vk::StructureType::FENCE_CREATE_INFO,
+            p_next: std::ptr::null(),
+            flags: if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() },
+        };
         Ok(Fence {
             device: device.clone(),
             waker: None,
             first_cleanup_fn: None,
             handle: unsafe {
-                device.create_fence(&vk::FenceCreateInfo::builder()
-                        .flags(if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() }),
-    None)?
+                device.create_fence(&info, None)?
             }
         })
     }
@@ -148,10 +151,15 @@ impl<T> Future for GpuFuture<'_, T> {
 
 impl Semaphore {
     pub fn new(device: Arc<Device>) -> Result<Self, vk::Result> {
+        let info = vk::SemaphoreCreateInfo {
+            s_type: vk::StructureType::SEMAPHORE_CREATE_INFO,
+            p_next: std::ptr::null(),
+            flags: Default::default(),
+        };
         Ok(Semaphore {
             device: device.clone(),
             handle: unsafe {
-                device.create_semaphore(&vk::SemaphoreCreateInfo::builder(), None)?
+                device.create_semaphore(&info, None)?
             }
         })
     }

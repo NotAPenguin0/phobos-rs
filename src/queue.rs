@@ -77,12 +77,17 @@ impl Queue {
     }
 
     pub(crate) fn allocate_command_buffer<'q, CmdBuf: IncompleteCmdBuffer<'q>>(device: Arc<Device>, queue_lock: MutexGuard<'q, Queue>) -> Result<CmdBuf> {
-        let handle = unsafe { device.allocate_command_buffers(
-            &vk::CommandBufferAllocateInfo::builder()
-                .command_pool(queue_lock.pool.handle)
-                .command_buffer_count(1)
-                .level(vk::CommandBufferLevel::PRIMARY))?
-        }.into_iter().next().ok_or(Error::Uncategorized("Command buffer allocation failed."))?;
+        let info = vk::CommandBufferAllocateInfo {
+            s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
+            p_next: std::ptr::null(),
+            command_pool: queue_lock.pool.handle,
+            level: vk::CommandBufferLevel::PRIMARY,
+            command_buffer_count: 1,
+        };
+        let handle = unsafe { device.allocate_command_buffers(&info)? }
+            .into_iter()
+            .next()
+            .ok_or(Error::Uncategorized("Command buffer allocation failed."))?;
 
         CmdBuf::new(device.clone(), queue_lock, handle, vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
     }

@@ -121,10 +121,12 @@ fn render_area<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBin
 #[cfg(feature="debug-markers")]
 fn annotate_pass<'q, D>(pass: &GpuTask<GpuResource, D>, debug: &DebugMessenger, mut cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
     let name = CString::new(pass.identifier.clone())?;
-    let label = vk::DebugUtilsLabelEXT::builder()
-        .label_name(&name)
-        .color(pass.color.unwrap_or([1.0, 1.0, 1.0, 1.0]))
-        .build();
+    let label = vk::DebugUtilsLabelEXT {
+        s_type: vk::StructureType::DEBUG_UTILS_LABEL_EXT,
+        p_next: std::ptr::null(),
+        p_label_name: name.as_ptr(),
+        color: pass.color.unwrap_or([1.0, 1.0, 1.0, 1.0]),
+    };
     Ok(cmd.begin_label(label, debug))
 }
 
@@ -175,21 +177,33 @@ fn record_image_barrier<'q, D>(barrier: &GpuBarrier, image: &ImageView, dst_reso
     // barrier.resource has information on srcLayout
     // dst_resource(barrier) has information on dstLayout
 
-    let info = vk::DependencyInfo::builder()
-        .dependency_flags(vk::DependencyFlags::BY_REGION);
-    let vk_barrier = vk::ImageMemoryBarrier2::builder()
-        .image(image.image)
-        .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-        .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-        .src_access_mask(barrier.src_access)
-        .dst_access_mask(barrier.dst_access)
-        .src_stage_mask(barrier.src_stage)
-        .dst_stage_mask(barrier.dst_stage)
-        .old_layout(barrier.resource.layout)
-        .new_layout(dst_resource.layout)
-        .subresource_range(image.subresource_range())
-        .build();
-    let dependency = info.image_memory_barriers(std::slice::from_ref(&vk_barrier)).build();
+    let vk_barrier = vk::ImageMemoryBarrier2 {
+        s_type: vk::StructureType::IMAGE_MEMORY_BARRIER_2,
+        p_next: std::ptr::null(),
+        src_stage_mask: barrier.src_stage,
+        src_access_mask: barrier.src_access,
+        dst_stage_mask: barrier.dst_stage,
+        dst_access_mask: barrier.dst_access,
+        old_layout: barrier.resource.layout,
+        new_layout: dst_resource.layout,
+        src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+        dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+        image: image.image,
+        subresource_range: image.subresource_range(),
+    };
+
+    let dependency = vk::DependencyInfo {
+        s_type: vk::StructureType::DEPENDENCY_INFO,
+        p_next: std::ptr::null(),
+        dependency_flags: vk::DependencyFlags::BY_REGION,
+        memory_barrier_count: 0,
+        p_memory_barriers: std::ptr::null(),
+        buffer_memory_barrier_count: 0,
+        p_buffer_memory_barriers: std::ptr::null(),
+        image_memory_barrier_count: 1,
+        p_image_memory_barriers: &vk_barrier,
+    };
+
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
@@ -197,16 +211,27 @@ fn record_buffer_barrier<'q, D>(barrier: &GpuBarrier, buffer: &BufferView, dst_r
     -> Result<IncompleteCommandBuffer<'q, D>>
     where D: ExecutionDomain {
 
-    let info = vk::DependencyInfo::builder()
-        .dependency_flags(vk::DependencyFlags::BY_REGION);
     // Since every driver implements buffer barriers as global memory barriers, we will do the same.
-    let vk_barrier = vk::MemoryBarrier2::builder()
-        .src_access_mask(barrier.src_access)
-        .dst_access_mask(barrier.dst_access)
-        .src_stage_mask(barrier.src_stage)
-        .dst_stage_mask(barrier.dst_stage)
-        .build();
-    let dependency = info.memory_barriers(std::slice::from_ref(&vk_barrier)).build();
+    let vk_barrier = vk::MemoryBarrier2 {
+        s_type: vk::StructureType::MEMORY_BARRIER_2,
+        p_next: std::ptr::null(),
+        src_stage_mask: barrier.src_stage,
+        src_access_mask: barrier.src_access,
+        dst_stage_mask: barrier.dst_stage,
+        dst_access_mask: barrier.dst_access,
+    };
+
+    let dependency = vk::DependencyInfo {
+        s_type: vk::StructureType::DEPENDENCY_INFO,
+        p_next: std::ptr::null(),
+        dependency_flags: vk::DependencyFlags::BY_REGION,
+        memory_barrier_count: 1,
+        p_memory_barriers: &vk_barrier,
+        buffer_memory_barrier_count: 0,
+        p_buffer_memory_barriers: std::ptr::null(),
+        image_memory_barrier_count:0 ,
+        p_image_memory_barriers: std::ptr::null(),
+    };
 
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
