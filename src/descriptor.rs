@@ -179,6 +179,16 @@ fn binding_buffer_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorBufferI
     .collect()
 }
 
+struct WriteDescriptorSet {
+    set: vk::DescriptorSet,
+    binding: u32,
+    array_element: u32,
+    count: u32,
+    ty: vk::DescriptorType,
+    image_info: Option<Vec<vk::DescriptorImageInfo>>,
+    buffer_info: Option<Vec<vk::DescriptorBufferInfo>>,
+}
+
 impl Resource for DescriptorSet {
     type Key = DescriptorSetBinding;
     type ExtraParams<'a> = ();
@@ -191,32 +201,48 @@ impl Resource for DescriptorSet {
             .build();
         let set = unsafe { device.allocate_descriptor_sets(&info) }?.first().cloned().unwrap();
         let writes = key.bindings.iter().map(|binding| {
-            let mut write = vk::WriteDescriptorSet {
-                s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                p_next: std::ptr::null(),
-                dst_set: set,
-                dst_binding: binding.binding,
-                dst_array_element: 0,
-                descriptor_count: binding.descriptors.len() as u32,
-                descriptor_type: binding.ty,
-                p_image_info: std::ptr::null(),
-                p_buffer_info: std::ptr::null(),
-                p_texel_buffer_view: std::ptr::null(),
+            let mut write = WriteDescriptorSet {
+                set,
+                binding: binding.binding,
+                array_element: 0,
+                count: binding.descriptors.len() as u32,
+                ty: binding.ty,
+                image_info: None,
+                buffer_info: None,
             };
-            // Now fill in the actual write info, based on the correct type
-            let mut image_info = Vec::new();
-            let mut buffer_info = Vec::new();
+
             match binding.ty {
-                vk::DescriptorType::COMBINED_IMAGE_SAMPLER => { image_info = binding_image_info(&binding); write.p_image_info = image_info.as_ptr(); },
-                vk::DescriptorType::SAMPLED_IMAGE => { image_info = binding_image_info(&binding); write.p_image_info = image_info.as_ptr(); },
-                vk::DescriptorType::UNIFORM_BUFFER => { buffer_info = binding_buffer_info(&binding); write.p_buffer_info = buffer_info.as_ptr(); },
+                vk::DescriptorType::COMBINED_IMAGE_SAMPLER => { write.image_info = Some(binding_image_info(&binding)); },
+                vk::DescriptorType::SAMPLED_IMAGE => { write.image_info = Some(binding_image_info(&binding)); },
+                vk::DescriptorType::UNIFORM_BUFFER => { write.buffer_info = Some(binding_buffer_info(&binding)); },
                 _ => { todo!(); }
             }
             write
         })
-        .collect::<Vec<vk::WriteDescriptorSet>>();
+        .collect::<Vec<WriteDescriptorSet>>();
 
-        unsafe { device.update_descriptor_sets(writes.as_slice(), &[]); }
+        let vk_writes = writes.iter().map(|write| {
+            vk::WriteDescriptorSet {
+                s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                p_next: std::ptr::null(),
+                dst_set: write.set,
+                dst_binding: write.binding,
+                dst_array_element: write.array_element,
+                descriptor_count: write.count,
+                descriptor_type: write.ty,
+                p_image_info: match &write.image_info {
+                    None => { std::ptr::null() }
+                    Some(image) => { image.as_ptr() }
+                },
+                p_buffer_info: match &write.buffer_info {
+                    None => { std::ptr::null() }
+                    Some(buffer) => { buffer.as_ptr() }
+                },
+                p_texel_buffer_view: std::ptr::null(),
+            }
+        }).collect::<Vec<_>>();
+
+        unsafe { device.update_descriptor_sets(vk_writes.as_slice(), &[]); }
 
         Ok(DescriptorSet {
             device,
