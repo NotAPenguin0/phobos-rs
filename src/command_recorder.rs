@@ -75,7 +75,7 @@ fn find_resolve_attachment<D>(pass: &GpuTask<GpuResource, D>, bindings: &Physica
 fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<RenderingAttachmentInfo>>
     where D: ExecutionDomain {
     Ok(pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
-        if !matches!(resource.usage, ResourceUsage::Attachment(AttachmentType::Resolve(_)))  {
+        if !matches!(resource.usage, ResourceUsage::Attachment(AttachmentType::Color))  {
             return None;
         }
         let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
