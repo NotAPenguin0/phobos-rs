@@ -735,7 +735,7 @@ impl PipelineBuilder {
 
     /// Build the pipeline create info structure.
     pub fn build(mut self) -> PipelineCreateInfo {
-        self.inner.build_inner();
+        // self.inner.build_inner(); Moved to pipeline cache
         self.inner
     }
 
@@ -764,19 +764,24 @@ impl PipelineCache {
         let refl = reflect_shaders(&info)?;
         // Using reflection, we can allow omitting the pipeline layout field.
         info.layout = build_pipeline_layout(&refl);
-        self.named_pipelines.insert(info.name.clone(), PipelineEntry {
+        let name = info.name.clone();
+        self.named_pipelines.insert(name.clone(), PipelineEntry {
             info,
             reflection: refl,
         });
+        self.named_pipelines.get_mut(&name).unwrap().info.build_inner();
         Ok(())
     }
 
 
     #[cfg(not(feature="shader-reflection"))]
     pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
-        self.named_pipelines.insert(info.name.clone(), PipelineEntry {
+        info.build_inner();
+        let name = info.name.clone();
+        self.named_pipelines.insert(name.clone(), PipelineEntry {
             info
         });
+        self.named_pipelines.get_mut(&name).unwrap().info.build_inner();
         Ok(())
     }
 
