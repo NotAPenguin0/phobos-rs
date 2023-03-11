@@ -4,8 +4,6 @@ use crate::{Device, Error, Fence, PhysicalDevice, Queue, QueueType};
 use crate::command_buffer::*;
 use anyhow::Result;
 use ash::vk;
-use crate::deferred_delete::DeletionQueue;
-use crate::domain::ExecutionDomain;
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling

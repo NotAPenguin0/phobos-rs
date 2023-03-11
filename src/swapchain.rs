@@ -6,6 +6,7 @@ use anyhow::Result;
 
 #[derive(Debug)]
 pub(crate) struct SwapchainImage {
+    #[allow(dead_code)]
     pub image: Image,
     pub view: ImageView
 }

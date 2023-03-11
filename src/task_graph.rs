@@ -419,6 +419,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
         self.graph.graph.node_count()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn source(&self) -> NodeIndex {
         self.source
     }
@@ -439,6 +440,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn barrier_src_resource<'a>(graph: &'a Graph<Node<GpuResource, GpuBarrier, GpuTask<GpuResource, D>>, String>, node: NodeIndex) -> Result<&'a GpuResource> {
         let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(anyhow::Error::from(Error::NodeNotFound)) };
         let edge = graph.edges_directed(node, Direction::Incoming).next().unwrap();

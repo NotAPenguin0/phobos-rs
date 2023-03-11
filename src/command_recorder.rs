@@ -10,7 +10,6 @@ use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, PassGraph, 
 use crate::task_graph::Resource;
 
 use anyhow::Result;
-use petgraph::data::DataMapMut;
 use crate::command_buffer::{RenderingAttachmentInfo, RenderingInfo};
 
 // Traversal
@@ -119,7 +118,7 @@ fn render_area<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBin
 }
 
 #[cfg(feature="debug-markers")]
-fn annotate_pass<'q, D>(pass: &GpuTask<GpuResource, D>, debug: &DebugMessenger, mut cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
+fn annotate_pass<'q, D>(pass: &GpuTask<GpuResource, D>, debug: &DebugMessenger, cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
     let name = CString::new(pass.identifier.clone())?;
     let label = vk::DebugUtilsLabelEXT {
         s_type: vk::StructureType::DEBUG_UTILS_LABEL_EXT,
@@ -150,7 +149,6 @@ fn record_pass<'exec, 'q, D>(pass: &mut GpuTask<'exec, 'q, GpuResource, D>, bind
             depth_attachment: depth_attachment(&pass, &bindings),
             stencil_attachment: None, // TODO: Stencil
         };
-        let depth_info = depth_attachment(&pass, &bindings);
         cmd = cmd.begin_rendering(&info);
     }
 
@@ -207,7 +205,7 @@ fn record_image_barrier<'q, D>(barrier: &GpuBarrier, image: &ImageView, dst_reso
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
-fn record_buffer_barrier<'q, D>(barrier: &GpuBarrier, buffer: &BufferView, dst_resource: &GpuResource, cmd: IncompleteCommandBuffer<'q, D>)
+fn record_buffer_barrier<'q, D>(barrier: &GpuBarrier, _buffer: &BufferView, _dst_resource: &GpuResource, cmd: IncompleteCommandBuffer<'q, D>)
     -> Result<IncompleteCommandBuffer<'q, D>>
     where D: ExecutionDomain {
 

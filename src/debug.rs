@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::{util, VkInstance, Error};
+use crate::{util, VkInstance};
 use anyhow::Result;
 
 #[derive(Derivative)]

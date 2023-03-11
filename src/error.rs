@@ -1,11 +1,8 @@
 use std::ffi::NulError;
-use std::fmt::{Display, Formatter};
 use std::sync::PoisonError;
 use ash;
-use ash::vk::Pipeline;
 use gpu_allocator::AllocationError;
 use thiserror::Error;
-use anyhow::Result;
 
 #[derive(Error, Debug)]
 pub enum Error {

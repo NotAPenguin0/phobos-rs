@@ -62,7 +62,6 @@ use crate::{Device, Error};
 use crate::cache::*;
 use crate::util::ByteSize;
 use anyhow::Result;
-use crate::command_buffer::RenderingInfo;
 #[cfg(feature="shader-reflection")]
 use crate::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
@@ -401,7 +400,7 @@ impl PipelineCreateInfo {
     pub(crate) fn to_vk(&self, layout: vk::PipelineLayout) -> vk::GraphicsPipelineCreateInfo {
         vk::GraphicsPipelineCreateInfo {
             s_type: vk::StructureType::GRAPHICS_PIPELINE_CREATE_INFO,
-            p_next: unsafe { (&self.vk_rendering_state as *const _) as *const std::ffi::c_void },
+            p_next:  (&self.vk_rendering_state as *const _) as *const std::ffi::c_void,
             flags: Default::default(),
             stage_count: 0,
             p_stages: std::ptr::null(),
@@ -734,8 +733,7 @@ impl PipelineBuilder {
     }
 
     /// Build the pipeline create info structure.
-    pub fn build(mut self) -> PipelineCreateInfo {
-        // self.inner.build_inner(); Moved to pipeline cache
+    pub fn build(self) -> PipelineCreateInfo {
         self.inner
     }
 

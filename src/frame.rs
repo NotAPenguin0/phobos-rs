@@ -56,7 +56,6 @@
 //! ```
 
 use std::future::Future;
-use std::mem::swap;
 use std::sync::{Arc, Mutex};
 use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, CmdBuffer, ImageView, WindowInterface, Surface, Image, SwapchainImage, ScratchAllocator, AppSettings, BufferView};
 use crate::sync::*;
@@ -450,6 +449,7 @@ impl FrameManager<'_> {
 
     /// Get a reference to the current swapchain image.
     /// This reference is valid as long as the swapchain is not resized.
+    #[allow(dead_code)]
     unsafe fn get_swapchain_image(&self) -> Result<ImageView> {
         Ok(self.swapchain.images[self.current_image as usize].view.clone())
     }
