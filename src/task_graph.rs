@@ -102,7 +102,7 @@ pub struct TaskGraph<R, B, T> where R: Resource + Default, B: Barrier<R> + Clone
 }
 
 
-#[derive(Debug, Default, Copy, Clone, Hash)]
+#[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum ResourceType {
     #[default]
     Image,
@@ -110,7 +110,7 @@ pub enum ResourceType {
 }
 
 /// Represents a virtual resource in the system, uniquely identified by a string.
-#[derive(Debug, Default, Clone, Hash)]
+#[derive(Debug, Default, Clone, Hash, Eq, PartialEq)]
 pub struct VirtualResource {
     pub uid: String,
     pub ty: ResourceType,
@@ -120,7 +120,8 @@ pub struct VirtualResource {
 pub enum AttachmentType {
     #[default]
     Color,
-    Depth
+    Depth,
+    Resolve(VirtualResource)
 }
 
 /// Resource usage in a task graph.
@@ -303,6 +304,7 @@ impl ResourceUsage {
             ResourceUsage::Present => { vk::AccessFlags2::NONE }
             ResourceUsage::Attachment(AttachmentType::Color) => { vk::AccessFlags2::COLOR_ATTACHMENT_WRITE }
             ResourceUsage::Attachment(AttachmentType::Depth) => { vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE }
+            ResourceUsage::Attachment(AttachmentType::Resolve(_)) => { vk::AccessFlags2::COLOR_ATTACHMENT_WRITE }
             ResourceUsage::ShaderRead => { vk::AccessFlags2::SHADER_READ }
             ResourceUsage::ShaderWrite => { vk::AccessFlags2::SHADER_WRITE }
         }

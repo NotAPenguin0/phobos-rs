@@ -6,7 +6,7 @@ use petgraph::graph::NodeIndex;
 use petgraph::{Incoming, Outgoing};
 use petgraph::prelude::EdgeRef;
 use crate::domain::{ExecutionDomain};
-use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, PassGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource, BuiltPassGraph, BufferView};
+use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, PassGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource, BuiltPassGraph, BufferView, AttachmentType};
 use crate::task_graph::Resource;
 
 use anyhow::Result;
@@ -53,6 +53,25 @@ fn insert_in_active_set<'a, 'e, 'q, D>(
     }
 }
 
+fn find_resolve_attachment<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings, resource: &GpuResource) -> Option<ImageView>
+    where D: ExecutionDomain {
+    pass.outputs.iter().find(|output| {
+        match &output.usage {
+            ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => {
+                VirtualResource::are_associated(&resource.resource, &resolve)
+            },
+            _ => false
+        }
+    })
+    .map(|resolve| {
+        let Some(PhysicalResource::Image(image)) = bindings.resolve(&resolve.resource) else {
+            // TODO: handle or report this error better
+            panic!("No resource bound");
+        };
+        image
+    }).cloned()
+}
+
 fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<RenderingAttachmentInfo>>
     where D: ExecutionDomain {
     Ok(pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
@@ -61,13 +80,14 @@ fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResou
             // TODO: handle or report this error better
             panic!("No resource bound");
         };
+        let resolve = find_resolve_attachment(&pass, bindings, resource);
         // Attachment should always have a load op set, or our library is bugged
         let info = RenderingAttachmentInfo {
             image_view: image.clone(),
             image_layout: resource.layout,
-            resolve_mode: None,
-            resolve_image_view: None,
-            resolve_image_layout: None,
+            resolve_mode: resolve.is_some().then(|| vk::ResolveModeFlags::AVERAGE),
+            resolve_image_layout: resolve.is_some().then(|| vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+            resolve_image_view: resolve,
             load_op: resource.load_op.unwrap(),
             store_op: vk::AttachmentStoreOp::STORE,
             clear_value: resource.clear_value.unwrap_or(vk::ClearValue::default()),
