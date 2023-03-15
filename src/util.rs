@@ -63,7 +63,7 @@ pub fn staged_buffer_upload<T>(device: Arc<Device>, allocator: Arc<Mutex<Allocat
     graph = graph.add_pass(pass)?;
     let mut graph = graph.build()?;
 
-    let cmd = exec.on_domain::<domain::Transfer>()?;
+    let cmd = exec.on_domain::<domain::Transfer>(None, None)?;
     let mut ifc = ctx.get_ifc();
     let bindings = PhysicalResourceBindings::new();
     let cmd = record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;

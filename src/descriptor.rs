@@ -132,6 +132,7 @@ pub struct DescriptorCache {
 ///             .build();
 /// ```
 #[cfg(feature="shader-reflection")]
+#[derive(Debug)]
 pub struct DescriptorSetBuilder<'a> {
     inner: DescriptorSetBinding,
     reflection: Option<&'a ReflectionInfo>
@@ -399,16 +400,17 @@ impl<'r> DescriptorSetBuilder<'r> {
         }
     }
 
-    pub fn resolve_and_bind_sampled_image(self, binding: u32, resource: VirtualResource, sampler: &Sampler, bindings: &PhysicalResourceBindings) -> Result<Self> {
+    pub fn resolve_and_bind_sampled_image(&mut self, binding: u32, resource: VirtualResource, sampler: &Sampler, bindings: &PhysicalResourceBindings) -> Result<()> {
         if let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource) {
-            Ok(self.bind_sampled_image(binding, image.clone(), sampler))
+            self.bind_sampled_image(binding, image.clone(), sampler);
+            Ok(())
         } else {
             Err(Error::NoResourceBound(resource.uid.clone()).into())
         }
     }
 
     /// Bind an image view to the given binding as a [`vk::DescriptorType::COMBINED_IMAGE_SAMPLER`]
-    pub fn bind_sampled_image(mut self, binding: u32, image: ImageView, sampler: &Sampler) -> Self {
+    pub fn bind_sampled_image(&mut self, binding: u32, image: ImageView, sampler: &Sampler) -> () {
         self.inner.bindings.push(DescriptorBinding {
             binding,
             ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
@@ -418,17 +420,17 @@ impl<'r> DescriptorSetBuilder<'r> {
                 layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
             }) ],
         });
-        self
     }
 
     #[cfg(feature="shader-reflection")]
-    pub fn bind_named_sampled_image(self, name: &str, image: ImageView, sampler: &Sampler) -> Result<Self> {
+    pub fn bind_named_sampled_image(&mut self, name: &str, image: ImageView, sampler: &Sampler) -> Result<()> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
         let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
-        Ok(self.bind_sampled_image(binding.binding, image, sampler))
+        self.bind_sampled_image(binding.binding, image, sampler);
+        Ok(())
     }
 
-    pub fn bind_uniform_buffer(mut self, binding: u32, buffer: BufferView) -> Self {
+    pub fn bind_uniform_buffer(&mut self, binding: u32, buffer: BufferView) -> () {
         self.inner.bindings.push(DescriptorBinding {
             binding,
             ty: vk::DescriptorType::UNIFORM_BUFFER,
@@ -436,15 +438,14 @@ impl<'r> DescriptorSetBuilder<'r> {
                 buffer,
             }) ],
         });
-
-        self
     }
 
     #[cfg(feature="shader-reflection")]
-    pub fn bind_named_uniform_buffer(self, name: &str, buffer: BufferView) -> Result<Self> {
+    pub fn bind_named_uniform_buffer(&mut self, name: &str, buffer: BufferView) -> Result<()> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
         let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
-        Ok(self.bind_uniform_buffer(binding.binding, buffer))
+        self.bind_uniform_buffer(binding.binding, buffer);
+        Ok(())
     }
 
     pub fn build(self) -> DescriptorSetBinding {
