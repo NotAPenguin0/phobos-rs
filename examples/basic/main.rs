@@ -79,7 +79,7 @@ fn main_loop(frame: &mut ph::FrameManager,
                             max_depth: 0.0,
                     })
                      .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
-                     .draw(6, 1, 0, 0);
+                     .draw(6, 1, 0, 0)?;
             Ok(cmd)
         })
         .build();
@@ -103,15 +103,8 @@ fn main_loop(frame: &mut ph::FrameManager,
                     })
                     .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } });
             let ph::PhysicalResource::Image(offscreen_attachment) = bindings.resolve(&offscreen).unwrap() else { panic!() };
-            let set = {
-                let pipelines = pipelines.lock().unwrap();
-                let reflection = pipelines.reflection_info("sample")?;
-                let mut builder = ph::DescriptorSetBuilder::with_reflection(&reflection);
-                builder.bind_named_sampled_image("tex", offscreen_attachment.clone(), &resources.sampler)?;
-                builder.build()
-            };
-            Ok(cmd.bind_new_descriptor_set(0, descriptors.clone(), set)?
-                .draw(6, 1, 0, 0))
+            Ok(cmd.bind_sampled_image(0, 0, &offscreen_attachment, &resources.sampler)?
+                .draw(6, 1, 0, 0)?)
         })
         .build();
     // Add another pass to handle presentation to the screen
@@ -131,7 +124,7 @@ fn main_loop(frame: &mut ph::FrameManager,
         bindings.bind_image("swapchain".to_string(), ifc.swapchain_image.as_ref().unwrap().clone());
         bindings.bind_image("offscreen".to_string(), resources.offscreen_view.clone());
         // create a command buffer capable of executing graphics commands
-        let cmd = exec.on_domain::<ph::domain::Graphics>(Some(pipelines), Some(descriptors)).unwrap();
+        let cmd = exec.on_domain::<ph::domain::Graphics>(Some(pipelines.clone()), Some(descriptors.clone())).unwrap();
         let cmd2 = exec.try_on_domain::<ph::domain::Graphics>(None, None);
         match cmd2 {
             Err(_) => { /* good, queue should be locked */ }
@@ -189,7 +182,7 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
 
     let mut graph = graph.add_pass(pass)?.build()?;
 
-    let cmd = exec.on_domain::<ph::domain::Transfer>()?;
+    let cmd = exec.on_domain::<ph::domain::Transfer>(None, None)?;
     let mut ifc = ctx.get_ifc();
     let bindings = ph::PhysicalResourceBindings::new();
     // Record graph to a command buffer, then finish it.

@@ -63,9 +63,9 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     /// Sets the scissor region. Equivalent of `vkCmdSetScissor`.
     fn scissor(self, scissor: vk::Rect2D) -> Self;
     /// Record a single drawcall. Equivalent of `vkCmdDraw`.
-    fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Self;
+    fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Result<Self> where Self: Sized;
     /// Record a single indexed drawcall. Equivalent of `vkCmdDrawIndexed`
-    fn draw_indexed(self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Self;
+    fn draw_indexed(self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Result<Self> where Self: Sized;
     /// Bind a graphics pipeline with a given name. This is looked up from the given pipeline cache.
     /// # Errors
     /// This function can report an error in case the pipeline name is not registered in the cache.
@@ -147,7 +147,8 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     current_bindpoint: vk::PipelineBindPoint, // TODO: Note: technically not correct
     current_rendering_state: Option<PipelineRenderingInfo>,
     current_render_area: vk::Rect2D,
-    current_descriptor_sets: HashMap<u32, DescriptorSetBuilder<'static>>, // Note static lifetime, we dont currently support adding reflection to this
+    current_descriptor_sets: Option<HashMap<u32, DescriptorSetBuilder<'static>>>, // Note static lifetime, we dont currently support adding reflection to this
+    descriptor_state_needs_update: bool, // TODO: Only update disturbed descriptor sets
     descriptor_cache: Option<Arc<Mutex<DescriptorCache>>>,
     pipeline_cache: Option<Arc<Mutex<PipelineCache>>>,
     _domain: PhantomData<D>,
@@ -181,7 +182,8 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
             current_bindpoint: vk::PipelineBindPoint::default(),
             current_rendering_state: None,
             current_render_area: Default::default(),
-            current_descriptor_sets: Default::default(),
+            current_descriptor_sets: None,
+            descriptor_state_needs_update: false,
             descriptor_cache: descriptors,
             pipeline_cache: pipelines,
             _domain: PhantomData
@@ -227,20 +229,53 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     /// Bind a descriptor set to the command buffer. This descriptor set can be obtained by calling
     /// [`Self::get_descriptor_set`]. Note that the index should be the same as the one used in get_descriptor_set.
     /// To safely do this, prefer using [`Self::bind_new_descriptor_set`] to combine these two functions into one call.
-    fn bind_descriptor_set(self, index: u32, set: &DescriptorSet) -> Self {
+    fn bind_descriptor_set(&self, index: u32, set: &DescriptorSet) {
         unsafe {
             self.device.cmd_bind_descriptor_sets(self.handle, self.current_bindpoint, self.current_pipeline_layout,
                                      index,
                                 std::slice::from_ref(&set.handle),
                                &[]); }
-        self
     }
 
-    fn ensure_descriptor_builder_entry(&mut self, set: u32) {
-        match self.current_descriptor_sets.entry(set) {
-            Entry::Occupied(_) => { }
-            Entry::Vacant(entry) => { entry.insert(DescriptorSetBuilder::new()); }
+    fn modify_descriptor_set(&mut self, set: u32, f: impl FnOnce(&mut DescriptorSetBuilder) -> Result<()>) -> Result<()> {
+        if self.current_descriptor_sets.is_none() {
+            self.current_descriptor_sets = Some(HashMap::new());
+        }
+
+        match self.current_descriptor_sets.as_mut().unwrap().entry(set) {
+            Entry::Occupied(mut entry) => {
+                f(entry.get_mut())?;
+            }
+            Entry::Vacant(entry) => {
+                let mut builder = DescriptorSetBuilder::new();
+                f(&mut builder)?;
+                entry.insert(builder);
+            }
         };
+        self.descriptor_state_needs_update = true;
+        Ok(())
+    }
+
+    fn ensure_descriptor_state(mut self) -> Result<Self> {
+        // No need to do anything
+        if !self.descriptor_state_needs_update {
+            return Ok(self);
+        }
+
+        let Some(cache) = &self.descriptor_cache else { return Err(Error::NoDescriptorCache.into()); };
+        {
+            let mut cache = cache.lock().unwrap();
+            for (index, builder) in self.current_descriptor_sets.take().unwrap() {
+                let mut info = builder.build();
+                info.layout = *self.current_set_layouts.get(index as usize).unwrap();
+                let set = cache.get_descriptor_set(info)?;
+                self.bind_descriptor_set(index, set);
+            }
+        }
+
+        // We updated all our descriptor sets, were good now.
+        self.descriptor_state_needs_update = false;
+        Ok(self)
     }
 
     /// Obtain a descriptor set from the cache, and immediately bind it to the given index.
@@ -264,12 +299,22 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     pub fn bind_new_descriptor_set(mut self, index: u32, cache: Arc<Mutex<DescriptorCache>>, bindings: DescriptorSetBinding) -> Result<Self> {
         let mut cache = cache.lock().or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?;
         let set = self.get_descriptor_set(index, bindings, &mut cache)?;
-        Ok(self.bind_descriptor_set(index, set))
+        self.bind_descriptor_set(index, set);
+        Ok(self)
+    }
+
+    /// Clears all currently bound descriptors.
+    pub fn forget_descriptor_state(mut self) -> Self {
+        self.current_descriptor_sets = None;
+        self.descriptor_state_needs_update = true;
+        self
     }
 
     pub fn bind_sampled_image(mut self, set: u32, binding: u32, image: &ImageView, sampler: &Sampler) -> Result<Self> {
-        self.ensure_descriptor_builder_entry(set);
-
+        self.modify_descriptor_set(set, |builder| {
+            builder.bind_sampled_image(binding, image.clone(), sampler);
+            Ok(())
+        })?;
         Ok(self)
     }
 
@@ -307,12 +352,11 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     }
 
     /// vkCmdPipelineBarrier2. Prefer using this over regular pipeline barriers if possible, to make
-    /// full use of VK_KHR_SYNCHRONIZATION_2.
+    /// full use of `VK_KHR_SYNCHRONIZATION_2`.
     pub fn pipeline_barrier_2(self, dependency: &vk::DependencyInfo) -> Self {
         unsafe {
             self.device.cmd_pipeline_barrier2(self.handle, &dependency);
         }
-
         self
     }
 
@@ -320,7 +364,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         unsafe {
             let (_, data, _) = data.align_to::<u8>();
             self.device.cmd_push_constants(self.handle, self.current_pipeline_layout, stage, offset, data);
-        };
+        }
         self
     }
 
@@ -451,14 +495,16 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         self
     }
 
-    fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Self {
+    fn draw(mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Result<Self> {
+        self = self.ensure_descriptor_state()?;
         unsafe { self.device.cmd_draw(self.handle, vertex_count, instance_count, first_vertex, first_instance); }
-        self
+        Ok(self)
     }
 
-    fn draw_indexed(self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Self {
+    fn draw_indexed(mut self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Result<Self> {
+        self = self.ensure_descriptor_state()?;
         unsafe { self.device.cmd_draw_indexed(self.handle, index_count, instance_count, first_index, vertex_offset, first_instance) }
-        self
+        Ok(self)
     }
 
     fn bind_graphics_pipeline(mut self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self> {
