@@ -89,6 +89,9 @@
 extern crate derivative;
 #[macro_use] extern crate log;
 
+pub mod prelude;
+pub use crate::prelude::*;
+
 mod command_pool;
 mod shader_reflection;
 pub mod cache;
@@ -97,11 +100,9 @@ pub mod image;
 pub mod frame;
 pub mod queue;
 pub mod error;
-pub mod instance;
 pub mod debug;
 pub mod surface;
 pub mod physical_device;
-pub mod device;
 pub mod execution_manager;
 pub mod swapchain;
 pub mod command_buffer;
@@ -113,28 +114,23 @@ pub mod scratch_allocator;
 pub mod deferred_delete;
 pub mod thread_context;
 pub mod util;
-pub mod prelude;
 pub mod core;
 pub mod sync;
 pub mod domain;
 pub mod graph;
+pub mod allocator;
 
 use std::sync::{Arc, Mutex};
 pub use ash::vk;
-use window::WindowInterface;
-pub use gpu_allocator::vulkan as vk_alloc;
-pub use gpu_allocator::MemoryLocation;
 
 pub use crate::image::*;
 pub use crate::frame::*;
 pub use crate::sync::*;
 pub use crate::error::*;
-pub use crate::instance::*;
 pub use crate::debug::*;
 pub use crate::surface::*;
 pub use crate::physical_device::*;
 pub use crate::queue::*;
-pub use crate::device::*;
 pub use crate::execution_manager::*;
 pub use crate::swapchain::*;
 pub use crate::window::*;
@@ -148,20 +144,5 @@ pub use crate::scratch_allocator::*;
 pub use crate::thread_context::*;
 pub use crate::util::*;
 pub use crate::deferred_delete::*;
-pub use crate::prelude::*;
-pub use vk_alloc::Allocator;
 
 use anyhow::Result;
-
-
-pub fn create_allocator(instance: &VkInstance, device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Arc<Mutex<vk_alloc::Allocator>>> {
-    Ok(Arc::new(Mutex::new(vk_alloc::Allocator::new(
-        &vk_alloc::AllocatorCreateDesc {
-            instance: instance.instance.clone(),
-            device: device.handle.clone(),
-            physical_device: physical_device.handle.clone(),
-            debug_settings: Default::default(),
-            buffer_device_address: false // We might change this if the bufferDeviceAddress feature gets enabled.
-        }
-    )?)))
-}

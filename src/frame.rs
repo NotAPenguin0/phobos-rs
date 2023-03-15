@@ -57,16 +57,15 @@
 
 use std::future::Future;
 use std::sync::{Arc, Mutex};
-use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, ImageView, WindowInterface, Surface, Image, SwapchainImage, ScratchAllocator, AppSettings, BufferView, Fence, Semaphore, CmdBuffer};
+use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, ImageView, WindowInterface, Surface, Image, SwapchainImage, ScratchAllocator, AppSettings, BufferView, Fence, Semaphore, CmdBuffer, Allocator, DefaultAllocator};
 use ash::vk;
-use gpu_allocator::vulkan::Allocator;
 use crate::domain::ExecutionDomain;
 use crate::deferred_delete::DeletionQueue;
 use anyhow::Result;
 /// Information stored for each in-flight frame.
 #[derive(Derivative)]
 #[derivative(Debug)]
-struct PerFrame<'f> {
+struct PerFrame<'f, A: Allocator = DefaultAllocator> {
     pub fence: Arc<Fence<'f>>,
     /// Signaled by the GPU when a swapchain image is ready.
     pub image_ready: Semaphore,
@@ -78,10 +77,10 @@ struct PerFrame<'f> {
     #[derivative(Debug="ignore")]
     pub command_buffer: Option<Box<dyn CmdBuffer>>,
     // Scratch allocators
-    pub vertex_allocator: ScratchAllocator,
-    pub index_allocator: ScratchAllocator,
-    pub uniform_allocator: ScratchAllocator,
-    pub storage_allocator: ScratchAllocator
+    pub vertex_allocator: ScratchAllocator<A>,
+    pub index_allocator: ScratchAllocator<A>,
+    pub uniform_allocator: ScratchAllocator<A>,
+    pub storage_allocator: ScratchAllocator<A>
 }
 
 /// Information stored for each swapchain image.
@@ -107,21 +106,26 @@ struct PerImage<'f> {
 ///
 /// Another way to acquire an instance of this struct is through a [`ThreadContext`].
 #[derive(Debug)]
-pub struct InFlightContext<'f> {
+pub struct InFlightContext<'f, A: Allocator = DefaultAllocator> {
     pub swapchain_image: Option<ImageView>,
     pub swapchain_image_index: Option<usize>,
-    pub(crate) vertex_allocator: &'f mut ScratchAllocator,
-    pub(crate) index_allocator: &'f mut ScratchAllocator,
-    pub(crate) uniform_allocator: &'f mut ScratchAllocator,
-    pub(crate) storage_allocator: &'f mut ScratchAllocator
+    pub(crate) vertex_allocator: &'f mut ScratchAllocator<A>,
+    pub(crate) index_allocator: &'f mut ScratchAllocator<A>,
+    pub(crate) uniform_allocator: &'f mut ScratchAllocator<A>,
+    pub(crate) storage_allocator: &'f mut ScratchAllocator<A>
 }
+
+/// The number of frames in flight. A frame in-flight is a frame that is rendering on the GPU or scheduled to do so.
+/// With two frames in flight, we can prepare a frame on the CPU while one frame is rendering on the GPU.
+/// This gives a good amount of parallelization while avoiding input lag.
+const FRAMES_IN_FLIGHT: usize = 2;
 
 /// Responsible for presentation, frame-frame synchronization and per-frame resources.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct FrameManager<'f> {
+pub struct FrameManager<'f, A: Allocator = DefaultAllocator> {
     device: Arc<Device>,
-    per_frame: [PerFrame<'f>; FrameManager::FRAMES_IN_FLIGHT],
+    per_frame: [PerFrame<'f, A>; FRAMES_IN_FLIGHT],
     per_image: Vec<PerImage<'f>>,
     current_frame: u32,
     current_image: u32,
@@ -129,36 +133,31 @@ pub struct FrameManager<'f> {
     swapchain_delete: DeletionQueue<Swapchain>,
 }
 
-impl FrameManager<'_> {
-    /// The number of frames in flight. A frame in-flight is a frame that is rendering on the GPU or scheduled to do so.
-    /// With two frames in flight, we can prepare a frame on the CPU while one frame is rendering on the GPU.
-    /// This gives a good amount of parallelization while avoiding input lag.
-    pub(crate) const FRAMES_IN_FLIGHT: usize = 2;
-
+impl<A: Allocator> FrameManager<'_, A> {
     /// Initialize frame manager with per-frame data.
-    pub fn new<Window>(device: Arc<Device>, allocator: Arc<Mutex<Allocator>>, settings: &AppSettings<Window>, swapchain: Swapchain) -> Result<Self> where Window: WindowInterface {
+    pub fn new<Window>(device: Arc<Device>, mut allocator: A, settings: &AppSettings<Window>, swapchain: Swapchain) -> Result<Self> where Window: WindowInterface {
         let scratch_flags_base = vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC;
         Ok(FrameManager {
             device: device.clone(),
-            per_frame: (0..Self::FRAMES_IN_FLIGHT).into_iter().map(|_| -> Result<PerFrame> {
-               Ok(PerFrame {
+            per_frame: (0..FRAMES_IN_FLIGHT).into_iter().map(|_| -> Result<PerFrame<A>> {
+               Ok(PerFrame::<A> {
                    fence: Arc::new(Fence::new(device.clone(), true)?),
                    image_ready: Semaphore::new(device.clone())?,
                    gpu_finished: Semaphore::new(device.clone())?,
                    command_buffer: None,
-                   vertex_allocator: ScratchAllocator::new(device.clone(), allocator.clone(), settings.scratch_vbo_size, scratch_flags_base | vk::BufferUsageFlags::VERTEX_BUFFER)?,
-                   index_allocator: ScratchAllocator::new(device.clone(), allocator.clone(), settings.scratch_ibo_size, scratch_flags_base | vk::BufferUsageFlags::INDEX_BUFFER)?,
-                   uniform_allocator: ScratchAllocator::new(device.clone(), allocator.clone(), settings.scratch_ubo_size, scratch_flags_base | vk::BufferUsageFlags::UNIFORM_BUFFER)?,
-                   storage_allocator: ScratchAllocator::new(device.clone(), allocator.clone(), settings.scratch_ssbo_size, scratch_flags_base | vk::BufferUsageFlags::STORAGE_BUFFER)?,
+                   vertex_allocator: ScratchAllocator::<A>::new(device.clone(), &mut allocator, settings.scratch_vbo_size, scratch_flags_base | vk::BufferUsageFlags::VERTEX_BUFFER)?,
+                   index_allocator: ScratchAllocator::<A>::new(device.clone(), &mut allocator, settings.scratch_ibo_size, scratch_flags_base | vk::BufferUsageFlags::INDEX_BUFFER)?,
+                   uniform_allocator: ScratchAllocator::<A>::new(device.clone(), &mut allocator, settings.scratch_ubo_size, scratch_flags_base | vk::BufferUsageFlags::UNIFORM_BUFFER)?,
+                   storage_allocator: ScratchAllocator::<A>::new(device.clone(), &mut allocator, settings.scratch_ssbo_size, scratch_flags_base | vk::BufferUsageFlags::STORAGE_BUFFER)?,
                })
-            }).collect::<Result<Vec<PerFrame>>>()?
+            }).collect::<Result<Vec<PerFrame<A>>>>()?
             .try_into()
             .map_err(|_| Error::Uncategorized("Conversion to slice failed"))?,
             per_image: swapchain.images.iter().map(|_| PerImage { fence: None } ).collect(),
             current_frame: 0,
             current_image: 0,
             swapchain,
-            swapchain_delete: DeletionQueue::<Swapchain>::new((Self::FRAMES_IN_FLIGHT + 2) as u32),
+            swapchain_delete: DeletionQueue::<Swapchain>::new((FRAMES_IN_FLIGHT + 2) as u32),
         })
     }
 
@@ -253,7 +252,7 @@ impl FrameManager<'_> {
         where
             Window: WindowInterface,
             D: ExecutionDomain + 'static,
-            F: FnOnce(InFlightContext) -> Result<CommandBuffer<D>> {
+            F: FnOnce(InFlightContext<A>) -> Result<CommandBuffer<D>> {
 
         // Advance deletion queue by one frame
         self.swapchain_delete.next_frame();
@@ -297,7 +296,7 @@ impl FrameManager<'_> {
             per_frame.command_buffer = None;
             let image = self.swapchain.images[self.current_image as usize].view.clone();
 
-            let ifc = InFlightContext {
+            let ifc = InFlightContext::<A> {
                 swapchain_image: Some(image),
                 swapchain_image_index: Some(self.current_image as usize),
                 vertex_allocator: &mut per_frame.vertex_allocator,
@@ -317,7 +316,7 @@ impl FrameManager<'_> {
         where
             Window: WindowInterface,
             D: ExecutionDomain + 'static,
-            F: FnOnce(InFlightContext) -> Fut,
+            F: FnOnce(InFlightContext<A>) -> Fut,
             Fut: Future<Output = Result<CommandBuffer<D>>> {
         
         // Advance deletion queue by one frame
@@ -362,7 +361,7 @@ impl FrameManager<'_> {
             per_frame.command_buffer = None;
             let image = self.swapchain.images[self.current_image as usize].view.clone();
 
-            let ifc = InFlightContext {
+            let ifc = InFlightContext::<A> {
                 swapchain_image: Some(image),
                 swapchain_image_index: Some(self.current_image as usize),
                 vertex_allocator: &mut per_frame.vertex_allocator,
@@ -458,7 +457,7 @@ impl FrameManager<'_> {
     }
 }
 
-impl<'f> InFlightContext<'f> {
+impl<'f, A: Allocator> InFlightContext<'f, A> {
     pub fn allocate_scratch_vbo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
         self.vertex_allocator.allocate(size)
     }

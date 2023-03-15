@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::ffi::CString;
-use crate::{BufferView, DebugMessenger, ImageView, IncompleteCommandBuffer, InFlightContext, PassGraph, PhysicalResourceBindings, VirtualResource, Error};
+use crate::{BufferView, DebugMessenger, ImageView, IncompleteCommandBuffer, InFlightContext, PassGraph, PhysicalResourceBindings, VirtualResource, Error, Allocator};
 use crate::domain::ExecutionDomain;
 
 use anyhow::Result;
@@ -15,7 +15,7 @@ use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::task_graph::{Node, Resource};
 
-pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain> {
+pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, A: Allocator> {
     /// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names
     /// to actual resources.
     /// # Errors
@@ -23,7 +23,7 @@ pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain> {
     fn record(&mut self,
               cmd: IncompleteCommandBuffer<'q, D>,
               bindings: &PhysicalResourceBindings,
-              ifc: &mut InFlightContext,
+              ifc: &mut InFlightContext<A>,
               debug: Option<&DebugMessenger>)
               -> Result<IncompleteCommandBuffer<'q, D>> where Self: Sized;
 }
@@ -57,9 +57,9 @@ macro_rules! parents {
     }
 }
 
-fn insert_in_active_set<'a, 'e, 'q, D>(
+fn insert_in_active_set<'a, 'e, 'q, D, A: Allocator>(
     node: NodeIndex,
-    graph: &'a PassGraph<'e, 'q, D>,
+    graph: &'a PassGraph<'e, 'q, D, A>,
     active: &mut HashSet<NodeIndex>,
     children: &mut HashSet<NodeIndex>) where D: ExecutionDomain {
     children.remove(&node);
@@ -69,7 +69,7 @@ fn insert_in_active_set<'a, 'e, 'q, D>(
     }
 }
 
-fn find_resolve_attachment<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalResourceBindings, resource: &PassResource) -> Option<ImageView>
+fn find_resolve_attachment<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings, resource: &PassResource) -> Option<ImageView>
     where D: ExecutionDomain {
     pass.outputs.iter().find(|output| {
         match &output.usage {
@@ -88,7 +88,7 @@ fn find_resolve_attachment<D>(pass: &PassNode<PassResource, D>, bindings: &Physi
         }).cloned()
 }
 
-fn color_attachments<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<RenderingAttachmentInfo>>
+fn color_attachments<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings) -> Result<Vec<RenderingAttachmentInfo>>
     where D: ExecutionDomain {
     Ok(pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
         if !matches!(resource.usage, ResourceUsage::Attachment(AttachmentType::Color))  {
@@ -114,7 +114,7 @@ fn color_attachments<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalRes
     }).collect())
 }
 
-fn depth_attachment<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalResourceBindings)
+fn depth_attachment<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings)
                        -> Option<RenderingAttachmentInfo> where D: ExecutionDomain {
     pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
         if resource.layout != vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL { return None; }
@@ -137,7 +137,7 @@ fn depth_attachment<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalReso
     }).next()
 }
 
-fn render_area<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalResourceBindings) -> vk::Rect2D where D: ExecutionDomain {
+fn render_area<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings) -> vk::Rect2D where D: ExecutionDomain {
     let resource = pass.outputs.iter().filter(|resource|
         match resource.usage {
             ResourceUsage::Attachment(_) => true,
@@ -156,7 +156,7 @@ fn render_area<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalResourceB
 }
 
 #[cfg(feature="debug-markers")]
-fn annotate_pass<'q, D>(pass: &PassNode<PassResource, D>, debug: &DebugMessenger, cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
+fn annotate_pass<'q, D, A: Allocator>(pass: &PassNode<PassResource, D, A>, debug: &DebugMessenger, cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
     let name = CString::new(pass.identifier.clone())?;
     let label = vk::DebugUtilsLabelEXT {
         s_type: vk::StructureType::DEBUG_UTILS_LABEL_EXT,
@@ -170,7 +170,7 @@ fn annotate_pass<'q, D>(pass: &PassNode<PassResource, D>, debug: &DebugMessenger
 #[cfg(not(feature="debug-markers"))]
 fn annotate_pass<D>(_: &PassNode<PassResource, D>, _: &DebugMessenger, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain { Ok(cmd) }
 
-fn record_pass<'exec, 'q, D>(pass: &mut PassNode<'exec, 'q, PassResource, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>)
+fn record_pass<'exec, 'q, D, A: Allocator>(pass: &mut PassNode<'exec, 'q, PassResource, D, A>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext<A>, mut cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>)
                              -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain  {
 
     if let Some(debug) = debug {
@@ -282,7 +282,7 @@ fn record_barrier<'q, D>(barrier: &PassResourceBarrier, dst_resource: &PassResou
     }
 }
 
-fn record_node<'exec, 'q, D>(graph: &mut BuiltPassGraph<'exec, 'q, D>, node: NodeIndex, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext,
+fn record_node<'exec, 'q, D, A: Allocator>(graph: &mut BuiltPassGraph<'exec, 'q, D, A>, node: NodeIndex, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext<A>,
                              cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
     let graph = &mut graph.graph.graph;
     let dst_resource_res = PassGraph::barrier_dst_resource(&graph, node).cloned();
@@ -299,11 +299,11 @@ fn record_node<'exec, 'q, D>(graph: &mut BuiltPassGraph<'exec, 'q, D>, node: Nod
 
 
 
-impl<'q, 'exec, D: ExecutionDomain> RecordGraphToCommandBuffer<'q, D> for BuiltPassGraph<'exec, 'q, D> {
+impl<'q, 'exec, D: ExecutionDomain, A: Allocator> RecordGraphToCommandBuffer<'q, D, A> for BuiltPassGraph<'exec, 'q, D, A> {
     fn record(&mut self,
               mut cmd: IncompleteCommandBuffer<'q, D>,
               bindings: &PhysicalResourceBindings,
-              ifc: &mut InFlightContext,
+              ifc: &mut InFlightContext<A>,
               debug: Option<&DebugMessenger>)
               -> Result<IncompleteCommandBuffer<'q, D>> where Self: Sized {
 

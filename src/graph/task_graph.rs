@@ -6,7 +6,7 @@ use petgraph::graph::{EdgeReference, NodeIndex};
 use anyhow::Result;
 use petgraph::dot::Dot;
 use crate::domain::ExecutionDomain;
-use crate::Error;
+use crate::{Allocator, Error};
 use crate::graph::pass_graph::{PassNode, PassResource, PassResourceBarrier};
 
 /// Represents a resource in a task graph.
@@ -170,13 +170,13 @@ pub trait GraphViz {
     fn dot(&self) -> Result<String>;
 }
 
-impl<D> GraphViz for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D>> where D: ExecutionDomain {
+impl<D, A: Allocator> GraphViz for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> where D: ExecutionDomain {
     fn dot(&self) -> Result<String> {
         Ok(format!("{}", Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes)))
     }
 }
 
-impl<D> Display for Node<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D>> where D: ExecutionDomain {
+impl<D, A: Allocator> Display for Node<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> where D: ExecutionDomain {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),

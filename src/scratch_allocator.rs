@@ -27,22 +27,20 @@ use std::ptr::NonNull;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use gpu_allocator::AllocationError::OutOfMemory;
-use gpu_allocator::MemoryLocation;
-use gpu_allocator::vulkan::Allocator;
-use crate::{Buffer, BufferView, Device, Error};
+use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};
 use crate::Error::AllocationError;
 use anyhow::Result;
 
 #[derive(Debug)]
-pub struct ScratchAllocator {
-    buffer: Buffer,
+pub struct ScratchAllocator<A: Allocator = DefaultAllocator> {
+    buffer: Buffer<A>,
     offset: vk::DeviceSize,
     alignment: vk::DeviceSize,
 }
 
-impl ScratchAllocator {
-    pub fn new(device: Arc<Device>, allocator: Arc<Mutex<Allocator>>, max_size: vk::DeviceSize, usage: vk::BufferUsageFlags) -> Result<Self> {
-        let buffer = Buffer::new(device.clone(), allocator, max_size, usage, MemoryLocation::CpuToGpu)?;
+impl<A: Allocator> ScratchAllocator<A> {
+    pub fn new(device: Arc<Device>, allocator: &mut A, max_size: vk::DeviceSize, usage: vk::BufferUsageFlags) -> Result<Self> {
+        let buffer = Buffer::new(device.clone(), allocator, max_size, usage, MemoryType::CpuToGpu)?;
         let alignment = if usage.intersects(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER) {
             16
         } else if usage.contains(vk::BufferUsageFlags::UNIFORM_BUFFER) {

@@ -6,7 +6,7 @@ use crate::domain::ExecutionDomain;
 use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::virtual_resource::VirtualResource;
-use crate::{Error, IncompleteCommandBuffer, InFlightContext, Pass, PhysicalResourceBindings, PipelineStage};
+use crate::{Allocator, Error, IncompleteCommandBuffer, InFlightContext, Pass, PhysicalResourceBindings, PipelineStage};
 
 use anyhow::Result;
 use petgraph::{Direction, Graph};
@@ -38,18 +38,18 @@ pub struct PassResourceBarrier {
 
 
 /// A task in a pass graph. Either a render pass, or a compute pass, etc.
-pub struct PassNode<'exec, 'q, R, D> where R: Resource, D: ExecutionDomain {
+pub struct PassNode<'exec, 'q, R, D, A: Allocator> where R: Resource, D: ExecutionDomain {
     pub identifier: String,
     pub color: Option<[f32; 4]>,
     pub inputs: Vec<R>,
     pub outputs: Vec<R>,
-    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>>  + 'exec>,
+    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>>  + 'exec>,
     pub is_renderpass: bool
 }
 
 /// Pass graph, used for synchronizing resources over a single queue.
-pub struct PassGraph<'exec, 'q, D> where D: ExecutionDomain {
-    pub(crate) graph: TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D>>,
+pub struct PassGraph<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
+    pub(crate) graph: TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>>,
     // Note that this is guaranteed to be stable.
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
     // index is invalidated. Since the source is always the first node, this is never invalidated.
@@ -58,19 +58,19 @@ pub struct PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     last_usages: HashMap<String, (usize, PipelineStage)>,
 }
 
-pub struct BuiltPassGraph<'exec, 'q, D> where D: ExecutionDomain {
-    graph: PassGraph<'exec, 'q, D>,
+pub struct BuiltPassGraph<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
+    graph: PassGraph<'exec, 'q, D, A>,
 }
 
-impl<'exec, 'q, D> Deref for BuiltPassGraph<'exec, 'q, D> where D: ExecutionDomain {
-    type Target = PassGraph<'exec, 'q, D>;
+impl<'exec, 'q, D, A: Allocator> Deref for BuiltPassGraph<'exec, 'q, D, A> where D: ExecutionDomain {
+    type Target = PassGraph<'exec, 'q, D, A>;
 
     fn deref(&self) -> &Self::Target {
         &self.graph
     }
 }
 
-impl<'exec, 'q, D> DerefMut for BuiltPassGraph<'exec, 'q, D> where D: ExecutionDomain {
+impl<'exec, 'q, D, A: Allocator> DerefMut for BuiltPassGraph<'exec, 'q, D, A> where D: ExecutionDomain {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.graph
     }
@@ -108,7 +108,7 @@ impl Resource for PassResource {
     }
 }
 
-impl<R, D> Task<R> for PassNode<'_, '_, R, D> where R: Resource, D: ExecutionDomain {
+impl<R, D, A: Allocator> Task<R> for PassNode<'_, '_, R, D, A> where R: Resource, D: ExecutionDomain {
     fn inputs(&self) -> &Vec<R> {
         &self.inputs
     }
@@ -152,7 +152,7 @@ macro_rules! barriers {
     }
 }
 
-impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
+impl<'exec, 'q, D, A: Allocator> PassGraph<'exec, 'q, D, A> where D: ExecutionDomain {
     /// Create a new task graph. If rendering to a swapchain, also give it the virtual resource you are planning to use for this.
     /// This is necessary for proper sync
     pub fn new(swapchain: Option<VirtualResource>) -> Self {
@@ -179,7 +179,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     /// Add a pass to a task graph.
     /// # Errors
     /// - This function can fail if adding the pass results in a cyclic dependency in the graph.
-    pub fn add_pass(mut self, pass: Pass<'exec, 'q, D>) -> Result<Self> {
+    pub fn add_pass(mut self, pass: Pass<'exec, 'q, D, A>) -> Result<Self> {
         {
             // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
             // Note that we dont actually fill the pipeline stages yet, we do that later
@@ -221,7 +221,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     }
 
     /// Builds the task graph so it can be recorded into a command buffer.
-    pub fn build(mut self) -> Result<BuiltPassGraph<'exec, 'q, D>> {
+    pub fn build(mut self) -> Result<BuiltPassGraph<'exec, 'q, D, A>> {
         self.set_source_stages()?;
         self.graph.create_barrier_nodes();
         self.merge_identical_barriers()?;
@@ -232,7 +232,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     }
 
     /// Returns the task graph built by the GPU task graph system, useful for outputting dotfiles.
-    pub fn task_graph(&self) -> &TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D>> {
+    pub fn task_graph(&self) -> &TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>> {
         &self.graph
     }
 
@@ -263,7 +263,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
     }
 
     #[allow(dead_code)]
-    fn barrier_src_resource<'a>(graph: &'a Graph<Node<PassResource, PassResourceBarrier, PassNode<PassResource, D>>, String>, node: NodeIndex) -> Result<&'a PassResource> {
+    fn barrier_src_resource<'a>(graph: &'a Graph<Node<PassResource, PassResourceBarrier, PassNode<PassResource, D, A>>, String>, node: NodeIndex) -> Result<&'a PassResource> {
         let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(Error::NodeNotFound.into()) };
         let edge = graph.edges_directed(node, Direction::Incoming).next().unwrap();
         let src_node = edge.source();
@@ -273,7 +273,7 @@ impl<'exec, 'q, D> PassGraph<'exec, 'q, D> where D: ExecutionDomain {
         Ok(task.inputs.iter().find(|&input| input.uid() == barrier.resource.uid()).unwrap())
     }
 
-    pub(crate) fn barrier_dst_resource<'a>(graph: &'a Graph<Node<PassResource, PassResourceBarrier, PassNode<PassResource, D>>, String>, node: NodeIndex) -> Result<&'a PassResource> {
+    pub(crate) fn barrier_dst_resource<'a>(graph: &'a Graph<Node<PassResource, PassResourceBarrier, PassNode<PassResource, D, A>>, String>, node: NodeIndex) -> Result<&'a PassResource> {
         // We know that:
         // 1) Each barrier has at least one outgoing edge
         // 2) During the merge, each outgoing edge from a barrier will have the same resource usage

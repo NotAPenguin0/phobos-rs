@@ -15,23 +15,21 @@
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicU64, Ordering};
 use ash::vk;
-use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};
-use gpu_allocator::vulkan::{AllocationCreateDesc, AllocationScheme, Allocator};
 use anyhow::Result;
 
-use crate::{Device, Error};
+use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 
 /// Abstraction over a [`VkImage`](vk::Image). Stores information about size, format, etc. Additionally couples the image data together
 /// with a memory allocation.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Image {
+pub struct Image<A: Allocator = DefaultAllocator> {
     // TODO: Reconsider member visibility
     /// Reference to the [`VkDevice`](vk::Device).
     #[derivative(Debug="ignore")]
     pub device: Arc<Device>,
     #[derivative(Debug="ignore")]
-    pub allocator: Option<Arc<Mutex<Allocator>>>,
+    pub allocator: Option<A>,
     /// [`VkImage`](vk::Image) handle.
     pub handle: vk::Image,
     /// Image format
@@ -47,7 +45,8 @@ pub struct Image {
     pub samples: vk::SampleCountFlags,
     /// GPU memory allocation. If this is None, then the image is not owned by our system (for example a swapchain image) and should not be
     /// destroyed.
-    pub memory: Option<vk_alloc::Allocation>,
+    #[derivative(Debug="ignore")]
+    pub memory: Option<A::Allocation>,
 }
 
 /// Abstraction over a [`VkImageView`](vk::ImageView). Most functions operating on images will expect these instead of raw owning [`Image`] structs.
@@ -88,11 +87,11 @@ pub struct ImgView {
 /// Reference-counted version of [`ImgView`].
 pub type ImageView = Arc<ImgView>;
 
-impl Image {
+impl<A: Allocator> Image<A> {
     // TODO: Allow specifying an initial layout for convenience
     // TODO: Full wrapper around the allocator for convenience
     /// Create a new simple [`VkImage`] and allocate some memory to it.
-    pub fn new(device: Arc<Device>, alloc: Arc<Mutex<Allocator>>, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format, samples: vk::SampleCountFlags) -> Result<Self> {
+    pub fn new(device: Arc<Device>, alloc: &mut A, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format, samples: vk::SampleCountFlags) -> Result<Self> {
         let sharing_mode = if usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {
             vk::SharingMode::EXCLUSIVE
         }
@@ -124,15 +123,8 @@ impl Image {
 
         let requirements = unsafe { device.get_image_memory_requirements(handle) };
 
-        let memory = alloc.lock().or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?.allocate(&AllocationCreateDesc {
-            name: "image_",
-            requirements,
-            // TODO: Proper memory location configuration
-            location: MemoryLocation::GpuOnly,
-            linear: false,
-            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
-        })?;
-
+        // TODO: Proper memory location configuration
+        let memory = alloc.allocate("image_", &requirements, MemoryType::GpuOnly)?;
         unsafe { device.bind_image_memory(handle, memory.memory(), memory.offset())?; }
 
         Ok(Self {
@@ -199,14 +191,14 @@ impl Image {
     }
 }
 
-impl Drop for Image {
+impl<A: Allocator> Drop for Image<A> {
     fn drop(&mut self) {
         if self.is_owned() {
             unsafe { self.device.destroy_image(self.handle, None); }
             if let Some(memory) = &mut self.memory {
                 let memory = std::mem::take(memory);
                 if let Some(allocator) = &mut self.allocator {
-                    allocator.lock().unwrap().free(memory).unwrap();
+                    allocator.free(memory).unwrap();
                 }
             }
         }

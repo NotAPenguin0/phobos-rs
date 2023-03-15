@@ -133,7 +133,7 @@ fn load_spirv_file(path: &Path) -> Vec<u32> {
 
 // Note that this is implemented in the graph library, which should be preferred for correct behaviour.
 #[allow(dead_code)]
-fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec: Arc<ph::ExecutionManager>) -> Result<ph::GpuFuture<'static, ph::Buffer>> {
+fn upload_buffer(device: Arc<ph::Device>, mut allocator: ph::DefaultAllocator, exec: Arc<ph::ExecutionManager>) -> Result<ph::GpuFuture<'static, ph::Buffer>> {
     let data: Vec<f32> = vec![
         -1.0, 1.0, 0.0, 1.0,
         -1.0, -1.0, 0.0, 0.0,
@@ -143,11 +143,11 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
         1.0, 1.0, 1.0, 1.0
     ];
     // This function will upload some data to a device local buffer using a staging buffer
-    let staging_buffer = ph::Buffer::new(device.clone(), allocator.clone(), (data.len() * std::mem::size_of::<f32>()) as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, MemoryLocation::CpuToGpu)?;
+    let staging_buffer = ph::Buffer::new(device.clone(), &mut allocator, (data.len() * std::mem::size_of::<f32>()) as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, ph::MemoryType::CpuToGpu)?;
     let mut staging = staging_buffer.view_full();
     staging.mapped_slice()?.copy_from_slice(data.as_slice());
 
-    let buffer = ph::Buffer::new_device_local(device.clone(), allocator.clone(), staging.size, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER)?;
+    let buffer = ph::Buffer::new_device_local(device.clone(), &mut allocator, staging.size, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER)?;
     let view = buffer.view_full();
 
     // Create an out of frame context.
@@ -219,7 +219,7 @@ fn main() -> Result<()> {
         (surface, physical_device)
     };
     let device = ph::Device::new(&instance, &physical_device, &settings)?;
-    let alloc = ph::create_allocator(&instance, device.clone(), &physical_device)?;
+    let mut alloc = ph::DefaultAllocator::new(&instance, device.clone(), &physical_device)?;
     let exec = ph::ExecutionManager::new(device.clone(), &physical_device)?;
     let mut frame = {
         let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
@@ -268,7 +268,7 @@ fn main() -> Result<()> {
         .build();
     cache.lock().unwrap().create_named_pipeline(pci)?;
     // Define some resources we will use for rendering
-    let image = ph::Image::new(device.clone(), alloc.clone(), 800, 600, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED, vk::Format::R8G8B8A8_SRGB, vk::SampleCountFlags::TYPE_1)?;
+    let image = ph::Image::new(device.clone(), &mut alloc, 800, 600, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED, vk::Format::R8G8B8A8_SRGB, vk::SampleCountFlags::TYPE_1)?;
     let data: Vec<f32> = vec![
         -1.0, 1.0, 0.0, 1.0,
         -1.0, -1.0, 0.0, 0.0,
