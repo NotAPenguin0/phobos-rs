@@ -315,21 +315,7 @@ fn main() -> Result<()> {
         // Do not render a frame if Exit control flow is specified, to avoid
         // sync issues.
         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
-
-        main_loop(
-            &mut frame,
-            &resources,
-            cache.clone(),
-            descriptor_cache.clone(),
-            &debug_messenger,
-            exec.clone(),
-            &surface,
-            &window).unwrap();
-
         *control_flow = ControlFlow::Poll;
-
-        cache.lock().unwrap().next_frame();
-        descriptor_cache.lock().unwrap().next_frame();
 
         // Note that we want to handle events after processing our current frame, so that
         // requesting an exit doesn't attempt to render another frame, which causes
@@ -342,6 +328,23 @@ fn main() -> Result<()> {
                 *control_flow = ControlFlow::Exit;
                 device.wait_idle().unwrap();
             },
+            Event::MainEventsCleared => {
+                window.request_redraw();
+            },
+            Event::RedrawRequested(_) => {
+                main_loop(
+                    &mut frame,
+                    &resources,
+                    cache.clone(),
+                    descriptor_cache.clone(),
+                    &debug_messenger,
+                    exec.clone(),
+                    &surface,
+                    &window).unwrap();
+
+                cache.lock().unwrap().next_frame();
+                descriptor_cache.lock().unwrap().next_frame();
+            }
             _ => (),
         }
     })
