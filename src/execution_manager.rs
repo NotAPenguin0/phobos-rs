@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
-use crate::{Device, Error, Fence, PhysicalDevice, Queue, QueueType};
+use crate::{DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache, Queue, QueueType};
 use crate::command_buffer::*;
 use anyhow::Result;
 use ash::vk;
@@ -130,18 +130,22 @@ impl ExecutionManager {
     }
 
     /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
-    pub fn try_on_domain<'q, D: domain::ExecutionDomain>(&'q self) -> Result<D::CmdBuf<'q>> {
+    pub fn try_on_domain<'q, D: domain::ExecutionDomain>(&'q self,
+                                                         pipelines:  Option<Arc<Mutex<PipelineCache>>>,
+                                                         descriptors: Option<Arc<Mutex<DescriptorCache>>>) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue)
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
-    pub fn on_domain<'q, D: domain::ExecutionDomain>(&'q self) -> Result<D::CmdBuf<'q>> {
+    pub fn on_domain<'q, D: domain::ExecutionDomain>(&'q self,
+                                                     pipelines:  Option<Arc<Mutex<PipelineCache>>>,
+                                                     descriptors: Option<Arc<Mutex<DescriptorCache>>>) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue)
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
-    // Submit a command buffer to its queue. TODO: Add semaphores
+    /// Submit a command buffer to its queue. TODO: Add semaphores
     pub fn submit<'f, 'q, D: domain::ExecutionDomain + 'f>(exec: Arc<ExecutionManager>, mut cmd: CommandBuffer<D>) -> Result<Fence<'f>> {
         let fence = Fence::new(exec.device.clone(), false)?;
 

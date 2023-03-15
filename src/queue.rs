@@ -1,6 +1,6 @@
-use std::sync::{Arc, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 use ash::vk;
-use crate::{sync, Device, Error, IncompleteCmdBuffer, CmdBuffer};
+use crate::{sync, Device, Error, IncompleteCmdBuffer, CmdBuffer, PipelineCache, DescriptorCache};
 use crate::command_pool::*;
 use anyhow::Result;
 
@@ -76,7 +76,12 @@ impl Queue {
         self.handle
     }
 
-    pub(crate) fn allocate_command_buffer<'q, CmdBuf: IncompleteCmdBuffer<'q>>(device: Arc<Device>, queue_lock: MutexGuard<'q, Queue>) -> Result<CmdBuf> {
+    pub(crate) fn allocate_command_buffer<'q, CmdBuf: IncompleteCmdBuffer<'q>>(
+        device: Arc<Device>,
+        queue_lock: MutexGuard<'q, Queue>,
+        pipelines:  Option<Arc<Mutex<PipelineCache>>>,
+        descriptors: Option<Arc<Mutex<DescriptorCache>>>)
+        -> Result<CmdBuf> {
         let info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
             p_next: std::ptr::null(),
@@ -89,7 +94,7 @@ impl Queue {
             .next()
             .ok_or(Error::Uncategorized("Command buffer allocation failed."))?;
 
-        CmdBuf::new(device.clone(), queue_lock, handle, vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
+        CmdBuf::new(device.clone(), queue_lock, handle, vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, pipelines, descriptors)
     }
 
     /// Instantly delete a command buffer, without taking synchronization into account.
