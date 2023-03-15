@@ -69,7 +69,7 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     /// Bind a graphics pipeline with a given name. This is looked up from the given pipeline cache.
     /// # Errors
     /// This function can report an error in case the pipeline name is not registered in the cache.
-    fn bind_graphics_pipeline(self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self> where Self: Sized;
+    fn bind_graphics_pipeline(self, name: &str) -> Result<Self> where Self: Sized;
     /// Bind a vertex buffer to the given vertex input binding.
     /// Equivalent of `vkCmdBindVertexBuffer`
     fn bind_vertex_buffer(self, binding: u32, buffer: BufferView) -> Self where Self: Sized;
@@ -529,14 +529,17 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         Ok(self)
     }
 
-    fn bind_graphics_pipeline(mut self, name: &str, cache: Arc<Mutex<PipelineCache>>) -> Result<Self> {
-        let mut cache = cache.lock().unwrap();
-        let Some(rendering_state) = &self.current_rendering_state else { return Err(Error::NoRenderpass.into()) };
-        let pipeline = cache.get_pipeline(name, &rendering_state)?;
-        unsafe { self.device.cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle); }
-        self.current_bindpoint = vk::PipelineBindPoint::GRAPHICS;
-        self.current_pipeline_layout = pipeline.layout;
-        self.current_set_layouts = pipeline.set_layouts.clone();
+    fn bind_graphics_pipeline(mut self, name: &str) -> Result<Self> {
+        let Some(cache) = &self.pipeline_cache else { return Err(Error::NoPipelineCache.into()); };
+        {
+            let mut cache = cache.lock().unwrap();
+            let Some(rendering_state) = &self.current_rendering_state else { return Err(Error::NoRenderpass.into()) };
+            let pipeline = cache.get_pipeline(name, &rendering_state)?;
+            unsafe { self.device.cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle); }
+            self.current_bindpoint = vk::PipelineBindPoint::GRAPHICS;
+            self.current_pipeline_layout = pipeline.layout;
+            self.current_set_layouts = pipeline.set_layouts.clone();
+        }
         Ok(self)
     }
 

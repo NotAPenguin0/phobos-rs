@@ -69,16 +69,8 @@ fn main_loop(frame: &mut ph::FrameManager,
             let slice = buffer.mapped_slice::<f32>()?;
             slice.copy_from_slice(vertices.as_slice());
             cmd = cmd.bind_vertex_buffer(0, buffer)
-                     .bind_graphics_pipeline("offscreen", pipelines.clone())?
-                     .viewport(vk::Viewport{
-                            x: 0.0,
-                            y: 0.0,
-                            width: 800.0,
-                            height: 600.0,
-                            min_depth: 0.0,
-                            max_depth: 0.0,
-                    })
-                     .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } })
+                     .bind_graphics_pipeline("offscreen")?
+                     .full_viewport_scissor()
                      .draw(6, 1, 0, 0)?;
             Ok(cmd)
         })
@@ -93,7 +85,7 @@ fn main_loop(frame: &mut ph::FrameManager,
         .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
         .execute(|mut cmd, _ifc, bindings| {
             cmd.full_viewport_scissor()
-                .bind_graphics_pipeline("sample", pipelines.clone())?
+                .bind_graphics_pipeline("sample")?
                 .resolve_and_bind_sampled_image(0, 0, offscreen.clone(), &resources.sampler, &bindings)?
                 .draw(6, 1, 0, 0)
         })
