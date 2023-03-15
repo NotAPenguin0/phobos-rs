@@ -6,7 +6,9 @@ use ash::vk;
 #[cfg(feature="shader-reflection")]
 use spv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
 
-use crate::{DescriptorSetLayoutCreateInfo, Error, PipelineCreateInfo, PipelineLayoutCreateInfo, PushConstantRange};
+use crate::{Error, PipelineCreateInfo};
+use crate::pipeline_layout::{PipelineLayoutCreateInfo, PushConstantRange};
+use crate::set_layout::DescriptorSetLayoutCreateInfo;
 
 #[cfg(all(feature="shader-reflection", not(feature="hlsl")))]
 type Ast = spv_cross::spirv::Ast<spv_cross::glsl::Target>;

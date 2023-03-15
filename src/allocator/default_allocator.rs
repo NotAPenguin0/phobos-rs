@@ -68,14 +68,14 @@ impl traits::Allocator for DefaultAllocator {
 
 impl traits::Allocation for Allocation {
     unsafe fn memory(&self) -> DeviceMemory {
-        self.memory()
+        self.allocation.memory()
     }
 
     fn offset(&self) -> DeviceSize {
-        self.offset()
+        self.allocation.offset()
     }
 
     fn mapped_ptr(&self) -> Option<NonNull<c_void>> {
-        self.mapped_ptr()
+        self.allocation.mapped_ptr()
     }
 }

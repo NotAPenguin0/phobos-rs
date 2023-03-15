@@ -6,12 +6,13 @@ use crate::domain::ExecutionDomain;
 use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::virtual_resource::VirtualResource;
-use crate::{Allocator, Error, IncompleteCommandBuffer, InFlightContext, Pass, PhysicalResourceBindings, PipelineStage};
+use crate::{Allocator, Error, IncompleteCommandBuffer, InFlightContext, PhysicalResourceBindings, PipelineStage};
 
 use anyhow::Result;
 use petgraph::{Direction, Graph};
 use petgraph::graph::NodeIndex;
 use petgraph::prelude::EdgeRef;
+use crate::graph::pass::Pass;
 
 /// Virtual GPU resource in a task graph.
 #[derive(Derivative, Default, Clone)]
