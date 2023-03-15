@@ -106,9 +106,9 @@ fn main_loop(frame: &mut ph::FrameManager,
             let set = {
                 let pipelines = pipelines.lock().unwrap();
                 let reflection = pipelines.reflection_info("sample")?;
-                ph::DescriptorSetBuilder::with_reflection(&reflection)
-                    .bind_named_sampled_image("tex", offscreen_attachment.clone(), &resources.sampler)?
-                    .build()
+                let mut builder = ph::DescriptorSetBuilder::with_reflection(&reflection);
+                builder.bind_named_sampled_image("tex", offscreen_attachment.clone(), &resources.sampler)?;
+                builder.build()
             };
             Ok(cmd.bind_new_descriptor_set(0, descriptors.clone(), set)?
                 .draw(6, 1, 0, 0))
