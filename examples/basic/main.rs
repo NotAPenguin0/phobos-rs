@@ -92,19 +92,10 @@ fn main_loop(frame: &mut ph::FrameManager,
                         Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
         .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
         .execute(|mut cmd, _ifc, bindings| {
-            cmd = cmd.bind_graphics_pipeline("sample", pipelines.clone()).unwrap()
-                    .viewport(vk::Viewport{
-                        x: 0.0,
-                        y: 0.0,
-                        width: 800.0,
-                        height: 600.0,
-                        min_depth: 0.0,
-                        max_depth: 0.0,
-                    })
-                    .scissor(vk::Rect2D { offset: Default::default(), extent: vk::Extent2D { width: 800, height: 600 } });
-            let ph::PhysicalResource::Image(offscreen_attachment) = bindings.resolve(&offscreen).unwrap() else { panic!() };
-            Ok(cmd.bind_sampled_image(0, 0, &offscreen_attachment, &resources.sampler)?
-                .draw(6, 1, 0, 0)?)
+            cmd.full_viewport_scissor()
+                .bind_graphics_pipeline("sample", pipelines.clone())?
+                .resolve_and_bind_sampled_image(0, 0, offscreen.clone(), &resources.sampler, &bindings)?
+                .draw(6, 1, 0, 0)
         })
         .build();
     // Add another pass to handle presentation to the screen

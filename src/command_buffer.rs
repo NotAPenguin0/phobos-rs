@@ -28,7 +28,7 @@ use crate::execution_manager::domain::*;
 use crate::execution_manager::domain;
 
 use ash::vk;
-use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBinding, DescriptorSetBuilder, Device, Error, ExecutionManager, ImageView, PipelineCache, PipelineRenderingInfo, Queue, Sampler};
+use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBinding, DescriptorSetBuilder, Device, Error, ExecutionManager, ImageView, PhysicalResourceBindings, PipelineCache, PipelineRenderingInfo, Queue, Sampler, VirtualResource};
 
 use anyhow::Result;
 use ash::vk::{Filter, Offset3D};
@@ -310,9 +310,31 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self
     }
 
+    pub fn resolve_and_bind_sampled_image(mut self,
+        set: u32,
+        binding: u32,
+        resource: VirtualResource,
+        sampler: &Sampler,
+        bindings: &PhysicalResourceBindings)
+        -> Result<Self> {
+
+        self.modify_descriptor_set(set, |builder| {
+            builder.resolve_and_bind_sampled_image(binding, resource, sampler, bindings)
+        })?;
+        Ok(self)
+    }
+
     pub fn bind_sampled_image(mut self, set: u32, binding: u32, image: &ImageView, sampler: &Sampler) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_sampled_image(binding, image.clone(), sampler);
+            Ok(())
+        })?;
+        Ok(self)
+    }
+
+    pub fn bind_uniform_buffer(mut self, set: u32, binding: u32, buffer: BufferView) -> Result<Self> {
+        self.modify_descriptor_set(set, |builder| {
+            builder.bind_uniform_buffer(binding, buffer);
             Ok(())
         })?;
         Ok(self)
