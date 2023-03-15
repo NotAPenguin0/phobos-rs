@@ -48,9 +48,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use ash::vk;
 use crate::cache::*;
-use crate::{BufferView, Device, Error, ImageView, PhysicalResource, PhysicalResourceBindings, Sampler, VirtualResource};
+use crate::{BufferView, Device, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
 use crate::deferred_delete::DeletionQueue;
 use anyhow::Result;
+use crate::graph::physical_resource::PhysicalResource;
 #[cfg(feature="shader-reflection")]
 use crate::shader_reflection::ReflectionInfo;
 

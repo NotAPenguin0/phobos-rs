@@ -1,8 +1,9 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 use ash::vk;
-use crate::{sync, Device, Error, IncompleteCmdBuffer, CmdBuffer, PipelineCache, DescriptorCache};
+use crate::{Device, Error, PipelineCache, DescriptorCache, Fence};
 use crate::command_pool::*;
 use anyhow::Result;
+use crate::traits::{CmdBuffer, IncompleteCmdBuffer};
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.
@@ -64,7 +65,7 @@ impl Queue {
     /// <br>
     /// # Thread safety
     /// This function is **not yet** thread safe! This function is marked as unsafe for now to signal this.
-    pub unsafe fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&sync::Fence>) -> Result<(), vk::Result> {
+    pub unsafe fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&Fence>) -> Result<(), vk::Result> {
         let fence = match fence {
             None => { vk::Fence::null() }
             Some(fence) => { fence.handle }

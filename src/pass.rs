@@ -64,17 +64,19 @@
 //! Binding physical resources and recording is covered under the [`task_graph`] module documentation.
 
 use ash::vk;
-use crate::{AttachmentType, Error, GpuResource, IncompleteCommandBuffer, InFlightContext, PhysicalResourceBindings, ResourceUsage, VirtualResource};
+use crate::{Error, IncompleteCommandBuffer, InFlightContext, PhysicalResourceBindings, VirtualResource};
 use crate::domain::ExecutionDomain;
 use crate::pipeline::PipelineStage;
 use anyhow::Result;
+use crate::graph::pass_graph::PassResource;
+use crate::graph::resource::{AttachmentType, ResourceUsage};
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
 pub struct Pass<'exec, 'q, D> where D: ExecutionDomain {
     pub(crate) name: String,
     pub(crate) color: Option<[f32; 4]>,
-    pub(crate) inputs: Vec<GpuResource>,
-    pub(crate) outputs: Vec<GpuResource>,
+    pub(crate) inputs: Vec<PassResource>,
+    pub(crate) outputs: Vec<PassResource>,
     pub(crate) execute: Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>>  + 'exec>,
     pub(crate) is_renderpass: bool
 }
@@ -136,7 +138,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
         Pass {
             name: name.into(),
             color: None,
-            inputs: vec![GpuResource{
+            inputs: vec![PassResource {
                 usage: ResourceUsage::Present,
                 resource: swapchain,
                 stage: PipelineStage::BOTTOM_OF_PIPE,
@@ -160,7 +162,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
     pub fn color_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self> {
         if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach color attachment to a pass that is not a renderpass").into()) }
         if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() { return Err(anyhow::Error::from(Error::NoClearValue)); }
-        self.inner.inputs.push(GpuResource {
+        self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Color),
             resource: resource.clone(),
             // from https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPipelineStageFlagBits2.html.
@@ -176,7 +178,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
             load_op: None,
         });
 
-        self.inner.outputs.push(GpuResource{
+        self.inner.outputs.push(PassResource{
             usage: ResourceUsage::Attachment(AttachmentType::Color),
             resource: resource.upgrade(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
@@ -191,7 +193,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
     /// Adds a depth attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
     pub fn depth_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Result<Self> {
         if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach depth attachment to a pass that is not a renderpass").into()) }
-        self.inner.inputs.push(GpuResource {
+        self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Depth),
             resource: resource.clone(),
             stage: match op {
@@ -206,7 +208,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
             load_op: None,
         });
 
-        self.inner.outputs.push(GpuResource {
+        self.inner.outputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Depth),
             resource: resource.upgrade(),
             // Depth/stencil writes happen in LATE_FRAGMENT_TESTS.
@@ -223,7 +225,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
     /// Resolves src into dst
     /// TODO: Add check for existence of src
     pub fn resolve(mut self, src: VirtualResource, dst: VirtualResource) -> Self {
-        self.inner.inputs.push(GpuResource {
+        self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Resolve(src.clone())),
             resource: dst.clone(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT, // RESOLVE is only for vkCmdResolve
@@ -232,7 +234,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
             load_op: None,
         });
 
-        self.inner.outputs.push(GpuResource {
+        self.inner.outputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Resolve(src)),
             resource: dst.upgrade(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT, // RESOLVE is only for vkCmdResolve
@@ -246,7 +248,7 @@ impl<'exec, 'q, D> PassBuilder<'exec, 'q, D> where D: ExecutionDomain {
 
     /// Declare that a resource will be used as a sampled image in the given pipeline stages.
     pub fn sample_image(mut self, resource: VirtualResource, stage: PipelineStage) -> Self {
-        self.inner.inputs.push(GpuResource {
+        self.inner.inputs.push(PassResource {
             usage: ResourceUsage::ShaderRead,
             resource,
             stage,

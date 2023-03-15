@@ -15,7 +15,7 @@ use winit::window::{WindowBuilder};
 use ph::IncompleteCmdBuffer; // TODO: Probably add this as a pub use to lib.rs
 
 use futures::executor::block_on;
-use phobos::{GraphicsCmdBuffer, PipelineStage, TransferCmdBuffer};
+use phobos::{GraphicsCmdBuffer, PipelineStage, RecordGraphToCommandBuffer, TransferCmdBuffer};
 
 use anyhow::Result;
 use gpu_allocator::MemoryLocation;
@@ -114,7 +114,7 @@ fn main_loop(frame: &mut ph::FrameManager,
             _ => { panic!("Queue should be locked") }
         }
         // record render graph to this command buffer
-        let cmd = ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, Some(debug)).unwrap()
+        let cmd = graph.record(cmd, &bindings, &mut ifc, Some(debug)).unwrap()
             .finish();
         cmd
     }))?;
@@ -169,7 +169,7 @@ fn upload_buffer(device: Arc<ph::Device>, allocator: Arc<Mutex<Allocator>>, exec
     let mut ifc = ctx.get_ifc();
     let bindings = ph::PhysicalResourceBindings::new();
     // Record graph to a command buffer, then finish it.
-    let cmd = ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
+    let cmd = graph.record(cmd, &bindings, &mut ifc, None)?.finish()?;
 
     let fence = ph::ExecutionManager::submit(exec.clone(), cmd)?
         // Remember to attach cleanup for the staging buffer so it does not get dropped at the end of the function,

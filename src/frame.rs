@@ -57,8 +57,7 @@
 
 use std::future::Future;
 use std::sync::{Arc, Mutex};
-use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, CmdBuffer, ImageView, WindowInterface, Surface, Image, SwapchainImage, ScratchAllocator, AppSettings, BufferView};
-use crate::sync::*;
+use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, ImageView, WindowInterface, Surface, Image, SwapchainImage, ScratchAllocator, AppSettings, BufferView, Fence, Semaphore, CmdBuffer};
 use ash::vk;
 use gpu_allocator::vulkan::Allocator;
 use crate::domain::ExecutionDomain;

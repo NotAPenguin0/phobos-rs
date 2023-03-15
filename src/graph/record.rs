@@ -1,16 +1,32 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::ffi::CString;
-use std::fmt::Debug;
-use ash::vk;
-use petgraph::graph::NodeIndex;
-use petgraph::{Incoming, Outgoing};
-use petgraph::prelude::EdgeRef;
-use crate::domain::{ExecutionDomain};
-use crate::{DebugMessenger, Error, GpuBarrier, GpuResource, GpuTask, PassGraph, ImageView, IncompleteCommandBuffer, InFlightContext, ResourceUsage, task_graph::Node, VirtualResource, BuiltPassGraph, BufferView, AttachmentType};
-use crate::task_graph::Resource;
+use crate::{BufferView, DebugMessenger, ImageView, IncompleteCommandBuffer, InFlightContext, PassGraph, PhysicalResourceBindings, VirtualResource, Error};
+use crate::domain::ExecutionDomain;
 
 use anyhow::Result;
-use crate::command_buffer::{RenderingAttachmentInfo, RenderingInfo};
+use ash::vk;
+use petgraph::data::DataMapMut;
+use petgraph::graph::NodeIndex;
+use petgraph::{Outgoing, Incoming};
+use petgraph::visit::EdgeRef;
+use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
+use crate::graph::physical_resource::PhysicalResource;
+use crate::graph::resource::{AttachmentType, ResourceUsage};
+use crate::graph::task_graph::{Node, Resource};
+
+pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain> {
+    /// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names
+    /// to actual resources.
+    /// # Errors
+    /// - This function can error if a virtual resource used in the graph is lacking an physical binding.
+    fn record(&mut self,
+              cmd: IncompleteCommandBuffer<'q, D>,
+              bindings: &PhysicalResourceBindings,
+              ifc: &mut InFlightContext,
+              debug: Option<&DebugMessenger>)
+              -> Result<IncompleteCommandBuffer<'q, D>> where Self: Sized;
+}
 
 // Traversal
 // =============
@@ -53,7 +69,7 @@ fn insert_in_active_set<'a, 'e, 'q, D>(
     }
 }
 
-fn find_resolve_attachment<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings, resource: &GpuResource) -> Option<ImageView>
+fn find_resolve_attachment<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalResourceBindings, resource: &PassResource) -> Option<ImageView>
     where D: ExecutionDomain {
     pass.outputs.iter().find(|output| {
         match &output.usage {
@@ -63,16 +79,16 @@ fn find_resolve_attachment<D>(pass: &GpuTask<GpuResource, D>, bindings: &Physica
             _ => false
         }
     })
-    .map(|resolve| {
-        let Some(PhysicalResource::Image(image)) = bindings.resolve(&resolve.resource) else {
-            // TODO: handle or report this error better
-            panic!("No resource bound");
-        };
-        image
-    }).cloned()
+        .map(|resolve| {
+            let Some(PhysicalResource::Image(image)) = bindings.resolve(&resolve.resource) else {
+                // TODO: handle or report this error better
+                panic!("No resource bound");
+            };
+            image
+        }).cloned()
 }
 
-fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<RenderingAttachmentInfo>>
+fn color_attachments<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalResourceBindings) -> Result<Vec<RenderingAttachmentInfo>>
     where D: ExecutionDomain {
     Ok(pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
         if !matches!(resource.usage, ResourceUsage::Attachment(AttachmentType::Color))  {
@@ -98,8 +114,8 @@ fn color_attachments<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResou
     }).collect())
 }
 
-fn depth_attachment<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings)
-    -> Option<RenderingAttachmentInfo> where D: ExecutionDomain {
+fn depth_attachment<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalResourceBindings)
+                       -> Option<RenderingAttachmentInfo> where D: ExecutionDomain {
     pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
         if resource.layout != vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL { return None; }
 
@@ -121,7 +137,7 @@ fn depth_attachment<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResour
     }).next()
 }
 
-fn render_area<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBindings) -> vk::Rect2D where D: ExecutionDomain {
+fn render_area<D>(pass: &PassNode<PassResource, D>, bindings: &PhysicalResourceBindings) -> vk::Rect2D where D: ExecutionDomain {
     let resource = pass.outputs.iter().filter(|resource|
         match resource.usage {
             ResourceUsage::Attachment(_) => true,
@@ -140,7 +156,7 @@ fn render_area<D>(pass: &GpuTask<GpuResource, D>, bindings: &PhysicalResourceBin
 }
 
 #[cfg(feature="debug-markers")]
-fn annotate_pass<'q, D>(pass: &GpuTask<GpuResource, D>, debug: &DebugMessenger, cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
+fn annotate_pass<'q, D>(pass: &PassNode<PassResource, D>, debug: &DebugMessenger, cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
     let name = CString::new(pass.identifier.clone())?;
     let label = vk::DebugUtilsLabelEXT {
         s_type: vk::StructureType::DEBUG_UTILS_LABEL_EXT,
@@ -152,10 +168,10 @@ fn annotate_pass<'q, D>(pass: &GpuTask<GpuResource, D>, debug: &DebugMessenger, 
 }
 
 #[cfg(not(feature="debug-markers"))]
-fn annotate_pass<D>(_: &GpuTask<GpuResource, D>, _: &DebugMessenger, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain { Ok(cmd) }
+fn annotate_pass<D>(_: &PassNode<PassResource, D>, _: &DebugMessenger, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain { Ok(cmd) }
 
-fn record_pass<'exec, 'q, D>(pass: &mut GpuTask<'exec, 'q, GpuResource, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>)
-    -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain  {
+fn record_pass<'exec, 'q, D>(pass: &mut PassNode<'exec, 'q, PassResource, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>)
+                             -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain  {
 
     if let Some(debug) = debug {
         cmd = annotate_pass(&pass, debug, cmd)?;
@@ -189,8 +205,8 @@ fn record_pass<'exec, 'q, D>(pass: &mut GpuTask<'exec, 'q, GpuResource, D>, bind
     Ok(cmd)
 }
 
-fn record_image_barrier<'q, D>(barrier: &GpuBarrier, image: &ImageView, dst_resource: &GpuResource, cmd: IncompleteCommandBuffer<'q, D>)
-    -> Result<IncompleteCommandBuffer<'q, D>>
+fn record_image_barrier<'q, D>(barrier: &PassResourceBarrier, image: &ImageView, dst_resource: &PassResource, cmd: IncompleteCommandBuffer<'q, D>)
+                               -> Result<IncompleteCommandBuffer<'q, D>>
     where D: ExecutionDomain {
 
     // Image layouts:
@@ -227,8 +243,8 @@ fn record_image_barrier<'q, D>(barrier: &GpuBarrier, image: &ImageView, dst_reso
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
-fn record_buffer_barrier<'q, D>(barrier: &GpuBarrier, _buffer: &BufferView, _dst_resource: &GpuResource, cmd: IncompleteCommandBuffer<'q, D>)
-    -> Result<IncompleteCommandBuffer<'q, D>>
+fn record_buffer_barrier<'q, D>(barrier: &PassResourceBarrier, _buffer: &BufferView, _dst_resource: &PassResource, cmd: IncompleteCommandBuffer<'q, D>)
+                                -> Result<IncompleteCommandBuffer<'q, D>>
     where D: ExecutionDomain {
 
     // Since every driver implements buffer barriers as global memory barriers, we will do the same.
@@ -256,8 +272,8 @@ fn record_buffer_barrier<'q, D>(barrier: &GpuBarrier, _buffer: &BufferView, _dst
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
-fn record_barrier<'q, D>(barrier: &GpuBarrier, dst_resource: &GpuResource, bindings: &PhysicalResourceBindings,
-                     cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain{
+fn record_barrier<'q, D>(barrier: &PassResourceBarrier, dst_resource: &PassResource, bindings: &PhysicalResourceBindings,
+                         cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain{
     let physical_resource = bindings.resolve(&barrier.resource.resource);
     let Some(resource) = physical_resource else { return Err(anyhow::Error::from(Error::NoResourceBound(barrier.resource.uid().clone()))) };
     match resource {
@@ -281,90 +297,42 @@ fn record_node<'exec, 'q, D>(graph: &mut BuiltPassGraph<'exec, 'q, D>, node: Nod
     }
 }
 
-/// Describes any physical resource handle on the GPU.
-#[derive(Debug, Clone)]
-pub enum PhysicalResource {
-    Image(ImageView),
-    Buffer(BufferView),
-}
 
-/// Stores bindings from virtual resources to physical resources.
-/// # Example usage
-/// ```
-/// use ash::vk;
-/// use phobos::{Error, Image, PhysicalResourceBindings, VirtualResource};
-///
-/// let resource = VirtualResource::new(String::from("image"));
-/// let image = Image::new(/*...*/);
-/// let view = image.view(vk::ImageAspectFlags::COLOR)?;
-/// let mut bindings = PhysicalResourceBindings::new();
-/// // Bind the virtual resource to the image
-/// bindings.bind_image(String::from("image"), view.clone());
-/// // ... Later, lookup the physical image handle from a virtual resource handle
-/// let view = bindings.resolve(&resource).ok_or(Error::NoResourceBound)?;
-/// ```
-#[derive(Debug)]
-pub struct PhysicalResourceBindings {
-    bindings: HashMap<String, PhysicalResource>
-}
 
-impl PhysicalResourceBindings {
-    /// Create a new physical resource binding map.
-    pub fn new() -> Self {
-        PhysicalResourceBindings { bindings: Default::default() }
-    }
+impl<'q, 'exec, D: ExecutionDomain> RecordGraphToCommandBuffer<'q, D> for BuiltPassGraph<'exec, 'q, D> {
+    fn record(&mut self,
+              mut cmd: IncompleteCommandBuffer<'q, D>,
+              bindings: &PhysicalResourceBindings,
+              ifc: &mut InFlightContext,
+              debug: Option<&DebugMessenger>)
+              -> Result<IncompleteCommandBuffer<'q, D>> where Self: Sized {
 
-    /// Bind an image to all virtual resources with `name(+*)` as their uid.
-    pub fn bind_image(&mut self, name: impl Into<String>, image: ImageView) {
-        self.bindings.insert(name.into(), PhysicalResource::Image(image));
-    }
+        let mut active = HashSet::new();
+        let mut children = HashSet::new();
+        for start in self.graph.sources() {
+            insert_in_active_set(start, &self, &mut active, &mut children);
+        }
+        // Record each initial active node.
+        for node in &active {
+            cmd = record_node(self, node.clone(), &bindings, ifc, cmd, debug)?;
+        }
 
-    /// Bind a buffer to all virtual resources with this name as their uid.
-    pub fn bind_buffer(&mut self, name: impl Into<String>, buffer: BufferView) { self.bindings.insert(name.into(), PhysicalResource::Buffer(buffer)); }
-
-    /// Alias a resource by giving it an alternative name
-    pub fn alias(&mut self, new_name: impl Into<String>, resource: &str) -> Result<()> {
-        self.bindings.insert(new_name.into(), self.bindings.get(resource).ok_or(Error::NoResourceBound(resource.to_owned()))?.clone());
-        Ok(())
-    }
-
-    /// Resolve a virtual resource to a physical resource. Returns `None` if the resource was not found.
-    pub fn resolve(&self, resource: &VirtualResource) -> Option<&PhysicalResource> {
-        self.bindings.get(&resource.name())
-    }
-}
-
-/// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names
-/// to actual resources.
-/// # Errors
-/// - This function can error if a virtual resource used in the graph is lacking an physical binding.
-pub fn record_graph<'a, 'exec, 'q, D>(graph: &'a mut BuiltPassGraph<'exec, 'q, D>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext, mut cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>)
-                                      -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
-    let mut active = HashSet::new();
-    let mut children = HashSet::new();
-    for start in graph.graph.sources() {
-        insert_in_active_set(start, &graph, &mut active, &mut children);
-    }
-    // Record each initial active node.
-    for node in &active {
-        cmd = record_node(graph, node.clone(), &bindings, ifc, cmd, debug)?;
-    }
-
-    while active.len() != graph.num_nodes() {
-        // For each node that is a child of an active node
-        let mut recorded_nodes = Vec::new();
-        for child in &children {
-            // If all parents of this child node are in the active set, record it.
-            if parents!(child, graph).all(|parent| active.contains(&parent)) {
-                cmd = record_node(graph, child.clone(), &bindings, ifc, cmd, debug)?;
-                recorded_nodes.push(child.clone());
+        while active.len() != self.num_nodes() {
+            // For each node that is a child of an active node
+            let mut recorded_nodes = Vec::new();
+            for child in &children {
+                // If all parents of this child node are in the active set, record it.
+                if parents!(child, self).all(|parent| active.contains(&parent)) {
+                    cmd = record_node(self, child.clone(), &bindings, ifc, cmd, debug)?;
+                    recorded_nodes.push(child.clone());
+                }
+            }
+            // Now we swap all recorded nodes to the active set
+            for node in recorded_nodes {
+                insert_in_active_set(node.clone(), &self, &mut active, &mut children);
             }
         }
-        // Now we swap all recorded nodes to the active set
-        for node in recorded_nodes {
-            insert_in_active_set(node.clone(), &graph, &mut active, &mut children);
-        }
-    }
 
-    Ok(cmd)
+        Ok(cmd)
+    }
 }

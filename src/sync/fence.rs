@@ -1,13 +1,14 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::slice;
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
+
 use ash::prelude::VkResult;
 use ash::vk;
+
 use crate::Device;
-use anyhow::Result;
 
 struct CleanupFnLink<'f> {
     pub f: Box<dyn FnOnce() -> () + 'f>,
@@ -18,7 +19,6 @@ struct CleanupFnLink<'f> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Fence<'f> {
-    #[derivative(Debug="ignore")]
     device: Arc<Device>,
     #[derivative(Debug="ignore")]
     first_cleanup_fn: Option<Box<CleanupFnLink<'f>>>,
@@ -30,14 +30,6 @@ pub struct GpuFuture<'f, T> {
     fence: Fence<'f>,
 }
 
-/// Wrapper around a [`VkSemaphore`](vk::Semaphore) object. Semaphores are used for GPU-GPU sync.
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub struct Semaphore {
-    #[derivative(Debug="ignore")]
-    pub device: Arc<Device>,
-    pub handle: vk::Semaphore,
-}
 
 impl<'f> Fence<'f> {
     /// Create a new fence, possibly in the singaled status.
@@ -56,7 +48,8 @@ impl<'f> Fence<'f> {
         })
     }
 
-    /// Waits for the fence to be signaled with no timeout.
+    /// Waits for the fence to be signaled with no timeout. Note that this is a blocking call. For the nonblocking version, use the `Future` implementation by calling
+    /// `.await`.
     pub fn wait(&self) -> VkResult<()> {
         unsafe { self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX) }
     }
@@ -115,11 +108,11 @@ impl Future for Fence<'_> {
         } else {
             let waker = ctx.waker().clone();
             std::thread::spawn(move || {
-                    // We will try to poll every 5 milliseconds.
-                    // TODO: measure, possibly configure
-                    std::thread::sleep(Duration::from_millis(5));
-                    waker.wake();
-                    return;
+                // We will try to poll every 5 milliseconds.
+                // TODO: measure, possibly configure
+                std::thread::sleep(Duration::from_millis(5));
+                waker.wake();
+                return;
             });
             Poll::Pending
         }
@@ -144,30 +137,9 @@ impl<T> Future for GpuFuture<'_, T> {
     }
 }
 
-impl Semaphore {
-    pub fn new(device: Arc<Device>) -> Result<Self, vk::Result> {
-        let info = vk::SemaphoreCreateInfo {
-            s_type: vk::StructureType::SEMAPHORE_CREATE_INFO,
-            p_next: std::ptr::null(),
-            flags: Default::default(),
-        };
-        Ok(Semaphore {
-            device: device.clone(),
-            handle: unsafe {
-                device.create_semaphore(&info, None)?
-            }
-        })
-    }
-}
 
 impl Drop for Fence<'_> {
     fn drop(&mut self) {
         unsafe { self.device.destroy_fence(self.handle, None); }
-    }
-}
-
-impl Drop for Semaphore {
-    fn drop(&mut self) {
-        unsafe { self.device.destroy_semaphore(self.handle, None); }
     }
 }

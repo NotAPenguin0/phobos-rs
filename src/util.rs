@@ -5,7 +5,7 @@ use ash::vk;
 use anyhow::Result;
 use gpu_allocator::MemoryLocation;
 use gpu_allocator::vulkan::Allocator;
-use crate::{Buffer, Device, domain, ExecutionManager, GpuFuture, IncompleteCmdBuffer, PassBuilder, PassGraph, PhysicalResourceBindings, record_graph, ThreadContext, TransferCmdBuffer};
+use crate::{Buffer, Device, domain, ExecutionManager, GpuFuture, IncompleteCmdBuffer, PassBuilder, PassGraph, PhysicalResourceBindings, RecordGraphToCommandBuffer, ThreadContext, TransferCmdBuffer};
 
 /// Wraps a c string into a string, or an empty string if the provided c string was null.
 /// Assumes the provided c string is null terminated.
@@ -66,7 +66,7 @@ pub fn staged_buffer_upload<T>(device: Arc<Device>, allocator: Arc<Mutex<Allocat
     let cmd = exec.on_domain::<domain::Transfer>(None, None)?;
     let mut ifc = ctx.get_ifc();
     let bindings = PhysicalResourceBindings::new();
-    let cmd = record_graph(&mut graph, &bindings, &mut ifc, cmd, None)?.finish()?;
+    let cmd = graph.record(cmd, &bindings, &mut ifc, None)?.finish()?;
 
     let fence = ExecutionManager::submit(exec.clone(), cmd)?
         .with_cleanup(move || {
