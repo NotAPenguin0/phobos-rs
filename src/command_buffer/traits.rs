@@ -47,7 +47,7 @@ pub trait ComputeCmdBuffer : TransferCmdBuffer {
 pub trait CmdBuffer {
     /// Delete the command buffer immediately.
     /// This is marked unsafe because there is no guarantee that the command buffer is not in use.
-    unsafe fn delete(&mut self, exec: Arc<ExecutionManager>) -> Result<()>;
+    unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()>;
 }
 
 /// Incomplete command buffer

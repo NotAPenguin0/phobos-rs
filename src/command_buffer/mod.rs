@@ -84,7 +84,7 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
 }
 
 impl<'q, D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
-    unsafe fn delete(&mut self, exec: Arc<ExecutionManager>) -> Result<()> {
+    unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()> {
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         let handle = self.handle;
         self.handle = vk::CommandBuffer::null();

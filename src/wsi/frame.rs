@@ -250,7 +250,7 @@ impl<A: Allocator> FrameManager<A> {
         Ok(new_swapchain)
     }
 
-    pub async fn new_frame<Window, D, F>(&mut self, exec: Arc<ExecutionManager>, window: &Window, surface: &Surface, f: F)
+    pub async fn new_frame<Window, D, F>(&mut self, exec: ExecutionManager, window: &Window, surface: &Surface, f: F)
                                         -> Result<()>
         where
             Window: WindowInterface,
@@ -314,7 +314,7 @@ impl<A: Allocator> FrameManager<A> {
     }
 
     /// Obtain a new frame context to run commands in.
-    pub async fn new_async_frame<Window, D, F, Fut>(&mut self, exec: Arc<ExecutionManager>, window: &Window, surface: &Surface, f: F)
+    pub async fn new_async_frame<Window, D, F, Fut>(&mut self, exec: ExecutionManager, window: &Window, surface: &Surface, f: F)
         -> Result<()>
         where
             Window: WindowInterface,
@@ -384,7 +384,7 @@ impl<A: Allocator> FrameManager<A> {
     /// will signal. Any commands submitted from somewhere else must be synchronized to this submission.
     /// Note: it's possible this will be enforced through the type system later.
     /// TODO: examine possibilities for this.
-    fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: Arc<ExecutionManager>) -> Result<()> {
+    fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: ExecutionManager) -> Result<()> {
         // Reset frame fence
         let mut per_frame = &mut self.per_frame[self.current_frame as usize];
         per_frame.fence.reset()?;
@@ -420,7 +420,7 @@ impl<A: Allocator> FrameManager<A> {
 
     /// Present a frame to the swapchain. This is the same as calling
     /// `glfwSwapBuffers()` in OpenGL code.
-    fn present(&self, exec: Arc<ExecutionManager>) -> Result<()> {
+    fn present(&self, exec: ExecutionManager) -> Result<()> {
         let per_frame = &self.per_frame[self.current_frame as usize];
         let functions = &self.swapchain.functions;
         let queue = exec.get_present_queue();

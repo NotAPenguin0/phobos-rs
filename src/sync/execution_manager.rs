@@ -33,17 +33,17 @@ use crate::core::queue::Queue;
 /// // or to the execution manager for submitting commands outside of a
 /// // frame context (such as on another thread).
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExecutionManager {
     device: Arc<Device>,
-    pub(crate) queues: Vec<Mutex<Queue>>,
+    pub(crate) queues: Arc<Vec<Mutex<Queue>>>,
 }
 
 
 impl ExecutionManager {
     /// Create a new execution manager. You should only ever have on instance of this struct
     /// in your program.
-    pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Arc<Self>> {
+    pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
         let mut counts = HashMap::new();
         let queues = physical_device.queues.iter().map(|queue| -> Result<Mutex<Queue>> {
             let index = counts.entry(queue.family_index).or_insert(0 as u32);
@@ -60,10 +60,10 @@ impl ExecutionManager {
             info!("Queue #{:?}({}) supports {:?} (dedicated: {}, can present: {})", lock.info.queue_type, lock.info.family_index, lock.info.flags, lock.info.dedicated, lock.info.can_present)
         }
 
-        Ok(Arc::new(ExecutionManager {
+        Ok(ExecutionManager {
             device: device.clone(),
-            queues
-        }))
+            queues: Arc::new(queues),
+        })
     }
 
     /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
@@ -83,8 +83,8 @@ impl ExecutionManager {
     }
 
     /// Submit a command buffer to its queue. TODO: Add semaphores
-    pub fn submit<'q, D: domain::ExecutionDomain + 'static>(exec: Arc<ExecutionManager>, mut cmd: CommandBuffer<D>) -> Result<Fence> {
-        let fence = Fence::new(exec.device.clone(), false)?;
+    pub fn submit<'q, D: domain::ExecutionDomain + 'static>(&self, mut cmd: CommandBuffer<D>) -> Result<Fence> {
+        let fence = Fence::new(self.device.clone(), false)?;
 
         let info = vk::SubmitInfo {
             s_type: vk::StructureType::SUBMIT_INFO,
@@ -98,13 +98,13 @@ impl ExecutionManager {
             p_signal_semaphores: std::ptr::null(),
         };
 
-        let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
+        let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         unsafe { queue.submit(std::slice::from_ref(&info), Some(&fence))?; }
-
-        let exec = exec.clone();
-        Ok(fence.with_cleanup(move || {
-            unsafe { cmd.delete(exec.clone()).unwrap(); }
-        }))
+        let exec = self.clone();
+        Ok(fence
+            .with_cleanup(move || {
+                unsafe { cmd.delete(exec).unwrap(); }
+            }))
     }
 
     /// Obtain a reference to a queue capable of presenting.
