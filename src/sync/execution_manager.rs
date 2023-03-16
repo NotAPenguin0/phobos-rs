@@ -83,7 +83,7 @@ impl ExecutionManager {
     }
 
     /// Submit a command buffer to its queue. TODO: Add semaphores
-    pub fn submit<'f, 'q, D: domain::ExecutionDomain + 'f>(exec: Arc<ExecutionManager>, mut cmd: CommandBuffer<D>) -> Result<Fence<'f>> {
+    pub fn submit<'q, D: domain::ExecutionDomain + 'static>(exec: Arc<ExecutionManager>, mut cmd: CommandBuffer<D>) -> Result<Fence> {
         let fence = Fence::new(exec.device.clone(), false)?;
 
         let info = vk::SubmitInfo {

@@ -1,11 +1,11 @@
 use std::sync::Arc;
-use crate::{Allocator, Buffer, Device, domain, ExecutionManager, GpuFuture, IncompleteCmdBuffer, MemoryType, PassBuilder, PassGraph, PhysicalResourceBindings, RecordGraphToCommandBuffer, ThreadContext, TransferCmdBuffer};
+use crate::{Allocator, Buffer, Device, domain, ExecutionManager, Fence, IncompleteCmdBuffer, MemoryType, PassBuilder, PassGraph, PhysicalResourceBindings, RecordGraphToCommandBuffer, ThreadContext, TransferCmdBuffer};
 
 use anyhow::Result;
 use ash::vk;
 
 /// Perform a staged upload to a GPU buffer. Returns a future that can be awaited to obtain the resulting buffer.
-pub fn staged_buffer_upload<T, A: Allocator>(device: Arc<Device>, mut allocator: A, exec: Arc<ExecutionManager>, data: &[T]) -> Result<GpuFuture<Buffer<A>>> where T: Copy {
+pub fn staged_buffer_upload<T, A: Allocator>(device: Arc<Device>, mut allocator: A, exec: Arc<ExecutionManager>, data: &[T]) -> Result<Fence<Buffer<A>>> where T: Copy {
     let staging = Buffer::new(device.clone(), &mut allocator, (data.len() * std::mem::size_of::<T>()) as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, MemoryType::CpuToGpu)?;
     let mut staging = staging.view_full();
     staging.mapped_slice()?.copy_from_slice(data);

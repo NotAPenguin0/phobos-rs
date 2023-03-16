@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::pin::Pin;
 use std::slice;
 use std::sync::Arc;
@@ -15,23 +14,47 @@ struct CleanupFnLink<'f> {
     pub next: Option<Box<CleanupFnLink<'f>>>
 }
 
+trait FenceValue<T> {
+    fn value(&mut self) -> T;
+}
+
 /// Wrapper around a [`VkFence`](vk::Fence) object. Fences are used for CPU-GPU sync.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Fence<'f> {
+pub struct Fence<T = ()> {
     device: Arc<Device>,
     #[derivative(Debug="ignore")]
-    first_cleanup_fn: Option<Box<CleanupFnLink<'f>>>,
+    first_cleanup_fn: Option<Box<CleanupFnLink<'static>>>,
+    value: Option<T>,
     pub handle: vk::Fence,
 }
 
-pub struct GpuFuture<'f, T> {
-    value: Option<T>,
-    fence: Fence<'f>,
+pub type GpuFuture<T> = Fence<T>;
+
+impl<T> FenceValue<T> for Fence<T> {
+    default fn value(&mut self) -> T {
+        self.value.take().unwrap()
+    }
 }
 
+impl FenceValue<()> for Fence<()> {
+    fn value(&mut self) -> () {}
+}
 
-impl<'f> Fence<'f> {
+impl Fence<()> {
+    pub fn attach_value<T>(mut self, value: T) -> Fence<T> {
+        Fence::<T> {
+            handle: self.handle,
+            first_cleanup_fn: self.first_cleanup_fn.take(),
+            device: self.device.clone(),
+            value: Some(value),
+        }
+    }
+}
+
+impl<T> Unpin for Fence<T> {}
+
+impl<T> Fence<T> {
     /// Create a new fence, possibly in the singaled status.
     pub fn new(device: Arc<Device>, signaled: bool) -> Result<Self, vk::Result> {
         let info = vk::FenceCreateInfo {
@@ -42,6 +65,7 @@ impl<'f> Fence<'f> {
         Ok(Fence {
             device: device.clone(),
             first_cleanup_fn: None,
+            value: None,
             handle: unsafe {
                 device.create_fence(&info, None)?
             }
@@ -61,7 +85,7 @@ impl<'f> Fence<'f> {
 
     /// Add a function to the front of the chain of functions to be called when this fence runs to completion ***AS A FUTURE***.
     /// TODO: Possibly also call this after Self::wait()
-    pub fn with_cleanup(mut self, f: impl FnOnce() -> () + 'f) -> Self {
+    pub fn with_cleanup(mut self, f: impl FnOnce() -> () + 'static) -> Self {
         if self.first_cleanup_fn.is_some() {
             let mut head = Box::new(CleanupFnLink {
                 f: Box::new(f),
@@ -79,19 +103,12 @@ impl<'f> Fence<'f> {
             self
         }
     }
-
-    pub fn attach_value<T>(self, value: T) -> GpuFuture<'f, T> {
-        GpuFuture {
-            value: Some(value),
-            fence: self,
-        }
-    }
 }
 
 // Note that the future implementation for Fence works by periodically polling the fence.
 // This could not be desirable depending on the timeout chosen by the implementation.
-impl Future for Fence<'_> {
-    type Output = ();
+impl<T> std::future::Future for Fence<T> {
+    type Output = T;
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         let status = unsafe { self.device.get_fence_status(self.handle).unwrap() };
@@ -104,7 +121,7 @@ impl Future for Fence<'_> {
                 func.f.call_once(());
                 f = func.next
             }
-            Poll::Ready(())
+            Poll::Ready(self.as_mut().value())
         } else {
             let waker = ctx.waker().clone();
             std::thread::spawn(move || {
@@ -119,26 +136,7 @@ impl Future for Fence<'_> {
     }
 }
 
-impl<T> Unpin for GpuFuture<'_, T> {}
-
-impl<T> Future for GpuFuture<'_, T> {
-    type Output = T;
-
-    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        let fence = Pin::new(&mut self.fence);
-        let status = fence.poll(ctx);
-        match status {
-            Poll::Ready(_) => {
-                let value = self.value.take().unwrap();
-                Poll::Ready(value)
-            }
-            Poll::Pending => { Poll::Pending }
-        }
-    }
-}
-
-
-impl Drop for Fence<'_> {
+impl<T> Drop for Fence<T> {
     fn drop(&mut self) {
         unsafe { self.device.destroy_fence(self.handle, None); }
     }

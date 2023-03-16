@@ -68,8 +68,8 @@ use crate::wsi::swapchain::SwapchainImage;
 /// Information stored for each in-flight frame.
 #[derive(Derivative)]
 #[derivative(Debug)]
-struct PerFrame<'f, A: Allocator = DefaultAllocator> {
-    pub fence: Arc<Fence<'f>>,
+struct PerFrame<A: Allocator = DefaultAllocator> {
+    pub fence: Arc<Fence>,
     /// Signaled by the GPU when a swapchain image is ready.
     pub image_ready: Semaphore,
     /// Signaled by the GPU when all commands for a frame have been processed.
@@ -88,9 +88,9 @@ struct PerFrame<'f, A: Allocator = DefaultAllocator> {
 
 /// Information stored for each swapchain image.
 #[derive(Debug)]
-struct PerImage<'f> {
+struct PerImage {
     /// Fence of the current frame.
-    pub fence: Option<Arc<Fence<'f>>>,
+    pub fence: Option<Arc<Fence>>,
 }
 
 
@@ -126,17 +126,17 @@ const FRAMES_IN_FLIGHT: usize = 2;
 /// Responsible for presentation, frame-frame synchronization and per-frame resources.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct FrameManager<'f, A: Allocator = DefaultAllocator> {
+pub struct FrameManager<A: Allocator = DefaultAllocator> {
     device: Arc<Device>,
-    per_frame: [PerFrame<'f, A>; FRAMES_IN_FLIGHT],
-    per_image: Vec<PerImage<'f>>,
+    per_frame: [PerFrame<A>; FRAMES_IN_FLIGHT],
+    per_image: Vec<PerImage>,
     current_frame: u32,
     current_image: u32,
     swapchain: Swapchain,
     swapchain_delete: DeletionQueue<Swapchain>,
 }
 
-impl<A: Allocator> FrameManager<'_, A> {
+impl<A: Allocator> FrameManager<A> {
     /// Initialize frame manager with per-frame data.
     pub fn new<Window>(device: Arc<Device>, mut allocator: A, settings: &AppSettings<Window>, swapchain: Swapchain) -> Result<Self> where Window: WindowInterface {
         let scratch_flags_base = vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC;

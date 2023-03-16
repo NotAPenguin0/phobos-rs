@@ -126,7 +126,7 @@ fn load_spirv_file(path: &Path) -> Vec<u32> {
 
 // Note that this is implemented in the graph library, which should be preferred for correct behaviour.
 #[allow(dead_code)]
-fn upload_buffer(device: Arc<ph::Device>, mut allocator: ph::DefaultAllocator, exec: Arc<ph::ExecutionManager>) -> Result<ph::GpuFuture<'static, ph::Buffer>> {
+fn upload_buffer(device: Arc<ph::Device>, mut allocator: ph::DefaultAllocator, exec: Arc<ph::ExecutionManager>) -> Result<ph::Fence<ph::Buffer>> {
     let data: Vec<f32> = vec![
         -1.0, 1.0, 0.0, 1.0,
         -1.0, -1.0, 0.0, 0.0,
