@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
-use crate::{CmdBuffer, DescriptorCache, Device, domain, Error, Fence, PhysicalDevice, PipelineCache};
+use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 use crate::command_buffer::*;
 use anyhow::Result;
 use ash::vk;
 use crate::core::queue::Queue;
+use crate::domain::ExecutionDomain;
+use crate::sync::submit_batch::SubmitBatch;
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
@@ -67,7 +69,7 @@ impl ExecutionManager {
     }
 
     /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
-    pub fn try_on_domain<'q, D: domain::ExecutionDomain>(&'q self,
+    pub fn try_on_domain<'q, D: ExecutionDomain>(&'q self,
                                                          pipelines:  Option<Arc<Mutex<PipelineCache>>>,
                                                          descriptors: Option<Arc<Mutex<DescriptorCache>>>) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
@@ -75,15 +77,20 @@ impl ExecutionManager {
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
-    pub fn on_domain<'q, D: domain::ExecutionDomain>(&'q self,
+    pub fn on_domain<'q, D: ExecutionDomain>(&'q self,
                                                      pipelines:  Option<Arc<Mutex<PipelineCache>>>,
                                                      descriptors: Option<Arc<Mutex<DescriptorCache>>>) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
+    /// Begin a submit batch. Note that all submits in a batch are over a single domain (currently).
+    pub fn start_submit_batch<D: ExecutionDomain + 'static>(&self) -> Result<SubmitBatch<D>> {
+        SubmitBatch::new(self.device.clone(), self.clone())
+    }
+
     /// Submit a command buffer to its queue. TODO: Add semaphores
-    pub fn submit<'q, D: domain::ExecutionDomain + 'static>(&self, mut cmd: CommandBuffer<D>) -> Result<Fence> {
+    pub fn submit<D: ExecutionDomain + 'static>(&self, mut cmd: CommandBuffer<D>) -> Result<Fence> {
         let fence = Fence::new(self.device.clone(), false)?;
 
         let info = vk::SubmitInfo {
@@ -107,12 +114,18 @@ impl ExecutionManager {
             }))
     }
 
+    pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
+        let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
+        unsafe { queue.submit2(submits, Some(fence))?; }
+        Ok(())
+    }
+
     /// Obtain a reference to a queue capable of presenting.
     pub(crate) fn get_present_queue(&self) -> Option<MutexGuard<Queue>> {
         self.queues.iter().find(|&queue| queue.lock().unwrap().info.can_present.clone()).map(|q| q.lock().unwrap())
     }
 
-    pub fn try_get_queue<D: domain::ExecutionDomain>(&self) -> TryLockResult<MutexGuard<Queue>> {
+    pub fn try_get_queue<D: ExecutionDomain>(&self) -> TryLockResult<MutexGuard<Queue>> {
         let q = self.queues.iter().find(|&q| {
             let q = q.try_lock();
             match q {
@@ -127,7 +140,7 @@ impl ExecutionManager {
     }
 
     /// Obtain a reference to a queue matching predicate.
-    pub fn get_queue<D: domain::ExecutionDomain>(&self) -> Option<MutexGuard<Queue>> {
+    pub fn get_queue<D: ExecutionDomain>(&self) -> Option<MutexGuard<Queue>> {
         self.queues.iter().find(|&q| {
             let q = q.lock().unwrap();
             D::queue_is_compatible(&*q)

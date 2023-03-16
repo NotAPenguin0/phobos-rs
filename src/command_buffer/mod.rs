@@ -47,6 +47,7 @@ pub(crate) mod command_pool;
 
 /// This struct represents a finished command buffer. This command buffer can't be recorded to anymore.
 /// It can only be obtained by calling [`IncompleteCommandBuffer::finish()`].
+#[derive(Debug)]
 pub struct CommandBuffer<D: ExecutionDomain> {
     pub(crate) handle: vk::CommandBuffer,
     _domain: PhantomData<D>,

@@ -9,7 +9,6 @@ pub struct Semaphore {
     pub handle: vk::Semaphore,
 }
 
-
 impl Semaphore {
     /// Create a new `VkSemaphore` object.
     pub fn new(device: Arc<Device>) -> Result<Self, vk::Result> {

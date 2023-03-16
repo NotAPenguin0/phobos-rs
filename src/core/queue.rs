@@ -46,7 +46,7 @@ pub struct Queue {
 }
 
 impl Queue {
-    pub fn new(device: Arc<Device>, handle: vk::Queue, info: QueueInfo) -> Result<Self> {
+    pub(crate) fn new(device: Arc<Device>, handle: vk::Queue, info: QueueInfo) -> Result<Self> {
         // We create a transient command pool because command buffers will be allocated and deallocated
         // frequently.
         let pool = CommandPool::new(device.clone(), info.family_index, vk::CommandPoolCreateFlags::TRANSIENT)?;
@@ -72,7 +72,22 @@ impl Queue {
         self.device.queue_submit(self.handle, submits, fence)
     }
 
-    pub fn handle(&self) -> vk::Queue {
+    /// Submits a batch of submissions to the queue, and signals the given fence when the
+    /// submission is done
+    /// <br>
+    /// <br>
+    /// # Thread safety
+    /// This function is **not yet** thread safe! This function is marked as unsafe for now to signal this.
+    pub unsafe fn submit2(&self, submits: &[vk::SubmitInfo2], fence: Option<&Fence>) -> Result<(), vk::Result> {
+        let fence = match fence {
+            None => { vk::Fence::null() }
+            Some(fence) => { fence.handle }
+        };
+        self.device.queue_submit2(self.handle, submits, fence)
+    }
+
+    /// Obtain the raw vulkan handle of a queue.
+    pub unsafe fn handle(&self) -> vk::Queue {
         self.handle
     }
 

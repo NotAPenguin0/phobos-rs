@@ -4,7 +4,7 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use phobos::prelude as ph;
+use phobos::{domain, PipelineStage, prelude as ph};
 use phobos::command_buffer::traits::*;
 use phobos::RecordGraphToCommandBuffer;
 use ph::vk;
@@ -36,6 +36,18 @@ fn main_loop(frame: &mut ph::FrameManager,
              exec: ph::ExecutionManager,
              surface: &ph::Surface,
              window: &winit::window::Window) -> Result<()> {
+
+    // Lets try the new batch submit API
+    block_on({
+        let cmd1 = exec.on_domain::<domain::All>(None, None)?.finish()?;
+        let cmd2 = exec.on_domain::<domain::All>(None, None)?.finish()?;
+        let mut batch = exec.start_submit_batch::<domain::All>()?;
+        batch.submit(cmd1)?
+             .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
+        batch.finish()?
+    });
+
+
     // Define a virtual resource pointing to the swapchain
     let swap_resource = ph::VirtualResource::image("swapchain".to_string());
     let offscreen = ph::VirtualResource::image("offscreen".to_string());
