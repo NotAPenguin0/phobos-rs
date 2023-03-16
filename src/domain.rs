@@ -1,6 +1,7 @@
 use ash::vk;
-use crate::{IncompleteCommandBuffer, Queue, QueueType};
+use crate::{IncompleteCommandBuffer, QueueType};
 use crate::command_buffer::traits::IncompleteCmdBuffer;
+use crate::core::queue::Queue;
 
 /// This trait defines an execution domain. An execution domain must specify a command buffer type,
 /// and expose a function that checks whether a queue is compatible with it or not.

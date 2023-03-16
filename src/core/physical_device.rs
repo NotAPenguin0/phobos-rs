@@ -1,9 +1,10 @@
 use std::ffi::CStr;
 use ash::vk;
 use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
-use crate::queue::{QueueInfo, QueueType};
 use crate::util;
 use anyhow::Result;
+use crate::core::queue::{QueueInfo, QueueType};
+use crate::util::string::wrap_c_str;
 
 /// Stores queried properties of a Vulkan extension.
 #[derive(Debug, Default)]
@@ -48,7 +49,7 @@ impl PhysicalDevice {
                     memory_properties: unsafe { instance.instance.get_physical_device_memory_properties(*device) },
                     extension_properties: unsafe { instance.instance.enumerate_device_extension_properties(*device).unwrap().iter().map(|vk_properties| {
                         ExtensionProperties {
-                            name: util::wrap_c_str(vk_properties.extension_name.as_ptr()),
+                            name: wrap_c_str(vk_properties.extension_name.as_ptr()),
                             spec_version: vk_properties.spec_version
                         }
                     }).collect() },

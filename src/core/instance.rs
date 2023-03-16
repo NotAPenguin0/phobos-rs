@@ -1,12 +1,12 @@
 use ash;
 use ash::vk;
-use crate::util;
-use crate::window::WindowInterface;
+use crate::{util, WindowInterface};
 use crate::AppSettings;
 use anyhow::Result;
 
 use std::ffi::{CString, CStr};
 use std::str::FromStr;
+use crate::util::string::unwrap_to_raw_strings;
 
 /// Represents the loaded vulkan instance.
 /// You need to create this to initialize the Vulkan API.
@@ -70,8 +70,8 @@ fn create_vk_instance<Window: WindowInterface>(entry: &ash::Entry, settings: &Ap
         );
     }
 
-    let layers_raw = util::unwrap_to_raw_strings(layers.as_slice());
-    let extensions_raw = util::unwrap_to_raw_strings(extensions.as_slice());
+    let layers_raw = unwrap_to_raw_strings(layers.as_slice());
+    let extensions_raw = unwrap_to_raw_strings(extensions.as_slice());
 
     let instance_info = vk::InstanceCreateInfo::builder()
         .application_info(&app_info)

@@ -5,6 +5,7 @@ use std::ffi::{CString, NulError};
 use crate::{PhysicalDevice, VkInstance, AppSettings, WindowInterface};
 use crate::util;
 use anyhow::Result;
+use crate::util::string::unwrap_to_raw_strings;
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
 /// Vulkan API.
@@ -60,7 +61,7 @@ impl Device {
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
 
-        let extension_names_raw = util::unwrap_to_raw_strings(extension_names.as_slice());
+        let extension_names_raw = unwrap_to_raw_strings(extension_names.as_slice());
         let info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(queue_create_infos.as_slice())
             .enabled_extension_names(extension_names_raw.as_slice())

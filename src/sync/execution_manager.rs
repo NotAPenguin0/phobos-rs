@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
-use crate::{CmdBuffer, DescriptorCache, Device, domain, Error, Fence, PhysicalDevice, PipelineCache, Queue};
+use crate::{CmdBuffer, DescriptorCache, Device, domain, Error, Fence, PhysicalDevice, PipelineCache};
 use crate::command_buffer::*;
 use anyhow::Result;
 use ash::vk;
+use crate::core::queue::Queue;
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling

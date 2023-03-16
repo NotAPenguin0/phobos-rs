@@ -1,43 +1,8 @@
-use std::ffi::{c_char, CStr, CString};
-use std::mem::size_of;
-use std::sync::{Arc, Mutex};
-use ash::vk;
-use anyhow::Result;
+use std::sync::Arc;
 use crate::{Allocator, Buffer, Device, domain, ExecutionManager, GpuFuture, IncompleteCmdBuffer, MemoryType, PassBuilder, PassGraph, PhysicalResourceBindings, RecordGraphToCommandBuffer, ThreadContext, TransferCmdBuffer};
 
-/// Wraps a c string into a string, or an empty string if the provided c string was null.
-/// Assumes the provided c string is null terminated.
-pub(crate) unsafe fn wrap_c_str(s: *const c_char) -> String {
-    return if s.is_null() {
-        String::default()
-    } else {
-        CStr::from_ptr(s).to_string_lossy().to_owned().to_string()
-    }
-}
-
-/// Safely unwraps a slice of strings into a vec of raw c strings.
-pub(crate) fn unwrap_to_raw_strings(strings: &[CString]) -> Vec<*const c_char> {
-    strings.iter().map(|string| string.as_ptr()).collect()
-}
-
-pub trait ByteSize {
-    fn byte_size(&self) -> usize;
-}
-
-impl ByteSize for vk::Format {
-    fn byte_size(&self) -> usize {
-        match *self {
-            vk::Format::R32G32_SFLOAT => 2 * size_of::<f32>(),
-            vk::Format::R32G32B32_SFLOAT => 3 * size_of::<f32>(),
-            vk::Format::R32G32B32A32_SFLOAT => 4 * size_of::<f32>(),
-            vk::Format::R8_UNORM => 1,
-            vk::Format::R8G8_UNORM => 2,
-            vk::Format::R8G8B8_UNORM => 3,
-            vk::Format::R8G8B8A8_UNORM => 4,
-            _ => { todo!() }
-        }
-    }
-}
+use anyhow::Result;
+use ash::vk;
 
 /// Perform a staged upload to a GPU buffer. Returns a future that can be awaited to obtain the resulting buffer.
 pub fn staged_buffer_upload<T, A: Allocator>(device: Arc<Device>, mut allocator: A, exec: Arc<ExecutionManager>, data: &[T]) -> Result<GpuFuture<Buffer<A>>> where T: Copy {

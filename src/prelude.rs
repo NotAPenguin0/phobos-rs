@@ -1,11 +1,17 @@
 pub use ash::vk;
 
-pub use crate::core::window;
 pub use crate::core::app_info::*;
 pub use crate::core::error::Error;
+pub use crate::core::device::Device;
+pub use crate::core::instance::VkInstance;
+pub use crate::core::debug::DebugMessenger;
+pub use crate::core::physical_device::*;
+pub use crate::core::queue::{QueueType};
 
 pub use crate::sync::fence::*;
 pub use crate::sync::semaphore::*;
+pub use crate::sync::execution_manager::ExecutionManager;
+pub use crate::sync::thread_context::ThreadContext;
 
 pub use crate::command_buffer::traits::*;
 
@@ -14,9 +20,6 @@ pub use crate::graph::virtual_resource::VirtualResource;
 pub use crate::graph::pass_graph::PassGraph;
 pub use crate::graph::physical_resource::PhysicalResourceBindings;
 pub use crate::graph::pass::PassBuilder;
-
-pub use crate::core::device::Device;
-pub use crate::core::instance::VkInstance;
 
 pub use crate::allocator::traits::*;
 pub use crate::allocator::default_allocator;
@@ -29,3 +32,16 @@ pub use crate::pipeline::hash::*;
 pub use crate::pipeline::builder::PipelineBuilder;
 pub use crate::pipeline::cache::PipelineCache;
 pub use crate::pipeline::shader::ShaderCreateInfo;
+
+pub use crate::descriptor::descriptor_set::DescriptorSet;
+pub use crate::descriptor::builder::DescriptorSetBuilder;
+pub use crate::descriptor::cache::DescriptorCache;
+
+pub use crate::wsi::window::{WindowInterface, WindowSize};
+pub use crate::wsi::swapchain::Swapchain;
+pub use crate::wsi::frame::{InFlightContext, FrameManager};
+pub use crate::wsi::surface::Surface;
+
+pub use crate::util::byte_size::ByteSize;
+pub use crate::util::upload::staged_buffer_upload;
+pub use crate::util::deferred_delete::DeletionQueue;

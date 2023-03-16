@@ -1,7 +1,7 @@
 use ash::vk;
 
-use crate::core::window::WindowInterface;
-use crate::QueueType;
+use crate::{WindowInterface};
+use crate::core::queue::QueueType;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]

@@ -23,11 +23,12 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, MutexGuard};
 use ash::vk;
-use crate::{DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache, Queue};
+use crate::{DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
 use crate::domain::ExecutionDomain;
 use crate::traits::CmdBuffer;
 
 use anyhow::Result;
+use crate::core::queue::Queue;
 use crate::create_info::PipelineRenderingInfo;
 
 pub mod traits;
@@ -37,6 +38,7 @@ pub mod transfer;
 pub mod compute;
 
 pub(crate) mod state;
+pub(crate) mod command_pool;
 
 /// This struct represents a finished command buffer. This command buffer can't be recorded to anymore.
 /// It can only be obtained by calling finish() on an incomplete command buffer;

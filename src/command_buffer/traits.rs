@@ -1,7 +1,8 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
-use crate::{BufferView, CommandBuffer, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache, Queue};
+use crate::{BufferView, CommandBuffer, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache};
+use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 
 /// Trait representing a command buffer that supports transfer commands.

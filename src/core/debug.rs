@@ -2,6 +2,7 @@ use ash::vk;
 
 use crate::{util, VkInstance};
 use anyhow::Result;
+use crate::util::string::wrap_c_str;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -44,8 +45,8 @@ extern "system" fn vk_debug_callback(
 
     let callback_data = unsafe { *p_callback_data };
     let message_id_number = callback_data.message_id_number as i32;
-    let message_id_name = unsafe { util::wrap_c_str(callback_data.p_message_id_name) };
-    let message = unsafe { util::wrap_c_str(callback_data.p_message) };
+    let message_id_name = unsafe { wrap_c_str(callback_data.p_message_id_name) };
+    let message = unsafe { wrap_c_str(callback_data.p_message) };
 
     match severity {
         vk::DebugUtilsMessageSeverityFlagsEXT::VERBOSE => {
