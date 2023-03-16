@@ -92,7 +92,6 @@ extern crate derivative;
 pub mod prelude;
 pub use crate::prelude::*;
 
-pub mod cache;
 pub mod buffer;
 pub mod image;
 pub mod command_buffer;

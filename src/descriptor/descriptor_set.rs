@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use ash::vk;
 use crate::{BufferView, Device, ImageView};
-use crate::cache::Resource;
 
 use anyhow::Result;
+use crate::util::cache::Resource;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct DescriptorImageInfo {

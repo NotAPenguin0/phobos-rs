@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
-use crate::cache::{Cache, Resource};
 use crate::create_info::{PipelineCreateInfo, PipelineRenderingInfo};
 use crate::{Device, Error, Pipeline};
 use crate::pipeline_layout::PipelineLayout;
@@ -12,6 +11,7 @@ use super::hash::*;
 
 use anyhow::Result;
 use ash::vk;
+use crate::util::cache::{Cache, Resource};
 
 #[derive(Debug)]
 struct PipelineEntry<P> where P: std::fmt::Debug {

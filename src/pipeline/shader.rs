@@ -3,10 +3,10 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use ash::vk;
 
-use crate::cache::Resource;
 use crate::Device;
 
 use anyhow::Result;
+use crate::util::cache::Resource;
 
 /// Shader resource object. This is managed by the pipeline cache internally.
 #[derive(Derivative)]
