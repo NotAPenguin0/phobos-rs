@@ -23,13 +23,12 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, MutexGuard};
 use ash::vk;
-use crate::{DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
+use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
 use crate::domain::ExecutionDomain;
-use crate::traits::CmdBuffer;
 
 use anyhow::Result;
 use crate::core::queue::Queue;
-use crate::create_info::PipelineRenderingInfo;
+use crate::pipeline::create_info::PipelineRenderingInfo;
 
 pub mod traits;
 pub mod incomplete;

@@ -1,6 +1,6 @@
 use ash::vk;
-use crate::pipeline_layout::PipelineLayoutCreateInfo;
-use crate::shader::ShaderCreateInfo;
+use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
+use crate::ShaderCreateInfo;
 
 #[derive(Debug, Copy, Clone)]
 pub struct VertexInputBindingDescription(pub(super) vk::VertexInputBindingDescription);

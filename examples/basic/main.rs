@@ -3,8 +3,11 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use ash::vk;
-use phobos as ph;
+
+use phobos::prelude as ph;
+use phobos::command_buffer::traits::*;
+use phobos::RecordGraphToCommandBuffer;
+use ph::vk;
 
 use winit;
 use winit::event::{Event, WindowEvent};
@@ -12,19 +15,9 @@ use winit::event_loop::{ControlFlow, EventLoopBuilder};
 use winit::platform::windows::EventLoopBuilderExtWindows;
 use winit::window::{WindowBuilder};
 
-use ph::IncompleteCmdBuffer; // TODO: Probably add this as a pub use to lib.rs
-
 use futures::executor::block_on;
-use phobos::{GraphicsCmdBuffer, PipelineStage, RecordGraphToCommandBuffer, TransferCmdBuffer};
 
 use anyhow::Result;
-use gpu_allocator::MemoryLocation;
-use gpu_allocator::vulkan::Allocator;
-
-// TODO:
-
-// 1. Enforce graph building in API.
-// 2. Possibly annotate BufferView with lifetime
 
 struct Resources {
     #[allow(dead_code)]
@@ -82,7 +75,7 @@ fn main_loop(frame: &mut ph::FrameManager,
         .color_attachment(swap_resource.clone(),
                           vk::AttachmentLoadOp::CLEAR,
                         Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
-        .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
+        .sample_image(offscreen_pass.output(&offscreen).unwrap(), ph::PipelineStage::FRAGMENT_SHADER)
         .execute(|mut cmd, _ifc, bindings| {
             cmd.full_viewport_scissor()
                 .bind_graphics_pipeline("sample")?

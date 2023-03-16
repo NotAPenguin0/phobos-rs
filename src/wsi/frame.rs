@@ -57,11 +57,12 @@
 
 use std::future::Future;
 use std::sync::{Arc, Mutex};
-use crate::{Device, Swapchain, Error, ExecutionManager, CommandBuffer, ImageView, WindowInterface, Surface, Image, ScratchAllocator, AppSettings, BufferView, Fence, Semaphore, CmdBuffer, Allocator, DefaultAllocator};
+use crate::{Device, Swapchain, Error, ExecutionManager, ImageView, WindowInterface, Surface, Image, ScratchAllocator, AppSettings, BufferView, Fence, Semaphore, CmdBuffer, Allocator, DefaultAllocator};
 use ash::vk;
 use crate::domain::ExecutionDomain;
 use crate::util::deferred_delete::DeletionQueue;
 use anyhow::Result;
+use crate::command_buffer::CommandBuffer;
 use crate::wsi::swapchain::SwapchainImage;
 
 /// Information stored for each in-flight frame.

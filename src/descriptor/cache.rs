@@ -1,10 +1,10 @@
 use std::sync::{Arc, Mutex};
 use crate::descriptor::descriptor_pool::{DescriptorPool, DescriptorPoolSize};
-use crate::descriptor_set::{DescriptorSet, DescriptorSetBinding};
-use crate::{DeletionQueue, Device, Error};
+use crate::{DeletionQueue, DescriptorSet, Device, Error};
 
 use anyhow::Result;
 use ash::vk;
+use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::util::cache::Cache;
 
 /// This structure uses a [`Cache`] over a [`DescriptorSet`] to automatically manage everything related to descriptor sets.

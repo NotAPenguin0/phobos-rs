@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use ash::vk;
 
-use crate::{ByteSize, Error};
-use crate::create_info::*;
+use crate::{ByteSize, Error, PipelineCreateInfo, ShaderCreateInfo};
+use crate::pipeline::create_info::*;
 
 use anyhow::Result;
-use crate::shader::ShaderCreateInfo;
 
 /// Used to facilitate creating a graphics pipeline.
 pub struct PipelineBuilder {

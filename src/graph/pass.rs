@@ -64,10 +64,11 @@
 //! Binding physical resources and recording is covered under the [`task_graph`] module documentation.
 
 use ash::vk;
-use crate::{Allocator, Error, IncompleteCommandBuffer, InFlightContext, PhysicalResourceBindings, VirtualResource};
+use crate::{Allocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
 use crate::domain::ExecutionDomain;
 use crate::pipeline::PipelineStage;
 use anyhow::Result;
+use crate::command_buffer::IncompleteCommandBuffer;
 use crate::graph::pass_graph::PassResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 

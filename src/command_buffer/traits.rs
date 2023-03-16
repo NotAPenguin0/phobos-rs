@@ -1,7 +1,8 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
-use crate::{BufferView, CommandBuffer, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache};
+use crate::{BufferView, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache};
+use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 

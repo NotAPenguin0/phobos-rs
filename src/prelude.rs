@@ -32,6 +32,7 @@ pub use crate::pipeline::hash::*;
 pub use crate::pipeline::builder::PipelineBuilder;
 pub use crate::pipeline::cache::PipelineCache;
 pub use crate::pipeline::shader::ShaderCreateInfo;
+pub use crate::pipeline::PipelineStage;
 
 pub use crate::descriptor::descriptor_set::DescriptorSet;
 pub use crate::descriptor::builder::DescriptorSetBuilder;
@@ -45,3 +46,9 @@ pub use crate::wsi::surface::Surface;
 pub use crate::util::byte_size::ByteSize;
 pub use crate::util::upload::staged_buffer_upload;
 pub use crate::util::deferred_delete::DeletionQueue;
+
+pub use crate::image::{Image, ImageView};
+pub use crate::buffer::{Buffer, BufferView};
+pub use crate::sampler::Sampler;
+
+pub use crate::domain;

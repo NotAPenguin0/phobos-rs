@@ -1,8 +1,8 @@
-use crate::descriptor_set::{DescriptorBinding, DescriptorBufferInfo, DescriptorContents, DescriptorImageInfo, DescriptorSetBinding};
 use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
 
 use anyhow::Result;
 use ash::vk;
+use crate::descriptor::descriptor_set::{DescriptorBinding, DescriptorBufferInfo, DescriptorContents, DescriptorImageInfo, DescriptorSetBinding};
 use crate::graph::physical_resource::PhysicalResource;
 
 #[cfg(feature="shader-reflection")]

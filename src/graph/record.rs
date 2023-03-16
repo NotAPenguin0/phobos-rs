@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::ffi::CString;
-use crate::{BufferView, DebugMessenger, ImageView, IncompleteCommandBuffer, InFlightContext, PassGraph, PhysicalResourceBindings, VirtualResource, Error, Allocator};
+use crate::{BufferView, DebugMessenger, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings, VirtualResource, Error, Allocator};
 use crate::domain::ExecutionDomain;
 
 use anyhow::Result;
@@ -9,6 +9,7 @@ use petgraph::data::DataMapMut;
 use petgraph::graph::NodeIndex;
 use petgraph::{Outgoing, Incoming};
 use petgraph::visit::EdgeRef;
+use crate::command_buffer::IncompleteCommandBuffer;
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
 use crate::graph::physical_resource::PhysicalResource;

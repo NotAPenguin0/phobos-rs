@@ -1,16 +1,17 @@
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
-use crate::create_info::{PipelineCreateInfo, PipelineRenderingInfo};
-use crate::{Device, Error, Pipeline};
-use crate::pipeline_layout::PipelineLayout;
-use crate::set_layout::DescriptorSetLayout;
-use crate::shader::Shader;
+use crate::{Device, Error, PipelineCreateInfo};
 use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 use super::hash::*;
 
 use anyhow::Result;
 use ash::vk;
+use crate::pipeline::create_info::PipelineRenderingInfo;
+use crate::pipeline::Pipeline;
+use crate::pipeline::pipeline_layout::PipelineLayout;
+use crate::pipeline::set_layout::DescriptorSetLayout;
+use crate::pipeline::shader::Shader;
 use crate::util::cache::{Cache, Resource};
 
 #[derive(Debug)]

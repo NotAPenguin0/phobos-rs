@@ -5,14 +5,14 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use ash::vk;
 
 use crate::domain::ExecutionDomain;
-use crate::{BufferView, CommandBuffer, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCommandBuffer, PhysicalResourceBindings, PipelineCache, Sampler, VirtualResource};
-use crate::traits::IncompleteCmdBuffer;
+use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, Sampler, VirtualResource};
 
 use anyhow::Result;
+use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
-use crate::create_info::PipelineRenderingInfo;
-use crate::descriptor_set::DescriptorSetBinding;
+use crate::descriptor::descriptor_set::DescriptorSetBinding;
+use crate::pipeline::create_info::PipelineRenderingInfo;
 
 impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer<'q, D> {
     type Domain = D;

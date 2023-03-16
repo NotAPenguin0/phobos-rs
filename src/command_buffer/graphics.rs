@@ -1,9 +1,9 @@
 use ash::vk;
 use crate::domain::ExecutionDomain;
-use crate::{BufferView, Error, GfxSupport, ImageView, IncompleteCommandBuffer};
-use crate::traits::{GraphicsCmdBuffer};
+use crate::{BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 
 use anyhow::Result;
+use crate::command_buffer::IncompleteCommandBuffer;
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D> {
     fn full_viewport_scissor(self) -> Self {

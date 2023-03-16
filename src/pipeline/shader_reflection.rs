@@ -7,8 +7,8 @@ use ash::vk;
 use spv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
 
 use crate::{Error, PipelineCreateInfo};
-use crate::pipeline_layout::{PipelineLayoutCreateInfo, PushConstantRange};
-use crate::set_layout::DescriptorSetLayoutCreateInfo;
+use crate::pipeline::pipeline_layout::{PipelineLayoutCreateInfo, PushConstantRange};
+use crate::pipeline::set_layout::DescriptorSetLayoutCreateInfo;
 
 #[cfg(all(feature="shader-reflection", not(feature="hlsl")))]
 type Ast = spv_cross::spirv::Ast<spv_cross::glsl::Target>;

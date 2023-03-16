@@ -1,9 +1,8 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 use ash::vk;
-use crate::{Device, Error, PipelineCache, DescriptorCache, Fence};
-use crate::command_pool::*;
+use crate::{Device, Error, PipelineCache, DescriptorCache, Fence, IncompleteCmdBuffer, CmdBuffer};
 use anyhow::Result;
-use crate::traits::{CmdBuffer, IncompleteCmdBuffer};
+use crate::command_buffer::command_pool::CommandPool;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.

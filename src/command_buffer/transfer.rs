@@ -1,9 +1,9 @@
 use crate::domain::ExecutionDomain;
-use crate::{BufferView, Error, ImageView, IncompleteCommandBuffer, TransferSupport};
-use crate::traits::TransferCmdBuffer;
+use crate::{BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
 
 use anyhow::Result;
 use ash::vk;
+use crate::command_buffer::IncompleteCommandBuffer;
 
 impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteCommandBuffer<'_, D> {
     fn copy_buffer(self, src: &BufferView, dst: &BufferView) -> Result<Self> {

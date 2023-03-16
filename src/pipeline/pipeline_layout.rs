@@ -2,11 +2,9 @@ use std::sync::Arc;
 use ash::vk;
 
 use crate::Device;
-use crate::set_layout::{DescriptorSetLayout, DescriptorSetLayoutCreateInfo};
-
-use super::hash::*;
 
 use anyhow::Result;
+use crate::pipeline::set_layout::{DescriptorSetLayout, DescriptorSetLayoutCreateInfo};
 use crate::util::cache::{Cache, Resource};
 
 /// A fully built Vulkan pipeline layout. This is a managed resource, so it cannot be manually
