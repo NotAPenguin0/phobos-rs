@@ -31,23 +31,22 @@
 
 use std::ffi::c_void;
 use std::ptr::NonNull;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use ash::vk;
-use crate::{Device, Error};
-
-use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};
+use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 
 use anyhow::Result;
-use gpu_allocator::vulkan::AllocationScheme;
+
 
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Buffer {
+pub struct Buffer<A: Allocator = DefaultAllocator> {
     #[derivative(Debug="ignore")]
     device: Arc<Device>,
     #[derivative(Debug="ignore")]
-    allocator: Arc<Mutex<vk_alloc::Allocator>>,
-    memory: vk_alloc::Allocation,
+    allocator: A,
+    #[derivative(Debug="ignore")]
+    memory: A::Allocation,
     pub(crate) pointer: Option<NonNull<c_void>>,
     pub handle: vk::Buffer,
     pub size: vk::DeviceSize,
@@ -61,8 +60,9 @@ pub struct BufferView {
     pub size: vk::DeviceSize,
 }
 
-impl Buffer {
-    pub fn new(device: Arc<Device>, allocator: Arc<Mutex<vk_alloc::Allocator>>, size: vk::DeviceSize, usage: vk::BufferUsageFlags, location: MemoryLocation) -> Result<Self> {
+impl<A: Allocator> Buffer<A> {
+    pub fn new(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
+        let size = size.into();
         let handle = unsafe {
             device.create_buffer(&vk::BufferCreateInfo {
                 s_type: vk::StructureType::BUFFER_CREATE_INFO,
@@ -77,14 +77,7 @@ impl Buffer {
         };
 
         let requirements = unsafe { device.get_buffer_memory_requirements(handle) };
-        let mut alloc = allocator.lock().or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?;
-        let memory = alloc.allocate(&vk_alloc::AllocationCreateDesc {
-            name: "buffer",
-            requirements,
-            location,
-            linear: true,
-            allocation_scheme: AllocationScheme::GpuAllocatorManaged,
-        })?;
+        let memory = allocator.allocate("buffer", &requirements, location)?;
 
         unsafe { device.bind_buffer_memory(handle, memory.memory(), memory.offset())? };
 
@@ -98,11 +91,13 @@ impl Buffer {
         })
     }
 
-    pub fn new_device_local(device: Arc<Device>, allocator: Arc<Mutex<vk_alloc::Allocator>>, size: vk::DeviceSize, usage: vk::BufferUsageFlags) -> Result<Self> {
-        Self::new(device, allocator, size, usage, MemoryLocation::GpuOnly)
+    pub fn new_device_local(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
+        Self::new(device, allocator, size, usage, MemoryType::GpuOnly)
     }
 
-    pub fn view(&self, offset: vk::DeviceSize, size: vk::DeviceSize) -> Result<BufferView> {
+    pub fn view(&self, offset: impl Into<vk::DeviceSize>, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
+        let offset = offset.into();
+        let size = size.into();
         return if offset + size >= self.size {
             Err(anyhow::Error::from(Error::BufferViewOutOfRange))
         } else {
@@ -129,11 +124,10 @@ impl Buffer {
     }
 }
 
-impl Drop for Buffer {
+impl<A: Allocator> Drop for Buffer<A> {
     fn drop(&mut self) {
-        let mut alloc = self.allocator.lock().unwrap();
         let memory = std::mem::take(&mut self.memory);
-        alloc.free(memory).unwrap();
+        self.allocator.free(memory).unwrap();
         unsafe { self.device.destroy_buffer(self.handle, None); }
     }
 }
