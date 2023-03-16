@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum MemoryType {
     /// Store the allocation in GPU only accessible memory - typically this is the faster GPU resource and this should be
     /// where most of the allocations live.

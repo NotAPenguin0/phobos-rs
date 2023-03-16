@@ -50,18 +50,18 @@ fn main_loop(frame: &mut ph::FrameManager,
     ];
 
     // Define a render graph with one pass that clears the swapchain image
-    let graph = ph::PassGraph::new(Some(swap_resource.clone()));
+    let graph = ph::PassGraph::new(Some(&swap_resource));
 
     // Render pass that renders to an offscreen attachment
     let offscreen_pass = ph::PassBuilder::render(String::from("offscreen"))
         .color([1.0, 0.0, 0.0, 1.0])
-        .color_attachment(offscreen.clone(), vk::AttachmentLoadOp::CLEAR, Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
+        .color_attachment(&offscreen, vk::AttachmentLoadOp::CLEAR, Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
         .execute(|mut cmd, ifc, _bindings| {
             // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
             let mut buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
             let slice = buffer.mapped_slice::<f32>()?;
             slice.copy_from_slice(vertices.as_slice());
-            cmd = cmd.bind_vertex_buffer(0, buffer)
+            cmd = cmd.bind_vertex_buffer(0, &buffer)
                      .bind_graphics_pipeline("offscreen")?
                      .full_viewport_scissor()
                      .draw(6, 1, 0, 0)?;
@@ -72,14 +72,14 @@ fn main_loop(frame: &mut ph::FrameManager,
     // Render pass that samples the offscreen attachment, and possibly does some postprocessing to it
     let sample_pass = ph::PassBuilder::render(String::from("sample"))
         .color([0.0, 1.0, 0.0, 1.0])
-        .color_attachment(swap_resource.clone(),
+        .color_attachment(&swap_resource,
                           vk::AttachmentLoadOp::CLEAR,
                         Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
-        .sample_image(offscreen_pass.output(&offscreen).unwrap(), ph::PipelineStage::FRAGMENT_SHADER)
+        .sample_image(&offscreen_pass.output(&offscreen).unwrap(), ph::PipelineStage::FRAGMENT_SHADER)
         .execute(|cmd, _ifc, bindings| {
             cmd.full_viewport_scissor()
                 .bind_graphics_pipeline("sample")?
-                .resolve_and_bind_sampled_image(0, 0, offscreen.clone(), &resources.sampler, &bindings)?
+                .resolve_and_bind_sampled_image(0, 0, &offscreen, &resources.sampler, &bindings)?
                 .draw(6, 1, 0, 0)
         })
         .build();
@@ -87,7 +87,7 @@ fn main_loop(frame: &mut ph::FrameManager,
     let present_pass = ph::PassBuilder::present(
         "present".to_string(),
         // This pass uses the output from the clear pass on the swap resource as its input
-        sample_pass.output(&swap_resource).unwrap());
+        &sample_pass.output(&swap_resource).unwrap());
     let mut graph = graph.add_pass(offscreen_pass)?
         .add_pass(sample_pass)?
         .add_pass(present_pass)?
@@ -97,8 +97,8 @@ fn main_loop(frame: &mut ph::FrameManager,
     block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {
         // create physical bindings for the render graph resources
         let mut bindings = ph::PhysicalResourceBindings::new();
-        bindings.bind_image("swapchain".to_string(), ifc.swapchain_image.as_ref().unwrap().clone());
-        bindings.bind_image("offscreen".to_string(), resources.offscreen_view.clone());
+        bindings.bind_image("swapchain".to_string(), &ifc.swapchain_image.as_ref().unwrap());
+        bindings.bind_image("offscreen".to_string(), &resources.offscreen_view);
         // create a command buffer capable of executing graphics commands
         let cmd = exec.on_domain::<ph::domain::Graphics>(Some(pipelines.clone()), Some(descriptors.clone())).unwrap();
         let cmd2 = exec.try_on_domain::<ph::domain::Graphics>(None, None);
@@ -124,57 +124,6 @@ fn load_spirv_file(path: &Path) -> Vec<u32> {
     Vec::from(binary)
 }
 
-// Note that this is implemented in the graph library, which should be preferred for correct behaviour.
-#[allow(dead_code)]
-fn upload_buffer(device: Arc<ph::Device>, mut allocator: ph::DefaultAllocator, exec: Arc<ph::ExecutionManager>) -> Result<ph::Fence<ph::Buffer>> {
-    let data: Vec<f32> = vec![
-        -1.0, 1.0, 0.0, 1.0,
-        -1.0, -1.0, 0.0, 0.0,
-        1.0, -1.0, 1.0, 0.0,
-        -1.0, 1.0, 0.0, 1.0,
-        1.0, -1.0, 1.0, 0.0,
-        1.0, 1.0, 1.0, 1.0
-    ];
-    // This function will upload some data to a device local buffer using a staging buffer
-    let staging_buffer = ph::Buffer::new(device.clone(), &mut allocator, (data.len() * std::mem::size_of::<f32>()) as vk::DeviceSize, vk::BufferUsageFlags::TRANSFER_SRC, ph::MemoryType::CpuToGpu)?;
-    let mut staging = staging_buffer.view_full();
-    staging.mapped_slice()?.copy_from_slice(data.as_slice());
-
-    let buffer = ph::Buffer::new_device_local(device.clone(), &mut allocator, staging.size, vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER)?;
-    let view = buffer.view_full();
-
-    // Create an out of frame context.
-    let mut ctx = ph::ThreadContext::new(device.clone(), allocator.clone(), None)?;
-
-    // Because why not, we'll try to use the render graph API. Note that because of the virtual resource system,
-    // we could define this entire graph once and then re-use it for every buffer copy!
-    // We won't do this here to keep the example short (and because at the time of writing buffers are not implemented in the virtual resource system yet).
-    let graph = ph::PassGraph::new(None);
-    let pass = ph::PassBuilder::new("copy".to_owned())
-        .execute(|cmd, _ifc, _| {
-            cmd.copy_buffer(&staging, &view)
-        })
-        .build();
-
-    let mut graph = graph.add_pass(pass)?.build()?;
-
-    let cmd = exec.on_domain::<ph::domain::Transfer>(None, None)?;
-    let mut ifc = ctx.get_ifc();
-    let bindings = ph::PhysicalResourceBindings::new();
-    // Record graph to a command buffer, then finish it.
-    let cmd = graph.record(cmd, &bindings, &mut ifc, None)?.finish()?;
-
-    let fence = ph::ExecutionManager::submit(exec.clone(), cmd)?
-        // Remember to attach cleanup for the staging buffer so it does not get dropped at the end of the function,
-        // but after the future completes
-        // We can possibly make the compiler enforce this in the future using lifetimes later, but I'm not sure
-        // how yet.
-        .with_cleanup(move || {
-            drop(staging_buffer);
-        });
-    Ok(fence.attach_value(buffer))
-}
-
 fn main() -> Result<()> {
     let event_loop = EventLoopBuilder::new().with_any_thread(true).build();
     let window = WindowBuilder::new()
@@ -189,7 +138,7 @@ fn main() -> Result<()> {
         .validation(true)
         .window(&window) // TODO: pass window information instead of window interface to remove dependency
         .present_mode(vk::PresentModeKHR::MAILBOX)
-        .scratch_size(1 * 1024) // 1 KiB scratch memory per buffer type per frame
+        .scratch_size(1 * 1024u64) // 1 KiB scratch memory per buffer type per frame
         .gpu(ph::GPURequirements {
             dedicated: true,
             min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.
@@ -212,7 +161,7 @@ fn main() -> Result<()> {
         (surface, physical_device)
     };
     let device = ph::Device::new(&instance, &physical_device, &settings)?;
-    let mut alloc = ph::DefaultAllocator::new(&instance, device.clone(), &physical_device)?;
+    let mut alloc = ph::DefaultAllocator::new(&instance, &device, &physical_device)?;
     let exec = ph::ExecutionManager::new(device.clone(), &physical_device)?;
     let mut frame = {
         let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
@@ -275,7 +224,7 @@ fn main() -> Result<()> {
         offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
         offscreen: image,
         sampler: ph::Sampler::default(device.clone())?,
-        vertex_buffer: block_on(ph::staged_buffer_upload(device.clone(), alloc.clone(), exec.clone(), data.as_slice())?)
+        vertex_buffer: block_on(ph::staged_buffer_upload(device.clone(), alloc.clone(), exec.clone(), data.as_slice()))?
     };
 
     let descriptor_cache = ph::DescriptorCache::new(device.clone())?;

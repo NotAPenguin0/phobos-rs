@@ -62,8 +62,8 @@ impl DescriptorPool {
         };
 
         Ok(Self{
-            device: device.clone(),
             handle: unsafe { device.create_descriptor_pool(&info, None)? },
+            device,
             size,
         })
     }

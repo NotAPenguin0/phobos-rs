@@ -6,6 +6,7 @@ use anyhow::Result;
 use crate::command_buffer::IncompleteCommandBuffer;
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D> {
+
     fn full_viewport_scissor(self) -> Self {
         let area = self.current_render_area;
         self.viewport(vk::Viewport {
@@ -56,12 +57,12 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         Ok(self)
     }
 
-    fn bind_vertex_buffer(self, binding: u32, buffer: BufferView) -> Self where Self: Sized {
+    fn bind_vertex_buffer(self, binding: u32, buffer: &BufferView) -> Self where Self: Sized {
         unsafe { self.device.cmd_bind_vertex_buffers(self.handle, binding, std::slice::from_ref(&buffer.handle), std::slice::from_ref(&buffer.offset)) };
         self
     }
 
-    fn bind_index_buffer(self, buffer: BufferView, ty: vk::IndexType) -> Self where Self: Sized {
+    fn bind_index_buffer(self, buffer: &BufferView, ty: vk::IndexType) -> Self where Self: Sized {
         unsafe { self.device.cmd_bind_index_buffer(self.handle, buffer.handle, buffer.offset, ty); }
         self
     }

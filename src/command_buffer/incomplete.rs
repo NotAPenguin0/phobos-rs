@@ -19,8 +19,8 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
 
     fn new(device: Arc<Device>,
            queue_lock: MutexGuard<'q, Queue>,
-           handle: vk::CommandBuffer, flags:
-           vk::CommandBufferUsageFlags,
+           handle: vk::CommandBuffer,
+           flags: vk::CommandBufferUsageFlags,
            pipelines:  Option<Arc<Mutex<PipelineCache>>>,
            descriptors: Option<Arc<Mutex<DescriptorCache>>>)
            -> Result<Self> {
@@ -34,7 +34,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
             device.begin_command_buffer(handle, &begin_info)?;
         };
         Ok(IncompleteCommandBuffer {
-            device: device.clone(),
+            device,
             handle,
             queue_lock,
             current_pipeline_layout: vk::PipelineLayout::null(),
@@ -148,7 +148,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     ///
     /// ```
     #[deprecated(since = "0.5.0", note = "Use the new bind_xxx functions of the command buffer.")]
-    pub fn bind_new_descriptor_set(mut self, index: u32, cache: Arc<Mutex<DescriptorCache>>, bindings: DescriptorSetBinding) -> Result<Self> {
+    pub fn bind_new_descriptor_set(mut self, index: u32, cache: &Arc<Mutex<DescriptorCache>>, bindings: DescriptorSetBinding) -> Result<Self> {
         let mut cache = cache.lock().or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?;
         let set = self.get_descriptor_set(index, bindings, &mut cache)?;
         self.bind_descriptor_set(index, set);
@@ -165,7 +165,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     pub fn resolve_and_bind_sampled_image(mut self,
                                           set: u32,
                                           binding: u32,
-                                          resource: VirtualResource,
+                                          resource: &VirtualResource,
                                           sampler: &Sampler,
                                           bindings: &PhysicalResourceBindings)
                                           -> Result<Self> {
@@ -178,13 +178,13 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
 
     pub fn bind_sampled_image(mut self, set: u32, binding: u32, image: &ImageView, sampler: &Sampler) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
-            builder.bind_sampled_image(binding, image.clone(), sampler);
+            builder.bind_sampled_image(binding, image, sampler);
             Ok(())
         })?;
         Ok(self)
     }
 
-    pub fn bind_uniform_buffer(mut self, set: u32, binding: u32, buffer: BufferView) -> Result<Self> {
+    pub fn bind_uniform_buffer(mut self, set: u32, binding: u32, buffer: &BufferView) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_uniform_buffer(binding, buffer);
             Ok(())
@@ -195,9 +195,14 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     /// Transitions an image layout.
     /// Generally you will not need to call this function manually,
     /// using the render graph api you can do most transitions automatically.
-    pub fn transition_image(self, image: &ImageView, src_stage: vk::PipelineStageFlags, dst_stage: vk::PipelineStageFlags,
-                            from: vk::ImageLayout, to: vk::ImageLayout,
-                            src_access: vk::AccessFlags, dst_access: vk::AccessFlags) -> Self {
+    pub fn transition_image(self,
+                            image: &ImageView,
+                            src_stage: vk::PipelineStageFlags,
+                            dst_stage: vk::PipelineStageFlags,
+                            from: vk::ImageLayout,
+                            to: vk::ImageLayout,
+                            src_access: vk::AccessFlags,
+                            dst_access: vk::AccessFlags) -> Self {
         let barrier = vk::ImageMemoryBarrier {
             s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
             p_next: std::ptr::null(),

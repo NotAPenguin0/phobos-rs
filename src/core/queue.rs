@@ -94,7 +94,7 @@ impl Queue {
             .next()
             .ok_or(Error::Uncategorized("Command buffer allocation failed."))?;
 
-        CmdBuf::new(device.clone(), queue_lock, handle, vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, pipelines, descriptors)
+        CmdBuf::new(device, queue_lock, handle, vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT, pipelines, descriptors)
     }
 
     /// Instantly delete a command buffer, without taking synchronization into account.

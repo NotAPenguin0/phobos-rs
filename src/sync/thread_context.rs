@@ -12,10 +12,10 @@ pub struct ThreadContext<A: Allocator = DefaultAllocator> {
 
 impl<A: Allocator> ThreadContext<A> {
     /// Spawn a new thread context with local scratch allocators.
-    pub fn new(device: Arc<Device>, mut allocator: A, scratch_size: Option<vk::DeviceSize>) -> Result<Self> {
+    pub fn new(device: Arc<Device>, mut allocator: A, scratch_size: Option<impl Into<vk::DeviceSize>>) -> Result<Self> {
         let scratch_size = match scratch_size {
             None => 1 as vk::DeviceSize,
-            Some(size) => size
+            Some(size) => size.into()
         };
 
         Ok(Self {

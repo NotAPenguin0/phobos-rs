@@ -121,30 +121,6 @@ impl<R, D, A: Allocator> Task<R> for PassNode<'_, '_, R, D, A> where R: Resource
     }
 }
 
-impl ResourceUsage {
-    pub fn access(&self) -> vk::AccessFlags2 {
-        match self {
-            ResourceUsage::Nothing => { vk::AccessFlags2::NONE }
-            ResourceUsage::Present => { vk::AccessFlags2::NONE }
-            ResourceUsage::Attachment(AttachmentType::Color) => { vk::AccessFlags2::COLOR_ATTACHMENT_WRITE }
-            ResourceUsage::Attachment(AttachmentType::Depth) => { vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE }
-            ResourceUsage::Attachment(AttachmentType::Resolve(_)) => { vk::AccessFlags2::COLOR_ATTACHMENT_WRITE }
-            ResourceUsage::ShaderRead => { vk::AccessFlags2::SHADER_READ }
-            ResourceUsage::ShaderWrite => { vk::AccessFlags2::SHADER_WRITE }
-        }
-    }
-
-    pub fn is_read(&self) -> bool {
-        match self {
-            ResourceUsage::Nothing => { true }
-            ResourceUsage::Present => { false }
-            ResourceUsage::Attachment(_) => { false }
-            ResourceUsage::ShaderRead => { true }
-            ResourceUsage::ShaderWrite => { false }
-        }
-    }
-}
-
 macro_rules! barriers {
     ($graph:ident) => {
         $graph.node_indices().filter_map(|node| match $graph.node_weight(node).unwrap() {
@@ -158,11 +134,11 @@ macro_rules! barriers {
 impl<'exec, 'q, D, A: Allocator> PassGraph<'exec, 'q, D, A> where D: ExecutionDomain {
     /// Create a new task graph. If rendering to a swapchain, also give it the virtual resource you are planning to use for this.
     /// This is necessary for proper sync
-    pub fn new(swapchain: Option<VirtualResource>) -> Self {
+    pub fn new(swapchain: Option<&VirtualResource>) -> Self {
         let mut graph = PassGraph {
             graph: TaskGraph::new(),
             source: NodeIndex::default(),
-            swapchain,
+            swapchain: swapchain.cloned(),
             last_usages: Default::default(),
         };
 
@@ -297,7 +273,7 @@ impl<'exec, 'q, D, A: Allocator> PassGraph<'exec, 'q, D, A> where D: ExecutionDo
         for output in &mut source.outputs {
             // Will only succeed if swapchain is set and this resource is the swapchain
             let default = VirtualResource::image("__none__internal__");
-            if VirtualResource::are_associated(&output.resource, self.swapchain.as_ref().unwrap_or(&default)) {
+            if output.resource.is_associated_with(self.swapchain.as_ref().unwrap_or(&default)) {
                 output.stage = PipelineStage::COLOR_ATTACHMENT_OUTPUT;
             }
             else {

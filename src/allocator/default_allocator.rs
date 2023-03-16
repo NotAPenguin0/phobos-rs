@@ -25,7 +25,7 @@ pub struct Allocation {
 }
 
 impl DefaultAllocator {
-    pub fn new(instance: &VkInstance, device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
+    pub fn new(instance: &VkInstance, device: &Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
         Ok(Self {
                 alloc: Arc::new(Mutex::new(vk_alloc::Allocator::new(
                 &vk_alloc::AllocatorCreateDesc {

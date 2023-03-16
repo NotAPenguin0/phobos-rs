@@ -47,23 +47,23 @@ impl VirtualResource {
     }
 
     /// Two virtual resources are associated if and only if their uid's only differ by "+" symbols.
-    pub fn are_associated(lhs: &VirtualResource, rhs: &VirtualResource) -> bool {
+    pub fn is_associated_with(&self, rhs: &VirtualResource) -> bool {
         // Since virtual resource uid's are constructed by appending * symbols, we can simply check whether the largest of the two strings starts with the shorter one
-        let larger = if lhs.uid.len() >= rhs.uid.len() { lhs } else { rhs };
-        let smaller = if lhs.uid.len() < rhs.uid.len() { lhs } else { rhs };
+        let larger = if self.uid.len() >= rhs.uid.len() { self } else { rhs };
+        let smaller = if self.uid.len() < rhs.uid.len() { self } else { rhs };
         larger.uid.starts_with(&smaller.uid)
     }
 
     /// One virtual resource is older than another if it has less '+' symbols.
     pub fn is_older(lhs: &VirtualResource, rhs: &VirtualResource) -> bool {
-        if !VirtualResource::are_associated(&lhs, &rhs) { return false; }
+        if !lhs.is_associated_with(rhs) { return false; }
         lhs.uid.len() < rhs.uid.len()
     }
 
     /// Note that this is not the same as inverting the result of as_older(), for the same exact state of the resource,
     /// both of these functions should return false (they decide whether resources are strictly older or younger than each other).
     pub fn is_younger(lhs: &VirtualResource, rhs: &VirtualResource) -> bool {
-        if !VirtualResource::are_associated(&lhs, &rhs) { return false; }
+        if !lhs.is_associated_with(rhs) { return false; }
         rhs.uid.len() < lhs.uid.len()
     }
 }

@@ -98,8 +98,8 @@ impl<'a, Window> AppBuilder<'a, Window> where Window: WindowInterface {
         self
     }
 
-    pub fn version(mut self, ver: (u32, u32, u32)) -> Self {
-        self.inner.version = ver;
+    pub fn version(mut self, ver: impl Into<(u32, u32, u32)>) -> Self {
+        self.inner.version = ver.into();
         self
     }
 
@@ -128,7 +128,8 @@ impl<'a, Window> AppBuilder<'a, Window> where Window: WindowInterface {
         self
     }
 
-    pub fn scratch_size(mut self, size: vk::DeviceSize) -> Self {
+    pub fn scratch_size(mut self, size: impl Into<vk::DeviceSize>) -> Self {
+        let size = size.into();
         self.inner.scratch_vbo_size = size;
         self.inner.scratch_ibo_size = size;
         self.inner.scratch_ubo_size = size;

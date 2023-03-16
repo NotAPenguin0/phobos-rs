@@ -61,7 +61,8 @@ pub struct BufferView {
 }
 
 impl<A: Allocator> Buffer<A> {
-    pub fn new(device: Arc<Device>, allocator: &mut A, size: vk::DeviceSize, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
+    pub fn new(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
+        let size = size.into();
         let handle = unsafe {
             device.create_buffer(&vk::BufferCreateInfo {
                 s_type: vk::StructureType::BUFFER_CREATE_INFO,
@@ -90,11 +91,13 @@ impl<A: Allocator> Buffer<A> {
         })
     }
 
-    pub fn new_device_local(device: Arc<Device>, allocator: &mut A, size: vk::DeviceSize, usage: vk::BufferUsageFlags) -> Result<Self> {
+    pub fn new_device_local(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
         Self::new(device, allocator, size, usage, MemoryType::GpuOnly)
     }
 
-    pub fn view(&self, offset: vk::DeviceSize, size: vk::DeviceSize) -> Result<BufferView> {
+    pub fn view(&self, offset: impl Into<vk::DeviceSize>, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
+        let offset = offset.into();
+        let size = size.into();
         return if offset + size >= self.size {
             Err(anyhow::Error::from(Error::BufferViewOutOfRange))
         } else {

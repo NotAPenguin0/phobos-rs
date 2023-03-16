@@ -23,7 +23,7 @@ impl CommandPool {
         let handle = unsafe { device.create_command_pool(&info, None)? };
 
         Ok(CommandPool {
-            device: device.clone(),
+            device,
             handle
         })
     }

@@ -30,9 +30,9 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     fn bind_graphics_pipeline(self, name: &str) -> Result<Self> where Self: Sized;
     /// Bind a vertex buffer to the given vertex input binding.
     /// Equivalent of `vkCmdBindVertexBuffer`
-    fn bind_vertex_buffer(self, binding: u32, buffer: BufferView) -> Self where Self: Sized;
+    fn bind_vertex_buffer(self, binding: u32, buffer: &BufferView) -> Self where Self: Sized;
     /// Bind an index buffer. Equivalent of `vkCmdBindIndexBuffer`
-    fn bind_index_buffer(self, buffer: BufferView, ty: vk::IndexType) -> Self where Self: Sized;
+    fn bind_index_buffer(self, buffer: &BufferView, ty: vk::IndexType) -> Self where Self: Sized;
     /// Blit an image. Equivalent to `vkCmdBlitImage`
     fn blit_image(self, src: &ImageView, dst: &ImageView, src_offsets: &[vk::Offset3D; 2], dst_offsets: &[vk::Offset3D; 2], filter: vk::Filter) -> Self where Self: Sized;
 }

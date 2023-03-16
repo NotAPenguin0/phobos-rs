@@ -39,7 +39,7 @@ pub struct ScratchAllocator<A: Allocator = DefaultAllocator> {
 }
 
 impl<A: Allocator> ScratchAllocator<A> {
-    pub fn new(device: Arc<Device>, allocator: &mut A, max_size: vk::DeviceSize, usage: vk::BufferUsageFlags) -> Result<Self> {
+    pub fn new(device: Arc<Device>, allocator: &mut A, max_size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
         let buffer = Buffer::new(device.clone(), allocator, max_size, usage, MemoryType::CpuToGpu)?;
         let alignment = if usage.intersects(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER) {
             16
@@ -62,7 +62,8 @@ impl<A: Allocator> ScratchAllocator<A> {
         }
     }
 
-    pub fn allocate(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
+    pub fn allocate(&mut self, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
+        let size = size.into();
         // Part of the buffer that is over the min alignment
         let unaligned_part = size % self.alignment;
         // Amount of padding bytes to insert

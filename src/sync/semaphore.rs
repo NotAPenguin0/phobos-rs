@@ -19,10 +19,10 @@ impl Semaphore {
             flags: Default::default(),
         };
         Ok(Semaphore {
-            device: device.clone(),
             handle: unsafe {
                 device.create_semaphore(&info, None)?
-            }
+            },
+            device,
         })
     }
 }

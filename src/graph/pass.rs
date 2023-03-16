@@ -91,7 +91,7 @@ impl<'exec, 'q, D, A: Allocator> Pass<'exec, 'q, D, A> where D: ExecutionDomain 
     /// Returns the output virtual resource associated with the input resource.
     pub fn output(&self, resource: &VirtualResource) -> Option<VirtualResource> {
         self.outputs.iter().filter_map(|output| {
-            if VirtualResource::are_associated(resource, &output.resource) { Some(output.resource.clone()) }
+            if resource.is_associated_with(&output.resource) { Some(output.resource.clone()) }
             else { None }
         }).next()
     }
@@ -135,13 +135,13 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
     /// Create a pass for presenting to the swapchain.
     /// Note that this doesn't actually do the presentation, it just adds the proper sync for it.
     /// If you are presenting to an output of the graph, this is required.
-    pub fn present(name: impl Into<String>, swapchain: VirtualResource) -> Pass<'exec, 'q, D, A> {
+    pub fn present(name: impl Into<String>, swapchain: &VirtualResource) -> Pass<'exec, 'q, D, A> {
         Pass {
             name: name.into(),
             color: None,
             inputs: vec![PassResource {
                 usage: ResourceUsage::Present,
-                resource: swapchain,
+                resource: swapchain.clone(),
                 stage: PipelineStage::BOTTOM_OF_PIPE,
                 layout: vk::ImageLayout::PRESENT_SRC_KHR,
                 clear_value: None,
@@ -160,7 +160,7 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
     }
 
     /// Adds a color attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
-    pub fn color_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self> {
+    pub fn color_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self> {
         if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach color attachment to a pass that is not a renderpass").into()) }
         if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() { return Err(anyhow::Error::from(Error::NoClearValue)); }
         self.inner.inputs.push(PassResource {
@@ -192,7 +192,7 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
     }
 
     /// Adds a depth attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
-    pub fn depth_attachment(mut self, resource: VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Result<Self> {
+    pub fn depth_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Result<Self> {
         if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach depth attachment to a pass that is not a renderpass").into()) }
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Depth),
@@ -225,7 +225,7 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
 
     /// Resolves src into dst
     /// TODO: Add check for existence of src
-    pub fn resolve(mut self, src: VirtualResource, dst: VirtualResource) -> Self {
+    pub fn resolve(mut self, src: &VirtualResource, dst: &VirtualResource) -> Self {
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Resolve(src.clone())),
             resource: dst.clone(),
@@ -236,7 +236,7 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
         });
 
         self.inner.outputs.push(PassResource {
-            usage: ResourceUsage::Attachment(AttachmentType::Resolve(src)),
+            usage: ResourceUsage::Attachment(AttachmentType::Resolve(src.clone())),
             resource: dst.upgrade(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT, // RESOLVE is only for vkCmdResolve
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
@@ -248,10 +248,10 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
     }
 
     /// Declare that a resource will be used as a sampled image in the given pipeline stages.
-    pub fn sample_image(mut self, resource: VirtualResource, stage: PipelineStage) -> Self {
+    pub fn sample_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::ShaderRead,
-            resource,
+            resource: resource.clone(),
             stage,
             layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
             clear_value: None,

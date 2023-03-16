@@ -74,7 +74,7 @@ fn find_resolve_attachment<D, A: Allocator>(pass: &PassNode<PassResource, D, A>,
     pass.outputs.iter().find(|output| {
         match &output.usage {
             ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => {
-                VirtualResource::are_associated(&resource.resource, &resolve)
+                resource.resource.is_associated_with(&resolve)
             },
             _ => false
         }
