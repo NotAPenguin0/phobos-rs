@@ -89,7 +89,6 @@ pub type ImageView = Arc<ImgView>;
 
 impl<A: Allocator> Image<A> {
     // TODO: Allow specifying an initial layout for convenience
-    // TODO: Full wrapper around the allocator for convenience
     /// Create a new simple [`VkImage`] and allocate some memory to it.
     pub fn new(device: Arc<Device>, alloc: &mut A, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format, samples: vk::SampleCountFlags) -> Result<Self> {
         let sharing_mode = if usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {

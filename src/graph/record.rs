@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::ffi::CString;
-use crate::{BufferView, DebugMessenger, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings, VirtualResource, Error, Allocator};
+use crate::{BufferView, DebugMessenger, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings, Error, Allocator};
 use crate::domain::ExecutionDomain;
 
 use anyhow::Result;

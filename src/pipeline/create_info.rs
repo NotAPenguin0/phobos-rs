@@ -43,7 +43,6 @@ pub struct Rect2D(pub(super) vk::Rect2D);
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
-    // TODO: Blend presets
     pub name: String,
     pub layout: PipelineLayoutCreateInfo,
     pub vertex_input_bindings: Vec<VertexInputBindingDescription>,

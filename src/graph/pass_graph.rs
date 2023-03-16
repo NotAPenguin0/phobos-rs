@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use ash::vk;
 use crate::domain::ExecutionDomain;
 use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
-use crate::graph::resource::{AttachmentType, ResourceUsage};
+use crate::graph::resource::{ResourceUsage};
 use crate::graph::virtual_resource::VirtualResource;
 use crate::{Allocator, Error, InFlightContext, PhysicalResourceBindings};
 
