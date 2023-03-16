@@ -43,8 +43,10 @@ impl FenceValue<()> for Fence<()> {
 
 impl Fence<()> {
     pub fn attach_value<T>(mut self, value: T) -> Fence<T> {
+        let mut handle = vk::Fence::null();
+        std::mem::swap(&mut self.handle, &mut handle);
         Fence::<T> {
-            handle: self.handle,
+            handle,
             first_cleanup_fn: self.first_cleanup_fn.take(),
             device: self.device.clone(),
             value: Some(value),
@@ -63,12 +65,12 @@ impl<T> Fence<T> {
             flags: if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() },
         };
         Ok(Fence {
-            device: device.clone(),
-            first_cleanup_fn: None,
-            value: None,
             handle: unsafe {
                 device.create_fence(&info, None)?
-            }
+            },
+            device,
+            first_cleanup_fn: None,
+            value: None,
         })
     }
 
