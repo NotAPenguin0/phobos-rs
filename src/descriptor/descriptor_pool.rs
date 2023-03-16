@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 use ash::vk;
 use crate::Device;
@@ -72,5 +73,16 @@ impl DescriptorPool {
 impl Drop for DescriptorPool {
     fn drop(&mut self) {
         unsafe { self.device.destroy_descriptor_pool(self.handle, None); }
+    }
+}
+
+
+impl Display for DescriptorPoolSize {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut result = writeln!(f, "DescriptorPoolSize (");
+        for (ty, size) in &self.0 {
+            result = result.and_then(|_| writeln!(f, "{:?} => {}", ty, size))
+        }
+        result
     }
 }

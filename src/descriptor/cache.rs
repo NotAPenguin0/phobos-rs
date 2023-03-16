@@ -40,6 +40,7 @@ impl DescriptorCache {
                 *count = *count * 2;
             }
         }
+        trace!("Growing descriptor pool to new size {}.", &old_size);
         old_size
     }
 
