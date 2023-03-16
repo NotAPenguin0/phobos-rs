@@ -3,7 +3,6 @@ use std::ffi::CString;
 use std::sync::{Arc, Mutex};
 use crate::{Device, Error, PipelineCreateInfo};
 use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
-use super::hash::*;
 
 use anyhow::Result;
 use ash::vk;

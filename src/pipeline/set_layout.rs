@@ -6,8 +6,6 @@ use crate::Device;
 use anyhow::Result;
 use crate::util::cache::Resource;
 
-use super::hash::*;
-
 /// A fully built Vulkan descriptor set layout. This is a managed resource, so it cannot be manually
 /// cloned or dropped.
 #[derive(Derivative)]

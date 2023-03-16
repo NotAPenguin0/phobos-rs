@@ -12,12 +12,12 @@
 //! [`ImgView`] also owns a full Vulkan resource. For this reason, we wrap it in a reference-counted `Arc` so we can safely treat it as if it were
 //! a `str` to a `String`. Most API functions will ask for an `ImageView`.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::sync::atomic::{AtomicU64, Ordering};
 use ash::vk;
 use anyhow::Result;
 
-use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
+use crate::{Allocation, Allocator, DefaultAllocator, Device, MemoryType};
 
 /// Abstraction over a [`VkImage`](vk::Image). Stores information about size, format, etc. Additionally couples the image data together
 /// with a memory allocation.

@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::{util, VkInstance};
+use crate::{VkInstance};
 use anyhow::Result;
 use crate::util::string::wrap_c_str;
 

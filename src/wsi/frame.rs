@@ -56,7 +56,7 @@
 //! ```
 
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use crate::{Device, Swapchain, Error, ExecutionManager, ImageView, WindowInterface, Surface, Image, ScratchAllocator, AppSettings, BufferView, Fence, Semaphore, CmdBuffer, Allocator, DefaultAllocator};
 use ash::vk;
 use crate::domain::ExecutionDomain;

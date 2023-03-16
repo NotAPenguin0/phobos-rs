@@ -1,7 +1,6 @@
 use std::ffi::CStr;
 use ash::vk;
 use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
-use crate::util;
 use anyhow::Result;
 use crate::core::queue::{QueueInfo, QueueType};
 use crate::util::string::wrap_c_str;

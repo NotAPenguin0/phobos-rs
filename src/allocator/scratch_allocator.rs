@@ -24,7 +24,7 @@
 //! ```
 
 use std::ptr::NonNull;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use ash::vk;
 use gpu_allocator::AllocationError::OutOfMemory;
 use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};

@@ -1,6 +1,6 @@
 use ash;
 use ash::vk;
-use crate::{util, WindowInterface};
+use crate::{WindowInterface};
 use crate::AppSettings;
 use anyhow::Result;
 

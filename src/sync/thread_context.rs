@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use ash::vk;
 use crate::{Allocator, DefaultAllocator, Device, InFlightContext, ScratchAllocator};
 use anyhow::Result;

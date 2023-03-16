@@ -31,15 +31,12 @@
 
 use std::ffi::c_void;
 use std::ptr::NonNull;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use ash::vk;
-use crate::{Allocation, Allocator, DefaultAllocator, Device, Error};
-
-use gpu_allocator::{MemoryLocation, vulkan as vk_alloc};
+use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 
 use anyhow::Result;
-use gpu_allocator::vulkan::AllocationScheme;
-use crate::allocator::memory_type::MemoryType;
+
 
 #[derive(Derivative)]
 #[derivative(Debug)]

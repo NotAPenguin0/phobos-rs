@@ -5,7 +5,6 @@ use crate::domain::ExecutionDomain;
 
 use anyhow::Result;
 use ash::vk;
-use petgraph::data::DataMapMut;
 use petgraph::graph::NodeIndex;
 use petgraph::{Outgoing, Incoming};
 use petgraph::visit::EdgeRef;

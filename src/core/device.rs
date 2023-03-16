@@ -3,7 +3,6 @@ use std::sync::Arc;
 use ash::vk;
 use std::ffi::{CString, NulError};
 use crate::{PhysicalDevice, VkInstance, AppSettings, WindowInterface};
-use crate::util;
 use anyhow::Result;
 use crate::util::string::unwrap_to_raw_strings;
 

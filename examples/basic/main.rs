@@ -76,7 +76,7 @@ fn main_loop(frame: &mut ph::FrameManager,
                           vk::AttachmentLoadOp::CLEAR,
                         Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
         .sample_image(offscreen_pass.output(&offscreen).unwrap(), ph::PipelineStage::FRAGMENT_SHADER)
-        .execute(|mut cmd, _ifc, bindings| {
+        .execute(|cmd, _ifc, bindings| {
             cmd.full_viewport_scissor()
                 .bind_graphics_pipeline("sample")?
                 .resolve_and_bind_sampled_image(0, 0, offscreen.clone(), &resources.sampler, &bindings)?
