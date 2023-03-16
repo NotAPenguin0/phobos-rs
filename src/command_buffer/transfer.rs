@@ -6,6 +6,9 @@ use ash::vk;
 use crate::command_buffer::IncompleteCommandBuffer;
 
 impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteCommandBuffer<'_, D> {
+    /// Copy one buffer to the other.
+    /// # Errors
+    /// Fails if the buffer views do not have the same size.
     fn copy_buffer(self, src: &BufferView, dst: &BufferView) -> Result<Self> {
         if src.size != dst.size {
             return Err(Error::InvalidBufferCopy.into());
@@ -22,6 +25,7 @@ impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteComma
         Ok(self)
     }
 
+    /// Copy a buffer to the base mip level of the specified image.
     fn copy_buffer_to_image(self, src: &BufferView, dst: &ImageView) -> Result<Self> where Self: Sized {
         let copy = vk::BufferImageCopy {
             buffer_offset: src.offset,

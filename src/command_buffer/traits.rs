@@ -24,7 +24,7 @@ pub trait GraphicsCmdBuffer : TransferCmdBuffer {
     fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Result<Self> where Self: Sized;
     /// Record a single indexed drawcall. Equivalent of `vkCmdDrawIndexed`
     fn draw_indexed(self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Result<Self> where Self: Sized;
-    /// Bind a graphics pipeline with a given name. This is looked up from the given pipeline cache.
+    /// Bind a graphics pipeline with a given name.
     /// # Errors
     /// This function can report an error in case the pipeline name is not registered in the cache.
     fn bind_graphics_pipeline(self, name: &str) -> Result<Self> where Self: Sized;

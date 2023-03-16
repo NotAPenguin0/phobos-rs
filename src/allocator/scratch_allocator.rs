@@ -7,14 +7,14 @@
 //! # Example
 //!
 //! ```
-//! use ash::vk;
-//! use phobos as ph;
-//!
+//! use phobos::prelude::*;
+//! // Some allocator
+//! let alloc = create_allocator();
 //! // Create a scratch allocator with at most 1 KiB of available memory for uniform buffers
-//! let mut allocator = ph::ScratchAllocator::new(device.clone(), alloc.clone(), (1 * 1024) as vk::DeviceSize, vk::BufferUsageFlags::UNIFORM_BUFFER);
+//! let mut allocator = ScratchAllocator::new(device.clone(), alloc.clone(), 1 * 1024u64, vk::BufferUsageFlags::UNIFORM_BUFFER);
 //!
 //! // Allocate a 64 byte uniform buffer and use it
-//! let buffer = allocator.allocate(64 as vk::DeviceSize)?;
+//! let buffer = allocator.allocate(64 as u64)?;
 //! // For buffer usage, check the buffer module documentation.
 //!
 //! // Once we're ready for the next batch of allocations, call reset(). This must happen
@@ -31,6 +31,7 @@ use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, Memo
 use crate::Error::AllocationError;
 use anyhow::Result;
 
+/// Very simple linear allocator. For example usage, see the module level documentation.
 #[derive(Debug)]
 pub struct ScratchAllocator<A: Allocator = DefaultAllocator> {
     buffer: Buffer<A>,
@@ -39,6 +40,8 @@ pub struct ScratchAllocator<A: Allocator = DefaultAllocator> {
 }
 
 impl<A: Allocator> ScratchAllocator<A> {
+    /// Create a new scratch allocator with a specified max capacity. All possible usages for buffers allocated from this should be
+    /// given in the usage flags.
     pub fn new(device: Arc<Device>, allocator: &mut A, max_size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
         let buffer = Buffer::new(device.clone(), allocator, max_size, usage, MemoryType::CpuToGpu)?;
         let alignment = if usage.intersects(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER) {
@@ -62,6 +65,9 @@ impl<A: Allocator> ScratchAllocator<A> {
         }
     }
 
+    /// Allocates a fixed amount of bytes from the allocator.
+    /// # Errors
+    /// - Fails if the allocator has ran out of memory.
     pub fn allocate(&mut self, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
         let size = size.into();
         // Part of the buffer that is over the min alignment
@@ -84,7 +90,11 @@ impl<A: Allocator> ScratchAllocator<A> {
         }
     }
 
-    pub fn reset(&mut self) {
+    /// Resets the linear allocator back to the beginning. Proper external synchronization needs to be
+    /// added to ensure old buffers are not overwritten.
+    /// # Safety
+    /// This function is only safe if the old allocations can be completely discarded by the next time [`Self::allocate()`] is called.
+    pub unsafe fn reset(&mut self) {
         self.offset = 0;
     }
 }

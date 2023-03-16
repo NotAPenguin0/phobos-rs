@@ -264,10 +264,12 @@ impl<A: Allocator> FrameManager<A> {
         self.current_frame = (self.current_frame + 1) % self.per_frame.len() as u32;
 
         // Advance per-frame allocator to the next frame
-        self.per_frame[self.current_frame as usize].vertex_allocator.reset();
-        self.per_frame[self.current_frame as usize].index_allocator.reset();
-        self.per_frame[self.current_frame as usize].uniform_allocator.reset();
-        self.per_frame[self.current_frame as usize].storage_allocator.reset();
+        unsafe {
+            self.per_frame[self.current_frame as usize].vertex_allocator.reset();
+            self.per_frame[self.current_frame as usize].index_allocator.reset();
+            self.per_frame[self.current_frame as usize].uniform_allocator.reset();
+            self.per_frame[self.current_frame as usize].storage_allocator.reset();
+        }
 
         let (index, resize_required) = self.acquire_image()?;
         self.current_image = index;
@@ -329,10 +331,12 @@ impl<A: Allocator> FrameManager<A> {
         self.current_frame = (self.current_frame + 1) % self.per_frame.len() as u32;
 
         // Advance per-frame allocator to the next frame
-        self.per_frame[self.current_frame as usize].vertex_allocator.reset();
-        self.per_frame[self.current_frame as usize].index_allocator.reset();
-        self.per_frame[self.current_frame as usize].uniform_allocator.reset();
-        self.per_frame[self.current_frame as usize].storage_allocator.reset();
+        unsafe {
+            self.per_frame[self.current_frame as usize].vertex_allocator.reset();
+            self.per_frame[self.current_frame as usize].index_allocator.reset();
+            self.per_frame[self.current_frame as usize].uniform_allocator.reset();
+            self.per_frame[self.current_frame as usize].storage_allocator.reset();
+        }
 
         let (index, resize_required) = self.acquire_image()?;
         self.current_image = index;

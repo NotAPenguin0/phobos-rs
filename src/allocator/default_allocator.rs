@@ -11,6 +11,9 @@ use gpu_allocator::vulkan::AllocationScheme;
 use crate::{Device, Error, PhysicalDevice, VkInstance};
 use crate::allocator::memory_type::MemoryType;
 
+/// The default allocator. This calls into the `gpu_allocator` crate.
+/// It's important to note that this allocator is `Clone`, `Send` and `Sync`. All its internal state is safely
+/// wrapped inside an `Arc<Mutex<T>>`. This is to facilitate passing it around everywhere.
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
 pub struct DefaultAllocator {
@@ -18,6 +21,7 @@ pub struct DefaultAllocator {
     alloc: Arc<Mutex<vk_alloc::Allocator>>,
 }
 
+/// Allocation returned from the default allocator. This must be freed explicitly by calling [`DefaultAllocator::free()`]
 #[derive(Default, Derivative)]
 #[derivative(Debug)]
 pub struct Allocation {
@@ -25,6 +29,7 @@ pub struct Allocation {
 }
 
 impl DefaultAllocator {
+    /// Create a new default allocator.
     pub fn new(instance: &VkInstance, device: &Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
         Ok(Self {
                 alloc: Arc::new(Mutex::new(vk_alloc::Allocator::new(
@@ -44,6 +49,7 @@ impl DefaultAllocator {
 impl traits::Allocator for DefaultAllocator {
     type Allocation = Allocation;
 
+    /// Allocates raw memory of a specific memory type. The given name is used for internal tracking.
     fn allocate(&mut self, name: &'static str, requirements: &MemoryRequirements, ty: MemoryType) -> Result<Self::Allocation> {
         let mut alloc = self.alloc.lock().map_err(|_| Error::PoisonError)?;
         let allocation = alloc.allocate(&vk_alloc::AllocationCreateDesc {
@@ -59,6 +65,7 @@ impl traits::Allocator for DefaultAllocator {
         })
     }
 
+    /// Free some memory allocated from this allocator.
     fn free(&mut self, allocation: Self::Allocation) -> Result<()> {
         let mut alloc = self.alloc.lock().map_err(|_| Error::PoisonError)?;
         alloc.free(allocation.allocation)?;

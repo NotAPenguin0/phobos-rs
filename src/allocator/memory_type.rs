@@ -1,3 +1,4 @@
+/// The memory type of an allocation indicates where it should live.
 #[derive(Debug)]
 pub enum MemoryType {
     /// Store the allocation in GPU only accessible memory - typically this is the faster GPU resource and this should be
