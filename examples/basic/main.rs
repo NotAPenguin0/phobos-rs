@@ -33,7 +33,7 @@ fn main_loop(frame: &mut ph::FrameManager,
              pipelines: Arc<Mutex<ph::PipelineCache>>,
              descriptors: Arc<Mutex<ph::DescriptorCache>>,
              debug: &ph::DebugMessenger,
-             exec: Arc<ph::ExecutionManager>,
+             exec: ph::ExecutionManager,
              surface: &ph::Surface,
              window: &winit::window::Window) -> Result<()> {
     // Define a virtual resource pointing to the swapchain
@@ -136,7 +136,7 @@ fn main() -> Result<()> {
         .version((1, 0, 0))
         .name(String::from("Phobos test app"))
         .validation(true)
-        .window(&window) // TODO: pass window information instead of window interface to remove dependency
+        .window(&window)
         .present_mode(vk::PresentModeKHR::MAILBOX)
         .scratch_size(1 * 1024u64) // 1 KiB scratch memory per buffer type per frame
         .gpu(ph::GPURequirements {

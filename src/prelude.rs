@@ -13,15 +13,11 @@ pub use crate::sync::semaphore::*;
 pub use crate::sync::execution_manager::ExecutionManager;
 pub use crate::sync::thread_context::ThreadContext;
 
-pub use crate::command_buffer::traits::*;
-
-pub use crate::graph::record::RecordGraphToCommandBuffer;
 pub use crate::graph::virtual_resource::VirtualResource;
 pub use crate::graph::pass_graph::PassGraph;
 pub use crate::graph::physical_resource::PhysicalResourceBindings;
 pub use crate::graph::pass::PassBuilder;
 
-pub use crate::allocator::traits::*;
 pub use crate::allocator::default_allocator;
 pub use crate::allocator::default_allocator::DefaultAllocator;
 pub use crate::allocator::memory_type::MemoryType;
@@ -38,7 +34,6 @@ pub use crate::descriptor::descriptor_set::DescriptorSet;
 pub use crate::descriptor::builder::DescriptorSetBuilder;
 pub use crate::descriptor::cache::DescriptorCache;
 
-pub use crate::wsi::window::{WindowInterface, WindowSize};
 pub use crate::wsi::swapchain::Swapchain;
 pub use crate::wsi::frame::{InFlightContext, FrameManager};
 pub use crate::wsi::surface::Surface;
@@ -52,3 +47,12 @@ pub use crate::buffer::{Buffer, BufferView};
 pub use crate::sampler::Sampler;
 
 pub use crate::domain;
+
+pub mod traits {
+    pub use crate::wsi::window::{WindowInterface, WindowSize};
+    pub use crate::command_buffer::traits::*;
+    pub use crate::graph::record::RecordGraphToCommandBuffer;
+    pub use crate::allocator::traits::*;
+}
+
+pub use traits::*;

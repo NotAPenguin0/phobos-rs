@@ -13,7 +13,16 @@ pub struct Sampler {
 }
 
 impl Sampler {
-    /// Create a new sampler with default settings.
+    /// Create a new sampler with default settings. These settings are:
+    /// - `LINEAR` min/mag filters
+    /// - `LINEAR` mipmap mode
+    /// - `REPEAT` address mode on all axes
+    /// - `0.0` mip lod bias
+    /// - Anisotropic filtering off
+    /// - Sampler compare op off
+    /// - Min mipmap level `0`
+    /// - Unbounded max mipmap level
+    /// - Normalized coordinates
     pub fn default(device: Arc<Device>) -> Result<Self> {
         let info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
@@ -28,7 +37,7 @@ impl Sampler {
             .compare_enable(false)
             .compare_op(vk::CompareOp::ALWAYS)
             .min_lod(0.0)
-            .max_lod(64.0)
+            .max_lod(vk::LOD_CLAMP_NONE)
             .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
             .unnormalized_coordinates(false)
             .build();
@@ -38,6 +47,7 @@ impl Sampler {
         })
     }
 
+    /// Create a new `VkSampler` object with given settings.
     pub fn new(device: Arc<Device>, info: vk::SamplerCreateInfo) -> Result<Self> {
         Ok(Self {
             device: device.clone(),
