@@ -18,8 +18,7 @@ If you are simply looking for a safe, low-level wrapper around Vulkan, Vulkano i
 - All Vulkan initialization from a single configuration structure.
 - Manage per-frame synchronization with the presentation engine.
 - GPU futures, fully integrated with Rust futures.
-  - More formally, `Future` is implemented for `phobos::Fence`.
-  - There is also a `GpuFuture<T>` which can be used to attach a future value to a fence.
+  - More formally, `Future<Output = T>` is implemented for `phobos::Fence<T>`.
 - Provide a task graph that can be used to automatically synchronize resources in your renderer.
   - Automatic image layout transitions.
   - Automatic renderpass declarations.
@@ -32,6 +31,7 @@ If you are simply looking for a safe, low-level wrapper around Vulkan, Vulkano i
 - A linear allocator for per-frame allocations like uniform buffers.
 - Typed command buffers per queue type.
 - Automatically thread safe command buffer recording.
+- Easily batch together submits into one `vkQueueSubmit` call and synchronize them with semaphores using the `SubmitBatch` utility.
 
 ## What does Phobos not do?
 
@@ -43,23 +43,23 @@ write a Vulkan renderer more easily and correctly, without hiding important API 
 For more elaborate examples, please check the [examples](examples) folder.
 
 ```rust 
-use phobos as ph;
+use phobos::prelude::*;
 
 fn main() {
     // Fill out app settings for initialization
-    let settings = ph::AppBuilder::new()
+    let settings = AppBuilder::new()
         .version((1, 0, 0))
         .name("Phobos example app")
         .validation(true)
         .window(&window) // Your winit window, or some other interface.
         .present_mode(vk::PresentModeKHR::MAILBOX)
-        .scratch_size(1024)
+        .scratch_size(1024u64)
         .gpu(ph::GPURequirements {
           dedicated: true,
           queues: vec![
-            ph::QueueRequest { dedicated: false, queue_type: ph::QueueType::Graphics },
-            ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Transfer },
-            ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Compute }
+            QueueRequest { dedicated: false, queue_type: QueueType::Graphics },
+            QueueRequest { dedicated: true, queue_type: QueueType::Transfer },
+            QueueRequest { dedicated: true, queue_type: QueueType::Compute }
           ],
           ..Default::default()
         })
@@ -67,32 +67,33 @@ fn main() {
   
     // Initialize Vulkan. This is generally always going to be the same for every project, but it is 
     // not abstracted away to allow keeping each created object separately.
-    let instance = ph::VkInstance::new(&settings)?;
-    let debug_messenger = ph::DebugMessenger::new(&instance)?;
+    let instance = VkInstance::new(&settings)?;
+    let debug_messenger = DebugMessenger::new(&instance)?;
     let (surface, physical_device) = {
-      let mut surface = ph::Surface::new(&instance, &settings)?;
-      let physical_device = ph::PhysicalDevice::select(&instance, Some(&surface), &settings)?;
+      let mut surface = Surface::new(&instance, &settings)?;
+      let physical_device = PhysicalDevice::select(&instance, Some(&surface), &settings)?;
       surface.query_details(&physical_device)?;
       (surface, physical_device)
     };
-    let device = ph::Device::new(&instance, &physical_device, &settings)?;
-    let mut alloc = ph::create_allocator(&instance, device.clone(), &physical_device)?;
-    let exec = ph::ExecutionManager::new(device.clone(), &physical_device)?;
+    let device = Device::new(&instance, &physical_device, &settings)?;
+    let mut alloc = DefaultAllocator::new(&instance, &device, &physical_device)?;
+    let exec = ExecutionManager::new(device.clone(), &physical_device)?;
     let mut frame = {
-      let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
-      ph::FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
+      let swapchain = Swapchain::new(&instance, device.clone(), &settings, &surface)?;
+      FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
     };
 
     // Create a new pass graph for rendering. Note how we only do this once, as 
     // we are using virtual resources that do not depend on the frame.
-    let swapchain = ph::VirtualResource::image("swapchain");
-    let clear_pass = ph::PassBuilder::render("clear")
-            .color_attachment(swapchain.clone(), vk::AttachmentLoadOp::CLEAR,
+    let swapchain = VirtualResource::image("swapchain");
+    let clear_pass = PassBuilder::render("clear")
+            .color_attachment(&swapchain, 
+                              vk::AttachmentLoadOp::CLEAR,
                               // Clear the swapchain to red.
                               Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
             .build();
-    let present_pass = ph::PassBuilder::present("present", clear_pass.output(&swapchain).unwrap());
-    let graph = ph::PassGraph::new()
+    let present_pass = PassBuilder::present("present", clear_pass.output(&swapchain).unwrap());
+    let graph = PassGraph::new()
             .add_pass(clear_pass)?
             .add_pass(present_pass)?
             .build()?;
@@ -102,11 +103,11 @@ fn main() {
       // callback will be called.
       futures::executor::block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {
             // Bind some physical resources to the render graph.
-            let mut bindings = ph::PhysicalResourceBindings::new();
-            bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap().clone());
-            let cmd = exec.on_domain::<ph::domain::Graphics>()?;
+            let mut bindings = PhysicalResourceBindings::new();
+            bindings.bind_image("swapchain", &ifc.swapchain_image.as_ref().unwrap());
+            let cmd = exec.on_domain::<domain::Graphics>()?;
             // Record render graph to our command buffer
-            ph::record_graph(&mut graph, &bindings, &mut ifc, cmd, None).finish()
+            graph.record(cmd, &bindings, &mut ifc, None).finish()
       }))?;
     }
 }

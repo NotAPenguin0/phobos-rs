@@ -1,5 +1,5 @@
 //! The [`ScratchAllocator`] is a very simple linear allocator that can be used for scratch resources.
-//! It is exposed through the [`InFlightContext`] struct, but you can also create your own instances elsewhere.
+//! It is exposed through the [`InFlightContext`](crate::InFlightContext) struct, but you can also create your own instances elsewhere.
 //!
 //! The allocator works by linearly incrementing an offset on every allocation. Deallocation is only possible by calling
 //! [`ScratchAllocator::reset`], which will free all memory and reset the offset to zero.

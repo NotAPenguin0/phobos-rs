@@ -18,7 +18,7 @@ use crate::pipeline::shader_reflection::ReflectionInfo;
 /// // Create a descriptor set with a single binding, and bind `my_image_view` together with
 /// // `my_sampler` as a combined image sampler.
 /// let set = DescriptorSetBuilder::new()
-///             .bind_sampled_image(0, my_image_view.clone(), &my_sampler)
+///             .bind_sampled_image(0, &my_image_view, &my_sampler)
 ///             .build();
 /// ```
 #[cfg(feature="shader-reflection")]

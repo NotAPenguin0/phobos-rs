@@ -21,7 +21,7 @@ pub struct DefaultAllocator {
     alloc: Arc<Mutex<vk_alloc::Allocator>>,
 }
 
-/// Allocation returned from the default allocator. This must be freed explicitly by calling [`DefaultAllocator::free()`]
+/// Allocation returned from the default allocator. This must be freed explicitly by calling [`DefaultAllocator::free()`](crate::DefaultAllocator::free)
 #[derive(Default, Derivative)]
 #[derivative(Debug)]
 pub struct Allocation {

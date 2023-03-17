@@ -14,13 +14,11 @@
 //! // Or, if you dont care about using the types under a namespace
 //! use phobos::prelude::*;
 //! ```
-//! <br>
-//! <br>
 //!
 //! # Example
 //!
 //! For illustrative purposes, we will use winit here. Any windowing library can be supported by implementing a few trait objects
-//! necessary to satisfy the [`WindowInterface`] trait.
+//! necessary to satisfy the [`WindowInterface`](crate::WindowInterface) trait.
 //! ```
 //! use winit::window::WindowBuilder;
 //! use winit::event_loop::EventLoopBuilder;
@@ -30,7 +28,7 @@
 //!     .build(&event_loop)
 //!     .unwrap();
 //! ```
-//! First, we will define an [`AppSettings`] structure that outlines requirements
+//! First, we will define an [`AppSettings`](crate::AppSettings) structure that outlines requirements
 //! and information about our application. Phobos will use this to
 //! pick a suitable GPU to run your program on and initialize Vulkan for it.
 //! ```
