@@ -16,8 +16,14 @@
 //!
 //! Vulkan command buffers need to call `vkEndCommandBuffer` before they can be submitted. After this call, no more commands should be
 //! recorded to it. For this reason, we expose two command buffer types. The [`IncompleteCommandBuffer`] still accepts commands, and can only
-//! be converted into a [`CommandBuffer`] by calling [`IncompleteCommandBuffer::finish`]. This turns it into a complete commad buffer, which can
+//! be converted into a [`CommandBuffer`] by calling [`IncompleteCommandBuffer::finish`]. This turns it into a complete command buffer, which can
 //! be submitted to the execution manager.
+//!
+//! # Commands
+//! All commands are implemented through traits for each domain. These are all defined inside the [`traits`] module, and are most easily imported
+//! through the [`prelude`](crate::prelude).
+//!
+//! There are also a bunch of methods that do not directly translate to Vulkan commands, for example for binding descriptor sets directly.
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -40,7 +46,8 @@ pub(crate) mod state;
 pub(crate) mod command_pool;
 
 /// This struct represents a finished command buffer. This command buffer can't be recorded to anymore.
-/// It can only be obtained by calling finish() on an incomplete command buffer;
+/// It can only be obtained by calling [`IncompleteCommandBuffer::finish()`].
+#[derive(Debug)]
 pub struct CommandBuffer<D: ExecutionDomain> {
     pub(crate) handle: vk::CommandBuffer,
     _domain: PhantomData<D>,
@@ -54,7 +61,7 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 ///
 /// # Example
 /// ```
-/// use phobos::{domain, ExecutionManager};
+/// use phobos::prelude::*;
 ///
 /// let exec = ExecutionManager::new(device.clone(), &physical_device);
 /// let cmd = exec.on_domain::<domain::All>()?
@@ -64,6 +71,12 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 ///               // This allows the command buffer to be submitted.
 ///               .finish();
 /// ```
+/// # Descriptor sets
+/// Descriptor sets can be bound simply by calling the associated `bind_xxx` functions on the command buffer.
+/// It should be noted that these are not actually bound yet on calling this function.
+/// Instead, the next `draw()` or `dispatch()` call flushes these bind calls and does an actual `vkCmdBindDescriptorSets` call.
+/// This also forgets the old binding state, so to update the bindings you need to re-bind all previously bound sets (this is something
+/// that could change in the future, see https://github.com/NotAPenguin0/phobos-rs/issues/23)
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
@@ -84,6 +97,7 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
 }
 
 impl<'q, D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
+    /// Immediately delete a command buffer. Must be externally synchronized.
     unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()> {
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         let handle = self.handle;

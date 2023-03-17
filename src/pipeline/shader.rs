@@ -17,6 +17,8 @@ pub struct Shader {
     pub(crate) handle: vk::ShaderModule
 }
 
+/// Info required to create a shader. Filling out the hash properly is necessary, but can easily be done automatically
+/// by using the [`ShaderCreateInfo::from_spirv`] method.
 #[derive(Debug, Clone)]
 pub struct ShaderCreateInfo {
     pub stage: vk::ShaderStageFlags,

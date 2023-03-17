@@ -3,6 +3,8 @@ use ash::vk;
 use crate::{Allocator, DefaultAllocator, Device, InFlightContext, ScratchAllocator};
 use anyhow::Result;
 
+/// Thread context with linear allocators that can be used as a substitute
+/// [`InFlightContext`] outside of a frame.
 pub struct ThreadContext<A: Allocator = DefaultAllocator> {
     vbo_allocator: ScratchAllocator<A>,
     ibo_allocator: ScratchAllocator<A>,

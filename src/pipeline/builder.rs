@@ -6,7 +6,8 @@ use crate::pipeline::create_info::*;
 
 use anyhow::Result;
 
-/// Used to facilitate creating a graphics pipeline.
+/// Used to facilitate creating a graphics pipeline. For an example, please check the
+/// [`pipeline`](crate::pipeline) module level documentation.
 pub struct PipelineBuilder {
     inner: PipelineCreateInfo,
     vertex_binding_offsets: HashMap<u32, u32>,
@@ -128,6 +129,7 @@ impl PipelineBuilder {
         }
     }
 
+    /// Add a vertex input binding. These are the binding indices for `vkCmdBindVertexBuffers`
     pub fn vertex_input(mut self, binding: u32, rate: vk::VertexInputRate) -> Self {
         self.vertex_binding_offsets.insert(0, 0);
         self.inner.vertex_input_bindings.push(VertexInputBindingDescription{
@@ -139,6 +141,9 @@ impl PipelineBuilder {
         self
     }
 
+    /// Add a vertex attribute to the specified binding.
+    /// Doing this will automatically calculate offsets and sizes, so make sure to add these in order of declaration in
+    /// the shader.
     pub fn vertex_attribute(mut self, binding: u32, location: u32, format: vk::Format) -> Result<Self> {
         let offset = self.vertex_binding_offsets.get_mut(&binding).ok_or(Error::NoVertexBinding)?;
         self.inner.vertex_attributes.push(VertexInputAttributeDescription{
@@ -156,31 +161,37 @@ impl PipelineBuilder {
         Ok(self)
     }
 
+    /// Add a shader to the pipeline.
     pub fn attach_shader(mut self, info: ShaderCreateInfo) -> Self {
         self.inner.shaders.push(info);
         self
     }
 
+    /// Set depth testing mode.
     pub fn depth_test(mut self, enable: bool) -> Self {
         self.inner.depth_stencil.0.depth_test_enable = vk::Bool32::from(enable);
         self
     }
 
+    /// Set depth write mode.
     pub fn depth_write(mut self, enable: bool) -> Self {
         self.inner.depth_stencil.0.depth_write_enable = vk::Bool32::from(enable);
         self
     }
 
+    /// Set the depth compare operation.
     pub fn depth_op(mut self, op: vk::CompareOp) -> Self {
         self.inner.depth_stencil.0.depth_compare_op = op;
         self
     }
 
+    /// Toggle depth clamping.
     pub fn depth_clamp(mut self, enable: bool) -> Self {
         self.inner.rasterizer.0.depth_clamp_enable = vk::Bool32::from(enable);
         self
     }
 
+    /// Configure all depth state in one call.
     pub fn depth(self, test: bool, write: bool, clamp: bool, op: vk::CompareOp) -> Self {
         self.depth_test(test)
             .depth_write(write)
@@ -188,6 +199,7 @@ impl PipelineBuilder {
             .depth_op(op)
     }
 
+    /// Add a dynamic state to the pipeline.
     pub fn dynamic_state(mut self, state: vk::DynamicState) -> Self {
         self.inner.dynamic_states.push(state);
         // When setting a viewport dynamic state, we still need a dummy viewport to make validation shut up
@@ -215,6 +227,7 @@ impl PipelineBuilder {
         self
     }
 
+    /// Add dynamic states to the pipeline.
     pub fn dynamic_states(mut self, states: &[vk::DynamicState]) -> Self {
         for state in states {
             self = self.dynamic_state(*state);
@@ -222,32 +235,38 @@ impl PipelineBuilder {
         self
     }
 
+    /// Set the polygon mode.
     pub fn polygon_mode(mut self, mode: vk::PolygonMode) -> Self {
         self.inner.rasterizer.0.polygon_mode = mode;
         self
     }
 
+    /// Set the face culling mask.
     pub fn cull_mask(mut self, cull: vk::CullModeFlags) -> Self {
         self.inner.rasterizer.0.cull_mode = cull;
         self
     }
 
+    /// Set the front face.
     pub fn front_face(mut self, face: vk::FrontFace) -> Self {
         self.inner.rasterizer.0.front_face = face;
         self
     }
 
+    /// Set the amount of MSAA samples.
     pub fn samples(mut self, samples: vk::SampleCountFlags) -> Self {
         self.inner.multisample.0.rasterization_samples = samples;
         self
     }
 
+    /// Enable sample shading and set the sample shading rate.
     pub fn sample_shading(mut self, value: f32) -> Self {
         self.inner.multisample.0.sample_shading_enable = vk::TRUE;
         self.inner.multisample.0.min_sample_shading = value;
         self
     }
 
+    /// Add a blend attachment, but with no blending enabled.
     pub fn blend_attachment_none(mut self) -> Self {
         self.inner.blend_attachments.push(PipelineColorBlendAttachmentState{
             0: vk::PipelineColorBlendAttachmentState {
@@ -263,6 +282,7 @@ impl PipelineBuilder {
         self
     }
 
+    /// Add an additive blend attachment, writing to each color component.
     pub fn blend_additive_unmasked(mut self, src: vk::BlendFactor, dst: vk::BlendFactor, src_alpha: vk::BlendFactor, dst_alpha: vk::BlendFactor) -> Self {
         self.inner.blend_attachments.push(PipelineColorBlendAttachmentState{
             0: vk::PipelineColorBlendAttachmentState {
@@ -283,6 +303,7 @@ impl PipelineBuilder {
         self.inner
     }
 
+    /// Obtain the pipeline name.
     pub fn get_name(&self) -> &str {
         &self.inner.name
     }

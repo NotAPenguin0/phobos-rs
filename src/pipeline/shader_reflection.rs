@@ -178,7 +178,7 @@ pub(crate) fn reflect_shaders(info: &PipelineCreateInfo) -> Result<ReflectionInf
 }
 
 #[cfg(feature="shader-reflection")]
-pub fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCreateInfo {
+pub(crate) fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCreateInfo {
     let mut layout = PipelineLayoutCreateInfo {
         flags: Default::default(),
         set_layouts: vec![],

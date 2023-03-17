@@ -32,6 +32,7 @@ pub struct Swapchain {
 }
 
 impl Swapchain {
+    /// Create a new swapchain.
     pub fn new<Window: WindowInterface>(instance: &VkInstance, device: Arc<Device>, settings: &AppSettings<Window>, surface: &Surface) -> Result<Self> {
         let format = choose_surface_format(settings, surface)?;
         let present_mode = choose_present_mode(settings, surface);
@@ -100,10 +101,12 @@ impl Swapchain {
         })
     }
 
+    /// Unsafe access to the swapchain extension functions.
     pub unsafe fn loader(&self) -> ash::extensions::khr::Swapchain {
         self.functions.clone()
     }
 
+    /// Unsafe access to the underlying vulkan handle.
     pub unsafe fn handle(&self) -> vk::SwapchainKHR {
         self.handle
     }

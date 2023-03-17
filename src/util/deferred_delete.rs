@@ -5,6 +5,7 @@ struct Item<T> {
     ttl: u32,
 }
 
+/// Deletion queue that stores resources until they are ready to be deleted.
 #[derive(Debug)]
 pub struct DeletionQueue<T> {
     max_ttl: u32,

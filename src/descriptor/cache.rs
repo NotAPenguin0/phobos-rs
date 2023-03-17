@@ -19,8 +19,6 @@ pub struct DescriptorCache {
     deferred_pool_delete: DeletionQueue<DescriptorPool>,
 }
 
-
-
 impl DescriptorCache {
     /// Create a new descriptor cache object.
     /// # Errors

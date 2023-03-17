@@ -16,6 +16,7 @@
 //! ```
 //! <br>
 //! <br>
+//!
 //! # Example
 //!
 //! For illustrative purposes, we will use winit here. Any windowing library can be supported by implementing a few trait objects

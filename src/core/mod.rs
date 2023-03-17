@@ -1,3 +1,5 @@
+//! The core module holds all functionality that is minimally required to initialize a Vulkan context.
+
 pub mod app_info;
 pub mod instance;
 pub mod device;

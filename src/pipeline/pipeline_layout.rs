@@ -8,7 +8,7 @@ use crate::pipeline::set_layout::{DescriptorSetLayout, DescriptorSetLayoutCreate
 use crate::util::cache::{Cache, Resource};
 
 /// A fully built Vulkan pipeline layout. This is a managed resource, so it cannot be manually
-/// cloned or dropped.
+/// created or dropped.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct PipelineLayout {

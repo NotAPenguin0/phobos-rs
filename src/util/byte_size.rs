@@ -1,11 +1,14 @@
 use std::mem::size_of;
 use ash::vk;
 
+/// Simple trait to get the size of one element in bytes of a `vk::Format`.
 pub trait ByteSize {
+    /// Returns the size, in bytes, of one element of this thing.
     fn byte_size(&self) -> usize;
 }
 
 impl ByteSize for vk::Format {
+    /// If an image is created with this format, then the return value of this function is the size in bytes of one pixel.
     fn byte_size(&self) -> usize {
         match *self {
             vk::Format::R32G32_SFLOAT => 2 * size_of::<f32>(),

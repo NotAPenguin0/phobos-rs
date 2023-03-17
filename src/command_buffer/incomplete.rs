@@ -136,7 +136,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     /// - This function can error if allocating the descriptor set fails.
     /// # Example
     /// ```
-    /// use phobos::{DescriptorSetBuilder, domain, ExecutionManager};
+    /// use phobos::prelude::*;
     /// let exec = ExecutionManager::new(device.clone(), &physical_device);    ///
     /// let cmd = exec.on_domain::<domain::All>()?
     ///     .bind_graphics_pipeline("my_pipeline", pipeline_cache.clone())
@@ -162,6 +162,9 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self
     }
 
+    /// Resolve a virtual resource from the given bindings, and bind it as a sampled image to the given slot.
+    /// # Errors
+    /// Fails if the virtual resource has no binding associated to it.
     pub fn resolve_and_bind_sampled_image(mut self,
                                           set: u32,
                                           binding: u32,
@@ -176,6 +179,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         Ok(self)
     }
 
+    /// Binds a combined image + sampler to the specified slot.
     pub fn bind_sampled_image(mut self, set: u32, binding: u32, image: &ImageView, sampler: &Sampler) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_sampled_image(binding, image, sampler);
@@ -184,6 +188,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         Ok(self)
     }
 
+    /// Binds a uniform buffer to teh specified slot.
     pub fn bind_uniform_buffer(mut self, set: u32, binding: u32, buffer: &BufferView) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_uniform_buffer(binding, buffer);
@@ -239,7 +244,12 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self
     }
 
+    /// Upload push constants. These are small packets of data stored inside the command buffer, so their state is tracked while executing.
+    /// Direct translation of [`vkCmdPushConstants`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPushConstants.html).
+    /// Tends to crash on some drivers if the specified push constant range does not exist (possible due to unused variable optimization in the shader,
+    /// or incorrect stage flags specified)
     pub fn push_constants<T: Copy>(self, stage: vk::ShaderStageFlags, offset: u32, data: &[T]) -> Self {
+        // TODO: Validate push constant ranges with current pipeline layout to prevent crashes.
         unsafe {
             let (_, data, _) = data.align_to::<u8>();
             self.device.cmd_push_constants(self.handle, self.current_pipeline_layout, stage, offset, data);

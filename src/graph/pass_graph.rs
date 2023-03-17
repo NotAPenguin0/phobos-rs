@@ -6,7 +6,7 @@ use crate::domain::ExecutionDomain;
 use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
 use crate::graph::resource::{ResourceUsage};
 use crate::graph::virtual_resource::VirtualResource;
-use crate::{Allocator, Error, InFlightContext, PhysicalResourceBindings};
+use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings};
 
 use anyhow::Result;
 use petgraph::{Direction, Graph};
@@ -20,7 +20,7 @@ use crate::pipeline::PipelineStage;
 #[derive(Derivative, Default, Clone)]
 #[derivative(Debug)]
 pub struct PassResource {
-    pub usage: ResourceUsage,
+    pub(crate) usage: ResourceUsage,
     pub resource: VirtualResource,
     pub stage: PipelineStage,
     pub layout: vk::ImageLayout,
@@ -41,7 +41,7 @@ pub struct PassResourceBarrier {
 
 
 /// A task in a pass graph. Either a render pass, or a compute pass, etc.
-pub struct PassNode<'exec, 'q, R, D, A: Allocator> where R: Resource, D: ExecutionDomain {
+pub struct PassNode<'exec, 'q, R, D, A: Allocator = DefaultAllocator> where R: Resource, D: ExecutionDomain {
     pub identifier: String,
     pub color: Option<[f32; 4]>,
     pub inputs: Vec<R>,
@@ -51,7 +51,7 @@ pub struct PassNode<'exec, 'q, R, D, A: Allocator> where R: Resource, D: Executi
 }
 
 /// Pass graph, used for synchronizing resources over a single queue.
-pub struct PassGraph<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
+pub struct PassGraph<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: ExecutionDomain {
     pub(crate) graph: TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>>,
     // Note that this is guaranteed to be stable.
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
@@ -61,7 +61,7 @@ pub struct PassGraph<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
     last_usages: HashMap<String, (usize, PipelineStage)>,
 }
 
-pub struct BuiltPassGraph<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
+pub struct BuiltPassGraph<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: ExecutionDomain {
     graph: PassGraph<'exec, 'q, D, A>,
 }
 
