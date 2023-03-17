@@ -25,12 +25,12 @@ struct PipelineEntry<P> where P: std::fmt::Debug {
 /// [`PipelineCache::create_named_pipeline`].
 /// # Example usage
 /// ```
-/// use phobos::{PipelineBuilder, PipelineCache};
-/// let cache = PipelineCache::new(device.clone());
-/// let pci = PipelineBuilder::new(String::from("my_pipeline"))
+/// use phobos::prelude::*;
+/// let cache = PipelineCache::new(device.clone())?;
+/// let pci = PipelineBuilder::new("my_pipeline")
 ///     // ... options for pipeline creation
 ///     .build();
-/// cache.or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?.create_named_pipeline(pci);
+/// cache.lock().or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?.create_named_pipeline(pci)?;
 /// ```
 #[derive(Debug)]
 pub struct PipelineCache {
@@ -129,11 +129,17 @@ impl PipelineCache {
         Ok(())
     }
 
+    /// Get reflection info for a previously registered pipeline.
+    /// # Errors
+    /// Fails if the pipeline was not found in the cache.
     #[cfg(feature="shader-reflection")]
     pub fn reflection_info(&self, name: &str) -> Result<&ReflectionInfo> {
         Ok(&self.named_pipelines.get(name).unwrap().reflection)
     }
 
+    /// Get the pipeline create info associated with a pipeline
+    /// # Errors
+    /// Fails if the pipeline was not found in the cache.
     pub fn pipeline_info(&self, name: &str) -> Option<&PipelineCreateInfo> {
         self.named_pipelines.get(name).map(|entry| &entry.info)
     }

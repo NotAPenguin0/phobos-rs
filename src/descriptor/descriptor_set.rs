@@ -30,6 +30,7 @@ pub(crate) struct DescriptorBinding {
     pub descriptors: Vec<DescriptorContents>,
 }
 
+/// Specifies a set of bindings in a descriptor set. Can be created by a [`DescriptorSetBuilder`](crate::DescriptorSetBuilder).
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct DescriptorSetBinding {
     pub(crate) pool: vk::DescriptorPool,
@@ -37,6 +38,8 @@ pub struct DescriptorSetBinding {
     pub(crate) layout: vk::DescriptorSetLayout,
 }
 
+/// Wrapper over a Vulkan `VkDescriptorSet`. You don't explicitly need to use this, as the command buffer and descriptor cache can manage these
+/// fully for you.
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Eq)]
 pub struct DescriptorSet {

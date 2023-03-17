@@ -39,7 +39,7 @@ pub struct Rect2D(pub(super) vk::Rect2D);
 
 /// Defines a full graphics pipeline. You can modify this manually, but all
 /// information is also exposed through the pipeline builder,
-/// with additional quality of life and presets.
+/// with additional quality of life and presets, so that method is recommended.
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
@@ -93,7 +93,7 @@ pub struct PipelineCreateInfo {
 
 
 impl PipelineCreateInfo {
-    pub fn build_rendering_state(&mut self) -> () {
+    pub(crate) fn build_rendering_state(&mut self) -> () {
         self.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
             .view_mask(self.rendering_info.view_mask)
             .color_attachment_formats(self.rendering_info.color_formats.as_slice())
@@ -102,7 +102,7 @@ impl PipelineCreateInfo {
             .build();
     }
 
-    pub fn build_inner(&mut self) -> () {
+    pub(crate) fn build_inner(&mut self) -> () {
         self.vk_attributes = self.vertex_attributes.iter().map(|v| v.0.clone()).collect();
         self.vk_vertex_inputs = self.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
         self.vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()

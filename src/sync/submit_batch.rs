@@ -16,11 +16,16 @@ struct SubmitInfo<D: ExecutionDomain> {
     wait_stages: Vec<PipelineStage>,
 }
 
+/// A handle to a submit inside a batch.
+/// Can be used to make submits wait on other submits inside a single batch
 #[derive(Debug, Copy, Clone)]
 pub struct SubmitHandle {
     index: usize,
 }
 
+/// A batch of submits containing multiple command buffers that possibly
+/// wait on each other using semaphores. An example usage is given in the documentation for
+/// [`ExecutionManager::start_submit_batch`].
 #[derive(Debug)]
 pub struct SubmitBatch<D: ExecutionDomain> {
     device: Arc<Device>,
@@ -63,6 +68,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
         })
     }
 
+    /// Submit a new command buffer in this batch with no dependencies.
     pub fn submit(&mut self, cmd: CommandBuffer<D>) -> Result<SubmitHandle> {
         self.submits.push(SubmitInfo {
             cmd,
@@ -76,6 +82,8 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
         })
     }
 
+    /// Finish this batch by submitting it to the execution manager.
+    /// This returns a [`Fence`] that can be awaited to wait for completion.
     pub fn finish(self) -> Result<Fence> {
         struct PerSubmit {
             wait_semaphores: Vec<vk::SemaphoreSubmitInfo>,
@@ -154,6 +162,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
 }
 
 impl SubmitHandle {
+    /// Add another submit to the batch that waits on this submit at the specified wait stage mask.
     pub fn then<D: ExecutionDomain + 'static>(
         &self,
         wait_stage: PipelineStage,

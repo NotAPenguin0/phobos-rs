@@ -11,24 +11,24 @@ use crate::sync::submit_batch::SubmitBatch;
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
 /// [`ExecutionManager::on_domain()`]. An execution domain is a type that implements
-/// the [`domain::ExecutionDomain`] trait. Four domains are already defined, and these should cover
+/// the [`domain::ExecutionDomain`](crate::domain::ExecutionDomain) trait. Four domains are already defined, and these should cover
 /// virtually every available use case.
 ///
-/// - [`domain::All`] supports all operations and is essentially a combination of the other three domains.
-/// - [`domain::Graphics`] supports only graphics operations.
-/// - [`domain::Transfer`] supports only transfer operations.
-/// - [`domain::Compute`] supports only compute operations.
+/// - [`domain::All`](crate::domain::All) supports all operations and is essentially a combination of the other three domains.
+/// - [`domain::Graphics`](crate::domain::Graphics) supports only graphics operations.
+/// - [`domain::Transfer`](crate::domain::Transfer) supports only transfer operations.
+/// - [`domain::Compute`](crate::domain::Compute) supports only compute operations.
 ///
 /// Note that all domains also implement a couple commands that apply to all domains with no
 /// restrictions on queue type support, such as pipeline barriers.
 ///
 /// # Example
 /// ```
-/// use phobos::{domain, ExecutionManager};
+/// use phobos::prelude::*;
 /// // Create an execution manager first. You only want one of these.
 /// let exec = ExecutionManager::new(device.clone(), &physical_device);
 /// // Obtain a command buffer on the Transfer domain
-/// let cmd = exec.on_domain::<domain::Transfer>()?
+/// let cmd = exec.on_domain::<domain::Transfer>(None, None)?
 ///               .copy_image(/*command parameters*/)
 ///               .finish();
 /// // Submit the command buffer, either to this frame's command list,
@@ -69,6 +69,7 @@ impl ExecutionManager {
     }
 
     /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
+    /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
     pub fn try_on_domain<'q, D: ExecutionDomain>(&'q self,
                                                          pipelines:  Option<Arc<Mutex<PipelineCache>>>,
                                                          descriptors: Option<Arc<Mutex<DescriptorCache>>>) -> Result<D::CmdBuf<'q>> {
@@ -77,6 +78,7 @@ impl ExecutionManager {
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
+    /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
     pub fn on_domain<'q, D: ExecutionDomain>(&'q self,
                                                      pipelines:  Option<Arc<Mutex<PipelineCache>>>,
                                                      descriptors: Option<Arc<Mutex<DescriptorCache>>>) -> Result<D::CmdBuf<'q>> {
@@ -85,6 +87,21 @@ impl ExecutionManager {
     }
 
     /// Begin a submit batch. Note that all submits in a batch are over a single domain (currently).
+    /// # Example
+    /// ```
+    /// use phobos::prelude::*;
+    /// let exec = ExecutionManager::new(device.clone(), &physical_device)?;
+    /// async {
+    ///     let cmd1 = exec.on_domain::<domain::All>(None, None)?.finish()?;
+    ///     let cmd2 = exec.on_domain::<domain::All>(None, None)?.finish()?;
+    ///     let mut batch = exec.start_submit_batch()?;
+    ///     // Submit the first command buffer first
+    ///     batch.submit(cmd1)?
+    ///          // The second command buffer waits at COLOR_ATTACHMENT_OUTPUT on the first command buffer's completion.
+    ///          .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
+    ///     batch.finish()?.await;
+    /// }
+    /// ```
     pub fn start_submit_batch<D: ExecutionDomain + 'static>(&self) -> Result<SubmitBatch<D>> {
         SubmitBatch::new(self.device.clone(), self.clone())
     }
@@ -125,6 +142,8 @@ impl ExecutionManager {
         self.queues.iter().find(|&queue| queue.lock().unwrap().info.can_present.clone()).map(|q| q.lock().unwrap())
     }
 
+    /// Try to get a reference to a queue matching the domain, or return an error state if this would need to block
+    /// to lock the queue.
     pub fn try_get_queue<D: ExecutionDomain>(&self) -> TryLockResult<MutexGuard<Queue>> {
         let q = self.queues.iter().find(|&q| {
             let q = q.try_lock();
@@ -139,7 +158,7 @@ impl ExecutionManager {
         }
     }
 
-    /// Obtain a reference to a queue matching predicate.
+    /// Obtain a reference to a queue matching the domain. Blocks if this queue is currently locked.
     pub fn get_queue<D: ExecutionDomain>(&self) -> Option<MutexGuard<Queue>> {
         self.queues.iter().find(|&q| {
             let q = q.lock().unwrap();

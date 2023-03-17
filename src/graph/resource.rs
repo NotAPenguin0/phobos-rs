@@ -9,7 +9,7 @@ pub enum ResourceType {
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub enum AttachmentType {
+pub(crate) enum AttachmentType {
     #[default]
     Color,
     Depth,
@@ -18,7 +18,8 @@ pub enum AttachmentType {
 
 /// Resource usage in a task graph.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub enum ResourceUsage {
+#[allow(dead_code)]
+pub(crate) enum ResourceUsage {
     #[default]
     Nothing,
     Present,

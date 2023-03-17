@@ -1,15 +1,14 @@
-//! The pipeline module mainly exposes the [`PipelineCache`] struct. This is a helper that manages creating
+//! The pipeline module mainly exposes the [`PipelineCache`](crate::PipelineCache) struct. This is a helper that manages creating
 //! pipelines, obtaining reflection information from them (if the `shader-reflection` feature is enabled).
 //! You probably only want one of these in the entire application. Since it's used everywhere, to ensure safe access
-//! is possible, [`PipelineCache::new()`] returns itself wrapped in an `Arc<Mutex<PipelineCache>>`.
+//! is possible, [`PipelineCache::new()`](crate::PipelineCache::new) returns itself wrapped in an `Arc<Mutex<PipelineCache>>`.
 //!
 //! # Example
-//! The following example uses the [`PipelineBuilder`] utility to make a graphics pipeline and add it to the pipeline cache.
+//! The following example uses the [`PipelineBuilder`](crate::PipelineBuilder) utility to make a graphics pipeline and add it to the pipeline cache.
 //!
 //! ```
 //! use std::path::Path;
-//! use ash::vk;
-//! use phobos as ph;
+//! use phobos::prelude::*;
 //!
 //! let mut cache = ph::PipelineCache::new(device.clone())?;
 //!
@@ -20,11 +19,11 @@
 //!
 //! // Create shaders, these can safely be discarded after building the pipeline
 //! // as they are just create info structs that are also stored internally
-//! let vertex = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::VERTEX, vtx_code);
-//! let fragment = ph::ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
+//! let vertex = ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::VERTEX, vtx_code);
+//! let fragment = ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
 //!
 //! // Now we can build the actual pipeline.
-//! let pci = ph::PipelineBuilder::new("sample".to_string())
+//! let pci = PipelineBuilder::new("sample")
 //!     // One vertex binding at binding 0. We have to specify this before adding attributes
 //!     .vertex_input(0, vk::VertexInputRate::VERTEX)
 //!     // Equivalent of `layout (location = 0) in vec2 Attr1;`
@@ -37,7 +36,9 @@
 //!     .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
 //!     // We don't want any blending, but we still need to specify what happens to our color output.
 //!     .blend_attachment_none()
+//!     // Disable face culling
 //!     .cull_mask(vk::CullModeFlags::NONE)
+//!     // Add our shaders
 //!     .attach_shader(vertex)
 //!     .attach_shader(fragment)
 //!     .build();
@@ -50,7 +51,7 @@
 //! ```
 //! # Correct usage
 //! The pipeline cache internally frees up resources by destroying pipelines that have not been accessed in a long time.
-//! To ensure this happens periodically, call [`PipelineCache::next_frame()`] at the end of each iteration of your render loop.
+//! To ensure this happens periodically, call [`PipelineCache::next_frame()`](crate::PipelineCache::next_frame) at the end of each iteration of your render loop.
 
 use std::sync::Arc;
 use ash::vk;

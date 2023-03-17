@@ -1,4 +1,4 @@
-//! Similarly to the [`image`] module, this module exposes two types: [`Buffer`] and [`BufferView`]. The difference here is that a
+//! Similarly to the [`image`](crate::image) module, this module exposes two types: [`Buffer`] and [`BufferView`]. The difference here is that a
 //! [`BufferView`] does not own a vulkan resource, so it cane be freely copied around as long as the owning [`Buffer`] lives.
 //!
 //! It also exposes some utilities for writing to memory-mapped buffers. For this you can use [`BufferView::mapped_slice`]. This only succeeds
@@ -7,9 +7,8 @@
 //! # Example
 //!
 //! ```
-//! use ash::vk;
-//! use gpu_allocator::MemoryLocation;
-//! use phobos as ph;
+//! use phobos::prelude::*;
+//!
 //! // Allocate a new buffer
 //! let buf = Buffer::new(device.clone(),
 //!                       alloc.clone(),
@@ -19,7 +18,7 @@
 //!                       vk::BufferUsageFlags::UNIFORM_BUFFER,
 //!                       // CpuToGpu will always set HOST_VISIBLE and HOST_COHERENT, and try to set DEVICE_LOCAL.
 //!                       // Usually this resides on the PCIe BAR.
-//!                       MemoryLocation::CpuToGpu);
+//!                       MemoryType::CpuToGpu);
 //! // Obtain a buffer view to the entire buffer.
 //! let mut view = buf.view_full();
 //! // Obtain a slice of floats
@@ -38,6 +37,7 @@ use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 use anyhow::Result;
 
 
+/// Wrapper around a [`VkBuffer`](vk::Buffer).
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Buffer<A: Allocator = DefaultAllocator> {
@@ -52,6 +52,9 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
     pub size: vk::DeviceSize,
 }
 
+/// View into a specific offset and range of a [`Buffer`].
+/// Care should be taken with the lifetime of this, as there is no checking that the buffer
+/// is not dropped while using this.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BufferView {
     pub(crate) handle: vk::Buffer,
@@ -61,6 +64,8 @@ pub struct BufferView {
 }
 
 impl<A: Allocator> Buffer<A> {
+    /// Allocate a new buffer with a specific size, at a specific memory location.
+    /// All usage flags must be given.
     pub fn new(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
         let size = size.into();
         let handle = unsafe {
@@ -91,10 +96,16 @@ impl<A: Allocator> Buffer<A> {
         })
     }
 
+    /// Allocate a new buffer with device local memory (VRAM). This is usually the correct memory location for most buffers.
     pub fn new_device_local(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
         Self::new(device, allocator, size, usage, MemoryType::GpuOnly)
     }
 
+    /// Creates a view into an offset and size of the buffer.
+    /// # Lifetime
+    /// This view is valid as long as the buffer is valid.
+    /// # Errors
+    /// Fails if `offset + size >= self.size`.
     pub fn view(&self, offset: impl Into<vk::DeviceSize>, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
         let offset = offset.into();
         let size = size.into();
@@ -110,6 +121,9 @@ impl<A: Allocator> Buffer<A> {
         }
     }
 
+    /// Creates a view of the entire buffer.
+    /// # Lifetime
+    /// This view is valid as long as the buffer is valid.
     pub fn view_full(&self) -> BufferView {
         BufferView {
             handle: self.handle,
@@ -119,6 +133,7 @@ impl<A: Allocator> Buffer<A> {
         }
     }
 
+    /// True if this buffer has a mapped pointer and thus can directly be written to.
     pub fn is_mapped(&self) -> bool {
         self.pointer.is_some()
     }
@@ -133,6 +148,9 @@ impl<A: Allocator> Drop for Buffer<A> {
 }
 
 impl BufferView {
+    /// Obtain a slice to the mapped memory of this buffer.
+    /// # Errors
+    /// Fails if this buffer is not mappable (not `HOST_VISIBLE`).
     pub fn mapped_slice<T>(&mut self) -> Result<&mut [T]> {
         if let Some(pointer) = self.pointer {
             Ok(unsafe { std::slice::from_raw_parts_mut(pointer.cast::<T>().as_ptr(),  self.size as usize / std::mem::size_of::<T>()) })

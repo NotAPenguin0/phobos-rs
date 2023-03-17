@@ -10,7 +10,7 @@
 //! Using [`Image::view`] you can create an [`ImageView`] that covers the entire image. Note that [`ImageView`] is in fact an
 //! `Arc<ImgView>`. The relationship between [`ImageView`] and [`ImgView`] is similar to `String` vs `str`, except that an
 //! [`ImgView`] also owns a full Vulkan resource. For this reason, we wrap it in a reference-counted `Arc` so we can safely treat it as if it were
-//! a `str` to a `String`. Most API functions will ask for an `ImageView`.
+//! a `str` to a `String`. Most API functions will ask for an [`ImageView`].
 
 use std::sync::{Arc};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -210,6 +210,7 @@ impl ImgView {
         COUNTER.fetch_add(1, Ordering::Relaxed)
     }
 
+    /// Returns the subresource range of the original image that this image view covers.
     pub fn subresource_range(&self) -> vk::ImageSubresourceRange {
         vk::ImageSubresourceRange {
             aspect_mask: self.aspect,

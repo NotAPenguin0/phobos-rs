@@ -20,6 +20,7 @@ pub struct Surface {
 }
 
 impl Surface {
+    /// Create a new surface.
     pub fn new<Window: WindowInterface>(instance: &VkInstance, settings: &AppSettings<Window>) -> Result<Self> {
         if let Some(window) = settings.window {
             let functions = ash::extensions::khr::Surface::new(&instance.entry, &instance.instance);

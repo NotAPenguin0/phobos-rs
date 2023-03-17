@@ -7,12 +7,14 @@
 //!
 //! Example code for a main loop using `winit` and `futures::block_on` as the future executor.
 //! ```
-//! use phobos as ph;
-//! use ash::vk;
+//! use winit::event_loop::ControlFlow;
+//! use winit::event::{Event, WindowEvent};
+//! use phobos::prelude::*;
 //!
+//! let alloc = DefaultAllocator::new(&instance, &device, &physical_device)?;
 //! let mut frame = {
-//!         let swapchain = ph::Swapchain::new(&instance, device.clone(), &settings, &surface)?;
-//!         ph::FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
+//!         let swapchain = Swapchain::new(&instance, device.clone(), &settings, &surface)?;
+//!         FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
 //!  };
 //!
 //! event_loop.run(move |event, _, control_flow| {
@@ -21,19 +23,6 @@
 //!         if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
 //!         *control_flow = ControlFlow::Poll;
 //!
-//!         futures::executor::block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {
-//!             // This closure is expected to return a command buffer with this frame's commands.
-//!             // This command buffer should at the very least transition the swapchain image to
-//!             // `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`.
-//!             // This can be done using the render graph API, or with a single command:
-//!             let cmd = exec.on_domain::<ph::domain::Graphics>()?
-//!                           .transition_image(&ifc.swapchain_image,
-//!                                 vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-//!                                 vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
-//!                                 vk::AccessFlags::empty(), vk::AccessFlags::empty())
-//!                           .finish();
-//!             Ok(cmd)
-//!         }))?;
 //!
 //!         // Advance caches to next frame to ensure resources are freed up where possible.
 //!         pipeline_cache.lock().unwrap().next_frame();
@@ -50,6 +39,25 @@
 //!                 *control_flow = ControlFlow::Exit;
 //!                 device.wait_idle().unwrap();
 //!             },
+//!             Event::MainEventsCleared => {
+//!                 window.request_redraw();
+//!             },
+//!             Event::RedrawRequested(_) => {
+//!                 // When a redraw is requested, we'll run our frame logic
+//!                 futures::executor::block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {
+//!                     // This closure is expected to return a command buffer with this frame's commands.
+//!                     // This command buffer should at the very least transition the swapchain image to
+//!                     // `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`.
+//!                     // This can be done using the render graph API, or with a single command:
+//!                     let cmd = exec.on_domain::<ph::domain::Graphics>()?
+//!                                   .transition_image(&ifc.swapchain_image,
+//!                                         vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+//!                                         vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
+//!                                         vk::AccessFlags::empty(), vk::AccessFlags::empty())
+//!                                   .finish()?;
+//!             Ok(cmd)
+//!         }))?;
+//!             }
 //!             _ => (),
 //!         }
 //! });
@@ -107,7 +115,7 @@ struct PerImage {
 ///
 /// ```
 ///
-/// Another way to acquire an instance of this struct is through a [`ThreadContext`].
+/// Another way to acquire an instance of this struct is through a [`ThreadContext`](crate::ThreadContext).
 #[derive(Debug)]
 pub struct InFlightContext<'f, A: Allocator = DefaultAllocator> {
     pub swapchain_image: Option<ImageView>,
@@ -250,6 +258,7 @@ impl<A: Allocator> FrameManager<A> {
         Ok(new_swapchain)
     }
 
+    /// Obtain a new frame context to run commands in.
     pub async fn new_frame<Window, D, F>(&mut self, exec: ExecutionManager, window: &Window, surface: &Surface, f: F)
                                         -> Result<()>
         where
@@ -459,24 +468,26 @@ impl<A: Allocator> FrameManager<A> {
         Ok(self.swapchain.images[self.current_image as usize].view.clone())
     }
 
+    /// Unsafe access to the underlying swapchain.
     pub unsafe fn get_swapchain(&self) -> &Swapchain {
         &self.swapchain
     }
 }
 
 impl<'f, A: Allocator> InFlightContext<'f, A> {
+    /// Allocate a scratch vertex buffer, which is only valid for the duration of this frame.
     pub fn allocate_scratch_vbo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
         self.vertex_allocator.allocate(size)
     }
-
+    /// Allocate a scratch index buffer, which is only valid for the duration of this frame.
     pub fn allocate_scratch_ibo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
         self.index_allocator.allocate(size)
     }
-
+    /// Allocate a scratch uniform buffer, which is only valid for the duration of this frame.
     pub fn allocate_scratch_ubo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
         self.uniform_allocator.allocate(size)
     }
-
+    /// Allocate a scratch shader storage buffer, which is only valid for the duration of this frame.
     pub fn allocate_scratch_ssbo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
         self.storage_allocator.allocate(size)
     }

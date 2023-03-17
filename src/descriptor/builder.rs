@@ -1,3 +1,6 @@
+//! The descriptor set builder is useful for building descriptor sets, but its public usage is now deprecated.
+//! Instead, use the `bind_xxx` functions of [`IncompleteCommandBuffer`](crate::command_buffer::IncompleteCommandBuffer)
+
 use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
 
 use anyhow::Result;
@@ -44,6 +47,7 @@ pub struct DescriptorSetBuilder<'a> {
 
 
 impl<'r> DescriptorSetBuilder<'r> {
+    /// Create a new empty descriptor set builder with no reflection information.
     pub fn new() -> Self {
         Self {
             inner: DescriptorSetBinding {
@@ -58,6 +62,8 @@ impl<'r> DescriptorSetBuilder<'r> {
         }
     }
 
+    /// Create a new empty descriptor set builder with associated reflection information.
+    /// This enables the usage of the `bind_named_xxx` set of functions.
     #[cfg(feature="shader-reflection")]
     pub fn with_reflection(info: &'r ReflectionInfo) -> Self {
         Self {
@@ -70,6 +76,9 @@ impl<'r> DescriptorSetBuilder<'r> {
         }
     }
 
+    /// Resolve the virtual resource through the given bindings, and bind it to a specific slot as a combined image sampler.
+    /// # Errors
+    /// Fails if the binding did not exist, or did not contain an image.
     pub fn resolve_and_bind_sampled_image(&mut self, binding: u32, resource: &VirtualResource, sampler: &Sampler, bindings: &PhysicalResourceBindings) -> Result<()> {
         if let Some(PhysicalResource::Image(image)) = bindings.resolve(resource) {
             self.bind_sampled_image(binding, image, sampler);
@@ -92,6 +101,11 @@ impl<'r> DescriptorSetBuilder<'r> {
         });
     }
 
+    /// Bind an image view to the given binding as a [`vk::DescriptorType::COMBINED_IMAGE_SAMPLER`].
+    /// Uses the reflection information provided at construction to look up the correct binding slot by its name
+    /// defined in the shader.
+    /// # Errors
+    /// Fails if `self` was not constructed with [`DescriptorSetBuilder::with_reflection()`].
     #[cfg(feature="shader-reflection")]
     pub fn bind_named_sampled_image(&mut self, name: &str, image: &ImageView, sampler: &Sampler) -> Result<()> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
@@ -100,6 +114,7 @@ impl<'r> DescriptorSetBuilder<'r> {
         Ok(())
     }
 
+    /// Bind a uniform buffer to the specified slot.
     pub fn bind_uniform_buffer(&mut self, binding: u32, buffer: &BufferView) -> () {
         self.inner.bindings.push(DescriptorBinding {
             binding,
@@ -110,6 +125,11 @@ impl<'r> DescriptorSetBuilder<'r> {
         });
     }
 
+    /// Bind a buffer to the given binding as a [`vk::DescriptorType::UNIFORM_BUFFER`].
+    /// Uses the reflection information provided at construction to look up the correct binding slot by its name
+    /// defined in the shader.
+    /// # Errors
+    /// Fails if `self` was not constructed with [`DescriptorSetBuilder::with_reflection()`].
     #[cfg(feature="shader-reflection")]
     pub fn bind_named_uniform_buffer(&mut self, name: &str, buffer: &BufferView) -> Result<()> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
@@ -118,6 +138,7 @@ impl<'r> DescriptorSetBuilder<'r> {
         Ok(())
     }
 
+    /// Build the descriptor set creation info to pass into the cache.
     pub fn build(self) -> DescriptorSetBinding {
         self.inner
     }

@@ -4,6 +4,7 @@ use crate::{VkInstance};
 use anyhow::Result;
 use crate::util::string::wrap_c_str;
 
+/// Vulkan debug messenger, can be passed to certain functions to extend debugging functionality.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct DebugMessenger {

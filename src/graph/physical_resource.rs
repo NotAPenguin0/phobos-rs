@@ -13,16 +13,14 @@ pub enum PhysicalResource {
 /// Stores bindings from virtual resources to physical resources.
 /// # Example usage
 /// ```
-/// use ash::vk;
-/// use phobos::{Error, Image, VirtualResource};
-/// use phobos::graph::physical_resource::PhysicalResourceBindings;
+/// use phobos::prelude::*;
 ///
-/// let resource = VirtualResource::new(String::from("image"));
+/// let resource = VirtualResource::new("image");
 /// let image = Image::new(/*...*/);
 /// let view = image.view(vk::ImageAspectFlags::COLOR)?;
 /// let mut bindings = PhysicalResourceBindings::new();
 /// // Bind the virtual resource to the image
-/// bindings.bind_image(String::from("image"), view.clone());
+/// bindings.bind_image("image", &view);
 /// // ... Later, lookup the physical image handle from a virtual resource handle
 /// let view = bindings.resolve(&resource).ok_or(Error::NoResourceBound)?;
 /// ```

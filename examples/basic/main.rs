@@ -41,7 +41,7 @@ fn main_loop(frame: &mut ph::FrameManager,
     block_on({
         let cmd1 = exec.on_domain::<domain::All>(None, None)?.finish()?;
         let cmd2 = exec.on_domain::<domain::All>(None, None)?.finish()?;
-        let mut batch = exec.start_submit_batch::<domain::All>()?;
+        let mut batch = exec.start_submit_batch()?;
         batch.submit(cmd1)?
              .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
         batch.finish()?
