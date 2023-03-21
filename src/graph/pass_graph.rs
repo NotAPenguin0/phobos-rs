@@ -1,5 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
 use ash::vk;
 use crate::domain::ExecutionDomain;
@@ -10,6 +11,7 @@ use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourc
 
 use anyhow::Result;
 use petgraph::{Direction, Graph};
+use petgraph::dot::Dot;
 use petgraph::graph::NodeIndex;
 use petgraph::prelude::EdgeRef;
 use crate::command_buffer::IncompleteCommandBuffer;
@@ -328,5 +330,26 @@ impl<'exec, 'q, D, A: Allocator> PassGraph<'exec, 'q, D, A> where D: ExecutionDo
         graph.retain_nodes(|_, node| { !to_remove.contains(&node) });
 
         Ok(())
+    }
+}
+
+
+pub trait GraphViz {
+    fn dot(&self) -> Result<String>;
+}
+
+impl<D, A: Allocator> GraphViz for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> where D: ExecutionDomain {
+    fn dot(&self) -> Result<String> {
+        Ok(format!("{}", Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes)))
+    }
+}
+
+impl<D, A: Allocator> Display for Node<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> where D: ExecutionDomain {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),
+            Node::Barrier(barrier) => { f.write_fmt(format_args!("{}({:#?} => {:#?})\n({:#?} => {:#?})", &barrier.resource.uid(), barrier.src_access, barrier.dst_access, barrier.src_stage, barrier.dst_stage))}
+            Node::_Unreachable(_) => { unreachable!() }
+        }
     }
 }

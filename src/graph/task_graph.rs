@@ -1,13 +1,9 @@
-use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use petgraph::{Graph, Incoming};
 use petgraph::graph::{EdgeReference, NodeIndex};
 
 use anyhow::Result;
-use petgraph::dot::Dot;
-use crate::domain::ExecutionDomain;
-use crate::{Allocator, Error};
-use crate::graph::pass_graph::{PassNode, PassResource, PassResourceBarrier};
+use crate::{Error};
 
 /// Represents a resource in a task graph.
 pub trait Resource {
@@ -67,11 +63,11 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
         Ok(matches!(graph.node_weight(node).ok_or(Error::NodeNotFound)?, Node::Task(_)))
     }
 
-    fn get_edge_attributes(_: &Graph<Node<R, B, T>, String>, _: EdgeReference<String>) -> String {
+    pub(crate) fn get_edge_attributes(_: &Graph<Node<R, B, T>, String>, _: EdgeReference<String>) -> String {
         String::from("")
     }
 
-    fn get_node_attributes(_: &Graph<Node<R, B, T>, String>, node: (NodeIndex, &Node<R, B, T>)) -> String {
+    pub(crate) fn get_node_attributes(_: &Graph<Node<R, B, T>, String>, node: (NodeIndex, &Node<R, B, T>)) -> String {
         match node.1 {
             Node::Task(_) => { String::from("fillcolor = \"#5e6df7\"") }
             Node::Barrier(_) => { String::from("fillcolor = \"#f75e70\" shape=box") }
@@ -166,23 +162,4 @@ impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier
     }
 }
 
-pub trait GraphViz {
-    fn dot(&self) -> Result<String>;
-}
-
-impl<D, A: Allocator> GraphViz for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> where D: ExecutionDomain {
-    fn dot(&self) -> Result<String> {
-        Ok(format!("{}", Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes)))
-    }
-}
-
-impl<D, A: Allocator> Display for Node<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> where D: ExecutionDomain {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),
-            Node::Barrier(barrier) => { f.write_fmt(format_args!("{}({:#?} => {:#?})\n({:#?} => {:#?})", &barrier.resource.uid(), barrier.src_access, barrier.dst_access, barrier.src_stage, barrier.dst_stage))}
-            Node::_Unreachable(_) => { unreachable!() }
-        }
-    }
-}
 
