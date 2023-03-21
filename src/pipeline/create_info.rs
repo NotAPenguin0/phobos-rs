@@ -102,7 +102,7 @@ impl PipelineCreateInfo {
             .build();
     }
 
-    pub(crate) fn build_inner(&mut self) -> () {
+    pub fn build_inner(&mut self) -> () {
         self.vk_attributes = self.vertex_attributes.iter().map(|v| v.0.clone()).collect();
         self.vk_vertex_inputs = self.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
         self.vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
