@@ -64,13 +64,15 @@
 //! ```
 
 use std::future::Future;
-use std::sync::{Arc};
-use crate::{Device, Swapchain, Error, ExecutionManager, ImageView, WindowInterface, Surface, Image, ScratchAllocator, AppSettings, BufferView, Fence, Semaphore, CmdBuffer, Allocator, DefaultAllocator};
+use std::sync::Arc;
+
+use anyhow::Result;
 use ash::vk;
+
+use crate::{Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore, Surface, Swapchain, WindowInterface};
+use crate::command_buffer::CommandBuffer;
 use crate::domain::ExecutionDomain;
 use crate::util::deferred_delete::DeletionQueue;
-use anyhow::Result;
-use crate::command_buffer::CommandBuffer;
 use crate::wsi::swapchain::SwapchainImage;
 
 /// Information stored for each in-flight frame.
@@ -411,7 +413,7 @@ impl<A: Allocator> FrameManager<A> {
         // Grab a copy of the command buffer handle for submission.
         // We do this because we're going to move the actual command buffer into our
         // PerFrame structure to keep it around until we can safely delete it next frame.
-        let cmd_handle = cmd.handle.clone();
+        let cmd_handle = unsafe { cmd.handle() };
         per_frame.command_buffer = Some(Box::new(cmd));
 
         let submit = vk::SubmitInfo {

@@ -28,12 +28,13 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, MutexGuard};
-use ash::vk;
-use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
-use crate::domain::ExecutionDomain;
 
 use anyhow::Result;
+use ash::vk;
+
+use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
 use crate::core::queue::Queue;
+use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 
 pub mod traits;
@@ -49,7 +50,7 @@ pub(crate) mod command_pool;
 /// It can only be obtained by calling [`IncompleteCommandBuffer::finish()`].
 #[derive(Debug)]
 pub struct CommandBuffer<D: ExecutionDomain> {
-    pub(crate) handle: vk::CommandBuffer,
+    handle: vk::CommandBuffer,
     _domain: PhantomData<D>,
 }
 
@@ -103,5 +104,11 @@ impl<'q, D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
         let handle = self.handle;
         self.handle = vk::CommandBuffer::null();
         queue.free_command_buffer::<Self>(handle)
+    }
+}
+
+impl<D: ExecutionDomain> CommandBuffer<D> {
+    pub unsafe fn handle(&self) -> vk::CommandBuffer {
+        self.handle
     }
 }

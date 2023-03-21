@@ -1,12 +1,12 @@
 use std::rc::Rc;
 use std::sync::Arc;
-use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
-use crate::command_buffer::CommandBuffer;
-use crate::domain::ExecutionDomain;
 
 use anyhow::Result;
 use ash::vk;
 
+use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
+use crate::command_buffer::CommandBuffer;
+use crate::domain::ExecutionDomain;
 
 #[derive(Debug)]
 struct SubmitInfo<D: ExecutionDomain> {
@@ -111,7 +111,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
                 cmd_buffer: vec![vk::CommandBufferSubmitInfo {
                     s_type: vk::StructureType::COMMAND_BUFFER_SUBMIT_INFO,
                     p_next: std::ptr::null(),
-                    command_buffer: submit.cmd.handle,
+                    command_buffer: unsafe { submit.cmd.handle() },
                     device_mask: 0,
                 }],
                 signal_semaphores: match &submit.signal_semaphore {

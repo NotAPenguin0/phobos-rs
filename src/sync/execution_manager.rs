@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
-use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
-use crate::command_buffer::*;
+
 use anyhow::Result;
 use ash::vk;
+
+use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
+use crate::command_buffer::*;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
@@ -112,6 +114,7 @@ impl ExecutionManager {
     pub fn submit<D: ExecutionDomain + 'static>(&self, mut cmd: CommandBuffer<D>) -> Result<Fence> {
         let fence = Fence::new(self.device.clone(), false)?;
 
+        let handle = unsafe { cmd.handle() };
         let info = vk::SubmitInfo {
             s_type: vk::StructureType::SUBMIT_INFO,
             p_next: std::ptr::null(),
@@ -119,7 +122,7 @@ impl ExecutionManager {
             p_wait_semaphores: std::ptr::null(),
             p_wait_dst_stage_mask: std::ptr::null(),
             command_buffer_count: 1,
-            p_command_buffers: &cmd.handle,
+            p_command_buffers: &handle,
             signal_semaphore_count: 0,
             p_signal_semaphores: std::ptr::null(),
         };
