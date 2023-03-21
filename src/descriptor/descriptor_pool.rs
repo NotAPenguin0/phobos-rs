@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
-use ash::vk;
-use crate::Device;
 
 use anyhow::Result;
+use ash::vk;
+
+use crate::Device;
 
 /// Defines how many descriptors a descriptor pool should be able to hold.
 #[derive(Debug, Clone)]
@@ -14,9 +15,9 @@ pub(super) struct DescriptorPoolSize(pub(super) HashMap<vk::DescriptorType, u32>
 #[derivative(Debug)]
 pub(super) struct DescriptorPool {
     #[derivative(Debug="ignore")]
-    pub device: Arc<Device>,
-    pub handle: vk::DescriptorPool,
-    pub size: DescriptorPoolSize
+    device: Arc<Device>,
+    handle: vk::DescriptorPool,
+    size: DescriptorPoolSize
 }
 
 
@@ -67,6 +68,14 @@ impl DescriptorPool {
             device,
             size,
         })
+    }
+
+    pub(super) unsafe fn handle(&self) -> vk::DescriptorPool {
+        self.handle
+    }
+
+    pub fn size(&self) -> &DescriptorPoolSize {
+        &self.size
     }
 }
 

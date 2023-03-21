@@ -61,7 +61,8 @@ impl ExecutionManager {
         info!("Created device queues:");
         for queue in &queues {
             let lock = queue.lock().unwrap();
-            info!("Queue #{:?}({}) supports {:?} (dedicated: {}, can present: {})", lock.info.queue_type, lock.info.family_index, lock.info.flags, lock.info.dedicated, lock.info.can_present)
+            let info = lock.info();
+            info!("Queue #{:?}({}) supports {:?} (dedicated: {}, can present: {})", info.queue_type, info.family_index, info.flags, info.dedicated, info.can_present)
         }
 
         Ok(ExecutionManager {
@@ -144,7 +145,7 @@ impl ExecutionManager {
 
     /// Obtain a reference to a queue capable of presenting.
     pub(crate) fn get_present_queue(&self) -> Option<MutexGuard<Queue>> {
-        self.queues.iter().find(|&queue| queue.lock().unwrap().info.can_present.clone()).map(|q| q.lock().unwrap())
+        self.queues.iter().find(|&queue| queue.lock().unwrap().info().can_present.clone()).map(|q| q.lock().unwrap())
     }
 
     /// Try to get a reference to a queue matching the domain, or return an error state if this would need to block

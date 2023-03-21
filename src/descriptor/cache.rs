@@ -1,9 +1,10 @@
 use std::sync::{Arc, Mutex};
-use crate::descriptor::descriptor_pool::{DescriptorPool, DescriptorPoolSize};
-use crate::{DeletionQueue, DescriptorSet, Device, Error};
 
 use anyhow::Result;
 use ash::vk;
+
+use crate::{DeletionQueue, DescriptorSet, Device, Error};
+use crate::descriptor::descriptor_pool::{DescriptorPool, DescriptorPoolSize};
 use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::util::cache::Cache;
 
@@ -53,13 +54,13 @@ impl DescriptorCache {
         if bindings.layout == vk::DescriptorSetLayout::null() { return Err(anyhow::Error::from(Error::NoDescriptorSetLayout)); }
 
         loop {
-            bindings.pool = self.pool.handle;
+            bindings.pool = unsafe { self.pool.handle() };
             let set = self.cache.get_or_create(&bindings, ());
             match set {
                 // Need to query again to fix lifetime compiler error
                 Ok(_) => { return Ok(self.cache.get_or_create(&bindings, ()).unwrap()); }
                 Err(_) => {
-                    let new_size = Self::grow_pool_size(self.pool.size.clone(), &bindings);
+                    let new_size = Self::grow_pool_size(self.pool.size().clone(), &bindings);
                     // Create new pool, swap it out with the old one and then push the old one onto the deletion queue
                     let mut new_pool = DescriptorPool::new(self.device.clone(), new_size)?;
                     std::mem::swap(&mut new_pool, &mut self.pool);

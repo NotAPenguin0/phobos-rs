@@ -44,7 +44,7 @@ pub struct Queue {
     /// TODO: measure lock contention on command pools and determine if we need a queue of pools to pull from instead.
     pool: CommandPool,
     /// Information about this queue, such as supported operations, family index, etc. See also [`QueueInfo`]
-    pub info: QueueInfo,
+    info: QueueInfo,
 }
 
 impl Queue {
@@ -118,5 +118,9 @@ impl Queue {
     /// This function **must** be externally synchronized.
     pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(&self, cmd: vk::CommandBuffer) -> Result<()> {
         Ok(self.device.free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd)))
+    }
+
+    pub fn info(&self) -> &QueueInfo {
+        &self.info
     }
 }
