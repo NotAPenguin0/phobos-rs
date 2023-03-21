@@ -52,10 +52,10 @@ trait FenceValue<T> {
 /// async fn upload_buffer<T: Copy>(device: Arc<Device>, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
 ///     // Create our result buffer
 ///     let size = (src.len() * size_of::<T>()) as u64;
-///     let buffer = Buffer::new_device_local(device.clone(), &allocator, size, vk::BufferUsageFlags::TRANSFER_DST)?;
+///     let buffer = Buffer::new_device_local(device.clone(), &mut allocator, size, vk::BufferUsageFlags::TRANSFER_DST)?;
 ///     let view = buffer.view_full();
 ///     // Create a staging buffer and copy our data to it
-///     let staging = Buffer::new(device.clone(), &allocator, size, vk::BufferUsageFlags::TRANSFER_SRC, MemoryType::CpuToGpu)?;
+///     let staging = Buffer::new(device.clone(), &mut allocator, size, vk::BufferUsageFlags::TRANSFER_SRC, MemoryType::CpuToGpu)?;
 ///     let mut staging_view = staging.view_full();
 ///     staging_view.mapped_slice()?.copy_from_slice(src);
 ///     // Create a command buffer to copy the buffers
@@ -103,6 +103,7 @@ pub struct Fence<T = ()> {
     #[derivative(Debug="ignore")]
     first_cleanup_fn: Option<Box<CleanupFnLink<'static>>>,
     value: Option<T>,
+    poll_rate: Duration,
     pub handle: vk::Fence,
 }
 
@@ -129,6 +130,7 @@ impl Fence<()> {
             first_cleanup_fn: self.first_cleanup_fn.take(),
             device: self.device.clone(),
             value: Some(value),
+            poll_rate: self.poll_rate.clone(),
         }
     }
 }
@@ -138,6 +140,11 @@ impl<T> Unpin for Fence<T> {}
 impl<T> Fence<T> {
     /// Create a new fence, possibly in the singaled status.
     pub fn new(device: Arc<Device>, signaled: bool) -> Result<Self, vk::Result> {
+        Self::new_with_poll_rate(device, signaled, Duration::from_millis(5))
+    }
+
+    /// Create a new fence with the specified poll rate for awaiting it as a future.
+    pub fn new_with_poll_rate(device: Arc<Device>, signaled: bool, poll_rate: Duration) -> Result<Self, vk::Result> {
         let info = vk::FenceCreateInfo {
             s_type: vk::StructureType::FENCE_CREATE_INFO,
             p_next: std::ptr::null(),
@@ -148,6 +155,7 @@ impl<T> Fence<T> {
                 device.create_fence(&info, None)?
             },
             device,
+            poll_rate,
             first_cleanup_fn: None,
             value: None,
         })
@@ -205,10 +213,9 @@ impl<T> std::future::Future for Fence<T> {
             Poll::Ready(self.as_mut().value())
         } else {
             let waker = ctx.waker().clone();
+            let poll_rate = self.poll_rate.clone();
             std::thread::spawn(move || {
-                // We will try to poll every 5 milliseconds.
-                // TODO: measure, possibly configure
-                std::thread::sleep(Duration::from_millis(5));
+                std::thread::sleep(poll_rate);
                 waker.wake();
                 return;
             });
