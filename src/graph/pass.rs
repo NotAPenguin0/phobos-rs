@@ -82,7 +82,7 @@ use crate::graph::pass_graph::PassResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
-pub struct Pass<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: ExecutionDomain {
+pub struct Pass<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
     pub(crate) name: String,
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<PassResource>,
@@ -92,11 +92,11 @@ pub struct Pass<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: Executio
 }
 
 /// Used to create [`Pass`] objects correctly.
-pub struct PassBuilder<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: ExecutionDomain {
+pub struct PassBuilder<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
     inner: Pass<'exec, 'q, D, A>,
 }
 
-impl<'exec, 'q, D, A: Allocator> Pass<'exec, 'q, D, A> where D: ExecutionDomain {
+impl<'exec, 'q, D: ExecutionDomain, A: Allocator> Pass<'exec, 'q, D, A> {
     /// Returns the output virtual resource associated with the input resource.
     pub fn output(&self, resource: &VirtualResource) -> Option<&VirtualResource> {
         self.outputs.iter().filter_map(|output| {
@@ -110,7 +110,7 @@ impl<'exec, 'q, D, A: Allocator> Pass<'exec, 'q, D, A> where D: ExecutionDomain 
     }
 }
 
-impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: ExecutionDomain {
+impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
 
     /// Create a new pass for generic commands. Does not support commands that are located inside a renderpass.
     pub fn new(name: impl Into<String>) -> Self {

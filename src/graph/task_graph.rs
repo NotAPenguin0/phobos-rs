@@ -12,32 +12,32 @@ pub trait Resource {
 }
 
 /// Task in a task dependency graph. This is parametrized on a resource type.
-pub trait Task<R> where R: Resource {
+pub trait Task<R: Resource> {
     fn inputs(&self) -> &Vec<R>;
     fn outputs(&self) -> &Vec<R>;
 }
 
 /// Represents a barrier in the task graph.
-pub trait Barrier<R> where R: Resource {
+pub trait Barrier<R: Resource> {
     fn new(resource: R) -> Self;
     fn resource(&self) -> &R;
 }
 
 /// Represents a node in a task graph.
 #[derive(Debug)]
-pub enum Node<R, B, T> where R: Resource, B: Barrier<R>, T: Task<R> {
+pub enum Node<R: Resource, B: Barrier<R>, T: Task<R>> {
     Task(T),
     Barrier(B),
     _Unreachable((!, PhantomData<R>)),
 }
 
 /// Task graph structure, used for automatic synchronization of resource accesses.
-pub struct TaskGraph<R, B, T> where R: Resource + Default, B: Barrier<R> + Clone, T: Task<R> {
+pub struct TaskGraph<R: Resource, B: Barrier<R> + Clone, T: Task<R>> {
     pub(crate) graph: Graph<Node<R, B, T>, String>,
 }
 
 
-impl<R, B, T> TaskGraph<R, B, T> where R: Clone + Default + Resource, B: Barrier<R> + Clone, T: Task<R> {
+impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph<R, B, T> {
     pub fn new() -> Self {
         TaskGraph {
             graph: Graph::new()

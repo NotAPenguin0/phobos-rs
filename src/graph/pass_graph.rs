@@ -43,7 +43,10 @@ pub struct PassResourceBarrier {
 
 
 /// A task in a pass graph. Either a render pass, or a compute pass, etc.
-pub struct PassNode<'exec, 'q, R, D, A: Allocator = DefaultAllocator> where R: Resource, D: ExecutionDomain {
+pub struct PassNode<'exec, 'q,
+        R: Resource,
+        D: ExecutionDomain,
+        A: Allocator = DefaultAllocator> {
     pub identifier: String,
     pub color: Option<[f32; 4]>,
     pub inputs: Vec<R>,
@@ -53,7 +56,9 @@ pub struct PassNode<'exec, 'q, R, D, A: Allocator = DefaultAllocator> where R: R
 }
 
 /// Pass graph, used for synchronizing resources over a single queue.
-pub struct PassGraph<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: ExecutionDomain {
+pub struct PassGraph<'exec, 'q,
+        D: ExecutionDomain,
+        A: Allocator = DefaultAllocator> {
     pub(crate) graph: TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>>,
     // Note that this is guaranteed to be stable.
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
@@ -63,11 +68,13 @@ pub struct PassGraph<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: Exe
     last_usages: HashMap<String, (usize, PipelineStage)>,
 }
 
-pub struct BuiltPassGraph<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: ExecutionDomain {
+pub struct BuiltPassGraph<'exec, 'q,
+        D: ExecutionDomain,
+        A: Allocator = DefaultAllocator> {
     graph: PassGraph<'exec, 'q, D, A>,
 }
 
-impl<'exec, 'q, D, A: Allocator> Deref for BuiltPassGraph<'exec, 'q, D, A> where D: ExecutionDomain {
+impl<'exec, 'q, D: ExecutionDomain, A: Allocator> Deref for BuiltPassGraph<'exec, 'q, D, A> {
     type Target = PassGraph<'exec, 'q, D, A>;
 
     fn deref(&self) -> &Self::Target {
@@ -75,7 +82,7 @@ impl<'exec, 'q, D, A: Allocator> Deref for BuiltPassGraph<'exec, 'q, D, A> where
     }
 }
 
-impl<'exec, 'q, D, A: Allocator> DerefMut for BuiltPassGraph<'exec, 'q, D, A> where D: ExecutionDomain {
+impl<'exec, 'q, D: ExecutionDomain, A: Allocator> DerefMut for BuiltPassGraph<'exec, 'q, D, A> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.graph
     }
@@ -133,7 +140,7 @@ macro_rules! barriers {
     }
 }
 
-impl<'exec, 'q, D, A: Allocator> PassGraph<'exec, 'q, D, A> where D: ExecutionDomain {
+impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
     /// Create a new task graph. If rendering to a swapchain, also give it the virtual resource you are planning to use for this.
     /// This is necessary for proper sync
     pub fn new(swapchain: Option<&VirtualResource>) -> Self {
@@ -338,13 +345,13 @@ pub trait GraphViz {
     fn dot(&self) -> Result<String>;
 }
 
-impl<D, A: Allocator> GraphViz for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> where D: ExecutionDomain {
+impl<D: ExecutionDomain, A: Allocator> GraphViz for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> {
     fn dot(&self) -> Result<String> {
         Ok(format!("{}", Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes)))
     }
 }
 
-impl<D, A: Allocator> Display for Node<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> where D: ExecutionDomain {
+impl<D: ExecutionDomain, A: Allocator> Display for Node<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),

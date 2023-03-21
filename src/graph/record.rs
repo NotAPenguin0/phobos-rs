@@ -57,11 +57,11 @@ macro_rules! parents {
     }
 }
 
-fn insert_in_active_set<'a, 'e, 'q, D, A: Allocator>(
+fn insert_in_active_set<'a, 'e, 'q, D: ExecutionDomain, A: Allocator>(
     node: NodeIndex,
     graph: &'a PassGraph<'e, 'q, D, A>,
     active: &mut HashSet<NodeIndex>,
-    children: &mut HashSet<NodeIndex>) where D: ExecutionDomain {
+    children: &mut HashSet<NodeIndex>) {
     children.remove(&node);
     active.insert(node);
     for child in children!(node, graph) {
@@ -69,8 +69,11 @@ fn insert_in_active_set<'a, 'e, 'q, D, A: Allocator>(
     }
 }
 
-fn find_resolve_attachment<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings, resource: &PassResource) -> Option<ImageView>
-    where D: ExecutionDomain {
+fn find_resolve_attachment<D: ExecutionDomain, A: Allocator>(
+    pass: &PassNode<PassResource, D, A>,
+    bindings: &PhysicalResourceBindings,
+    resource: &PassResource)
+    -> Option<ImageView> {
     pass.outputs.iter().find(|output| {
         match &output.usage {
             ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => {
@@ -88,8 +91,10 @@ fn find_resolve_attachment<D, A: Allocator>(pass: &PassNode<PassResource, D, A>,
         }).cloned()
 }
 
-fn color_attachments<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings) -> Result<Vec<RenderingAttachmentInfo>>
-    where D: ExecutionDomain {
+fn color_attachments<D: ExecutionDomain, A: Allocator>(
+    pass: &PassNode<PassResource, D, A>,
+    bindings: &PhysicalResourceBindings)
+    -> Result<Vec<RenderingAttachmentInfo>> {
     Ok(pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
         if !matches!(resource.usage, ResourceUsage::Attachment(AttachmentType::Color))  {
             return None;
@@ -114,8 +119,10 @@ fn color_attachments<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindi
     }).collect())
 }
 
-fn depth_attachment<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings)
-                       -> Option<RenderingAttachmentInfo> where D: ExecutionDomain {
+fn depth_attachment<D: ExecutionDomain, A: Allocator>(
+    pass: &PassNode<PassResource, D, A>,
+    bindings: &PhysicalResourceBindings)
+    -> Option<RenderingAttachmentInfo> {
     pass.outputs.iter().filter_map(|resource| -> Option<RenderingAttachmentInfo> {
         if resource.layout != vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL { return None; }
 
@@ -137,7 +144,7 @@ fn depth_attachment<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindin
     }).next()
 }
 
-fn render_area<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings) -> vk::Rect2D where D: ExecutionDomain {
+fn render_area<D: ExecutionDomain, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings) -> vk::Rect2D {
     let resource = pass.outputs.iter().filter(|resource|
         match resource.usage {
             ResourceUsage::Attachment(_) => true,
@@ -156,7 +163,11 @@ fn render_area<D, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &
 }
 
 #[cfg(feature="debug-markers")]
-fn annotate_pass<'q, D, A: Allocator>(pass: &PassNode<PassResource, D, A>, debug: &DebugMessenger, cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
+fn annotate_pass<'q, D: ExecutionDomain, A: Allocator>(
+    pass: &PassNode<PassResource, D, A>,
+    debug: &DebugMessenger,
+    cmd: IncompleteCommandBuffer<'q, D>)
+    -> Result<IncompleteCommandBuffer<'q, D>> {
     let name = CString::new(pass.identifier.clone())?;
     let label = vk::DebugUtilsLabelEXT {
         s_type: vk::StructureType::DEBUG_UTILS_LABEL_EXT,
@@ -168,10 +179,15 @@ fn annotate_pass<'q, D, A: Allocator>(pass: &PassNode<PassResource, D, A>, debug
 }
 
 #[cfg(not(feature="debug-markers"))]
-fn annotate_pass<D>(_: &PassNode<PassResource, D>, _: &DebugMessenger, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> where D: ExecutionDomain { Ok(cmd) }
+fn annotate_pass<D: ExecutionDomain>(_: &PassNode<PassResource, D>, _: &DebugMessenger, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> { Ok(cmd) }
 
-fn record_pass<'exec, 'q, D, A: Allocator>(pass: &mut PassNode<'exec, 'q, PassResource, D, A>, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext<A>, mut cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>)
-                             -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain  {
+fn record_pass<'exec, 'q, D: ExecutionDomain, A: Allocator>(
+    pass: &mut PassNode<'exec, 'q, PassResource, D, A>,
+    bindings: &PhysicalResourceBindings,
+    ifc: &mut InFlightContext<A>,
+    mut cmd: IncompleteCommandBuffer<'q, D>,
+    debug: Option<&DebugMessenger>)
+    -> Result<IncompleteCommandBuffer<'q, D>> {
 
     if let Some(debug) = debug {
         cmd = annotate_pass(&pass, debug, cmd)?;
@@ -205,9 +221,12 @@ fn record_pass<'exec, 'q, D, A: Allocator>(pass: &mut PassNode<'exec, 'q, PassRe
     Ok(cmd)
 }
 
-fn record_image_barrier<'q, D>(barrier: &PassResourceBarrier, image: &ImageView, dst_resource: &PassResource, cmd: IncompleteCommandBuffer<'q, D>)
-                               -> Result<IncompleteCommandBuffer<'q, D>>
-    where D: ExecutionDomain {
+fn record_image_barrier<'q, D: ExecutionDomain>(
+    barrier: &PassResourceBarrier,
+    image: &ImageView,
+    dst_resource: &PassResource,
+    cmd: IncompleteCommandBuffer<'q, D>)
+    -> Result<IncompleteCommandBuffer<'q, D>> {
 
     // Image layouts:
     // barrier.resource has information on srcLayout
@@ -243,9 +262,12 @@ fn record_image_barrier<'q, D>(barrier: &PassResourceBarrier, image: &ImageView,
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
-fn record_buffer_barrier<'q, D>(barrier: &PassResourceBarrier, _buffer: &BufferView, _dst_resource: &PassResource, cmd: IncompleteCommandBuffer<'q, D>)
-                                -> Result<IncompleteCommandBuffer<'q, D>>
-    where D: ExecutionDomain {
+fn record_buffer_barrier<'q, D: ExecutionDomain>(
+    barrier: &PassResourceBarrier,
+    _buffer: &BufferView,
+    _dst_resource: &PassResource,
+    cmd: IncompleteCommandBuffer<'q, D>)
+    -> Result<IncompleteCommandBuffer<'q, D>> {
 
     // Since every driver implements buffer barriers as global memory barriers, we will do the same.
     let vk_barrier = vk::MemoryBarrier2 {
@@ -272,8 +294,12 @@ fn record_buffer_barrier<'q, D>(barrier: &PassResourceBarrier, _buffer: &BufferV
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
-fn record_barrier<'q, D>(barrier: &PassResourceBarrier, dst_resource: &PassResource, bindings: &PhysicalResourceBindings,
-                         cmd: IncompleteCommandBuffer<'q, D>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain{
+fn record_barrier<'q, D: ExecutionDomain>(
+    barrier: &PassResourceBarrier,
+    dst_resource: &PassResource,
+    bindings: &PhysicalResourceBindings,
+    cmd: IncompleteCommandBuffer<'q, D>)
+    -> Result<IncompleteCommandBuffer<'q, D>> {
     let physical_resource = bindings.resolve(&barrier.resource.resource);
     let Some(resource) = physical_resource else { return Err(anyhow::Error::from(Error::NoResourceBound(barrier.resource.uid().clone()))) };
     match resource {
@@ -282,8 +308,14 @@ fn record_barrier<'q, D>(barrier: &PassResourceBarrier, dst_resource: &PassResou
     }
 }
 
-fn record_node<'exec, 'q, D, A: Allocator>(graph: &mut BuiltPassGraph<'exec, 'q, D, A>, node: NodeIndex, bindings: &PhysicalResourceBindings, ifc: &mut InFlightContext<A>,
-                             cmd: IncompleteCommandBuffer<'q, D>, debug: Option<&DebugMessenger>) -> Result<IncompleteCommandBuffer<'q, D>> where D: ExecutionDomain {
+fn record_node<'exec, 'q, D: ExecutionDomain, A: Allocator>(
+    graph: &mut BuiltPassGraph<'exec, 'q, D, A>,
+    node: NodeIndex,
+    bindings: &PhysicalResourceBindings,
+    ifc: &mut InFlightContext<A>,
+    cmd: IncompleteCommandBuffer<'q, D>,
+    debug: Option<&DebugMessenger>)
+    -> Result<IncompleteCommandBuffer<'q, D>> {
     let graph = &mut graph.graph.graph;
     let dst_resource_res = PassGraph::barrier_dst_resource(&graph, node).cloned();
     let weight = graph.node_weight_mut(node).unwrap();

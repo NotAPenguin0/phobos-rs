@@ -84,7 +84,7 @@ impl Device {
         unsafe { Ok(self.device_wait_idle()?) }
     }
 
-    pub unsafe fn ash_device(&self) -> ash::Device {
+    pub unsafe fn handle(&self) -> ash::Device {
         self.handle.clone()
     }
 }

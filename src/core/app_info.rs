@@ -39,7 +39,7 @@ pub struct GPURequirements {
 
 /// Application settings used to initialize the phobos context.
 #[derive(Debug)]
-pub struct AppSettings<'a, Window> where Window: WindowInterface {
+pub struct AppSettings<'a, Window: WindowInterface> {
     /// Application name. Possibly displayed in debugging tools, task manager, etc.
     pub name: String,
     /// Application version.
@@ -66,7 +66,7 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
     pub scratch_ssbo_size: vk::DeviceSize,
 }
 
-impl<'a, Window> Default for AppSettings<'a, Window> where Window: WindowInterface {
+impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
     fn default() -> Self {
         AppSettings {
             name: String::from(""),
@@ -84,11 +84,11 @@ impl<'a, Window> Default for AppSettings<'a, Window> where Window: WindowInterfa
     }
 }
 
-pub struct AppBuilder<'a, Window> where Window: WindowInterface {
+pub struct AppBuilder<'a, Window: WindowInterface> {
     inner: AppSettings<'a, Window>,
 }
 
-impl<'a, Window> AppBuilder<'a, Window> where Window: WindowInterface {
+impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
     pub fn new() -> Self {
         AppBuilder { inner: AppSettings::default() }
     }

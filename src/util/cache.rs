@@ -27,14 +27,14 @@ struct Entry<R> {
 /// to use this for a type `R`, it's enough for `R` to implement the [`Resource`] trait.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Cache<R> where R: Resource + Sized {
+pub struct Cache<R: Resource + Sized> {
     #[derivative(Debug="ignore")]
     device: Arc<Device>,
     #[derivative(Debug="ignore")]
     store: HashMap<R::Key, Entry<R>>
 }
 
-impl<R> Cache<R> where R: Resource + Sized {
+impl<R: Resource + Sized> Cache<R> {
     /// Create a new resource cache from a Vulkan device.
     pub fn new(device: Arc<Device>) -> Self {
         Self {
