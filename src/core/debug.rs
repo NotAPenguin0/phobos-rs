@@ -1,7 +1,9 @@
+use std::ops::Deref;
+
+use anyhow::Result;
 use ash::vk;
 
-use crate::{VkInstance};
-use anyhow::Result;
+use crate::VkInstance;
 use crate::util::string::wrap_c_str;
 
 /// Vulkan debug messenger, can be passed to certain functions to extend debugging functionality.
@@ -10,7 +12,7 @@ use crate::util::string::wrap_c_str;
 pub struct DebugMessenger {
     handle: vk::DebugUtilsMessengerEXT,
     #[derivative(Debug="ignore")]
-    pub(crate) functions: ash::extensions::ext::DebugUtils,
+    functions: ash::extensions::ext::DebugUtils,
 }
 
 impl DebugMessenger {
@@ -35,6 +37,14 @@ impl DebugMessenger {
 impl Drop for DebugMessenger {
     fn drop(&mut self) {
         unsafe { self.functions.destroy_debug_utils_messenger(self.handle, None); }
+    }
+}
+
+impl Deref for DebugMessenger {
+    type Target = ash::extensions::ext::DebugUtils;
+
+    fn deref(&self) -> &Self::Target {
+        &self.functions
     }
 }
 

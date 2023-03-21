@@ -2,16 +2,16 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, MutexGuard};
-use ash::vk;
-
-use crate::domain::ExecutionDomain;
-use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, Sampler, VirtualResource};
 
 use anyhow::Result;
+use ash::vk;
+
+use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, Sampler, VirtualResource};
 use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
 use crate::descriptor::descriptor_set::DescriptorSetBinding;
+use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 
 impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer<'q, D> {
@@ -327,7 +327,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     #[cfg(feature="debug-markers")]
     pub fn begin_label(self, label: vk::DebugUtilsLabelEXT, debug: &DebugMessenger) -> Self {
         unsafe {
-            debug.functions.cmd_begin_debug_utils_label(self.handle, &label);
+            debug.cmd_begin_debug_utils_label(self.handle, &label);
         }
         self
     }
@@ -335,7 +335,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     #[cfg(feature="debug-markers")]
     pub fn end_label(self, debug: &DebugMessenger) -> Self {
         unsafe {
-            debug.functions.cmd_end_debug_utils_label(self.handle);
+            debug.cmd_end_debug_utils_label(self.handle);
         }
         self
     }
