@@ -98,9 +98,9 @@ pub struct PassBuilder<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: E
 
 impl<'exec, 'q, D, A: Allocator> Pass<'exec, 'q, D, A> where D: ExecutionDomain {
     /// Returns the output virtual resource associated with the input resource.
-    pub fn output(&self, resource: &VirtualResource) -> Option<VirtualResource> {
+    pub fn output(&self, resource: &VirtualResource) -> Option<&VirtualResource> {
         self.outputs.iter().filter_map(|output| {
-            if resource.is_associated_with(&output.resource) { Some(output.resource.clone()) }
+            if resource.is_associated_with(&output.resource) { Some(&output.resource) }
             else { None }
         }).next()
     }
