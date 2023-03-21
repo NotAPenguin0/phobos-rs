@@ -73,7 +73,7 @@
 //! Binding physical resources and recording is covered under the [`graph`](crate::graph) module documentation.
 
 use ash::vk;
-use crate::{Allocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
+use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
 use crate::domain::ExecutionDomain;
 use crate::pipeline::PipelineStage;
 use anyhow::Result;
@@ -82,7 +82,7 @@ use crate::graph::pass_graph::PassResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
-pub struct Pass<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
+pub struct Pass<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: ExecutionDomain {
     pub(crate) name: String,
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<PassResource>,
@@ -92,7 +92,7 @@ pub struct Pass<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
 }
 
 /// Used to create [`Pass`] objects correctly.
-pub struct PassBuilder<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
+pub struct PassBuilder<'exec, 'q, D, A: Allocator = DefaultAllocator> where D: ExecutionDomain {
     inner: Pass<'exec, 'q, D, A>,
 }
 
