@@ -1,7 +1,9 @@
 use std::sync::{Arc, Mutex, MutexGuard};
-use ash::vk;
-use crate::{Device, Error, PipelineCache, DescriptorCache, Fence, IncompleteCmdBuffer, CmdBuffer};
+
 use anyhow::Result;
+use ash::vk;
+
+use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffer, PipelineCache};
 use crate::command_buffer::command_pool::CommandPool;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
@@ -100,7 +102,7 @@ impl Queue {
         let info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
             p_next: std::ptr::null(),
-            command_pool: queue_lock.pool.handle,
+            command_pool: unsafe { queue_lock.pool.handle() },
             level: vk::CommandBufferLevel::PRIMARY,
             command_buffer_count: 1,
         };
@@ -115,6 +117,6 @@ impl Queue {
     /// Instantly delete a command buffer, without taking synchronization into account.
     /// This function **must** be externally synchronized.
     pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(&self, cmd: vk::CommandBuffer) -> Result<()> {
-        Ok(self.device.free_command_buffers(self.pool.handle, std::slice::from_ref(&cmd)))
+        Ok(self.device.free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd)))
     }
 }

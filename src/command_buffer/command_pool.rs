@@ -1,15 +1,16 @@
 use std::sync::Arc;
-use ash::vk;
-use crate::prelude::*;
 
 use anyhow::Result;
+use ash::vk;
+
+use crate::prelude::*;
 
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct CommandPool {
     #[derivative(Debug="ignore")]
     device: Arc<Device>,
-    pub(crate) handle: vk::CommandPool
+    handle: vk::CommandPool
 }
 
 impl CommandPool {
@@ -26,6 +27,10 @@ impl CommandPool {
             device,
             handle
         })
+    }
+
+    pub unsafe fn handle(&self) -> vk::CommandPool {
+        self.handle
     }
 }
 
