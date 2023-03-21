@@ -8,6 +8,9 @@ pub use crate::core::debug::DebugMessenger;
 pub use crate::core::physical_device::*;
 pub use crate::core::queue::{QueueType};
 
+pub use crate::command_buffer::CommandBuffer;
+pub use crate ::command_buffer::IncompleteCommandBuffer;
+
 pub use crate::sync::fence::*;
 pub use crate::sync::semaphore::*;
 pub use crate::sync::execution_manager::ExecutionManager;
