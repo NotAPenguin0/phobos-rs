@@ -17,6 +17,7 @@ pub use crate::graph::virtual_resource::VirtualResource;
 pub use crate::graph::pass_graph::PassGraph;
 pub use crate::graph::physical_resource::PhysicalResourceBindings;
 pub use crate::graph::pass::PassBuilder;
+pub use crate::graph::pass::Pass;
 
 pub use crate::allocator::default_allocator;
 pub use crate::allocator::default_allocator::DefaultAllocator;

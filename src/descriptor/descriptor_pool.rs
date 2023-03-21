@@ -42,8 +42,8 @@ impl DescriptorPoolSize {
 
 impl DescriptorPool {
     pub(super) fn new(device: Arc<Device>, size: DescriptorPoolSize) -> Result<Self> {
-        // Fold over all values to compute the sum of all sizes, this is the total amount of
-        // descriptor sets that can be allocated from this pool.
+        // TODO: this max_sets value is overly pessimistic as it doesnt account for multiple
+        // descriptors being held in the same descriptor set. Ideally this grows with the pool too.
         let max_sets = size.0.values().fold(0, |a, x| x + a);
         let flags = vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET;
         let pool_sizes = size.0.iter().map(|(descriptor_type, count)| {
