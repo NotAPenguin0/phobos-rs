@@ -1,5 +1,5 @@
 /// The memory type of an allocation indicates where it should live.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum MemoryType {
     /// Store the allocation in GPU only accessible memory - typically this is the faster GPU resource and this should be
     /// where most of the allocations live.
