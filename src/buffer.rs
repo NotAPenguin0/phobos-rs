@@ -30,12 +30,12 @@
 
 use std::ffi::c_void;
 use std::ptr::NonNull;
-use std::sync::{Arc};
-use ash::vk;
-use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
+use std::sync::Arc;
 
 use anyhow::Result;
+use ash::vk;
 
+use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 
 /// Wrapper around a [`VkBuffer`](vk::Buffer).
 #[derive(Derivative)]
@@ -76,8 +76,8 @@ impl<A: Allocator> Buffer<A> {
                 size,
                 usage,
                 sharing_mode: vk::SharingMode::CONCURRENT,
-                queue_family_index_count: device.queue_families.len() as u32,
-                p_queue_family_indices: device.queue_families.as_ptr(),
+                queue_family_index_count: device.queue_families().len() as u32,
+                p_queue_family_indices: device.queue_families().as_ptr(),
             }, None)?
         };
 

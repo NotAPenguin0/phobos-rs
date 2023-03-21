@@ -1,9 +1,11 @@
+use std::ffi::{CString, NulError};
 use std::ops::Deref;
 use std::sync::Arc;
-use ash::vk;
-use std::ffi::{CString, NulError};
-use crate::{PhysicalDevice, VkInstance, AppSettings, WindowInterface};
+
 use anyhow::Result;
+use ash::vk;
+
+use crate::{AppSettings, PhysicalDevice, VkInstance, WindowInterface};
 use crate::util::string::unwrap_to_raw_strings;
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
@@ -12,9 +14,9 @@ use crate::util::string::unwrap_to_raw_strings;
 #[derivative(Debug)]
 pub struct Device {
     #[derivative(Debug="ignore")]
-    pub(crate) handle: ash::Device,
-    pub(crate) queue_families: Vec<u32>,
-    pub(crate) properties: vk::PhysicalDeviceProperties,
+    handle: ash::Device,
+    queue_families: Vec<u32>,
+    properties: vk::PhysicalDeviceProperties,
 }
 
 impl Device {
@@ -84,8 +86,19 @@ impl Device {
         unsafe { Ok(self.device_wait_idle()?) }
     }
 
+    /// Get unsafe access to the underlying VkDevice handle
     pub unsafe fn handle(&self) -> ash::Device {
         self.handle.clone()
+    }
+
+    /// Get the queue families we requested on this device.
+    pub fn queue_families(&self) -> &[u32] {
+        self.queue_families.as_slice()
+    }
+
+    /// Get the device properties
+    pub fn properties(&self) -> &vk::PhysicalDeviceProperties {
+        &self.properties
     }
 }
 

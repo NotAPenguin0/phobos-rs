@@ -1,15 +1,15 @@
 use std::ffi::c_void;
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex};
-use crate::allocator::traits;
-
-use gpu_allocator::vulkan as vk_alloc;
 
 use anyhow::Result;
 use ash::vk::{DeviceMemory, DeviceSize, MemoryRequirements};
+use gpu_allocator::vulkan as vk_alloc;
 use gpu_allocator::vulkan::AllocationScheme;
+
 use crate::{Device, Error, PhysicalDevice, VkInstance};
 use crate::allocator::memory_type::MemoryType;
+use crate::allocator::traits;
 
 /// The default allocator. This calls into the `gpu_allocator` crate.
 /// It's important to note that this allocator is `Clone`, `Send` and `Sync`. All its internal state is safely
@@ -35,7 +35,7 @@ impl DefaultAllocator {
                 alloc: Arc::new(Mutex::new(vk_alloc::Allocator::new(
                 &vk_alloc::AllocatorCreateDesc {
                     instance: instance.instance.clone(),
-                    device: device.handle.clone(),
+                    device: unsafe { device.handle() },
                     physical_device: physical_device.handle.clone(),
                     debug_settings: Default::default(),
                     buffer_device_address: false // We might change this if the bufferDeviceAddress feature gets enabled.

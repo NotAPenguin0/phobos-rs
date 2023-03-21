@@ -1,8 +1,10 @@
 use std::sync::Arc;
+
+use anyhow::Result;
 use ash::vk;
+
 use crate::{AppSettings, Device, Error, Surface, VkInstance, WindowInterface};
 use crate::image::*;
-use anyhow::Result;
 
 #[derive(Debug)]
 pub(crate) struct SwapchainImage {
@@ -60,7 +62,7 @@ impl Swapchain {
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .build();
 
-        let functions = ash::extensions::khr::Swapchain::new(&instance.instance, &device.handle);
+        let functions = ash::extensions::khr::Swapchain::new(&instance.instance, unsafe { &device.handle() });
         let swapchain = unsafe { functions.create_swapchain(&info, None)? };
 
         let images: Vec<SwapchainImage> = unsafe { functions.get_swapchain_images(swapchain)? }

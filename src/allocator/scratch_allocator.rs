@@ -24,12 +24,14 @@
 //! ```
 
 use std::ptr::NonNull;
-use std::sync::{Arc};
+use std::sync::Arc;
+
+use anyhow::Result;
 use ash::vk;
 use gpu_allocator::AllocationError::OutOfMemory;
+
 use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};
 use crate::Error::AllocationError;
-use anyhow::Result;
 
 /// Very simple linear allocator. For example usage, see the module level documentation.
 #[derive(Debug)]
@@ -47,9 +49,9 @@ impl<A: Allocator> ScratchAllocator<A> {
         let alignment = if usage.intersects(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER) {
             16
         } else if usage.contains(vk::BufferUsageFlags::UNIFORM_BUFFER) {
-            device.properties.limits.min_uniform_buffer_offset_alignment
+            device.properties().limits.min_uniform_buffer_offset_alignment
         } else if usage.contains(vk::BufferUsageFlags::STORAGE_BUFFER) {
-            device.properties.limits.min_storage_buffer_offset_alignment
+            device.properties().limits.min_storage_buffer_offset_alignment
         } else {
             unimplemented!()
         };

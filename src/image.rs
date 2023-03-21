@@ -12,10 +12,11 @@
 //! [`ImgView`] also owns a full Vulkan resource. For this reason, we wrap it in a reference-counted `Arc` so we can safely treat it as if it were
 //! a `str` to a `String`. Most API functions will ask for an [`ImageView`].
 
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use ash::vk;
+
 use anyhow::Result;
+use ash::vk;
 
 use crate::{Allocation, Allocator, DefaultAllocator, Device, MemoryType};
 
@@ -115,8 +116,8 @@ impl<A: Allocator> Image<A> {
             tiling: vk::ImageTiling::OPTIMAL,
             usage,
             sharing_mode,
-            queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families.len() as u32 } else { 0 },
-            p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families.as_ptr() } else { std::ptr::null() },
+            queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families().len() as u32 } else { 0 },
+            p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families().as_ptr() } else { std::ptr::null() },
             initial_layout: vk::ImageLayout::UNDEFINED,
         }, None)? };
 
