@@ -34,7 +34,7 @@ impl DefaultAllocator {
         Ok(Self {
                 alloc: Arc::new(Mutex::new(vk_alloc::Allocator::new(
                 &vk_alloc::AllocatorCreateDesc {
-                    instance: instance.instance.clone(),
+                    instance: (*instance).clone(),
                     device: unsafe { device.handle() },
                     physical_device: physical_device.handle.clone(),
                     debug_settings: Default::default(),

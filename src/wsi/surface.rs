@@ -1,6 +1,7 @@
-use ash::vk;
-use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 use anyhow::Result;
+use ash::vk;
+
+use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 
 /// Contains all information about a [`VkSurfaceKHR`](vk::SurfaceKHR)
 #[derive(Derivative)]
@@ -23,9 +24,9 @@ impl Surface {
     /// Create a new surface.
     pub fn new<Window: WindowInterface>(instance: &VkInstance, settings: &AppSettings<Window>) -> Result<Self> {
         if let Some(window) = settings.window {
-            let functions = ash::extensions::khr::Surface::new(&instance.entry, &instance.instance);
+            let functions = ash::extensions::khr::Surface::new(unsafe { instance.loader() }, &*instance);
             let handle = unsafe {
-                ash_window::create_surface(&instance.entry, &instance.instance, window.raw_display_handle(), window.raw_window_handle(), None)?
+                ash_window::create_surface(instance.loader(), &*instance, window.raw_display_handle(), window.raw_window_handle(), None)?
             };
             Ok(Surface {
                 handle,

@@ -62,7 +62,7 @@ impl Swapchain {
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .build();
 
-        let functions = ash::extensions::khr::Swapchain::new(&instance.instance, unsafe { &device.handle() });
+        let functions = ash::extensions::khr::Swapchain::new(&*instance, unsafe { &device.handle() });
         let swapchain = unsafe { functions.create_swapchain(&info, None)? };
 
         let images: Vec<SwapchainImage> = unsafe { functions.get_swapchain_images(swapchain)? }

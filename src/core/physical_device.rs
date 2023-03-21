@@ -1,7 +1,9 @@
 use std::ffi::CStr;
-use ash::vk;
-use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
+
 use anyhow::Result;
+use ash::vk;
+
+use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
 use crate::core::queue::{QueueInfo, QueueType};
 use crate::util::string::wrap_c_str;
 
@@ -35,7 +37,7 @@ pub struct PhysicalDevice {
 impl PhysicalDevice {
     /// Selects the best available physical device from the given requirements and parameters.
     pub fn select<Window: WindowInterface>(instance: &VkInstance, surface: Option<&Surface>, settings: &AppSettings<Window>) -> Result<Self> {
-        let devices = unsafe { instance.instance.enumerate_physical_devices()? };
+        let devices = unsafe { instance.enumerate_physical_devices()? };
         if devices.is_empty() {
             return Err(anyhow::Error::from(Error::NoGPU));
         }
@@ -44,15 +46,15 @@ impl PhysicalDevice {
             .find_map(|device| -> Option<PhysicalDevice> {
                 let mut physical_device = PhysicalDevice {
                     handle: *device,
-                    properties: unsafe { instance.instance.get_physical_device_properties(*device) },
-                    memory_properties: unsafe { instance.instance.get_physical_device_memory_properties(*device) },
-                    extension_properties: unsafe { instance.instance.enumerate_device_extension_properties(*device).unwrap().iter().map(|vk_properties| {
+                    properties: unsafe { instance.get_physical_device_properties(*device) },
+                    memory_properties: unsafe { instance.get_physical_device_memory_properties(*device) },
+                    extension_properties: unsafe { instance.enumerate_device_extension_properties(*device).unwrap().iter().map(|vk_properties| {
                         ExtensionProperties {
                             name: wrap_c_str(vk_properties.extension_name.as_ptr()),
                             spec_version: vk_properties.spec_version
                         }
                     }).collect() },
-                    queue_families: unsafe { instance.instance.get_physical_device_queue_family_properties(*device) },
+                    queue_families: unsafe { instance.get_physical_device_queue_family_properties(*device) },
                     ..Default::default()
                 };
 

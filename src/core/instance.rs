@@ -1,11 +1,13 @@
+use std::ffi::{CStr, CString};
+use std::ops::Deref;
+use std::str::FromStr;
+
+use anyhow::Result;
 use ash;
 use ash::vk;
-use crate::{WindowInterface};
-use crate::AppSettings;
-use anyhow::Result;
 
-use std::ffi::{CString, CStr};
-use std::str::FromStr;
+use crate::WindowInterface;
+use crate::AppSettings;
 use crate::util::string::unwrap_to_raw_strings;
 
 /// Represents the loaded vulkan instance.
@@ -14,9 +16,9 @@ use crate::util::string::unwrap_to_raw_strings;
 #[derivative(Debug)]
 pub struct VkInstance {
     #[derivative(Debug="ignore")]
-    pub(crate) entry: ash::Entry,
+    entry: ash::Entry,
     #[derivative(Debug="ignore")]
-    pub(crate) instance: ash::Instance,
+    instance: ash::Instance,
 }
 
 impl VkInstance {
@@ -26,11 +28,23 @@ impl VkInstance {
         let instance = create_vk_instance(&entry, &settings)?;
         Ok(VkInstance{ entry, instance })
     }
+
+    pub unsafe fn loader(&self) -> &ash::Entry {
+        &self.entry
+    }
 }
 
 impl Drop for VkInstance {
     fn drop(&mut self) {
         unsafe { self.instance.destroy_instance(None); }
+    }
+}
+
+impl Deref for VkInstance {
+    type Target = ash::Instance;
+
+    fn deref(&self) -> &Self::Target {
+        &self.instance
     }
 }
 

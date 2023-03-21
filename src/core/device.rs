@@ -74,7 +74,7 @@ impl Device {
 
 
         Ok(Arc::new(unsafe { Device {
-            handle: instance.instance.create_device(physical_device.handle, &info, None)?,
+            handle: instance.create_device(physical_device.handle, &info, None)?,
             queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
             properties: physical_device.properties
         } }))

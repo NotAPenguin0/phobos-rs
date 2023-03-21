@@ -3,8 +3,8 @@ use std::ops::Deref;
 use anyhow::Result;
 use ash::vk;
 
-use crate::VkInstance;
 use crate::util::string::wrap_c_str;
+use crate::VkInstance;
 
 /// Vulkan debug messenger, can be passed to certain functions to extend debugging functionality.
 #[derive(Derivative)]
@@ -19,7 +19,7 @@ impl DebugMessenger {
     /// Creates a new debug messenger. Requires the vulkan validation layers to be enabled to
     /// do anything useful.
     pub fn new(instance: &VkInstance) -> Result<Self> {
-        let functions = ash::extensions::ext::DebugUtils::new(&instance.entry, &instance.instance);
+        let functions = ash::extensions::ext::DebugUtils::new(unsafe { instance.loader() }, &*instance);
         let info = vk::DebugUtilsMessengerCreateInfoEXT {
             s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
             p_next: std::ptr::null(),
