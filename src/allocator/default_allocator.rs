@@ -36,7 +36,7 @@ impl DefaultAllocator {
                 &vk_alloc::AllocatorCreateDesc {
                     instance: (*instance).clone(),
                     device: unsafe { device.handle() },
-                    physical_device: physical_device.handle.clone(),
+                    physical_device: unsafe { physical_device.handle() },
                     debug_settings: Default::default(),
                     buffer_device_address: false // We might change this if the bufferDeviceAddress feature gets enabled.
                     }

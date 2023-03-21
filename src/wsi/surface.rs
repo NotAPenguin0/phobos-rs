@@ -44,9 +44,9 @@ impl Surface {
     /// Because surface support varies per physical device, this function requires one to be selected.
     pub fn query_details(&mut self, physical_device: &PhysicalDevice) -> Result<()> {
         unsafe {
-            self.capabilities = self.functions.get_physical_device_surface_capabilities(physical_device.handle, self.handle)?;
-            self.formats = self.functions.get_physical_device_surface_formats(physical_device.handle, self.handle)?;
-            self.present_modes = self.functions.get_physical_device_surface_present_modes(physical_device.handle, self.handle)?;
+            self.capabilities = self.functions.get_physical_device_surface_capabilities(physical_device.handle(), self.handle)?;
+            self.formats = self.functions.get_physical_device_surface_formats(physical_device.handle(), self.handle)?;
+            self.present_modes = self.functions.get_physical_device_surface_present_modes(physical_device.handle(), self.handle)?;
         }
         Ok(())
     }

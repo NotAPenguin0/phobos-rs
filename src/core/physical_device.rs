@@ -20,18 +20,18 @@ pub struct ExtensionProperties {
 #[derive(Default, Debug)]
 pub struct PhysicalDevice {
     /// Handle to the [`VkPhysicalDevice`](vk::PhysicalDevice).
-    pub handle: vk::PhysicalDevice,
+    handle: vk::PhysicalDevice,
     /// [`VkPhysicalDeviceProperties`](vk::PhysicalDeviceProperties) structure with properties of this physical device.
-    pub properties: vk::PhysicalDeviceProperties,
+    properties: vk::PhysicalDeviceProperties,
     /// [`VkPhysicalDeviceMemoryProperties`](vk::PhysicalDeviceMemoryProperties) structure with memory properties of the physical device, such as
     /// available memory types and heaps.
-    pub memory_properties: vk::PhysicalDeviceMemoryProperties,
+    memory_properties: vk::PhysicalDeviceMemoryProperties,
     /// Available Vulkan extensions.
-    pub extension_properties: Vec<ExtensionProperties>,
+    extension_properties: Vec<ExtensionProperties>,
     /// List of [`VkQueueFamilyProperties`](vk::QueueFamilyProperties) with properties of each queue family on the device.
-    pub queue_families: Vec<vk::QueueFamilyProperties>,
+    queue_families: Vec<vk::QueueFamilyProperties>,
     /// List of [`QueueInfo`]  with requested queues abstracted away from the physical queues.
-    pub queues: Vec<QueueInfo>
+    queues: Vec<QueueInfo>
 }
 
 impl PhysicalDevice {
@@ -135,6 +135,29 @@ impl PhysicalDevice {
                 info!("Device has {} bytes of available video memory, of which {} are device local.", total_video_memory(&physical_device), total_device_memory(&physical_device));
                 return Some(physical_device);
         }).ok_or(anyhow::Error::from(Error::NoGPU))
+    }
+
+    /// Get all queue families available on this device
+    pub fn queue_families(&self) -> &[vk::QueueFamilyProperties] {
+        self.queue_families.as_slice()
+    }
+
+    /// Get all requested queues
+    pub fn queues(&self) -> &[QueueInfo] {
+        self.queues.as_slice()
+    }
+
+    /// Get unsafe access to the physical device handle
+    pub unsafe fn handle(&self) -> vk::PhysicalDevice {
+        self.handle
+    }
+
+    pub fn properties(&self) -> &vk::PhysicalDeviceProperties {
+        &self.properties
+    }
+
+    pub fn memory_properties(&self) -> &vk::PhysicalDeviceMemoryProperties {
+        &self.memory_properties
     }
 }
 

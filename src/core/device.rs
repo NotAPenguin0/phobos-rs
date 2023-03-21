@@ -24,10 +24,10 @@ impl Device {
     /// lot of Vulkan-related structures.
     pub fn new<Window: WindowInterface>(instance: &VkInstance, physical_device: &PhysicalDevice, settings: &AppSettings<Window>) -> Result<Arc<Self>> {
         let mut priorities = Vec::<f32>::new();
-        let queue_create_infos = physical_device.queue_families.iter()
+        let queue_create_infos = physical_device.queue_families().iter()
             .enumerate()
             .flat_map(|(index, _)| {
-                let count = physical_device.queues.iter().filter(|queue| queue.family_index == index as u32).count();
+                let count = physical_device.queues().iter().filter(|queue| queue.family_index == index as u32).count();
                 if count == 0 {
                     return None;
                 }
@@ -74,9 +74,9 @@ impl Device {
 
 
         Ok(Arc::new(unsafe { Device {
-            handle: instance.create_device(physical_device.handle, &info, None)?,
+            handle: instance.create_device(physical_device.handle(), &info, None)?,
             queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
-            properties: physical_device.properties
+            properties: *physical_device.properties()
         } }))
     }
 

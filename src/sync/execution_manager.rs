@@ -49,7 +49,7 @@ impl ExecutionManager {
     /// in your program.
     pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
         let mut counts = HashMap::new();
-        let queues = physical_device.queues.iter().map(|queue| -> Result<Mutex<Queue>> {
+        let queues = physical_device.queues().iter().map(|queue| -> Result<Mutex<Queue>> {
             let index = counts.entry(queue.family_index).or_insert(0 as u32);
             let handle = unsafe { device.get_device_queue(queue.family_index, *index) };
             // Note that we can unwrap() here, because if this does not return Some() then our algorithm is
