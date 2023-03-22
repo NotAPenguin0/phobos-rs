@@ -54,16 +54,18 @@
 //! To ensure this happens periodically, call [`PipelineCache::next_frame()`](crate::PipelineCache::next_frame) at the end of each iteration of your render loop.
 
 use std::sync::Arc;
+
 use ash::vk;
+
 use crate::Device;
 
-pub mod shader;
-pub mod set_layout;
-pub mod pipeline_layout;
-pub mod create_info;
-pub mod cache;
 pub mod builder;
+pub mod cache;
+pub mod create_info;
 pub mod hash;
+pub mod pipeline_layout;
+pub mod set_layout;
+pub mod shader;
 
 pub(crate) mod shader_reflection;
 
@@ -74,7 +76,7 @@ pub type PipelineStage = vk::PipelineStageFlags2;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Pipeline {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
     pub(crate) handle: vk::Pipeline,
     pub(crate) layout: vk::PipelineLayout,

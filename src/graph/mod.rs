@@ -48,12 +48,11 @@
 //!                 .finish();
 //! ```
 
-pub mod record;
-pub mod virtual_resource;
-pub mod physical_resource;
-pub mod resource;
-pub mod pass_graph;
 pub mod pass;
+pub mod pass_graph;
+pub mod physical_resource;
+pub mod record;
+pub mod resource;
+pub mod virtual_resource;
 
 pub(crate) mod task_graph;
-

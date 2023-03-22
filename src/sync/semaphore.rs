@@ -1,12 +1,14 @@
 use std::sync::Arc;
+
 use ash::vk;
+
 use crate::Device;
 
 /// Wrapper around a [`VkSemaphore`](vk::Semaphore) object. Semaphores are used for GPU-GPU sync.
 #[derive(Debug)]
 pub struct Semaphore {
-    pub device: Arc<Device>,
-    pub handle: vk::Semaphore,
+    device: Arc<Device>,
+    handle: vk::Semaphore,
 }
 
 impl Semaphore {
@@ -18,16 +20,20 @@ impl Semaphore {
             flags: Default::default(),
         };
         Ok(Semaphore {
-            handle: unsafe {
-                device.create_semaphore(&info, None)?
-            },
+            handle: unsafe { device.create_semaphore(&info, None)? },
             device,
         })
+    }
+
+    pub unsafe fn handle(&self) -> vk::Semaphore {
+        self.handle
     }
 }
 
 impl Drop for Semaphore {
     fn drop(&mut self) {
-        unsafe { self.device.destroy_semaphore(self.handle, None); }
+        unsafe {
+            self.device.destroy_semaphore(self.handle, None);
+        }
     }
 }

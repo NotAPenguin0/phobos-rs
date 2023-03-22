@@ -1,5 +1,5 @@
 /// The memory type of an allocation indicates where it should live.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum MemoryType {
     /// Store the allocation in GPU only accessible memory - typically this is the faster GPU resource and this should be
     /// where most of the allocations live.
@@ -13,9 +13,9 @@ pub enum MemoryType {
 impl From<MemoryType> for gpu_allocator::MemoryLocation {
     fn from(value: MemoryType) -> Self {
         match value {
-            MemoryType::GpuOnly => { gpu_allocator::MemoryLocation::GpuOnly }
-            MemoryType::CpuToGpu => { gpu_allocator::MemoryLocation::CpuToGpu }
-            MemoryType::GpuToCpu => { gpu_allocator::MemoryLocation::GpuToCpu }
+            MemoryType::GpuOnly => gpu_allocator::MemoryLocation::GpuOnly,
+            MemoryType::CpuToGpu => gpu_allocator::MemoryLocation::CpuToGpu,
+            MemoryType::GpuToCpu => gpu_allocator::MemoryLocation::GpuToCpu,
         }
     }
 }

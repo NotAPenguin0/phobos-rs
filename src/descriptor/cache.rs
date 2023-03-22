@@ -1,9 +1,10 @@
 use std::sync::{Arc, Mutex};
-use crate::descriptor::descriptor_pool::{DescriptorPool, DescriptorPoolSize};
-use crate::{DeletionQueue, DescriptorSet, Device, Error};
 
 use anyhow::Result;
 use ash::vk;
+
+use crate::{DeletionQueue, DescriptorSet, Device, Error};
+use crate::descriptor::descriptor_pool::{DescriptorPool, DescriptorPoolSize};
 use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::util::cache::Cache;
 
@@ -12,7 +13,7 @@ use crate::util::cache::Cache;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct DescriptorCache {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
     cache: Cache<DescriptorSet>,
     pool: DescriptorPool,
@@ -32,9 +33,17 @@ impl DescriptorCache {
         })))
     }
 
-    fn grow_pool_size(mut old_size: DescriptorPoolSize, request: &DescriptorSetBinding) -> DescriptorPoolSize {
+    fn grow_pool_size(
+        mut old_size: DescriptorPoolSize,
+        request: &DescriptorSetBinding,
+    ) -> DescriptorPoolSize {
         for (ty, count) in old_size.0.iter_mut() {
-            if request.bindings.iter().find(|&binding| binding.ty == *ty).is_some() {
+            if request
+                .bindings
+                .iter()
+                .find(|&binding| binding.ty == *ty)
+                .is_some()
+            {
                 *count = *count * 2;
             }
         }
@@ -48,18 +57,27 @@ impl DescriptorCache {
     /// - This function fails if no descriptor set layout was specified in `bindings`
     /// - This function fails the the requested descriptor set has no descriptors
     /// - This function fails if allocating a descriptor set failed due to an internal error.
-    pub fn get_descriptor_set(&mut self, mut bindings: DescriptorSetBinding) -> Result<&DescriptorSet> {
-        if bindings.bindings.is_empty() { return Err(anyhow::Error::from(Error::EmptyDescriptorBinding)); }
-        if bindings.layout == vk::DescriptorSetLayout::null() { return Err(anyhow::Error::from(Error::NoDescriptorSetLayout)); }
+    pub fn get_descriptor_set(
+        &mut self,
+        mut bindings: DescriptorSetBinding,
+    ) -> Result<&DescriptorSet> {
+        if bindings.bindings.is_empty() {
+            return Err(anyhow::Error::from(Error::EmptyDescriptorBinding));
+        }
+        if bindings.layout == vk::DescriptorSetLayout::null() {
+            return Err(anyhow::Error::from(Error::NoDescriptorSetLayout));
+        }
 
         loop {
-            bindings.pool = self.pool.handle;
+            bindings.pool = unsafe { self.pool.handle() };
             let set = self.cache.get_or_create(&bindings, ());
             match set {
                 // Need to query again to fix lifetime compiler error
-                Ok(_) => { return Ok(self.cache.get_or_create(&bindings, ()).unwrap()); }
+                Ok(_) => {
+                    return Ok(self.cache.get_or_create(&bindings, ()).unwrap());
+                }
                 Err(_) => {
-                    let new_size = Self::grow_pool_size(self.pool.size.clone(), &bindings);
+                    let new_size = Self::grow_pool_size(self.pool.size().clone(), &bindings);
                     // Create new pool, swap it out with the old one and then push the old one onto the deletion queue
                     let mut new_pool = DescriptorPool::new(self.device.clone(), new_size)?;
                     std::mem::swap(&mut new_pool, &mut self.pool);

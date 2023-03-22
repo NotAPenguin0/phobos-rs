@@ -7,11 +7,10 @@ pub(crate) unsafe fn wrap_c_str(s: *const c_char) -> String {
         String::default()
     } else {
         CStr::from_ptr(s).to_string_lossy().to_owned().to_string()
-    }
+    };
 }
 
 /// Safely unwraps a slice of strings into a vec of raw c strings.
 pub(crate) fn unwrap_to_raw_strings(strings: &[CString]) -> Vec<*const c_char> {
     strings.iter().map(|string| string.as_ptr()).collect()
 }
-

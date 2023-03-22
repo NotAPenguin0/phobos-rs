@@ -1,27 +1,38 @@
 use ash::vk;
+
 use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
 use crate::ShaderCreateInfo;
 
 #[derive(Debug, Copy, Clone)]
-pub struct VertexInputBindingDescription(pub(super) vk::VertexInputBindingDescription);
+pub(crate) struct VertexInputBindingDescription(pub(super) vk::VertexInputBindingDescription);
 
 #[derive(Debug, Copy, Clone)]
-pub struct VertexInputAttributeDescription(pub(super) vk::VertexInputAttributeDescription);
+pub(crate) struct VertexInputAttributeDescription(pub(super) vk::VertexInputAttributeDescription);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineInputAssemblyStateCreateInfo(pub(super) vk::PipelineInputAssemblyStateCreateInfo);
+pub(crate) struct PipelineInputAssemblyStateCreateInfo(
+    pub(super) vk::PipelineInputAssemblyStateCreateInfo,
+);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineDepthStencilStateCreateInfo(pub(super) vk::PipelineDepthStencilStateCreateInfo);
+pub(crate) struct PipelineDepthStencilStateCreateInfo(
+    pub(super) vk::PipelineDepthStencilStateCreateInfo,
+);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineRasterizationStateCreateInfo(pub(super) vk::PipelineRasterizationStateCreateInfo);
+pub(crate) struct PipelineRasterizationStateCreateInfo(
+    pub(super) vk::PipelineRasterizationStateCreateInfo,
+);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineMultisampleStateCreateInfo(pub(super) vk::PipelineMultisampleStateCreateInfo);
+pub(crate) struct PipelineMultisampleStateCreateInfo(
+    pub(super) vk::PipelineMultisampleStateCreateInfo,
+);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineColorBlendAttachmentState(pub(super) vk::PipelineColorBlendAttachmentState);
+pub(crate) struct PipelineColorBlendAttachmentState(
+    pub(super) vk::PipelineColorBlendAttachmentState,
+);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct PipelineRenderingInfo {
@@ -37,74 +48,83 @@ pub struct Viewport(pub(super) vk::Viewport);
 #[derive(Debug, Copy, Clone)]
 pub struct Rect2D(pub(super) vk::Rect2D);
 
-/// Defines a full graphics pipeline. You can modify this manually, but all
-/// information is also exposed through the pipeline builder,
-/// with additional quality of life and presets, so that method is recommended.
+/// Defines a full graphics pipeline. Use the pipeline builder to construct this properly.
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
-    pub name: String,
-    pub layout: PipelineLayoutCreateInfo,
-    pub vertex_input_bindings: Vec<VertexInputBindingDescription>,
-    pub vertex_attributes: Vec<VertexInputAttributeDescription>,
-    pub shaders: Vec<ShaderCreateInfo>,
-    pub input_assembly: PipelineInputAssemblyStateCreateInfo,
-    pub depth_stencil: PipelineDepthStencilStateCreateInfo,
-    pub dynamic_states: Vec<vk::DynamicState>,
-    pub rasterizer: PipelineRasterizationStateCreateInfo,
-    pub multisample: PipelineMultisampleStateCreateInfo,
-    pub blend_attachments: Vec<PipelineColorBlendAttachmentState>,
-    pub viewports: Vec<Viewport>,
-    pub scissors: Vec<Rect2D>,
-    pub blend_enable_logic_op: bool,
+    pub(crate) name: String,
+    pub(crate) layout: PipelineLayoutCreateInfo,
+    pub(crate) vertex_input_bindings: Vec<VertexInputBindingDescription>,
+    pub(crate) vertex_attributes: Vec<VertexInputAttributeDescription>,
+    pub(crate) shaders: Vec<ShaderCreateInfo>,
+    pub(crate) input_assembly: PipelineInputAssemblyStateCreateInfo,
+    pub(crate) depth_stencil: PipelineDepthStencilStateCreateInfo,
+    pub(crate) dynamic_states: Vec<vk::DynamicState>,
+    pub(crate) rasterizer: PipelineRasterizationStateCreateInfo,
+    pub(crate) multisample: PipelineMultisampleStateCreateInfo,
+    pub(crate) blend_attachments: Vec<PipelineColorBlendAttachmentState>,
+    pub(crate) viewports: Vec<Viewport>,
+    pub(crate) scissors: Vec<Rect2D>,
+    pub(crate) blend_enable_logic_op: bool,
     pub(crate) rendering_info: PipelineRenderingInfo,
 
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) vk_vertex_inputs: Vec<vk::VertexInputBindingDescription>,
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) vk_attributes: Vec<vk::VertexInputAttributeDescription>,
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) vertex_input_state: vk::PipelineVertexInputStateCreateInfo,
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) vk_viewports: Vec<vk::Viewport>,
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) vk_scissors: Vec<vk::Rect2D>,
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) viewport_state: vk::PipelineViewportStateCreateInfo,
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) vk_blend_attachments: Vec<vk::PipelineColorBlendAttachmentState>,
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) blend_state: vk::PipelineColorBlendStateCreateInfo,
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) vk_dynamic_state: vk::PipelineDynamicStateCreateInfo,
-    #[derivative(PartialEq="ignore")]
-    #[derivative(Hash="ignore")]
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
     pub(super) vk_rendering_state: vk::PipelineRenderingCreateInfo,
 }
-
 
 impl PipelineCreateInfo {
     pub(crate) fn build_rendering_state(&mut self) -> () {
         self.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
             .view_mask(self.rendering_info.view_mask)
             .color_attachment_formats(self.rendering_info.color_formats.as_slice())
-            .depth_attachment_format(self.rendering_info.depth_format.unwrap_or(vk::Format::UNDEFINED))
-            .stencil_attachment_format(self.rendering_info.stencil_format.unwrap_or(vk::Format::UNDEFINED))
+            .depth_attachment_format(
+                self.rendering_info
+                    .depth_format
+                    .unwrap_or(vk::Format::UNDEFINED),
+            )
+            .stencil_attachment_format(
+                self.rendering_info
+                    .stencil_format
+                    .unwrap_or(vk::Format::UNDEFINED),
+            )
             .build();
     }
 
-    pub(crate) fn build_inner(&mut self) -> () {
+    pub fn build_inner(&mut self) -> () {
         self.vk_attributes = self.vertex_attributes.iter().map(|v| v.0.clone()).collect();
-        self.vk_vertex_inputs = self.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
+        self.vk_vertex_inputs = self
+            .vertex_input_bindings
+            .iter()
+            .map(|v| v.0.clone())
+            .collect();
         self.vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(self.vk_vertex_inputs.as_slice())
             .vertex_attribute_descriptions(self.vk_attributes.as_slice())
@@ -130,7 +150,7 @@ impl PipelineCreateInfo {
     pub(crate) fn to_vk(&self, layout: vk::PipelineLayout) -> vk::GraphicsPipelineCreateInfo {
         vk::GraphicsPipelineCreateInfo {
             s_type: vk::StructureType::GRAPHICS_PIPELINE_CREATE_INFO,
-            p_next:  (&self.vk_rendering_state as *const _) as *const std::ffi::c_void,
+            p_next: (&self.vk_rendering_state as *const _) as *const std::ffi::c_void,
             flags: Default::default(),
             stage_count: 0,
             p_stages: std::ptr::null(),

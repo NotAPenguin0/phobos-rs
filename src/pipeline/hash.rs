@@ -1,5 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+
 use crate::pipeline::create_info::*;
 use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
 use crate::pipeline::set_layout::DescriptorSetLayoutCreateInfo;
@@ -7,7 +8,7 @@ use crate::ShaderCreateInfo;
 
 impl Hash for ShaderCreateInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u64(self.code_hash)
+        state.write_u64(self.code_hash())
     }
 }
 
@@ -67,7 +68,7 @@ impl Hash for PipelineRasterizationStateCreateInfo {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         self.0.flags.hash(hasher);
         self.0.depth_clamp_enable.hash(hasher);
-        self.0.rasterizer_discard_enable .hash(hasher);
+        self.0.rasterizer_discard_enable.hash(hasher);
         self.0.polygon_mode.hash(hasher);
         self.0.cull_mode.hash(hasher);
         self.0.front_face.hash(hasher);
@@ -159,15 +160,15 @@ impl PartialEq<Self> for DescriptorSetLayoutCreateInfo {
 
 impl PartialEq<Self> for PipelineLayoutCreateInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.flags == other.flags &&
-            self.set_layouts == other.set_layouts &&
-            self.push_constants == other.push_constants
+        self.flags == other.flags
+            && self.set_layouts == other.set_layouts
+            && self.push_constants == other.push_constants
     }
 }
 
 impl PartialEq<Self> for ShaderCreateInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.code_hash == other.code_hash
+        self.code_hash() == other.code_hash()
     }
 }
 
@@ -263,8 +264,7 @@ impl PartialEq for Viewport {
 
 impl PartialEq for Rect2D {
     fn eq(&self, other: &Self) -> bool {
-        self.0.offset == other.0.offset
-            && self.0.extent == other.0.extent
+        self.0.offset == other.0.offset && self.0.extent == other.0.extent
     }
 }
 
@@ -280,4 +280,3 @@ impl Eq for PipelineMultisampleStateCreateInfo {}
 impl Eq for PipelineColorBlendAttachmentState {}
 impl Eq for Viewport {}
 impl Eq for Rect2D {}
-

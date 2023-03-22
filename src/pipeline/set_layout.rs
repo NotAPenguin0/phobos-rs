@@ -1,9 +1,9 @@
 use std::sync::Arc;
+
+use anyhow::Result;
 use ash::vk;
 
 use crate::Device;
-
-use anyhow::Result;
 use crate::util::cache::Resource;
 
 /// A fully built Vulkan descriptor set layout. This is a managed resource, so it cannot be manually
@@ -11,9 +11,15 @@ use crate::util::cache::Resource;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct DescriptorSetLayout {
-    #[derivative(Debug="ignore")]
-    pub(crate) device: Arc<Device>,
-    pub(crate) handle: vk::DescriptorSetLayout
+    #[derivative(Debug = "ignore")]
+    device: Arc<Device>,
+    handle: vk::DescriptorSetLayout,
+}
+
+impl DescriptorSetLayout {
+    pub unsafe fn handle(&self) -> vk::DescriptorSetLayout {
+        self.handle
+    }
 }
 
 /// Describes a descriptor set layout.
@@ -21,9 +27,8 @@ pub struct DescriptorSetLayout {
 /// information necessary.
 #[derive(Debug, Clone, Default)]
 pub struct DescriptorSetLayoutCreateInfo {
-    pub bindings: Vec<vk::DescriptorSetLayoutBinding>
+    pub bindings: Vec<vk::DescriptorSetLayoutBinding>,
 }
-
 
 impl Resource for DescriptorSetLayout {
     type Key = DescriptorSetLayoutCreateInfo;
@@ -36,7 +41,7 @@ impl Resource for DescriptorSetLayout {
             .build();
         Ok(Self {
             device: device.clone(),
-            handle: unsafe { device.create_descriptor_set_layout(&info, None)? }
+            handle: unsafe { device.create_descriptor_set_layout(&info, None)? },
         })
     }
 }

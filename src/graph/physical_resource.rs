@@ -1,7 +1,8 @@
 use std::collections::HashMap;
-use crate::{BufferView, Error, ImageView, VirtualResource};
 
 use anyhow::Result;
+
+use crate::{BufferView, Error, ImageView, VirtualResource};
 
 /// Describes any physical resource handle on the GPU.
 #[derive(Debug, Clone)]
@@ -26,26 +27,38 @@ pub enum PhysicalResource {
 /// ```
 #[derive(Debug)]
 pub struct PhysicalResourceBindings {
-    bindings: HashMap<String, PhysicalResource>
+    bindings: HashMap<String, PhysicalResource>,
 }
 
 impl PhysicalResourceBindings {
     /// Create a new physical resource binding map.
     pub fn new() -> Self {
-        PhysicalResourceBindings { bindings: Default::default() }
+        PhysicalResourceBindings {
+            bindings: Default::default(),
+        }
     }
 
     /// Bind an image to all virtual resources with `name(+*)` as their uid.
     pub fn bind_image(&mut self, name: impl Into<String>, image: &ImageView) {
-        self.bindings.insert(name.into(), PhysicalResource::Image(image.clone()));
+        self.bindings
+            .insert(name.into(), PhysicalResource::Image(image.clone()));
     }
 
     /// Bind a buffer to all virtual resources with this name as their uid.
-    pub fn bind_buffer(&mut self, name: impl Into<String>, buffer: &BufferView) { self.bindings.insert(name.into(), PhysicalResource::Buffer(buffer.clone())); }
+    pub fn bind_buffer(&mut self, name: impl Into<String>, buffer: &BufferView) {
+        self.bindings
+            .insert(name.into(), PhysicalResource::Buffer(buffer.clone()));
+    }
 
     /// Alias a resource by giving it an alternative name
     pub fn alias(&mut self, new_name: impl Into<String>, resource: &str) -> Result<()> {
-        self.bindings.insert(new_name.into(), self.bindings.get(resource).ok_or(Error::NoResourceBound(resource.to_owned()))?.clone());
+        self.bindings.insert(
+            new_name.into(),
+            self.bindings
+                .get(resource)
+                .ok_or(Error::NoResourceBound(resource.to_owned()))?
+                .clone(),
+        );
         Ok(())
     }
 

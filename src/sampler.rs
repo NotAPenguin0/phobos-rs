@@ -1,15 +1,17 @@
 use std::sync::Arc;
-use ash::vk;
-use crate::{Device};
+
 use anyhow::Result;
+use ash::vk;
+
+use crate::Device;
 
 /// Represents a vulkan sampler object.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Sampler {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
-    pub handle: vk::Sampler,
+    handle: vk::Sampler,
 }
 
 impl Sampler {
@@ -51,13 +53,19 @@ impl Sampler {
     pub fn new(device: Arc<Device>, info: vk::SamplerCreateInfo) -> Result<Self> {
         Ok(Self {
             device: device.clone(),
-            handle: unsafe { device.create_sampler(&info, None)? }
+            handle: unsafe { device.create_sampler(&info, None)? },
         })
+    }
+
+    pub unsafe fn handle(&self) -> vk::Sampler {
+        self.handle
     }
 }
 
 impl Drop for Sampler {
     fn drop(&mut self) {
-        unsafe { self.device.destroy_sampler(self.handle, None); }
+        unsafe {
+            self.device.destroy_sampler(self.handle, None);
+        }
     }
 }

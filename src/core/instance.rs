@@ -1,22 +1,24 @@
+use std::ffi::{CStr, CString};
+use std::ops::Deref;
+use std::str::FromStr;
+
+use anyhow::Result;
 use ash;
 use ash::vk;
-use crate::{WindowInterface};
-use crate::AppSettings;
-use anyhow::Result;
 
-use std::ffi::{CString, CStr};
-use std::str::FromStr;
+use crate::AppSettings;
 use crate::util::string::unwrap_to_raw_strings;
+use crate::WindowInterface;
 
 /// Represents the loaded vulkan instance.
 /// You need to create this to initialize the Vulkan API.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct VkInstance {
-    #[derivative(Debug="ignore")]
-    pub(crate) entry: ash::Entry,
-    #[derivative(Debug="ignore")]
-    pub(crate) instance: ash::Instance,
+    #[derivative(Debug = "ignore")]
+    entry: ash::Entry,
+    #[derivative(Debug = "ignore")]
+    instance: ash::Instance,
 }
 
 impl VkInstance {
@@ -24,27 +26,46 @@ impl VkInstance {
     pub fn new<Window: WindowInterface>(settings: &AppSettings<Window>) -> Result<Self> {
         let entry = unsafe { ash::Entry::load()? };
         let instance = create_vk_instance(&entry, &settings)?;
-        Ok(VkInstance{ entry, instance })
+        Ok(VkInstance { entry, instance })
+    }
+
+    pub unsafe fn loader(&self) -> &ash::Entry {
+        &self.entry
     }
 }
 
 impl Drop for VkInstance {
     fn drop(&mut self) {
-        unsafe { self.instance.destroy_instance(None); }
+        unsafe {
+            self.instance.destroy_instance(None);
+        }
     }
 }
 
-fn create_vk_instance<Window: WindowInterface>(entry: &ash::Entry, settings: &AppSettings<Window>) -> Result<ash::Instance> {
+impl Deref for VkInstance {
+    type Target = ash::Instance;
+
+    fn deref(&self) -> &Self::Target {
+        &self.instance
+    }
+}
+
+fn create_vk_instance<Window: WindowInterface>(
+    entry: &ash::Entry,
+    settings: &AppSettings<Window>,
+) -> Result<ash::Instance> {
     let app_name = CString::new(settings.name.clone())?;
     let engine_name = CString::new("Phobos")?;
     let app_info = vk::ApplicationInfo {
         api_version: vk::make_api_version(0, 1, 3, 0),
         p_application_name: app_name.as_ptr(),
         p_engine_name: engine_name.as_ptr(),
-        engine_version: vk::make_api_version(0,
-                                             u32::from_str(env!("CARGO_PKG_VERSION_MAJOR")).unwrap(),
-                                             u32::from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap(),
-                                             u32::from_str(env!("CARGO_PKG_VERSION_PATCH")).unwrap()),
+        engine_version: vk::make_api_version(
+            0,
+            u32::from_str(env!("CARGO_PKG_VERSION_MAJOR")).unwrap(),
+            u32::from_str(env!("CARGO_PKG_VERSION_MINOR")).unwrap(),
+            u32::from_str(env!("CARGO_PKG_VERSION_PATCH")).unwrap(),
+        ),
         ..Default::default()
     };
 
@@ -66,7 +87,7 @@ fn create_vk_instance<Window: WindowInterface>(entry: &ash::Entry, settings: &Ap
             ash_window::enumerate_required_extensions(window.raw_display_handle())?
                 .to_vec()
                 .iter()
-                .map(|&raw_str| unsafe { CString::from(CStr::from_ptr(raw_str)) })
+                .map(|&raw_str| unsafe { CString::from(CStr::from_ptr(raw_str)) }),
         );
     }
 

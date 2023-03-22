@@ -4,20 +4,18 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use phobos::{domain, PipelineStage, prelude as ph};
-use phobos::command_buffer::traits::*;
-use phobos::RecordGraphToCommandBuffer;
-use ph::vk;
-
+use anyhow::Result;
+use futures::executor::block_on;
 use winit;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoopBuilder};
 use winit::platform::windows::EventLoopBuilderExtWindows;
-use winit::window::{WindowBuilder};
+use winit::window::WindowBuilder;
 
-use futures::executor::block_on;
-
-use anyhow::Result;
+use ph::vk;
+use phobos::{domain, PipelineStage, prelude as ph};
+use phobos::command_buffer::traits::*;
+use phobos::RecordGraphToCommandBuffer;
 
 struct Resources {
     #[allow(dead_code)]
@@ -28,37 +26,34 @@ struct Resources {
     pub vertex_buffer: ph::Buffer,
 }
 
-fn main_loop(frame: &mut ph::FrameManager,
-             resources: &Resources,
-             pipelines: Arc<Mutex<ph::PipelineCache>>,
-             descriptors: Arc<Mutex<ph::DescriptorCache>>,
-             debug: &ph::DebugMessenger,
-             exec: ph::ExecutionManager,
-             surface: &ph::Surface,
-             window: &winit::window::Window) -> Result<()> {
-
+fn main_loop(
+    frame: &mut ph::FrameManager,
+    resources: &Resources,
+    pipelines: Arc<Mutex<ph::PipelineCache>>,
+    descriptors: Arc<Mutex<ph::DescriptorCache>>,
+    debug: &ph::DebugMessenger,
+    exec: ph::ExecutionManager,
+    surface: &ph::Surface,
+    window: &winit::window::Window,
+) -> Result<()> {
     // Lets try the new batch submit API
     block_on({
         let cmd1 = exec.on_domain::<domain::All>(None, None)?.finish()?;
         let cmd2 = exec.on_domain::<domain::All>(None, None)?.finish()?;
         let mut batch = exec.start_submit_batch()?;
-        batch.submit(cmd1)?
-             .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
+        batch
+            .submit(cmd1)?
+            .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
         batch.finish()?
     });
-
 
     // Define a virtual resource pointing to the swapchain
     let swap_resource = ph::VirtualResource::image("swapchain".to_string());
     let offscreen = ph::VirtualResource::image("offscreen".to_string());
 
     let vertices: Vec<f32> = vec![
-        -1.0, 1.0, 0.0, 1.0,
-        -1.0, -1.0, 0.0, 0.0,
-        1.0, -1.0, 1.0, 0.0,
-        -1.0, 1.0, 0.0, 1.0,
-        1.0, -1.0, 1.0, 0.0,
-        1.0, 1.0, 1.0, 1.0
+        -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0,
+        -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
     ];
 
     // Define a render graph with one pass that clears the swapchain image
@@ -67,16 +62,25 @@ fn main_loop(frame: &mut ph::FrameManager,
     // Render pass that renders to an offscreen attachment
     let offscreen_pass = ph::PassBuilder::render(String::from("offscreen"))
         .color([1.0, 0.0, 0.0, 1.0])
-        .color_attachment(&offscreen, vk::AttachmentLoadOp::CLEAR, Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
+        .color_attachment(
+            &offscreen,
+            vk::AttachmentLoadOp::CLEAR,
+            Some(vk::ClearColorValue {
+                float32: [1.0, 0.0, 0.0, 1.0],
+            }),
+        )?
         .execute(|mut cmd, ifc, _bindings| {
             // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
-            let mut buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
+            let mut buffer = ifc.allocate_scratch_vbo(
+                (vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize,
+            )?;
             let slice = buffer.mapped_slice::<f32>()?;
             slice.copy_from_slice(vertices.as_slice());
-            cmd = cmd.bind_vertex_buffer(0, &buffer)
-                     .bind_graphics_pipeline("offscreen")?
-                     .full_viewport_scissor()
-                     .draw(6, 1, 0, 0)?;
+            cmd = cmd
+                .bind_vertex_buffer(0, &buffer)
+                .bind_graphics_pipeline("offscreen")?
+                .full_viewport_scissor()
+                .draw(6, 1, 0, 0)?;
             Ok(cmd)
         })
         .build();
@@ -84,10 +88,17 @@ fn main_loop(frame: &mut ph::FrameManager,
     // Render pass that samples the offscreen attachment, and possibly does some postprocessing to it
     let sample_pass = ph::PassBuilder::render(String::from("sample"))
         .color([0.0, 1.0, 0.0, 1.0])
-        .color_attachment(&swap_resource,
-                          vk::AttachmentLoadOp::CLEAR,
-                        Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
-        .sample_image(&offscreen_pass.output(&offscreen).unwrap(), ph::PipelineStage::FRAGMENT_SHADER)
+        .color_attachment(
+            &swap_resource,
+            vk::AttachmentLoadOp::CLEAR,
+            Some(vk::ClearColorValue {
+                float32: [1.0, 0.0, 0.0, 1.0],
+            }),
+        )?
+        .sample_image(
+            &offscreen_pass.output(&offscreen).unwrap(),
+            ph::PipelineStage::FRAGMENT_SHADER,
+        )
         .execute(|cmd, _ifc, bindings| {
             cmd.full_viewport_scissor()
                 .bind_graphics_pipeline("sample")?
@@ -99,8 +110,10 @@ fn main_loop(frame: &mut ph::FrameManager,
     let present_pass = ph::PassBuilder::present(
         "present".to_string(),
         // This pass uses the output from the clear pass on the swap resource as its input
-        &sample_pass.output(&swap_resource).unwrap());
-    let mut graph = graph.add_pass(offscreen_pass)?
+        &sample_pass.output(&swap_resource).unwrap(),
+    );
+    let mut graph = graph
+        .add_pass(offscreen_pass)?
         .add_pass(sample_pass)?
         .add_pass(present_pass)?
         // Build the graph, now we can bind physical resources and use it.
@@ -109,17 +122,26 @@ fn main_loop(frame: &mut ph::FrameManager,
     block_on(frame.new_frame(exec.clone(), window, &surface, |mut ifc| {
         // create physical bindings for the render graph resources
         let mut bindings = ph::PhysicalResourceBindings::new();
-        bindings.bind_image("swapchain".to_string(), &ifc.swapchain_image.as_ref().unwrap());
+        bindings.bind_image(
+            "swapchain".to_string(),
+            &ifc.swapchain_image.as_ref().unwrap(),
+        );
         bindings.bind_image("offscreen".to_string(), &resources.offscreen_view);
         // create a command buffer capable of executing graphics commands
-        let cmd = exec.on_domain::<ph::domain::Graphics>(Some(pipelines.clone()), Some(descriptors.clone())).unwrap();
+        let cmd = exec
+            .on_domain::<ph::domain::Graphics>(Some(pipelines.clone()), Some(descriptors.clone()))
+            .unwrap();
         let cmd2 = exec.try_on_domain::<ph::domain::Graphics>(None, None);
         match cmd2 {
             Err(_) => { /* good, queue should be locked */ }
-            _ => { panic!("Queue should be locked") }
+            _ => {
+                panic!("Queue should be locked")
+            }
         }
         // record render graph to this command buffer
-        let cmd = graph.record(cmd, &bindings, &mut ifc, Some(debug)).unwrap()
+        let cmd = graph
+            .record(cmd, &bindings, &mut ifc, Some(debug))
+            .unwrap()
             .finish();
         cmd
     }))?;
@@ -156,9 +178,18 @@ fn main() -> Result<()> {
             min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.
             min_dedicated_video_memory: 1 * 1024 * 1024 * 1024,
             queues: vec![
-                ph::QueueRequest { dedicated: false, queue_type: ph::QueueType::Graphics },
-                ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Transfer },
-                ph::QueueRequest { dedicated: true, queue_type: ph::QueueType::Compute }
+                ph::QueueRequest {
+                    dedicated: false,
+                    queue_type: ph::QueueType::Graphics,
+                },
+                ph::QueueRequest {
+                    dedicated: true,
+                    queue_type: ph::QueueType::Transfer,
+                },
+                ph::QueueRequest {
+                    dedicated: true,
+                    queue_type: ph::QueueType::Compute,
+                },
             ],
             ..Default::default()
         })
@@ -222,21 +253,30 @@ fn main() -> Result<()> {
         .build();
     cache.lock().unwrap().create_named_pipeline(pci)?;
     // Define some resources we will use for rendering
-    let image = ph::Image::new(device.clone(), &mut alloc, 800, 600, vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED, vk::Format::R8G8B8A8_SRGB, vk::SampleCountFlags::TYPE_1)?;
+    let image = ph::Image::new(
+        device.clone(),
+        &mut alloc,
+        800,
+        600,
+        vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
+        vk::Format::R8G8B8A8_SRGB,
+        vk::SampleCountFlags::TYPE_1,
+    )?;
     let data: Vec<f32> = vec![
-        -1.0, 1.0, 0.0, 1.0,
-        -1.0, -1.0, 0.0, 0.0,
-        1.0, -1.0, 1.0, 0.0,
-        -1.0, 1.0, 0.0, 1.0,
-        1.0, -1.0, 1.0, 0.0,
-        1.0, 1.0, 1.0, 1.0
+        -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0,
+        -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
     ];
 
     let resources = Resources {
         offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
         offscreen: image,
         sampler: ph::Sampler::default(device.clone())?,
-        vertex_buffer: block_on(ph::staged_buffer_upload(device.clone(), alloc.clone(), exec.clone(), data.as_slice()))?
+        vertex_buffer: block_on(ph::staged_buffer_upload(
+            device.clone(),
+            alloc.clone(),
+            exec.clone(),
+            data.as_slice(),
+        ))?,
     };
 
     let descriptor_cache = ph::DescriptorCache::new(device.clone())?;
@@ -244,7 +284,9 @@ fn main() -> Result<()> {
     event_loop.run(move |event, _, control_flow| {
         // Do not render a frame if Exit control flow is specified, to avoid
         // sync issues.
-        if let ControlFlow::ExitWithCode(_) = *control_flow { return; }
+        if let ControlFlow::ExitWithCode(_) = *control_flow {
+            return;
+        }
         *control_flow = ControlFlow::Poll;
 
         // Note that we want to handle events after processing our current frame, so that
@@ -253,14 +295,14 @@ fn main() -> Result<()> {
         match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
-                window_id
+                window_id,
             } if window_id == window.id() => {
                 *control_flow = ControlFlow::Exit;
                 device.wait_idle().unwrap();
-            },
+            }
             Event::MainEventsCleared => {
                 window.request_redraw();
-            },
+            }
             Event::RedrawRequested(_) => {
                 main_loop(
                     &mut frame,
@@ -270,7 +312,9 @@ fn main() -> Result<()> {
                     &debug_messenger,
                     exec.clone(),
                     &surface,
-                    &window).unwrap();
+                    &window,
+                )
+                    .unwrap();
 
                 cache.lock().unwrap().next_frame();
                 descriptor_cache.lock().unwrap().next_frame();

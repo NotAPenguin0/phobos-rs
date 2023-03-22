@@ -30,26 +30,26 @@
 
 use std::ffi::c_void;
 use std::ptr::NonNull;
-use std::sync::{Arc};
-use ash::vk;
-use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
+use std::sync::Arc;
 
 use anyhow::Result;
+use ash::vk;
 
+use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 
 /// Wrapper around a [`VkBuffer`](vk::Buffer).
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Buffer<A: Allocator = DefaultAllocator> {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     allocator: A,
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     memory: A::Allocation,
-    pub(crate) pointer: Option<NonNull<c_void>>,
-    pub handle: vk::Buffer,
-    pub size: vk::DeviceSize,
+    pointer: Option<NonNull<c_void>>,
+    handle: vk::Buffer,
+    size: vk::DeviceSize,
 }
 
 /// View into a specific offset and range of a [`Buffer`].
@@ -57,28 +57,37 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
 /// is not dropped while using this.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BufferView {
-    pub(crate) handle: vk::Buffer,
-    pub(crate) pointer: Option<NonNull<c_void>>,
-    pub offset: vk::DeviceSize,
-    pub size: vk::DeviceSize,
+    handle: vk::Buffer,
+    pointer: Option<NonNull<c_void>>,
+    offset: vk::DeviceSize,
+    size: vk::DeviceSize,
 }
 
 impl<A: Allocator> Buffer<A> {
     /// Allocate a new buffer with a specific size, at a specific memory location.
     /// All usage flags must be given.
-    pub fn new(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
+    pub fn new(
+        device: Arc<Device>,
+        allocator: &mut A,
+        size: impl Into<vk::DeviceSize>,
+        usage: vk::BufferUsageFlags,
+        location: MemoryType,
+    ) -> Result<Self> {
         let size = size.into();
         let handle = unsafe {
-            device.create_buffer(&vk::BufferCreateInfo {
-                s_type: vk::StructureType::BUFFER_CREATE_INFO,
-                p_next: std::ptr::null(),
-                flags: vk::BufferCreateFlags::empty(),
-                size,
-                usage,
-                sharing_mode: vk::SharingMode::CONCURRENT,
-                queue_family_index_count: device.queue_families.len() as u32,
-                p_queue_family_indices: device.queue_families.as_ptr(),
-            }, None)?
+            device.create_buffer(
+                &vk::BufferCreateInfo {
+                    s_type: vk::StructureType::BUFFER_CREATE_INFO,
+                    p_next: std::ptr::null(),
+                    flags: vk::BufferCreateFlags::empty(),
+                    size,
+                    usage,
+                    sharing_mode: vk::SharingMode::CONCURRENT,
+                    queue_family_index_count: device.queue_families().len() as u32,
+                    p_queue_family_indices: device.queue_families().as_ptr(),
+                },
+                None,
+            )?
         };
 
         let requirements = unsafe { device.get_buffer_memory_requirements(handle) };
@@ -97,7 +106,12 @@ impl<A: Allocator> Buffer<A> {
     }
 
     /// Allocate a new buffer with device local memory (VRAM). This is usually the correct memory location for most buffers.
-    pub fn new_device_local(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
+    pub fn new_device_local(
+        device: Arc<Device>,
+        allocator: &mut A,
+        size: impl Into<vk::DeviceSize>,
+        usage: vk::BufferUsageFlags,
+    ) -> Result<Self> {
         Self::new(device, allocator, size, usage, MemoryType::GpuOnly)
     }
 
@@ -106,7 +120,11 @@ impl<A: Allocator> Buffer<A> {
     /// This view is valid as long as the buffer is valid.
     /// # Errors
     /// Fails if `offset + size >= self.size`.
-    pub fn view(&self, offset: impl Into<vk::DeviceSize>, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
+    pub fn view(
+        &self,
+        offset: impl Into<vk::DeviceSize>,
+        size: impl Into<vk::DeviceSize>,
+    ) -> Result<BufferView> {
         let offset = offset.into();
         let size = size.into();
         return if offset + size >= self.size {
@@ -115,10 +133,13 @@ impl<A: Allocator> Buffer<A> {
             Ok(BufferView {
                 handle: self.handle,
                 offset,
-                pointer: unsafe { self.pointer.map(|p| NonNull::new(p.as_ptr().offset(offset as isize)).unwrap() ) },
+                pointer: unsafe {
+                    self.pointer
+                        .map(|p| NonNull::new(p.as_ptr().offset(offset as isize)).unwrap())
+                },
                 size,
             })
-        }
+        };
     }
 
     /// Creates a view of the entire buffer.
@@ -137,13 +158,23 @@ impl<A: Allocator> Buffer<A> {
     pub fn is_mapped(&self) -> bool {
         self.pointer.is_some()
     }
+
+    pub unsafe fn handle(&self) -> vk::Buffer {
+        self.handle
+    }
+
+    pub fn size(&self) -> vk::DeviceSize {
+        self.size
+    }
 }
 
 impl<A: Allocator> Drop for Buffer<A> {
     fn drop(&mut self) {
         let memory = std::mem::take(&mut self.memory);
         self.allocator.free(memory).unwrap();
-        unsafe { self.device.destroy_buffer(self.handle, None); }
+        unsafe {
+            self.device.destroy_buffer(self.handle, None);
+        }
     }
 }
 
@@ -153,9 +184,26 @@ impl BufferView {
     /// Fails if this buffer is not mappable (not `HOST_VISIBLE`).
     pub fn mapped_slice<T>(&mut self) -> Result<&mut [T]> {
         if let Some(pointer) = self.pointer {
-            Ok(unsafe { std::slice::from_raw_parts_mut(pointer.cast::<T>().as_ptr(),  self.size as usize / std::mem::size_of::<T>()) })
+            Ok(unsafe {
+                std::slice::from_raw_parts_mut(
+                    pointer.cast::<T>().as_ptr(),
+                    self.size as usize / std::mem::size_of::<T>(),
+                )
+            })
         } else {
             Err(anyhow::Error::from(Error::UnmappableBuffer))
         }
+    }
+
+    pub unsafe fn handle(&self) -> vk::Buffer {
+        self.handle
+    }
+
+    pub fn offset(&self) -> vk::DeviceSize {
+        self.offset
+    }
+
+    pub fn size(&self) -> vk::DeviceSize {
+        self.size
     }
 }

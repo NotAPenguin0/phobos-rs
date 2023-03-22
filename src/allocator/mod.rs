@@ -10,7 +10,7 @@
 //! A linear allocator used for making temporary, short lived allocations. For more information check the [`scratch_allocator`]
 //! module documentation.
 
-pub mod traits;
 pub mod default_allocator;
 pub mod memory_type;
 pub mod scratch_allocator;
+pub mod traits;

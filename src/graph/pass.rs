@@ -72,37 +72,53 @@
 //!
 //! Binding physical resources and recording is covered under the [`graph`](crate::graph) module documentation.
 
-use ash::vk;
-use crate::{Allocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
-use crate::domain::ExecutionDomain;
-use crate::pipeline::PipelineStage;
 use anyhow::Result;
+use ash::vk;
+
+use crate::{
+    Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource,
+};
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::domain::ExecutionDomain;
 use crate::graph::pass_graph::PassResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
+use crate::pipeline::PipelineStage;
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
-pub struct Pass<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
+pub struct Pass<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
     pub(crate) name: String,
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<PassResource>,
     pub(crate) outputs: Vec<PassResource>,
-    pub(crate) execute: Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>>  + 'exec>,
-    pub(crate) is_renderpass: bool
+    pub(crate) execute: Box<
+        dyn FnMut(
+            IncompleteCommandBuffer<'q, D>,
+            &mut InFlightContext<A>,
+            &PhysicalResourceBindings,
+        ) -> Result<IncompleteCommandBuffer<'q, D>>
+        + 'exec,
+    >,
+    pub(crate) is_renderpass: bool,
 }
 
 /// Used to create [`Pass`] objects correctly.
-pub struct PassBuilder<'exec, 'q, D, A: Allocator> where D: ExecutionDomain {
+pub struct PassBuilder<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
     inner: Pass<'exec, 'q, D, A>,
 }
 
-impl<'exec, 'q, D, A: Allocator> Pass<'exec, 'q, D, A> where D: ExecutionDomain {
+impl<'exec, 'q, D: ExecutionDomain, A: Allocator> Pass<'exec, 'q, D, A> {
     /// Returns the output virtual resource associated with the input resource.
-    pub fn output(&self, resource: &VirtualResource) -> Option<VirtualResource> {
-        self.outputs.iter().filter_map(|output| {
-            if resource.is_associated_with(&output.resource) { Some(output.resource.clone()) }
-            else { None }
-        }).next()
+    pub fn output(&self, resource: &VirtualResource) -> Option<&VirtualResource> {
+        self.outputs
+            .iter()
+            .filter_map(|output| {
+                if resource.is_associated_with(&output.resource) {
+                    Some(&output.resource)
+                } else {
+                    None
+                }
+            })
+            .next()
     }
 
     pub fn name(&self) -> &str {
@@ -110,8 +126,7 @@ impl<'exec, 'q, D, A: Allocator> Pass<'exec, 'q, D, A> where D: ExecutionDomain 
     }
 }
 
-impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: ExecutionDomain {
-
+impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     /// Create a new pass for generic commands. Does not support commands that are located inside a renderpass.
     pub fn new(name: impl Into<String>) -> Self {
         PassBuilder {
@@ -121,11 +136,10 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
                 execute: Box::new(|c, _, _| Ok(c)),
                 inputs: vec![],
                 outputs: vec![],
-                is_renderpass: false
+                is_renderpass: false,
             },
         }
     }
-
 
     /// Create a new renderpass.
     pub fn render(name: impl Into<String>) -> Self {
@@ -136,7 +150,7 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
                 execute: Box::new(|c, _, _| Ok(c)),
                 inputs: vec![],
                 outputs: vec![],
-                is_renderpass: true
+                is_renderpass: true,
             },
         }
     }
@@ -158,20 +172,32 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
             }],
             outputs: vec![],
             execute: Box::new(|c, _, _| Ok(c)),
-            is_renderpass: false
+            is_renderpass: false,
         }
     }
 
-    #[cfg(feature="debug-markers")]
+    #[cfg(feature = "debug-markers")]
     pub fn color(mut self, color: [f32; 4]) -> Self {
         self.inner.color = Some(color);
         self
     }
 
     /// Adds a color attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
-    pub fn color_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self> {
-        if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach color attachment to a pass that is not a renderpass").into()) }
-        if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() { return Err(anyhow::Error::from(Error::NoClearValue)); }
+    pub fn color_attachment(
+        mut self,
+        resource: &VirtualResource,
+        op: vk::AttachmentLoadOp,
+        clear: Option<vk::ClearColorValue>,
+    ) -> Result<Self> {
+        if !self.inner.is_renderpass {
+            return Err(Error::Uncategorized(
+                "Cannot attach color attachment to a pass that is not a renderpass",
+            )
+                .into());
+        }
+        if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() {
+            return Err(anyhow::Error::from(Error::NoClearValue));
+        }
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Color),
             resource: resource.clone(),
@@ -181,28 +207,38 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
             stage: match op {
                 vk::AttachmentLoadOp::LOAD => PipelineStage::COLOR_ATTACHMENT_OUTPUT,
                 vk::AttachmentLoadOp::CLEAR => PipelineStage::COLOR_ATTACHMENT_OUTPUT,
-                _ => todo!()
+                _ => todo!(),
             },
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             clear_value: None,
             load_op: None,
         });
 
-        self.inner.outputs.push(PassResource{
+        self.inner.outputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Color),
             resource: resource.upgrade(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             clear_value: clear.map(|c| vk::ClearValue { color: c }),
-            load_op: Some(op)
+            load_op: Some(op),
         });
 
         Ok(self)
     }
 
     /// Adds a depth attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
-    pub fn depth_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Result<Self> {
-        if !self.inner.is_renderpass { return Err(Error::Uncategorized("Cannot attach depth attachment to a pass that is not a renderpass").into()) }
+    pub fn depth_attachment(
+        mut self,
+        resource: &VirtualResource,
+        op: vk::AttachmentLoadOp,
+        clear: Option<vk::ClearDepthStencilValue>,
+    ) -> Result<Self> {
+        if !self.inner.is_renderpass {
+            return Err(Error::Uncategorized(
+                "Cannot attach depth attachment to a pass that is not a renderpass",
+            )
+                .into());
+        }
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Depth),
             resource: resource.clone(),
@@ -211,7 +247,7 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
                 // 'Load' operations on depth/stencil attachments happen in EARLY_FRAGMENT_TESTS.
                 vk::AttachmentLoadOp::LOAD => PipelineStage::EARLY_FRAGMENT_TESTS,
                 vk::AttachmentLoadOp::CLEAR => PipelineStage::EARLY_FRAGMENT_TESTS,
-                _ => todo!()
+                _ => todo!(),
             },
             layout: vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
             clear_value: None,
@@ -226,7 +262,7 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
             stage: PipelineStage::LATE_FRAGMENT_TESTS,
             layout: vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
             clear_value: clear.map(|c| vk::ClearValue { depth_stencil: c }),
-            load_op: Some(op)
+            load_op: Some(op),
         });
 
         Ok(self)
@@ -264,13 +300,21 @@ impl<'exec, 'q, D, A: Allocator> PassBuilder<'exec, 'q, D, A> where D: Execution
             stage,
             layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
             clear_value: None,
-            load_op: None
+            load_op: None,
         });
         self
     }
 
     /// Set the function to be called when recording this pass.
-    pub fn execute(mut self, exec: impl FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>>  + 'exec) -> Self {
+    pub fn execute(
+        mut self,
+        exec: impl FnMut(
+            IncompleteCommandBuffer<'q, D>,
+            &mut InFlightContext<A>,
+            &PhysicalResourceBindings,
+        ) -> Result<IncompleteCommandBuffer<'q, D>>
+        + 'exec,
+    ) -> Self {
         self.inner.execute = Box::new(exec);
         self
     }

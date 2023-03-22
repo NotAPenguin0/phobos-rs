@@ -3,20 +3,25 @@ use crate::graph::resource::ResourceType;
 /// Represents a virtual resource in the system, uniquely identified by a string.
 #[derive(Debug, Default, Clone, Hash, Eq, PartialEq)]
 pub struct VirtualResource {
-    pub uid: String,
-    pub ty: ResourceType,
+    pub(crate) uid: String,
+    ty: ResourceType,
 }
-
 
 impl VirtualResource {
     /// Create a new image virtual resource. Note that the name should not contain any '+' characters.
     pub fn image(uid: impl Into<String>) -> Self {
-        VirtualResource { uid: uid.into(), ty: ResourceType::Image }
+        VirtualResource {
+            uid: uid.into(),
+            ty: ResourceType::Image,
+        }
     }
 
     /// Create a new buffer virtual resource. Note that the name should not contain any '+' characters.
     pub fn buffer(uid: impl Into<String>) -> Self {
-        VirtualResource { uid: uid.into(), ty: ResourceType::Buffer }
+        VirtualResource {
+            uid: uid.into(),
+            ty: ResourceType::Buffer,
+        }
     }
 
     /// 'Upgrades' the resource to a new version of itself. This is used to obtain the virtual resource name of an input resource after
@@ -24,7 +29,7 @@ impl VirtualResource {
     pub fn upgrade(&self) -> Self {
         VirtualResource {
             uid: self.uid.clone() + "+",
-            ty: self.ty
+            ty: self.ty,
         }
     }
 
@@ -49,21 +54,41 @@ impl VirtualResource {
     /// Two virtual resources are associated if and only if their uid's only differ by "+" symbols.
     pub fn is_associated_with(&self, rhs: &VirtualResource) -> bool {
         // Since virtual resource uid's are constructed by appending * symbols, we can simply check whether the largest of the two strings starts with the shorter one
-        let larger = if self.uid.len() >= rhs.uid.len() { self } else { rhs };
-        let smaller = if self.uid.len() < rhs.uid.len() { self } else { rhs };
+        let larger = if self.uid.len() >= rhs.uid.len() {
+            self
+        } else {
+            rhs
+        };
+        let smaller = if self.uid.len() < rhs.uid.len() {
+            self
+        } else {
+            rhs
+        };
         larger.uid.starts_with(&smaller.uid)
     }
 
     /// One virtual resource is older than another if it has less '+' symbols.
     pub fn is_older(lhs: &VirtualResource, rhs: &VirtualResource) -> bool {
-        if !lhs.is_associated_with(rhs) { return false; }
+        if !lhs.is_associated_with(rhs) {
+            return false;
+        }
         lhs.uid.len() < rhs.uid.len()
     }
 
     /// Note that this is not the same as inverting the result of as_older(), for the same exact state of the resource,
     /// both of these functions should return false (they decide whether resources are strictly older or younger than each other).
     pub fn is_younger(lhs: &VirtualResource, rhs: &VirtualResource) -> bool {
-        if !lhs.is_associated_with(rhs) { return false; }
+        if !lhs.is_associated_with(rhs) {
+            return false;
+        }
         rhs.uid.len() < lhs.uid.len()
+    }
+
+    pub fn resource_type(&self) -> ResourceType {
+        self.ty
+    }
+
+    pub fn uid(&self) -> &String {
+        &self.uid
     }
 }

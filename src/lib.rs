@@ -102,21 +102,23 @@
 
 #[macro_use]
 extern crate derivative;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
-pub mod prelude;
 pub use crate::prelude::*;
 
+pub mod prelude;
+
+pub mod allocator;
 pub mod buffer;
-pub mod image;
 pub mod command_buffer;
-pub mod pipeline;
-pub mod descriptor;
-pub mod sampler;
-pub mod util;
 pub mod core;
-pub mod sync;
+pub mod descriptor;
 pub mod domain;
 pub mod graph;
-pub mod allocator;
+pub mod image;
+pub mod pipeline;
+pub mod sampler;
+pub mod sync;
+pub mod util;
 pub mod wsi;

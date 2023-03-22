@@ -1,12 +1,12 @@
 use std::rc::Rc;
 use std::sync::Arc;
-use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
-use crate::command_buffer::CommandBuffer;
-use crate::domain::ExecutionDomain;
 
 use anyhow::Result;
 use ash::vk;
 
+use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
+use crate::command_buffer::CommandBuffer;
+use crate::domain::ExecutionDomain;
 
 #[derive(Debug)]
 struct SubmitInfo<D: ExecutionDomain> {
@@ -45,15 +45,21 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
     }
 
     fn get_submit_semaphore(&self, submit: SubmitHandle) -> Option<Rc<Semaphore>> {
-        self.submits.get(submit.index).map(|submit| submit.signal_semaphore.clone()).flatten()
+        self.submits
+            .get(submit.index)
+            .map(|submit| submit.signal_semaphore.clone())
+            .flatten()
     }
 
-    fn submit_after(&mut self, handles: &[SubmitHandle], cmd: CommandBuffer<D>, wait_stages: &[PipelineStage]) -> Result<SubmitHandle> {
+    fn submit_after(
+        &mut self,
+        handles: &[SubmitHandle],
+        cmd: CommandBuffer<D>,
+        wait_stages: &[PipelineStage],
+    ) -> Result<SubmitHandle> {
         let wait_semaphores = handles
             .iter()
-            .map(|handle| {
-                self.get_submit_semaphore(*handle).unwrap()
-            })
+            .map(|handle| self.get_submit_semaphore(*handle).unwrap())
             .collect::<Vec<_>>();
 
         self.submits.push(SubmitInfo {
@@ -94,39 +100,38 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
         let mut per_submit_info = Vec::new();
         for submit in &self.submits {
             let info = PerSubmit {
-                wait_semaphores: submit.wait_semaphores
+                wait_semaphores: submit
+                    .wait_semaphores
                     .iter()
                     .zip(&submit.wait_stages)
-                    .map(|(semaphore, stage)| {
-                        vk::SemaphoreSubmitInfo {
-                            s_type: vk::StructureType::SEMAPHORE_SUBMIT_INFO,
-                            p_next: std::ptr::null(),
-                            semaphore: semaphore.handle,
-                            value: 0,
-                            stage_mask: *stage,
-                            device_index: 0,
-                        }
+                    .map(|(semaphore, stage)| vk::SemaphoreSubmitInfo {
+                        s_type: vk::StructureType::SEMAPHORE_SUBMIT_INFO,
+                        p_next: std::ptr::null(),
+                        semaphore: unsafe { semaphore.handle() },
+                        value: 0,
+                        stage_mask: *stage,
+                        device_index: 0,
                     })
                     .collect(),
                 cmd_buffer: vec![vk::CommandBufferSubmitInfo {
                     s_type: vk::StructureType::COMMAND_BUFFER_SUBMIT_INFO,
                     p_next: std::ptr::null(),
-                    command_buffer: submit.cmd.handle,
+                    command_buffer: unsafe { submit.cmd.handle() },
                     device_mask: 0,
                 }],
                 signal_semaphores: match &submit.signal_semaphore {
-                    None => { vec![] }
+                    None => {
+                        vec![]
+                    }
                     Some(semaphore) => {
-                        vec![
-                            vk::SemaphoreSubmitInfo {
-                                s_type: vk::StructureType::SEMAPHORE_SUBMIT_INFO,
-                                p_next: std::ptr::null(),
-                                semaphore: semaphore.handle,
-                                value: 0,
-                                stage_mask: PipelineStage::BOTTOM_OF_PIPE,
-                                device_index: 0,
-                            }
-                        ]
+                        vec![vk::SemaphoreSubmitInfo {
+                            s_type: vk::StructureType::SEMAPHORE_SUBMIT_INFO,
+                            p_next: std::ptr::null(),
+                            semaphore: unsafe { semaphore.handle() },
+                            value: 0,
+                            stage_mask: PipelineStage::BOTTOM_OF_PIPE,
+                            device_index: 0,
+                        }]
                     }
                 },
             };
@@ -134,26 +139,27 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
         }
         let submits = per_submit_info
             .iter()
-            .map(|submit| {
-                vk::SubmitInfo2 {
-                    s_type: vk::StructureType::SUBMIT_INFO_2,
-                    p_next: std::ptr::null(),
-                    flags: Default::default(),
-                    wait_semaphore_info_count: submit.wait_semaphores.len() as u32,
-                    p_wait_semaphore_infos: submit.wait_semaphores.as_ptr(),
-                    command_buffer_info_count: submit.cmd_buffer.len() as u32,
-                    p_command_buffer_infos: submit.cmd_buffer.as_ptr(),
-                    signal_semaphore_info_count: submit.signal_semaphores.len() as u32,
-                    p_signal_semaphore_infos: submit.signal_semaphores.as_ptr(),
-                }
+            .map(|submit| vk::SubmitInfo2 {
+                s_type: vk::StructureType::SUBMIT_INFO_2,
+                p_next: std::ptr::null(),
+                flags: Default::default(),
+                wait_semaphore_info_count: submit.wait_semaphores.len() as u32,
+                p_wait_semaphore_infos: submit.wait_semaphores.as_ptr(),
+                command_buffer_info_count: submit.cmd_buffer.len() as u32,
+                p_command_buffer_infos: submit.cmd_buffer.as_ptr(),
+                signal_semaphore_info_count: submit.signal_semaphores.len() as u32,
+                p_signal_semaphore_infos: submit.signal_semaphores.as_ptr(),
             })
             .collect::<Vec<_>>();
 
-        self.exec.submit_batch::<D>(submits.as_slice(), &self.signal_fence)?;
+        self.exec
+            .submit_batch::<D>(submits.as_slice(), &self.signal_fence)?;
         let fence = self.signal_fence.with_cleanup(move || {
             // Take ownership of every resource inside the submit batch, to delete it afterwards
             for mut submit in self.submits {
-                unsafe { submit.cmd.delete(self.exec.clone()).unwrap(); }
+                unsafe {
+                    submit.cmd.delete(self.exec.clone()).unwrap();
+                }
             }
         });
 
@@ -167,9 +173,12 @@ impl SubmitHandle {
         &self,
         wait_stage: PipelineStage,
         cmd: CommandBuffer<D>,
-        batch: &mut SubmitBatch<D>)
-        -> Result<SubmitHandle> {
-
-        batch.submit_after(std::slice::from_ref(&self), cmd, std::slice::from_ref(&wait_stage))
+        batch: &mut SubmitBatch<D>,
+    ) -> Result<SubmitHandle> {
+        batch.submit_after(
+            std::slice::from_ref(&self),
+            cmd,
+            std::slice::from_ref(&wait_stage),
+        )
     }
 }

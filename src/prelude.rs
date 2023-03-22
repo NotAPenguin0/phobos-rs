@@ -1,59 +1,58 @@
 pub use ash::vk;
 
-pub use crate::core::app_info::*;
-pub use crate::core::error::Error;
-pub use crate::core::device::Device;
-pub use crate::core::instance::VkInstance;
-pub use crate::core::debug::DebugMessenger;
-pub use crate::core::physical_device::*;
-pub use crate::core::queue::{QueueType};
-
-pub use crate::sync::fence::*;
-pub use crate::sync::semaphore::*;
-pub use crate::sync::execution_manager::ExecutionManager;
-pub use crate::sync::thread_context::ThreadContext;
-
-pub use crate::graph::virtual_resource::VirtualResource;
-pub use crate::graph::pass_graph::PassGraph;
-pub use crate::graph::physical_resource::PhysicalResourceBindings;
-pub use crate::graph::pass::PassBuilder;
-pub use crate::graph::pass::Pass;
+pub use traits::*;
 
 pub use crate::allocator::default_allocator;
 pub use crate::allocator::default_allocator::DefaultAllocator;
 pub use crate::allocator::memory_type::MemoryType;
 pub use crate::allocator::scratch_allocator::ScratchAllocator;
-
-pub use crate::pipeline::create_info::PipelineCreateInfo;
-pub use crate::pipeline::hash::*;
-pub use crate::pipeline::builder::PipelineBuilder;
-pub use crate::pipeline::cache::PipelineCache;
-pub use crate::pipeline::shader::ShaderCreateInfo;
-pub use crate::pipeline::PipelineStage;
-
-pub use crate::descriptor::descriptor_set::DescriptorSet;
+pub use crate::buffer::{Buffer, BufferView};
+pub use crate::command_buffer::CommandBuffer;
+pub use crate::command_buffer::IncompleteCommandBuffer;
+pub use crate::core::app_info::*;
+pub use crate::core::debug::DebugMessenger;
+pub use crate::core::device::Device;
+pub use crate::core::error::Error;
+pub use crate::core::instance::VkInstance;
+pub use crate::core::physical_device::*;
+pub use crate::core::queue::QueueType;
 pub use crate::descriptor::builder::DescriptorSetBuilder;
 pub use crate::descriptor::cache::DescriptorCache;
-
-pub use crate::wsi::swapchain::Swapchain;
-pub use crate::wsi::frame::{InFlightContext, FrameManager};
-pub use crate::wsi::surface::Surface;
-
-pub use crate::util::byte_size::ByteSize;
-pub use crate::util::upload::staged_buffer_upload;
-pub use crate::util::deferred_delete::DeletionQueue;
-
-pub use crate::image::{Image, ImageView};
-pub use crate::buffer::{Buffer, BufferView};
-pub use crate::sampler::Sampler;
-
+pub use crate::descriptor::descriptor_set::DescriptorSet;
 pub use crate::domain;
+pub use crate::graph::pass::Pass;
+pub use crate::graph::pass::PassBuilder;
+pub use crate::graph::pass_graph::PassGraph;
+pub use crate::graph::physical_resource::PhysicalResourceBindings;
+pub use crate::graph::virtual_resource::VirtualResource;
+pub use crate::image::{Image, ImageView};
+pub use crate::allocator::default_allocator;
+pub use crate::allocator::default_allocator::DefaultAllocator;
+pub use crate::allocator::memory_type::MemoryType;
+pub use crate::allocator::scratch_allocator::ScratchAllocator;
+pub use crate::pipeline::builder::PipelineBuilder;
+pub use crate::pipeline::cache::PipelineCache;
+pub use crate::pipeline::create_info::PipelineCreateInfo;
+pub use crate::pipeline::hash::*;
+pub use crate::pipeline::PipelineStage;
+pub use crate::pipeline::shader::ShaderCreateInfo;
+pub use crate::sampler::Sampler;
+pub use crate::sync::execution_manager::ExecutionManager;
+pub use crate::sync::fence::*;
+pub use crate::sync::semaphore::*;
+pub use crate::sync::thread_context::ThreadContext;
+pub use crate::util::byte_size::ByteSize;
+pub use crate::util::deferred_delete::DeletionQueue;
+pub use crate::util::upload::staged_buffer_upload;
+pub use crate::wsi::frame::{FrameManager, InFlightContext};
+pub use crate::wsi::surface::Surface;
+pub use crate::wsi::swapchain::Swapchain;
 
 pub mod traits {
-    pub use crate::wsi::window::{WindowInterface, WindowSize};
-    pub use crate::command_buffer::traits::*;
-    pub use crate::graph::record::RecordGraphToCommandBuffer;
     pub use crate::allocator::traits::*;
+    pub use crate::command_buffer::traits::*;
+    pub use crate::graph::pass_graph::GraphViz;
+    pub use crate::graph::record::RecordGraphToCommandBuffer;
+    pub use crate::wsi::window::{WindowInterface, WindowSize};
 }
 
-pub use traits::*;

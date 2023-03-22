@@ -11,8 +11,8 @@
 //! - [`submit_batch`] provides a utility to chain [`Semaphore`](crate::Semaphore)s together and submit them all
 //! as one batch.
 
+pub mod execution_manager;
 pub mod fence;
 pub mod semaphore;
-pub mod execution_manager;
-pub mod thread_context;
 pub mod submit_batch;
+pub mod thread_context;

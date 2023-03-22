@@ -1,7 +1,7 @@
 use ash::vk;
 
-use crate::{WindowInterface};
 use crate::core::queue::QueueType;
+use crate::WindowInterface;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]
@@ -11,7 +11,7 @@ pub struct QueueRequest {
     /// try to exclude transfer capabilities, as this is not possible per spec guarantees (a graphics queue must have transfer support)
     pub dedicated: bool,
     /// Capabilities that are requested from the queue.
-    pub queue_type: QueueType
+    pub queue_type: QueueType,
 }
 
 /// Minimum requirements for the GPU. This will be used to determine what physical device is selected.
@@ -39,7 +39,7 @@ pub struct GPURequirements {
 
 /// Application settings used to initialize the phobos context.
 #[derive(Debug)]
-pub struct AppSettings<'a, Window> where Window: WindowInterface {
+pub struct AppSettings<'a, Window: WindowInterface> {
     /// Application name. Possibly displayed in debugging tools, task manager, etc.
     pub name: String,
     /// Application version.
@@ -66,7 +66,7 @@ pub struct AppSettings<'a, Window> where Window: WindowInterface {
     pub scratch_ssbo_size: vk::DeviceSize,
 }
 
-impl<'a, Window> Default for AppSettings<'a, Window> where Window: WindowInterface {
+impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
     fn default() -> Self {
         AppSettings {
             name: String::from(""),
@@ -84,13 +84,15 @@ impl<'a, Window> Default for AppSettings<'a, Window> where Window: WindowInterfa
     }
 }
 
-pub struct AppBuilder<'a, Window> where Window: WindowInterface {
+pub struct AppBuilder<'a, Window: WindowInterface> {
     inner: AppSettings<'a, Window>,
 }
 
-impl<'a, Window> AppBuilder<'a, Window> where Window: WindowInterface {
+impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
     pub fn new() -> Self {
-        AppBuilder { inner: AppSettings::default() }
+        AppBuilder {
+            inner: AppSettings::default(),
+        }
     }
 
     pub fn name(mut self, name: impl Into<String>) -> Self {
