@@ -47,9 +47,9 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
     allocator: A,
     #[derivative(Debug="ignore")]
     memory: A::Allocation,
-    pub(crate) pointer: Option<NonNull<c_void>>,
-    pub handle: vk::Buffer,
-    pub size: vk::DeviceSize,
+    pointer: Option<NonNull<c_void>>,
+    handle: vk::Buffer,
+    size: vk::DeviceSize,
 }
 
 /// View into a specific offset and range of a [`Buffer`].
@@ -57,10 +57,10 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
 /// is not dropped while using this.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BufferView {
-    pub(crate) handle: vk::Buffer,
-    pub(crate) pointer: Option<NonNull<c_void>>,
-    pub offset: vk::DeviceSize,
-    pub size: vk::DeviceSize,
+    handle: vk::Buffer,
+    pointer: Option<NonNull<c_void>>,
+    offset: vk::DeviceSize,
+    size: vk::DeviceSize,
 }
 
 impl<A: Allocator> Buffer<A> {
@@ -137,6 +137,14 @@ impl<A: Allocator> Buffer<A> {
     pub fn is_mapped(&self) -> bool {
         self.pointer.is_some()
     }
+
+    pub unsafe fn handle(&self) -> vk::Buffer {
+        self.handle
+    }
+
+    pub fn size(&self) -> vk::DeviceSize {
+        self.size
+    }
 }
 
 impl<A: Allocator> Drop for Buffer<A> {
@@ -157,5 +165,17 @@ impl BufferView {
         } else {
             Err(anyhow::Error::from(Error::UnmappableBuffer))
         }
+    }
+
+    pub unsafe fn handle(&self) -> vk::Buffer {
+        self.handle
+    }
+
+    pub fn offset(&self) -> vk::DeviceSize {
+        self.offset
+    }
+
+    pub fn size(&self) -> vk::DeviceSize {
+        self.size
     }
 }

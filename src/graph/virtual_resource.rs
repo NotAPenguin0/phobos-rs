@@ -3,8 +3,8 @@ use crate::graph::resource::ResourceType;
 /// Represents a virtual resource in the system, uniquely identified by a string.
 #[derive(Debug, Default, Clone, Hash, Eq, PartialEq)]
 pub struct VirtualResource {
-    pub uid: String,
-    pub ty: ResourceType,
+    pub(crate) uid: String,
+    ty: ResourceType,
 }
 
 
@@ -65,5 +65,13 @@ impl VirtualResource {
     pub fn is_younger(lhs: &VirtualResource, rhs: &VirtualResource) -> bool {
         if !lhs.is_associated_with(rhs) { return false; }
         rhs.uid.len() < lhs.uid.len()
+    }
+
+    pub fn resource_type(&self) -> ResourceType {
+        self.ty
+    }
+
+    pub fn uid(&self) -> &String {
+        &self.uid
     }
 }

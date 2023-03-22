@@ -1,27 +1,28 @@
 use ash::vk;
+
 use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
 use crate::ShaderCreateInfo;
 
 #[derive(Debug, Copy, Clone)]
-pub struct VertexInputBindingDescription(pub(super) vk::VertexInputBindingDescription);
+pub(crate) struct VertexInputBindingDescription(pub(super) vk::VertexInputBindingDescription);
 
 #[derive(Debug, Copy, Clone)]
-pub struct VertexInputAttributeDescription(pub(super) vk::VertexInputAttributeDescription);
+pub(crate) struct VertexInputAttributeDescription(pub(super) vk::VertexInputAttributeDescription);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineInputAssemblyStateCreateInfo(pub(super) vk::PipelineInputAssemblyStateCreateInfo);
+pub(crate) struct PipelineInputAssemblyStateCreateInfo(pub(super) vk::PipelineInputAssemblyStateCreateInfo);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineDepthStencilStateCreateInfo(pub(super) vk::PipelineDepthStencilStateCreateInfo);
+pub(crate) struct PipelineDepthStencilStateCreateInfo(pub(super) vk::PipelineDepthStencilStateCreateInfo);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineRasterizationStateCreateInfo(pub(super) vk::PipelineRasterizationStateCreateInfo);
+pub(crate) struct PipelineRasterizationStateCreateInfo(pub(super) vk::PipelineRasterizationStateCreateInfo);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineMultisampleStateCreateInfo(pub(super) vk::PipelineMultisampleStateCreateInfo);
+pub(crate) struct PipelineMultisampleStateCreateInfo(pub(super) vk::PipelineMultisampleStateCreateInfo);
 
 #[derive(Debug, Copy, Clone)]
-pub struct PipelineColorBlendAttachmentState(pub(super) vk::PipelineColorBlendAttachmentState);
+pub(crate) struct PipelineColorBlendAttachmentState(pub(super) vk::PipelineColorBlendAttachmentState);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct PipelineRenderingInfo {
@@ -37,26 +38,24 @@ pub struct Viewport(pub(super) vk::Viewport);
 #[derive(Debug, Copy, Clone)]
 pub struct Rect2D(pub(super) vk::Rect2D);
 
-/// Defines a full graphics pipeline. You can modify this manually, but all
-/// information is also exposed through the pipeline builder,
-/// with additional quality of life and presets, so that method is recommended.
+/// Defines a full graphics pipeline. Use the pipeline builder to construct this properly.
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
-    pub name: String,
-    pub layout: PipelineLayoutCreateInfo,
-    pub vertex_input_bindings: Vec<VertexInputBindingDescription>,
-    pub vertex_attributes: Vec<VertexInputAttributeDescription>,
-    pub shaders: Vec<ShaderCreateInfo>,
-    pub input_assembly: PipelineInputAssemblyStateCreateInfo,
-    pub depth_stencil: PipelineDepthStencilStateCreateInfo,
-    pub dynamic_states: Vec<vk::DynamicState>,
-    pub rasterizer: PipelineRasterizationStateCreateInfo,
-    pub multisample: PipelineMultisampleStateCreateInfo,
-    pub blend_attachments: Vec<PipelineColorBlendAttachmentState>,
-    pub viewports: Vec<Viewport>,
-    pub scissors: Vec<Rect2D>,
-    pub blend_enable_logic_op: bool,
+    pub(crate) name: String,
+    pub(crate) layout: PipelineLayoutCreateInfo,
+    pub(crate) vertex_input_bindings: Vec<VertexInputBindingDescription>,
+    pub(crate) vertex_attributes: Vec<VertexInputAttributeDescription>,
+    pub(crate) shaders: Vec<ShaderCreateInfo>,
+    pub(crate) input_assembly: PipelineInputAssemblyStateCreateInfo,
+    pub(crate) depth_stencil: PipelineDepthStencilStateCreateInfo,
+    pub(crate) dynamic_states: Vec<vk::DynamicState>,
+    pub(crate) rasterizer: PipelineRasterizationStateCreateInfo,
+    pub(crate) multisample: PipelineMultisampleStateCreateInfo,
+    pub(crate) blend_attachments: Vec<PipelineColorBlendAttachmentState>,
+    pub(crate) viewports: Vec<Viewport>,
+    pub(crate) scissors: Vec<Rect2D>,
+    pub(crate) blend_enable_logic_op: bool,
     pub(crate) rendering_info: PipelineRenderingInfo,
 
     #[derivative(PartialEq="ignore")]

@@ -1,11 +1,11 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+
+use anyhow::Result;
 use ash::vk;
 
 use crate::Device;
-
-use anyhow::Result;
 use crate::util::cache::Resource;
 
 /// Shader resource object. This is managed by the pipeline cache internally.
@@ -13,19 +13,37 @@ use crate::util::cache::Resource;
 #[derivative(Debug)]
 pub struct Shader {
     #[derivative(Debug="ignore")]
-    pub(crate) device: Arc<Device>,
-    pub(crate) handle: vk::ShaderModule
+    device: Arc<Device>,
+    handle: vk::ShaderModule
 }
 
-/// Info required to create a shader. Filling out the hash properly is necessary, but can easily be done automatically
-/// by using the [`ShaderCreateInfo::from_spirv`] method.
+impl Shader {
+    pub unsafe fn handle(&self) -> vk::ShaderModule {
+        self.handle
+    }
+}
+
+/// Info required to create a shader. Use [`ShaderCreateInfo::from_spirv`] to construct this.
 #[derive(Debug, Clone)]
 pub struct ShaderCreateInfo {
-    pub stage: vk::ShaderStageFlags,
-    pub(crate) code: Vec<u32>,
-    pub(crate) code_hash: u64
+    stage: vk::ShaderStageFlags,
+    code: Vec<u32>,
+    code_hash: u64
 }
 
+impl ShaderCreateInfo {
+    pub fn stage(&self) -> vk::ShaderStageFlags {
+        self.stage
+    }
+
+    pub fn code(&self) -> &[u32] {
+        self.code.as_slice()
+    }
+
+    pub fn code_hash(&self) -> u64 {
+        self.code_hash
+    }
+}
 
 impl Resource for Shader {
     type Key = ShaderCreateInfo;

@@ -1,5 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+
 use crate::pipeline::create_info::*;
 use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
 use crate::pipeline::set_layout::DescriptorSetLayoutCreateInfo;
@@ -7,7 +8,7 @@ use crate::ShaderCreateInfo;
 
 impl Hash for ShaderCreateInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_u64(self.code_hash)
+        state.write_u64(self.code_hash())
     }
 }
 
@@ -167,7 +168,7 @@ impl PartialEq<Self> for PipelineLayoutCreateInfo {
 
 impl PartialEq<Self> for ShaderCreateInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.code_hash == other.code_hash
+        self.code_hash() == other.code_hash()
     }
 }
 

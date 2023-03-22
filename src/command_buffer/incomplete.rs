@@ -217,7 +217,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
             new_layout: to,
             src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
             dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
-            image: image.image,
+            image: unsafe { image.image() },
             subresource_range: image.subresource_range(),
         };
         unsafe {
@@ -262,11 +262,11 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
             vk::RenderingAttachmentInfo {
                 s_type: vk::StructureType::RENDERING_ATTACHMENT_INFO,
                 p_next: std::ptr::null(),
-                image_view: attachment.image_view.handle,
+                image_view: unsafe { attachment.image_view.handle() },
                 image_layout: attachment.image_layout,
                 resolve_mode: attachment.resolve_mode.unwrap_or(vk::ResolveModeFlagsKHR::NONE),
                 resolve_image_view: match &attachment.resolve_image_view {
-                    Some(view) => view.handle,
+                    Some(view) => unsafe { view.handle() },
                     None => vk::ImageView::null()
                 },
                 resolve_image_layout: attachment.resolve_image_layout.unwrap_or(vk::ImageLayout::UNDEFINED),
@@ -305,9 +305,9 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
 
         self.current_rendering_state = Some(PipelineRenderingInfo {
             view_mask: info.view_mask,
-            color_formats: info.color_attachments.iter().map(|attachment| attachment.image_view.format).collect(),
-            depth_format: info.depth_attachment.as_ref().map(|attachment| attachment.image_view.format),
-            stencil_format: info.stencil_attachment.as_ref().map(|attachment| attachment.image_view.format),
+            color_formats: info.color_attachments.iter().map(|attachment| attachment.image_view.format()).collect(),
+            depth_format: info.depth_attachment.as_ref().map(|attachment| attachment.image_view.format()),
+            stencil_format: info.stencil_attachment.as_ref().map(|attachment| attachment.image_view.format()),
         });
         self.current_render_area = info.render_area;
 

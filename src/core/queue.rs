@@ -69,7 +69,7 @@ impl Queue {
     pub unsafe fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&Fence>) -> Result<(), vk::Result> {
         let fence = match fence {
             None => { vk::Fence::null() }
-            Some(fence) => { fence.handle }
+            Some(fence) => { fence.handle() }
         };
         self.device.queue_submit(self.handle, submits, fence)
     }
@@ -83,7 +83,7 @@ impl Queue {
     pub unsafe fn submit2(&self, submits: &[vk::SubmitInfo2], fence: Option<&Fence>) -> Result<(), vk::Result> {
         let fence = match fence {
             None => { vk::Fence::null() }
-            Some(fence) => { fence.handle }
+            Some(fence) => { fence.handle() }
         };
         self.device.queue_submit2(self.handle, submits, fence)
     }

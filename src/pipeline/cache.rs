@@ -1,17 +1,19 @@
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
-use crate::{Device, Error, PipelineCreateInfo};
-use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
 use anyhow::Result;
 use ash::vk;
+
+use crate::{Device, Error, PipelineCreateInfo};
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::Pipeline;
 use crate::pipeline::pipeline_layout::PipelineLayout;
 use crate::pipeline::set_layout::DescriptorSetLayout;
 use crate::pipeline::shader::Shader;
 use crate::util::cache::{Cache, Resource};
+
+use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
 #[derive(Debug)]
 struct PipelineEntry<P> where P: std::fmt::Debug {
@@ -50,14 +52,14 @@ impl Resource for Pipeline {
     fn create(device: Arc<Device>, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self> {
         let (shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
-        let mut pci = info.to_vk(layout.handle);
+        let mut pci = info.to_vk(unsafe { layout.handle() });
         // Set shader create info
         let entry = CString::new("main")?;
         let shader_info: Vec<_> = info.shaders.iter().map(|shader| -> vk::PipelineShaderStageCreateInfo {
             vk::PipelineShaderStageCreateInfo::builder()
                 .name(&entry)
-                .stage(shader.stage)
-                .module(shaders.get_or_create(shader, ()).unwrap().handle)
+                .stage(shader.stage())
+                .module(unsafe { shaders.get_or_create(shader, ()).unwrap().handle() })
                 .build()
         }).collect();
         pci.stage_count = shader_info.len() as u32;
@@ -74,8 +76,8 @@ impl Resource for Pipeline {
                         |(_, e)|
                             Err(anyhow::Error::from(Error::VkError(e))))
                     ?.first().cloned().unwrap(),
-                layout: layout.handle,
-                set_layouts: layout.set_layouts.clone(),
+                layout: layout.handle(),
+                set_layouts: layout.set_layouts().to_vec(),
             })
         }
     }

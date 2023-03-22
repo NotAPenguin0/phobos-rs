@@ -104,7 +104,7 @@ pub struct Fence<T = ()> {
     first_cleanup_fn: Option<Box<CleanupFnLink<'static>>>,
     value: Option<T>,
     poll_rate: Duration,
-    pub handle: vk::Fence,
+    handle: vk::Fence,
 }
 
 pub type GpuFuture<T> = Fence<T>;
@@ -191,6 +191,10 @@ impl<T> Fence<T> {
             }));
             self
         }
+    }
+
+    pub unsafe fn handle(&self) -> vk::Fence {
+        self.handle
     }
 }
 

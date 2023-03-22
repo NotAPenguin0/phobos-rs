@@ -2,20 +2,21 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
-use ash::vk;
-use crate::domain::ExecutionDomain;
-use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
-use crate::graph::resource::{ResourceUsage};
-use crate::graph::virtual_resource::VirtualResource;
-use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings};
 
 use anyhow::Result;
+use ash::vk;
 use petgraph::{Direction, Graph};
 use petgraph::dot::Dot;
 use petgraph::graph::NodeIndex;
 use petgraph::prelude::EdgeRef;
+
+use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings};
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::domain::ExecutionDomain;
 use crate::graph::pass::Pass;
+use crate::graph::resource::ResourceUsage;
+use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
+use crate::graph::virtual_resource::VirtualResource;
 use crate::pipeline::PipelineStage;
 
 /// Virtual GPU resource in a task graph.
@@ -23,22 +24,22 @@ use crate::pipeline::PipelineStage;
 #[derivative(Debug)]
 pub struct PassResource {
     pub(crate) usage: ResourceUsage,
-    pub resource: VirtualResource,
-    pub stage: PipelineStage,
-    pub layout: vk::ImageLayout,
+    pub(crate) resource: VirtualResource,
+    pub(crate) stage: PipelineStage,
+    pub(crate) layout: vk::ImageLayout,
     #[derivative(Debug="ignore")]
-    pub clear_value: Option<vk::ClearValue>,
-    pub load_op: Option<vk::AttachmentLoadOp>
+    pub(crate) clear_value: Option<vk::ClearValue>,
+    pub(crate) load_op: Option<vk::AttachmentLoadOp>
 }
 
 /// GPU barrier in a task graph. Directly translates to `vkCmdPipelineBarrier()`.
 #[derive(Debug, Clone)]
 pub struct PassResourceBarrier {
-    pub resource: PassResource,
-    pub src_access: vk::AccessFlags2,
-    pub dst_access: vk::AccessFlags2,
-    pub src_stage: PipelineStage,
-    pub dst_stage: PipelineStage,
+    pub(crate) resource: PassResource,
+    pub(crate) src_access: vk::AccessFlags2,
+    pub(crate) dst_access: vk::AccessFlags2,
+    pub(crate) src_stage: PipelineStage,
+    pub(crate) dst_stage: PipelineStage,
 }
 
 
@@ -47,12 +48,12 @@ pub struct PassNode<'exec, 'q,
         R: Resource,
         D: ExecutionDomain,
         A: Allocator = DefaultAllocator> {
-    pub identifier: String,
-    pub color: Option<[f32; 4]>,
-    pub inputs: Vec<R>,
-    pub outputs: Vec<R>,
-    pub execute: Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>>  + 'exec>,
-    pub is_renderpass: bool
+    pub(crate) identifier: String,
+    pub(crate) color: Option<[f32; 4]>,
+    pub(crate) inputs: Vec<R>,
+    pub(crate) outputs: Vec<R>,
+    pub(crate) execute: Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>>  + 'exec>,
+    pub(crate) is_renderpass: bool
 }
 
 /// Pass graph, used for synchronizing resources over a single queue.
@@ -112,11 +113,11 @@ impl<> Barrier<PassResource> for PassResourceBarrier {
 
 impl Resource for PassResource {
     fn is_dependency_of(&self, lhs: &Self) -> bool {
-        self.virtual_resource().uid == lhs.virtual_resource().uid
+        self.virtual_resource().uid() == lhs.virtual_resource().uid()
     }
 
     fn uid(&self) -> &String {
-        &self.virtual_resource().uid
+        self.virtual_resource().uid()
     }
 }
 

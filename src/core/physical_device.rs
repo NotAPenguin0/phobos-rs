@@ -104,10 +104,10 @@ impl PhysicalDevice {
                     // The surface is supported if one of the queues we found can present to it.
                     let supported_queue = physical_device.queues.iter_mut().find(|queue| {
                         unsafe {
-                            surface.functions.get_physical_device_surface_support(
+                            surface.get_physical_device_surface_support(
                                     physical_device.handle,
                                     queue.family_index,
-                                    surface.handle)
+                                    surface.handle())
                                 .unwrap()
                         }
                     });

@@ -1,13 +1,12 @@
 //! The descriptor set builder is useful for building descriptor sets, but its public usage is now deprecated.
 //! Instead, use the `bind_xxx` functions of [`IncompleteCommandBuffer`](crate::command_buffer::IncompleteCommandBuffer)
 
-use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
-
 use anyhow::Result;
 use ash::vk;
+
+use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
 use crate::descriptor::descriptor_set::{DescriptorBinding, DescriptorBufferInfo, DescriptorContents, DescriptorImageInfo, DescriptorSetBinding};
 use crate::graph::physical_resource::PhysicalResource;
-
 #[cfg(feature="shader-reflection")]
 use crate::pipeline::shader_reflection::ReflectionInfo;
 
@@ -84,7 +83,7 @@ impl<'r> DescriptorSetBuilder<'r> {
             self.bind_sampled_image(binding, image, sampler);
             Ok(())
         } else {
-            Err(Error::NoResourceBound(resource.uid.clone()).into())
+            Err(Error::NoResourceBound(resource.uid().clone()).into())
         }
     }
 
@@ -94,7 +93,7 @@ impl<'r> DescriptorSetBuilder<'r> {
             binding,
             ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             descriptors: vec![ DescriptorContents::Image(DescriptorImageInfo {
-                sampler: sampler.handle,
+                sampler: unsafe { sampler.handle() },
                 view: image.clone(),
                 layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
             }) ],

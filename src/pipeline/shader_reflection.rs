@@ -1,8 +1,8 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+
 use anyhow::Result;
 use ash::vk;
-
 #[cfg(feature="shader-reflection")]
 use spv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
 
@@ -147,7 +147,7 @@ fn merge_push_constants(reflected_shaders: &[ReflectionInfo]) -> Result<Vec<Push
 pub(crate) fn reflect_shaders(info: &PipelineCreateInfo) -> Result<ReflectionInfo> {
     let mut reflected_shaders = Vec::new();
     for shader in &info.shaders {
-        let module = spv_cross::spirv::Module::from_words(shader.code.as_slice());
+        let module = spv_cross::spirv::Module::from_words(shader.code());
         reflected_shaders.push(reflect_module(module)?);
     }
 

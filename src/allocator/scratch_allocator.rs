@@ -23,7 +23,6 @@
 //! allocator.reset();
 //! ```
 
-use std::ptr::NonNull;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -77,18 +76,12 @@ impl<A: Allocator> ScratchAllocator<A> {
         // Amount of padding bytes to insert
         let padding = self.alignment - unaligned_part;
         let padded_size = size + padding;
-        return if self.offset + padded_size > self.buffer.size {
+        return if self.offset + padded_size > self.buffer.size() {
             Err(anyhow::Error::from(AllocationError(OutOfMemory)))
         } else {
             let offset = self.offset;
             self.offset += padded_size;
-            let Some(pointer) = self.buffer.pointer else { panic!() };
-            Ok(BufferView {
-                handle: self.buffer.handle,
-                pointer: unsafe { NonNull::new(pointer.as_ptr().offset(offset as isize)) },
-                offset,
-                size,
-            })
+            self.buffer.view(offset, size)
         }
     }
 

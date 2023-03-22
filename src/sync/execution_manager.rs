@@ -40,7 +40,7 @@ use crate::sync::submit_batch::SubmitBatch;
 #[derive(Debug, Clone)]
 pub struct ExecutionManager {
     device: Arc<Device>,
-    pub(crate) queues: Arc<Vec<Mutex<Queue>>>,
+    queues: Arc<Vec<Mutex<Queue>>>,
 }
 
 

@@ -1,9 +1,9 @@
 use std::sync::Arc;
+
+use anyhow::Result;
 use ash::vk;
 
 use crate::Device;
-
-use anyhow::Result;
 use crate::pipeline::set_layout::{DescriptorSetLayout, DescriptorSetLayoutCreateInfo};
 use crate::util::cache::{Cache, Resource};
 
@@ -13,9 +13,9 @@ use crate::util::cache::{Cache, Resource};
 #[derivative(Debug)]
 pub struct PipelineLayout {
     #[derivative(Debug="ignore")]
-    pub(crate) device: Arc<Device>,
-    pub(crate) handle: vk::PipelineLayout,
-    pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,
+    device: Arc<Device>,
+    handle: vk::PipelineLayout,
+    set_layouts: Vec<vk::DescriptorSetLayout>,
 }
 
 /// Defines a range of Vulkan push constants, for manually defining a pipeline layout if you cannot
@@ -35,6 +35,15 @@ pub struct PipelineLayoutCreateInfo {
     pub push_constants: Vec<PushConstantRange>,
 }
 
+impl PipelineLayout {
+    pub unsafe fn handle(&self) -> vk::PipelineLayout {
+        self.handle
+    }
+
+    pub fn set_layouts(&self) -> &[vk::DescriptorSetLayout] {
+        self.set_layouts.as_slice()
+    }
+}
 
 impl Resource for PipelineLayout {
     type Key = PipelineLayoutCreateInfo;
@@ -43,7 +52,7 @@ impl Resource for PipelineLayout {
 
     fn create(device: Arc<Device>, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self> {
         let set_layouts = key.set_layouts.iter().map(|info|
-            set_layout_cache.get_or_create(&info, ()).unwrap().handle
+            unsafe { set_layout_cache.get_or_create(&info, ()).unwrap().handle() }
         ).collect::<Vec<_>>();
 
         let pc = key.push_constants.iter().map(|pc| pc.to_vk()).collect::<Vec<_>>();

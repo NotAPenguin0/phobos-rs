@@ -1,8 +1,9 @@
 use std::sync::Arc;
-use ash::vk;
-use crate::{BufferView, Device, ImageView};
 
 use anyhow::Result;
+use ash::vk;
+
+use crate::{BufferView, Device, ImageView};
 use crate::util::cache::Resource;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -56,7 +57,7 @@ fn binding_image_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorImageInf
         let DescriptorContents::Image(image) = descriptor else { panic!("Missing descriptor type case?") };
         vk::DescriptorImageInfo {
             sampler: image.sampler,
-            image_view: image.view.handle,
+            image_view: unsafe { image.view.handle() },
             image_layout: image.layout,
         }
     })
@@ -67,22 +68,22 @@ fn binding_buffer_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorBufferI
     binding.descriptors.iter().map(|descriptor| {
         let DescriptorContents::Buffer(buffer) = descriptor else { panic!("Missing descriptor type case?") };
         vk::DescriptorBufferInfo {
-            buffer: buffer.buffer.handle,
-            offset: buffer.buffer.offset,
-            range: buffer.buffer.size,
+            buffer: unsafe { buffer.buffer.handle() },
+            offset: buffer.buffer.offset(),
+            range: buffer.buffer.size(),
         }
     })
         .collect()
 }
 
 struct WriteDescriptorSet {
-    set: vk::DescriptorSet,
-    binding: u32,
-    array_element: u32,
-    count: u32,
-    ty: vk::DescriptorType,
-    image_info: Option<Vec<vk::DescriptorImageInfo>>,
-    buffer_info: Option<Vec<vk::DescriptorBufferInfo>>,
+    pub set: vk::DescriptorSet,
+    pub binding: u32,
+    pub array_element: u32,
+    pub count: u32,
+    pub ty: vk::DescriptorType,
+    pub image_info: Option<Vec<vk::DescriptorImageInfo>>,
+    pub buffer_info: Option<Vec<vk::DescriptorBufferInfo>>,
 }
 
 impl Resource for DescriptorSet {

@@ -101,7 +101,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
                         vk::SemaphoreSubmitInfo {
                             s_type: vk::StructureType::SEMAPHORE_SUBMIT_INFO,
                             p_next: std::ptr::null(),
-                            semaphore: semaphore.handle,
+                            semaphore: unsafe { semaphore.handle() },
                             value: 0,
                             stage_mask: *stage,
                             device_index: 0,
@@ -121,7 +121,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
                             vk::SemaphoreSubmitInfo {
                                 s_type: vk::StructureType::SEMAPHORE_SUBMIT_INFO,
                                 p_next: std::ptr::null(),
-                                semaphore: semaphore.handle,
+                                semaphore: unsafe { semaphore.handle() },
                                 value: 0,
                                 stage_mask: PipelineStage::BOTTOM_OF_PIPE,
                                 device_index: 0,

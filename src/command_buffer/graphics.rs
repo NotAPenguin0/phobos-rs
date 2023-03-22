@@ -1,9 +1,9 @@
-use ash::vk;
-use crate::domain::ExecutionDomain;
-use crate::{BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
-
 use anyhow::Result;
+use ash::vk;
+
+use crate::{BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::domain::ExecutionDomain;
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D> {
     /// Sets the viewport and scissor regions to the entire render area. Can only be called inside a renderpass.
@@ -68,13 +68,15 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// Binds a vertex buffer to the specified binding point. Note that currently there is no validation as to whether this
     /// binding actually exists for the given pipeline. Direct translation of [`vkCmdBindVertexBuffers`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindVertexBuffers.html).
     fn bind_vertex_buffer(self, binding: u32, buffer: &BufferView) -> Self where Self: Sized {
-        unsafe { self.device.cmd_bind_vertex_buffers(self.handle, binding, std::slice::from_ref(&buffer.handle), std::slice::from_ref(&buffer.offset)) };
+        let handle = unsafe { buffer.handle() };
+        let offset = buffer.offset();
+        unsafe { self.device.cmd_bind_vertex_buffers(self.handle, binding, std::slice::from_ref(&handle), std::slice::from_ref(&offset)) };
         self
     }
 
     /// Bind the an index buffer. The index type must match. Direct translation of [`vkCmdBindIndexBuffer`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindIndexBuffer.html)
     fn bind_index_buffer(self, buffer: &BufferView, ty: vk::IndexType) -> Self where Self: Sized {
-        unsafe { self.device.cmd_bind_index_buffer(self.handle, buffer.handle, buffer.offset, ty); }
+        unsafe { self.device.cmd_bind_index_buffer(self.handle, buffer.handle(), buffer.offset(), ty); }
         self
     }
 
@@ -83,17 +85,17 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     fn blit_image(self, src: &ImageView, dst: &ImageView, src_offsets: &[vk::Offset3D; 2], dst_offsets: &[vk::Offset3D; 2], filter: vk::Filter) -> Self where Self: Sized {
         let blit = vk::ImageBlit {
             src_subresource: vk::ImageSubresourceLayers {
-                aspect_mask: src.aspect,
-                mip_level: src.base_level,
-                base_array_layer: src.base_layer,
-                layer_count: src.layer_count,
+                aspect_mask: src.aspect(),
+                mip_level: src.base_level(),
+                base_array_layer: src.base_layer(),
+                layer_count: src.layer_count(),
             },
             src_offsets: *src_offsets,
             dst_subresource: vk::ImageSubresourceLayers {
-                aspect_mask: dst.aspect,
-                mip_level: dst.base_level,
-                base_array_layer: dst.base_layer,
-                layer_count: dst.layer_count,
+                aspect_mask: dst.aspect(),
+                mip_level: dst.base_level(),
+                base_array_layer: dst.base_layer(),
+                layer_count: dst.layer_count(),
             },
             dst_offsets: *dst_offsets
         };
@@ -101,9 +103,9 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         unsafe {
             self.device.cmd_blit_image(
                 self.handle,
-                src.image,
+                src.image(),
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-                dst.image,
+                dst.image(),
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
                 std::slice::from_ref(&blit), filter);
         }

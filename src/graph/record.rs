@@ -1,15 +1,16 @@
 use std::collections::HashSet;
 use std::ffi::CString;
-use crate::{BufferView, DebugMessenger, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings, Error, Allocator};
-use crate::domain::ExecutionDomain;
 
 use anyhow::Result;
 use ash::vk;
+use petgraph::{Incoming, Outgoing};
 use petgraph::graph::NodeIndex;
-use petgraph::{Outgoing, Incoming};
 use petgraph::visit::EdgeRef;
+
+use crate::{Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::domain::ExecutionDomain;
 use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
@@ -158,7 +159,7 @@ fn render_area<D: ExecutionDomain, A: Allocator>(pass: &PassNode<PassResource, D
     vk::Rect2D {
         offset: vk::Offset2D { x: 0, y: 0 },
         // TODO: properly set size of current level?
-        extent: vk::Extent2D { width: image.size.width, height: image.size.height },
+        extent: vk::Extent2D { width: image.width(), height: image.height() },
     }
 }
 
@@ -243,7 +244,7 @@ fn record_image_barrier<'q, D: ExecutionDomain>(
         new_layout: dst_resource.layout,
         src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
         dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
-        image: image.image,
+        image: unsafe { image.image() },
         subresource_range: image.subresource_range(),
     };
 
