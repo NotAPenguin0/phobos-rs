@@ -52,11 +52,11 @@ pub struct Rect2D(pub(super) vk::Rect2D);
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
+    pub shaders: Vec<ShaderCreateInfo>,
     pub(crate) name: String,
     pub(crate) layout: PipelineLayoutCreateInfo,
     pub(crate) vertex_input_bindings: Vec<VertexInputBindingDescription>,
     pub(crate) vertex_attributes: Vec<VertexInputAttributeDescription>,
-    pub(crate) shaders: Vec<ShaderCreateInfo>,
     pub(crate) input_assembly: PipelineInputAssemblyStateCreateInfo,
     pub(crate) depth_stencil: PipelineDepthStencilStateCreateInfo,
     pub(crate) dynamic_states: Vec<vk::DynamicState>,
