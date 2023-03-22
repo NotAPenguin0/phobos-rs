@@ -1,7 +1,9 @@
-use std::sync::{Arc};
-use ash::vk;
-use crate::{Allocator, DefaultAllocator, Device, InFlightContext, ScratchAllocator};
+use std::sync::Arc;
+
 use anyhow::Result;
+use ash::vk;
+
+use crate::{Allocator, DefaultAllocator, Device, InFlightContext, ScratchAllocator};
 
 /// Thread context with linear allocators that can be used as a substitute
 /// [`InFlightContext`] outside of a frame.
@@ -14,17 +16,41 @@ pub struct ThreadContext<A: Allocator = DefaultAllocator> {
 
 impl<A: Allocator> ThreadContext<A> {
     /// Spawn a new thread context with local scratch allocators.
-    pub fn new(device: Arc<Device>, mut allocator: A, scratch_size: Option<impl Into<vk::DeviceSize>>) -> Result<Self> {
+    pub fn new(
+        device: Arc<Device>,
+        mut allocator: A,
+        scratch_size: Option<impl Into<vk::DeviceSize>>,
+    ) -> Result<Self> {
         let scratch_size = match scratch_size {
             None => 1 as vk::DeviceSize,
-            Some(size) => size.into()
+            Some(size) => size.into(),
         };
 
         Ok(Self {
-            vbo_allocator: ScratchAllocator::<A>::new(device.clone(), &mut allocator, scratch_size, vk::BufferUsageFlags::VERTEX_BUFFER)?,
-            ibo_allocator: ScratchAllocator::<A>::new(device.clone(), &mut allocator, scratch_size, vk::BufferUsageFlags::INDEX_BUFFER)?,
-            ubo_allocator: ScratchAllocator::<A>::new(device.clone(), &mut allocator, scratch_size, vk::BufferUsageFlags::UNIFORM_BUFFER)?,
-            ssbo_allocator: ScratchAllocator::<A>::new(device.clone(), &mut allocator, scratch_size, vk::BufferUsageFlags::STORAGE_BUFFER)?,
+            vbo_allocator: ScratchAllocator::<A>::new(
+                device.clone(),
+                &mut allocator,
+                scratch_size,
+                vk::BufferUsageFlags::VERTEX_BUFFER,
+            )?,
+            ibo_allocator: ScratchAllocator::<A>::new(
+                device.clone(),
+                &mut allocator,
+                scratch_size,
+                vk::BufferUsageFlags::INDEX_BUFFER,
+            )?,
+            ubo_allocator: ScratchAllocator::<A>::new(
+                device.clone(),
+                &mut allocator,
+                scratch_size,
+                vk::BufferUsageFlags::UNIFORM_BUFFER,
+            )?,
+            ssbo_allocator: ScratchAllocator::<A>::new(
+                device.clone(),
+                &mut allocator,
+                scratch_size,
+                vk::BufferUsageFlags::STORAGE_BUFFER,
+            )?,
         })
     }
 

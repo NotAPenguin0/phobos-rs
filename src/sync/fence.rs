@@ -11,7 +11,7 @@ use crate::Device;
 
 struct CleanupFnLink<'f> {
     pub f: Box<dyn FnOnce() -> () + 'f>,
-    pub next: Option<Box<CleanupFnLink<'f>>>
+    pub next: Option<Box<CleanupFnLink<'f>>>,
 }
 
 trait FenceValue<T> {
@@ -100,7 +100,7 @@ trait FenceValue<T> {
 #[derivative(Debug)]
 pub struct Fence<T = ()> {
     device: Arc<Device>,
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     first_cleanup_fn: Option<Box<CleanupFnLink<'static>>>,
     value: Option<T>,
     poll_rate: Duration,
@@ -144,16 +144,22 @@ impl<T> Fence<T> {
     }
 
     /// Create a new fence with the specified poll rate for awaiting it as a future.
-    pub fn new_with_poll_rate(device: Arc<Device>, signaled: bool, poll_rate: Duration) -> Result<Self, vk::Result> {
+    pub fn new_with_poll_rate(
+        device: Arc<Device>,
+        signaled: bool,
+        poll_rate: Duration,
+    ) -> Result<Self, vk::Result> {
         let info = vk::FenceCreateInfo {
             s_type: vk::StructureType::FENCE_CREATE_INFO,
             p_next: std::ptr::null(),
-            flags: if signaled { vk::FenceCreateFlags::SIGNALED } else { vk::FenceCreateFlags::empty() },
+            flags: if signaled {
+                vk::FenceCreateFlags::SIGNALED
+            } else {
+                vk::FenceCreateFlags::empty()
+            },
         };
         Ok(Fence {
-            handle: unsafe {
-                device.create_fence(&info, None)?
-            },
+            handle: unsafe { device.create_fence(&info, None)? },
             device,
             poll_rate,
             first_cleanup_fn: None,
@@ -164,7 +170,10 @@ impl<T> Fence<T> {
     /// Waits for the fence to be signaled with no timeout. Note that this is a blocking call. For the nonblocking version, use the `Future` implementation by calling
     /// `.await`.
     pub fn wait(&self) -> VkResult<()> {
-        unsafe { self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX) }
+        unsafe {
+            self.device
+                .wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
+        }
     }
 
     /// Resets a fence to the unsignaled status.
@@ -178,7 +187,7 @@ impl<T> Fence<T> {
         if self.first_cleanup_fn.is_some() {
             let mut head = Box::new(CleanupFnLink {
                 f: Box::new(f),
-                next: None
+                next: None,
             });
             let fun = self.first_cleanup_fn.take().unwrap();
             head.next = Some(fun);
@@ -187,7 +196,7 @@ impl<T> Fence<T> {
         } else {
             self.first_cleanup_fn = Some(Box::new(CleanupFnLink {
                 f: Box::new(f),
-                next: None
+                next: None,
             }));
             self
         }
@@ -230,6 +239,8 @@ impl<T> std::future::Future for Fence<T> {
 
 impl<T> Drop for Fence<T> {
     fn drop(&mut self) {
-        unsafe { self.device.destroy_fence(self.handle, None); }
+        unsafe {
+            self.device.destroy_fence(self.handle, None);
+        }
     }
 }

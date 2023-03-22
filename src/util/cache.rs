@@ -1,9 +1,10 @@
 use std::collections::{hash_map, HashMap};
 use std::hash::Hash;
 use std::sync::Arc;
-use crate::{Device};
 
 use anyhow::Result;
+
+use crate::Device;
 
 /// Trait that needs to be implemented by types managed by a [`Cache`]
 pub trait Resource {
@@ -15,12 +16,14 @@ pub trait Resource {
     const MAX_TIME_TO_LIVE: u32;
 
     /// Allocates a new resource to be stored in the cache. This function may error, but this error will propagate through the cache's access function.
-    fn create(device: Arc<Device>, key: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self> where Self: Sized;
+    fn create(device: Arc<Device>, key: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
+        where
+            Self: Sized;
 }
 
 struct Entry<R> {
     value: R,
-    ttl: u32
+    ttl: u32,
 }
 
 /// Implements a smart resource cache that deallocates resources that have not been accessed in a while.
@@ -28,10 +31,10 @@ struct Entry<R> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Cache<R: Resource + Sized> {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
-    #[derivative(Debug="ignore")]
-    store: HashMap<R::Key, Entry<R>>
+    #[derivative(Debug = "ignore")]
+    store: HashMap<R::Key, Entry<R>>,
 }
 
 impl<R: Resource + Sized> Cache<R> {
@@ -50,16 +53,18 @@ impl<R: Resource + Sized> Cache<R> {
     /// the cache is exists.
     /// # Errors
     /// This function can only error if the requested resource did not exist, and allocation of it failed.
-    pub fn get_or_create<'a, 'b, 's: 'b>(&'s mut self, key: &R::Key, params: R::ExtraParams<'a>) -> Result<&'b R> {
+    pub fn get_or_create<'a, 'b, 's: 'b>(
+        &'s mut self,
+        key: &R::Key,
+        params: R::ExtraParams<'a>,
+    ) -> Result<&'b R> {
         let entry = self.store.entry(key.clone());
         let entry = match entry {
-            hash_map::Entry::Occupied(entry) => { entry.into_mut() },
-            hash_map::Entry::Vacant(entry) => {
-                entry.insert(Entry {
-                    value: R::create(self.device.clone(), &key, params)?,
-                    ttl: R::MAX_TIME_TO_LIVE,
-                })
-            }
+            hash_map::Entry::Occupied(entry) => entry.into_mut(),
+            hash_map::Entry::Vacant(entry) => entry.insert(Entry {
+                value: R::create(self.device.clone(), &key, params)?,
+                ttl: R::MAX_TIME_TO_LIVE,
+            }),
         };
         entry.ttl = R::MAX_TIME_TO_LIVE;
         Ok(&entry.value)
@@ -67,7 +72,9 @@ impl<R: Resource + Sized> Cache<R> {
 
     /// Updates the cache to deallocate resources that have not been accessed for too long.
     pub(crate) fn next_frame(&mut self) {
-        self.store.iter_mut().for_each(| (_, entry)| entry.ttl = entry.ttl - 1 );
+        self.store
+            .iter_mut()
+            .for_each(|(_, entry)| entry.ttl = entry.ttl - 1);
         self.store.retain(|_, entry| entry.ttl != 0);
     }
 }

@@ -2,17 +2,22 @@ use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+
 use ash::vk;
 use layout::backends::svg::SVGWriter;
-use phobos as ph;
-use ph::task_graph::*;
 use layout::gv;
 use layout::gv::GraphBuilder;
+
+use ph::task_graph::*;
+use phobos as ph;
 use phobos::{domain, IncompleteCommandBuffer, record_graph};
 use phobos::pass::{Pass, PassBuilder};
 use phobos::pipeline::PipelineStage;
 
-pub fn display_dot<G>(graph: &G, path: &str) where G: GraphViz {
+pub fn display_dot<G>(graph: &G, path: &str)
+    where
+        G: GraphViz,
+{
     let dot = graph.dot().unwrap();
     let dot = format!("{}", dot);
     let mut parser = gv::DotParser::new(&dot);
@@ -26,7 +31,7 @@ pub fn display_dot<G>(graph: &G, path: &str) where G: GraphViz {
             let svg = svg.finalize();
             let mut f = File::create(Path::new(path)).unwrap();
             f.write(&svg.as_bytes()).unwrap();
-        },
+        }
         Err(e) => {
             parser.print_error();
             println!("dot render error: {}", e);
@@ -36,10 +41,18 @@ pub fn display_dot<G>(graph: &G, path: &str) where G: GraphViz {
 
 #[test]
 fn associated_virtual_resources() -> Result<(), ph::Error> {
-    let v1 = VirtualResource { uid: String::from("abc") };
-    let v2 = VirtualResource { uid: String::from("def*") };
-    let v3 = VirtualResource { uid: String::from("abc*") };
-    let v4 = VirtualResource { uid: String::from("def**") };
+    let v1 = VirtualResource {
+        uid: String::from("abc"),
+    };
+    let v2 = VirtualResource {
+        uid: String::from("def*"),
+    };
+    let v3 = VirtualResource {
+        uid: String::from("abc*"),
+    };
+    let v4 = VirtualResource {
+        uid: String::from("def**"),
+    };
 
     assert!(VirtualResource::are_associated(&v1, &v3));
     assert!(VirtualResource::are_associated(&v3, &v1));
@@ -85,7 +98,10 @@ fn test_graph() -> Result<(), ph::Error> {
         .get();
     let p3 = PassBuilder::render(String::from("Finalize output"))
         .color_attachment(swap.clone(), vk::AttachmentLoadOp::CLEAR)
-        .sample_image(p2.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
+        .sample_image(
+            p2.output(&offscreen).unwrap(),
+            PipelineStage::FRAGMENT_SHADER,
+        )
         .sample_image(p1.output(&depth).unwrap(), PipelineStage::FRAGMENT_SHADER)
         .get();
 

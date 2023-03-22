@@ -1,5 +1,6 @@
 use std::ffi::NulError;
 use std::sync::PoisonError;
+
 use ash;
 use gpu_allocator::AllocationError;
 use thiserror::Error;
@@ -28,7 +29,9 @@ pub enum Error {
     #[error("No queue found that supports presentation. Only headless mode is supported.")]
     NoPresentQueue,
     /// No queue was found for requested domain. Did you forget to request it?
-    #[error("No queue found for requested domain. Did you forget a queue request on initialization?")]
+    #[error(
+    "No queue found for requested domain. Did you forget a queue request on initialization?"
+    )]
     NoCapableQueue,
     /// Vulkan allocation error.
     #[error("Vulkan allocation error: `{0}`")]
@@ -112,7 +115,9 @@ impl From<ash::vk::Result> for Error {
 }
 
 impl From<AllocationError> for Error {
-    fn from(value: AllocationError) -> Self { Error::AllocationError(value) }
+    fn from(value: AllocationError) -> Self {
+        Error::AllocationError(value)
+    }
 }
 
 impl From<(Vec<ash::vk::Pipeline>, ash::vk::Result)> for Error {

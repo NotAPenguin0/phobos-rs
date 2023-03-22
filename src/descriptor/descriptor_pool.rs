@@ -14,12 +14,11 @@ pub(super) struct DescriptorPoolSize(pub(super) HashMap<vk::DescriptorType, u32>
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(super) struct DescriptorPool {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
     handle: vk::DescriptorPool,
-    size: DescriptorPoolSize
+    size: DescriptorPoolSize,
 }
-
 
 impl DescriptorPoolSize {
     pub fn new(min_capacity: u32) -> Self {
@@ -35,9 +34,7 @@ impl DescriptorPoolSize {
         sizes.insert(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::STORAGE_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::INPUT_ATTACHMENT, min_capacity);
-        Self {
-            0: sizes,
-        }
+        Self { 0: sizes }
     }
 }
 
@@ -47,12 +44,14 @@ impl DescriptorPool {
         // descriptor sets that can be allocated from this pool.
         let max_sets = size.0.values().fold(0, |a, x| x + a);
         let flags = vk::DescriptorPoolCreateFlags::FREE_DESCRIPTOR_SET;
-        let pool_sizes = size.0.iter().map(|(descriptor_type, count)| {
-            vk::DescriptorPoolSize {
+        let pool_sizes = size
+            .0
+            .iter()
+            .map(|(descriptor_type, count)| vk::DescriptorPoolSize {
                 ty: *descriptor_type,
                 descriptor_count: *count,
-            }
-        }).collect::<Vec<vk::DescriptorPoolSize>>();
+            })
+            .collect::<Vec<vk::DescriptorPoolSize>>();
 
         let info = vk::DescriptorPoolCreateInfo {
             s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
@@ -63,7 +62,7 @@ impl DescriptorPool {
             p_pool_sizes: pool_sizes.as_ptr(),
         };
 
-        Ok(Self{
+        Ok(Self {
             handle: unsafe { device.create_descriptor_pool(&info, None)? },
             device,
             size,
@@ -81,10 +80,11 @@ impl DescriptorPool {
 
 impl Drop for DescriptorPool {
     fn drop(&mut self) {
-        unsafe { self.device.destroy_descriptor_pool(self.handle, None); }
+        unsafe {
+            self.device.destroy_descriptor_pool(self.handle, None);
+        }
     }
 }
-
 
 impl Display for DescriptorPoolSize {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

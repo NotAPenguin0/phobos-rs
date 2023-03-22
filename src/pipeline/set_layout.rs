@@ -11,9 +11,9 @@ use crate::util::cache::Resource;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct DescriptorSetLayout {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
-    handle: vk::DescriptorSetLayout
+    handle: vk::DescriptorSetLayout,
 }
 
 impl DescriptorSetLayout {
@@ -27,9 +27,8 @@ impl DescriptorSetLayout {
 /// information necessary.
 #[derive(Debug, Clone, Default)]
 pub struct DescriptorSetLayoutCreateInfo {
-    pub bindings: Vec<vk::DescriptorSetLayoutBinding>
+    pub bindings: Vec<vk::DescriptorSetLayoutBinding>,
 }
-
 
 impl Resource for DescriptorSetLayout {
     type Key = DescriptorSetLayoutCreateInfo;
@@ -42,7 +41,7 @@ impl Resource for DescriptorSetLayout {
             .build();
         Ok(Self {
             device: device.clone(),
-            handle: unsafe { device.create_descriptor_set_layout(&info, None)? }
+            handle: unsafe { device.create_descriptor_set_layout(&info, None)? },
         })
     }
 }

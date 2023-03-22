@@ -20,9 +20,7 @@ impl Semaphore {
             flags: Default::default(),
         };
         Ok(Semaphore {
-            handle: unsafe {
-                device.create_semaphore(&info, None)?
-            },
+            handle: unsafe { device.create_semaphore(&info, None)? },
             device,
         })
     }
@@ -34,6 +32,8 @@ impl Semaphore {
 
 impl Drop for Semaphore {
     fn drop(&mut self) {
-        unsafe { self.device.destroy_semaphore(self.handle, None); }
+        unsafe {
+            self.device.destroy_semaphore(self.handle, None);
+        }
     }
 }

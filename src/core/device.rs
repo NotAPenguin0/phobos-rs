@@ -13,7 +13,7 @@ use crate::util::string::unwrap_to_raw_strings;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Device {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     handle: ash::Device,
     queue_families: Vec<u32>,
     properties: vk::PhysicalDeviceProperties,
@@ -22,12 +22,22 @@ pub struct Device {
 impl Device {
     /// Create a new Vulkan device. This is wrapped in an Arc because it gets passed around and stored in a
     /// lot of Vulkan-related structures.
-    pub fn new<Window: WindowInterface>(instance: &VkInstance, physical_device: &PhysicalDevice, settings: &AppSettings<Window>) -> Result<Arc<Self>> {
+    pub fn new<Window: WindowInterface>(
+        instance: &VkInstance,
+        physical_device: &PhysicalDevice,
+        settings: &AppSettings<Window>,
+    ) -> Result<Arc<Self>> {
         let mut priorities = Vec::<f32>::new();
-        let queue_create_infos = physical_device.queue_families().iter()
+        let queue_create_infos = physical_device
+            .queue_families()
+            .iter()
             .enumerate()
             .flat_map(|(index, _)| {
-                let count = physical_device.queues().iter().filter(|queue| queue.family_index == index as u32).count();
+                let count = physical_device
+                    .queues()
+                    .iter()
+                    .filter(|queue| queue.family_index == index as u32)
+                    .count();
                 if count == 0 {
                     return None;
                 }
@@ -40,10 +50,11 @@ impl Device {
                 })
             })
             .collect::<Vec<_>>();
-        let mut extension_names: Vec<CString> = settings.gpu_requirements.device_extensions.iter()
-            .map(|ext|
-                CString::new(ext.clone())
-            )
+        let mut extension_names: Vec<CString> = settings
+            .gpu_requirements
+            .device_extensions
+            .iter()
+            .map(|ext| CString::new(ext.clone()))
             .collect::<Result<Vec<CString>, NulError>>()?;
 
         // Add required extensions
@@ -72,12 +83,16 @@ impl Device {
             .push_next(&mut features_1_3)
             .build();
 
-
-        Ok(Arc::new(unsafe { Device {
-            handle: instance.create_device(physical_device.handle(), &info, None)?,
-            queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
-            properties: *physical_device.properties()
-        } }))
+        Ok(Arc::new(unsafe {
+            Device {
+                handle: instance.create_device(physical_device.handle(), &info, None)?,
+                queue_families: queue_create_infos
+                    .iter()
+                    .map(|info| info.queue_family_index)
+                    .collect(),
+                properties: *physical_device.properties(),
+            }
+        }))
     }
 
     /// Wait for the device to be completely idle.
@@ -112,6 +127,8 @@ impl Deref for Device {
 
 impl Drop for Device {
     fn drop(&mut self) {
-        unsafe { self.destroy_device(None); }
+        unsafe {
+            self.destroy_device(None);
+        }
     }
 }

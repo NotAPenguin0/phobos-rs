@@ -18,24 +18,34 @@ pub struct Surface {
     /// List of [`VkPresentModeKHR`](vk::PresentModeKHR) with all present modes this surface supports.
     present_modes: Vec<vk::PresentModeKHR>,
     /// Vulkan extension functions for surface handling.
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     functions: ash::extensions::khr::Surface,
 }
 
 impl Surface {
     /// Create a new surface.
-    pub fn new<Window: WindowInterface>(instance: &VkInstance, settings: &AppSettings<Window>) -> Result<Self> {
+    pub fn new<Window: WindowInterface>(
+        instance: &VkInstance,
+        settings: &AppSettings<Window>,
+    ) -> Result<Self> {
         if let Some(window) = settings.window {
-            let functions = ash::extensions::khr::Surface::new(unsafe { instance.loader() }, &*instance);
+            let functions =
+                ash::extensions::khr::Surface::new(unsafe { instance.loader() }, &*instance);
             let handle = unsafe {
-                ash_window::create_surface(instance.loader(), &*instance, window.raw_display_handle(), window.raw_window_handle(), None)?
+                ash_window::create_surface(
+                    instance.loader(),
+                    &*instance,
+                    window.raw_display_handle(),
+                    window.raw_window_handle(),
+                    None,
+                )?
             };
             Ok(Surface {
                 handle,
                 functions,
                 capabilities: Default::default(),
                 formats: vec![],
-                present_modes: vec![]
+                present_modes: vec![],
             })
         } else {
             Err(anyhow::Error::from(Error::NoWindow))
@@ -46,9 +56,12 @@ impl Surface {
     /// Because surface support varies per physical device, this function requires one to be selected.
     pub fn query_details(&mut self, physical_device: &PhysicalDevice) -> Result<()> {
         unsafe {
-            self.capabilities = self.get_physical_device_surface_capabilities(physical_device.handle(), self.handle)?;
-            self.formats = self.get_physical_device_surface_formats(physical_device.handle(), self.handle)?;
-            self.present_modes = self.get_physical_device_surface_present_modes(physical_device.handle(), self.handle)?;
+            self.capabilities = self
+                .get_physical_device_surface_capabilities(physical_device.handle(), self.handle)?;
+            self.formats =
+                self.get_physical_device_surface_formats(physical_device.handle(), self.handle)?;
+            self.present_modes = self
+                .get_physical_device_surface_present_modes(physical_device.handle(), self.handle)?;
         }
         Ok(())
     }
@@ -80,6 +93,8 @@ impl Deref for Surface {
 
 impl Drop for Surface {
     fn drop(&mut self) {
-        unsafe { self.functions.destroy_surface(self.handle, None); }
+        unsafe {
+            self.functions.destroy_surface(self.handle, None);
+        }
     }
 }

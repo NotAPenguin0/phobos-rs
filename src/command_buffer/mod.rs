@@ -32,19 +32,22 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
+use crate::{
+    CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager,
+    PipelineCache,
+};
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 
-pub mod traits;
-pub mod incomplete;
-pub mod graphics;
-pub mod transfer;
 pub mod compute;
+pub mod graphics;
+pub mod incomplete;
+pub mod traits;
+pub mod transfer;
 
-pub(crate) mod state;
 pub(crate) mod command_pool;
+pub(crate) mod state;
 
 /// This struct represents a finished command buffer. This command buffer can't be recorded to anymore.
 /// It can only be obtained by calling [`IncompleteCommandBuffer::finish()`].
@@ -53,7 +56,6 @@ pub struct CommandBuffer<D: ExecutionDomain> {
     handle: vk::CommandBuffer,
     _domain: PhantomData<D>,
 }
-
 
 /// This struct represents an incomplete command buffer.
 /// This is a command buffer that has not been called [`IncompleteCommandBuffer::finish()`] on yet.
@@ -81,7 +83,7 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
     handle: vk::CommandBuffer,
     queue_lock: MutexGuard<'q, Queue>,

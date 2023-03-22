@@ -43,26 +43,32 @@ pub struct ExecutionManager {
     queues: Arc<Vec<Mutex<Queue>>>,
 }
 
-
 impl ExecutionManager {
     /// Create a new execution manager. You should only ever have on instance of this struct
     /// in your program.
     pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
         let mut counts = HashMap::new();
-        let queues = physical_device.queues().iter().map(|queue| -> Result<Mutex<Queue>> {
-            let index = counts.entry(queue.family_index).or_insert(0 as u32);
-            let handle = unsafe { device.get_device_queue(queue.family_index, *index) };
-            // Note that we can unwrap() here, because if this does not return Some() then our algorithm is
-            // bugged and this should panic.
-            *counts.get_mut(&queue.family_index).unwrap() += 1;
-            Ok(Mutex::new(Queue::new(device.clone(), handle, *queue)?))
-        }).collect::<Result<Vec<Mutex<Queue>>>>()?;
+        let queues = physical_device
+            .queues()
+            .iter()
+            .map(|queue| -> Result<Mutex<Queue>> {
+                let index = counts.entry(queue.family_index).or_insert(0 as u32);
+                let handle = unsafe { device.get_device_queue(queue.family_index, *index) };
+                // Note that we can unwrap() here, because if this does not return Some() then our algorithm is
+                // bugged and this should panic.
+                *counts.get_mut(&queue.family_index).unwrap() += 1;
+                Ok(Mutex::new(Queue::new(device.clone(), handle, *queue)?))
+            })
+            .collect::<Result<Vec<Mutex<Queue>>>>()?;
 
         info!("Created device queues:");
         for queue in &queues {
             let lock = queue.lock().unwrap();
             let info = lock.info();
-            info!("Queue #{:?}({}) supports {:?} (dedicated: {}, can present: {})", info.queue_type, info.family_index, info.flags, info.dedicated, info.can_present)
+            info!(
+                "Queue #{:?}({}) supports {:?} (dedicated: {}, can present: {})",
+                info.queue_type, info.family_index, info.flags, info.dedicated, info.can_present
+            )
         }
 
         Ok(ExecutionManager {
@@ -73,22 +79,34 @@ impl ExecutionManager {
 
     /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn try_on_domain<'q, D: ExecutionDomain>(&'q self,
-                                                 pipelines:  Option<Arc<Mutex<PipelineCache>>>,
-                                                 descriptors: Option<Arc<Mutex<DescriptorCache>>>)
-                                                 -> Result<D::CmdBuf<'q>> {
+    pub fn try_on_domain<'q, D: ExecutionDomain>(
+        &'q self,
+        pipelines: Option<Arc<Mutex<PipelineCache>>>,
+        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+    ) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(
+            self.device.clone(),
+            queue,
+            pipelines,
+            descriptors,
+        )
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn on_domain<'q, D: ExecutionDomain>(&'q self,
-                                             pipelines:  Option<Arc<Mutex<PipelineCache>>>,
-                                             descriptors: Option<Arc<Mutex<DescriptorCache>>>)
-                                             -> Result<D::CmdBuf<'q>> {
+    pub fn on_domain<'q, D: ExecutionDomain>(
+        &'q self,
+        pipelines: Option<Arc<Mutex<PipelineCache>>>,
+        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+    ) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(
+            self.device.clone(),
+            queue,
+            pipelines,
+            descriptors,
+        )
     }
 
     /// Begin a submit batch. Note that all submits in a batch are over a single domain (currently).
@@ -129,23 +147,33 @@ impl ExecutionManager {
         };
 
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        unsafe { queue.submit(std::slice::from_ref(&info), Some(&fence))?; }
+        unsafe {
+            queue.submit(std::slice::from_ref(&info), Some(&fence))?;
+        }
         let exec = self.clone();
-        Ok(fence
-            .with_cleanup(move || {
-                unsafe { cmd.delete(exec).unwrap(); }
-            }))
+        Ok(fence.with_cleanup(move || unsafe {
+            cmd.delete(exec).unwrap();
+        }))
     }
 
-    pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
+    pub(crate) fn submit_batch<D: ExecutionDomain>(
+        &self,
+        submits: &[vk::SubmitInfo2],
+        fence: &Fence,
+    ) -> Result<()> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        unsafe { queue.submit2(submits, Some(fence))?; }
+        unsafe {
+            queue.submit2(submits, Some(fence))?;
+        }
         Ok(())
     }
 
     /// Obtain a reference to a queue capable of presenting.
     pub(crate) fn get_present_queue(&self) -> Option<MutexGuard<Queue>> {
-        self.queues.iter().find(|&queue| queue.lock().unwrap().info().can_present.clone()).map(|q| q.lock().unwrap())
+        self.queues
+            .iter()
+            .find(|&queue| queue.lock().unwrap().info().can_present.clone())
+            .map(|q| q.lock().unwrap())
     }
 
     /// Try to get a reference to a queue matching the domain, or return an error state if this would need to block
@@ -154,21 +182,24 @@ impl ExecutionManager {
         let q = self.queues.iter().find(|&q| {
             let q = q.try_lock();
             match q {
-                Ok(queue) => { D::queue_is_compatible(&*queue) }
-                Err(_) => { false }
+                Ok(queue) => D::queue_is_compatible(&*queue),
+                Err(_) => false,
             }
         });
         match q {
-            None => { Err(TryLockError::WouldBlock) }
-            Some(q) => { Ok(q.lock()?) }
+            None => Err(TryLockError::WouldBlock),
+            Some(q) => Ok(q.lock()?),
         }
     }
 
     /// Obtain a reference to a queue matching the domain. Blocks if this queue is currently locked.
     pub fn get_queue<D: ExecutionDomain>(&self) -> Option<MutexGuard<Queue>> {
-        self.queues.iter().find(|&q| {
-            let q = q.lock().unwrap();
-            D::queue_is_compatible(&*q)
-        }).map(|q| q.lock().unwrap())
+        self.queues
+            .iter()
+            .find(|&q| {
+                let q = q.lock().unwrap();
+                D::queue_is_compatible(&*q)
+            })
+            .map(|q| q.lock().unwrap())
     }
 }

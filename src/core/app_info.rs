@@ -1,7 +1,7 @@
 use ash::vk;
 
-use crate::{WindowInterface};
 use crate::core::queue::QueueType;
+use crate::WindowInterface;
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 #[derive(Debug)]
@@ -11,7 +11,7 @@ pub struct QueueRequest {
     /// try to exclude transfer capabilities, as this is not possible per spec guarantees (a graphics queue must have transfer support)
     pub dedicated: bool,
     /// Capabilities that are requested from the queue.
-    pub queue_type: QueueType
+    pub queue_type: QueueType,
 }
 
 /// Minimum requirements for the GPU. This will be used to determine what physical device is selected.
@@ -90,7 +90,9 @@ pub struct AppBuilder<'a, Window: WindowInterface> {
 
 impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
     pub fn new() -> Self {
-        AppBuilder { inner: AppSettings::default() }
+        AppBuilder {
+            inner: AppSettings::default(),
+        }
     }
 
     pub fn name(mut self, name: impl Into<String>) -> Self {

@@ -26,15 +26,15 @@ use crate::{Allocation, Allocator, DefaultAllocator, Device, MemoryType};
 #[derivative(Debug)]
 pub struct Image<A: Allocator = DefaultAllocator> {
     /// Reference to the [`VkDevice`](vk::Device).
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     allocator: Option<A>,
     /// [`VkImage`](vk::Image) handle.
     handle: vk::Image,
     /// GPU memory allocation. If this is None, then the image is not owned by our system (for example a swapchain image) and should not be
     /// destroyed.
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     memory: Option<A::Allocation>,
     /// Image format
     format: vk::Format,
@@ -56,9 +56,9 @@ pub struct Image<A: Allocator = DefaultAllocator> {
 #[derivative(Debug, Hash, PartialEq, Eq)]
 pub struct ImgView {
     /// Reference to the [`VkDevice`](vk::Device)
-    #[derivative(Debug="ignore")]
-    #[derivative(Hash="ignore")]
-    #[derivative(PartialEq="ignore")]
+    #[derivative(Debug = "ignore")]
+    #[derivative(Hash = "ignore")]
+    #[derivative(PartialEq = "ignore")]
     device: Arc<Device>,
     /// [`VkImageView`](vk::ImageView) handle
     handle: vk::ImageView,
@@ -90,41 +90,65 @@ pub type ImageView = Arc<ImgView>;
 impl<A: Allocator> Image<A> {
     // TODO: Allow specifying an initial layout for convenience
     /// Create a new simple [`VkImage`] and allocate some memory to it.
-    pub fn new(device: Arc<Device>, alloc: &mut A, width: u32, height: u32, usage: vk::ImageUsageFlags, format: vk::Format, samples: vk::SampleCountFlags) -> Result<Self> {
-        let sharing_mode = if usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {
+    pub fn new(
+        device: Arc<Device>,
+        alloc: &mut A,
+        width: u32,
+        height: u32,
+        usage: vk::ImageUsageFlags,
+        format: vk::Format,
+        samples: vk::SampleCountFlags,
+    ) -> Result<Self> {
+        let sharing_mode = if usage.intersects(
+            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+        ) {
             vk::SharingMode::EXCLUSIVE
-        }
-        else {
+        } else {
             vk::SharingMode::CONCURRENT
         };
 
-        let handle = unsafe { device.create_image(&vk::ImageCreateInfo {
-            s_type: vk::StructureType::IMAGE_CREATE_INFO,
-            p_next: std::ptr::null(),
-            flags: Default::default(),
-            image_type: vk::ImageType::TYPE_2D,
-            format,
-            extent: vk::Extent3D {
-                width,
-                height,
-                depth: 1,
-            },
-            mip_levels: 1,
-            array_layers: 1,
-            samples,
-            tiling: vk::ImageTiling::OPTIMAL,
-            usage,
-            sharing_mode,
-            queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families().len() as u32 } else { 0 },
-            p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT { device.queue_families().as_ptr() } else { std::ptr::null() },
-            initial_layout: vk::ImageLayout::UNDEFINED,
-        }, None)? };
+        let handle = unsafe {
+            device.create_image(
+                &vk::ImageCreateInfo {
+                    s_type: vk::StructureType::IMAGE_CREATE_INFO,
+                    p_next: std::ptr::null(),
+                    flags: Default::default(),
+                    image_type: vk::ImageType::TYPE_2D,
+                    format,
+                    extent: vk::Extent3D {
+                        width,
+                        height,
+                        depth: 1,
+                    },
+                    mip_levels: 1,
+                    array_layers: 1,
+                    samples,
+                    tiling: vk::ImageTiling::OPTIMAL,
+                    usage,
+                    sharing_mode,
+                    queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT {
+                        device.queue_families().len() as u32
+                    } else {
+                        0
+                    },
+                    p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT {
+                        device.queue_families().as_ptr()
+                    } else {
+                        std::ptr::null()
+                    },
+                    initial_layout: vk::ImageLayout::UNDEFINED,
+                },
+                None,
+            )?
+        };
 
         let requirements = unsafe { device.get_image_memory_requirements(handle) };
 
         // TODO: Proper memory location configuration
         let memory = alloc.allocate("image_", &requirements, MemoryType::GpuOnly)?;
-        unsafe { device.bind_image_memory(handle, memory.memory(), memory.offset())?; }
+        unsafe {
+            device.bind_image_memory(handle, memory.memory(), memory.offset())?;
+        }
 
         Ok(Self {
             device: device.clone(),
@@ -150,8 +174,8 @@ impl<A: Allocator> Image<A> {
         size: vk::Extent3D,
         layers: u32,
         mip_levels: u32,
-        samples: vk::SampleCountFlags) -> Self {
-
+        samples: vk::SampleCountFlags,
+    ) -> Self {
         Self {
             device,
             allocator: None,
@@ -190,7 +214,7 @@ impl<A: Allocator> Image<A> {
         };
 
         let view_handle = unsafe { self.device.create_image_view(&info, None)? };
-        Ok(ImageView::new(ImgView{
+        Ok(ImageView::new(ImgView {
             device: self.device.clone(),
             handle: view_handle,
             image: self.handle.clone(),
@@ -251,7 +275,9 @@ impl<A: Allocator> Image<A> {
 impl<A: Allocator> Drop for Image<A> {
     fn drop(&mut self) {
         if self.is_owned() {
-            unsafe { self.device.destroy_image(self.handle, None); }
+            unsafe {
+                self.device.destroy_image(self.handle, None);
+            }
             if let Some(memory) = &mut self.memory {
                 let memory = std::mem::take(memory);
                 if let Some(allocator) = &mut self.allocator {
@@ -275,7 +301,7 @@ impl ImgView {
             base_mip_level: self.base_level,
             level_count: self.level_count,
             base_array_layer: self.base_layer,
-            layer_count: self.layer_count
+            layer_count: self.layer_count,
         }
     }
 
@@ -338,6 +364,8 @@ impl ImgView {
 
 impl Drop for ImgView {
     fn drop(&mut self) {
-        unsafe { self.device.destroy_image_view(self.handle, None); }
+        unsafe {
+            self.device.destroy_image_view(self.handle, None);
+        }
     }
 }

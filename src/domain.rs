@@ -57,7 +57,10 @@ impl ExecutionDomain for Compute {
 
 impl ExecutionDomain for All {
     fn queue_is_compatible(queue: &Queue) -> bool {
-        queue.info().flags.contains(vk::QueueFlags::COMPUTE | vk::QueueFlags::GRAPHICS | vk::QueueFlags::TRANSFER)
+        queue
+            .info()
+            .flags
+            .contains(vk::QueueFlags::COMPUTE | vk::QueueFlags::GRAPHICS | vk::QueueFlags::TRANSFER)
     }
 
     type CmdBuf<'q> = IncompleteCommandBuffer<'q, All>;

@@ -12,7 +12,7 @@ use crate::util::cache::{Cache, Resource};
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct PipelineLayout {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
     handle: vk::PipelineLayout,
     set_layouts: Vec<vk::DescriptorSetLayout>,
@@ -50,12 +50,22 @@ impl Resource for PipelineLayout {
     type ExtraParams<'a> = &'a mut Cache<DescriptorSetLayout>;
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self> {
-        let set_layouts = key.set_layouts.iter().map(|info|
-            unsafe { set_layout_cache.get_or_create(&info, ()).unwrap().handle() }
-        ).collect::<Vec<_>>();
+    fn create(
+        device: Arc<Device>,
+        key: &Self::Key,
+        set_layout_cache: Self::ExtraParams<'_>,
+    ) -> Result<Self> {
+        let set_layouts = key
+            .set_layouts
+            .iter()
+            .map(|info| unsafe { set_layout_cache.get_or_create(&info, ()).unwrap().handle() })
+            .collect::<Vec<_>>();
 
-        let pc = key.push_constants.iter().map(|pc| pc.to_vk()).collect::<Vec<_>>();
+        let pc = key
+            .push_constants
+            .iter()
+            .map(|pc| pc.to_vk())
+            .collect::<Vec<_>>();
         let info = vk::PipelineLayoutCreateInfo::builder()
             .flags(key.flags)
             .push_constant_ranges(pc.as_slice())
@@ -64,7 +74,7 @@ impl Resource for PipelineLayout {
         Ok(Self {
             device: device.clone(),
             handle: unsafe { device.create_pipeline_layout(&info, None)? },
-            set_layouts: set_layouts.clone()
+            set_layouts: set_layouts.clone(),
         })
     }
 }
@@ -76,7 +86,6 @@ impl Drop for PipelineLayout {
         }
     }
 }
-
 
 impl PushConstantRange {
     pub fn to_vk(&self) -> vk::PushConstantRange {

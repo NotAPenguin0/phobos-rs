@@ -12,9 +12,9 @@ use crate::util::cache::Resource;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Shader {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     device: Arc<Device>,
-    handle: vk::ShaderModule
+    handle: vk::ShaderModule,
 }
 
 impl Shader {
@@ -28,7 +28,7 @@ impl Shader {
 pub struct ShaderCreateInfo {
     stage: vk::ShaderStageFlags,
     code: Vec<u32>,
-    code_hash: u64
+    code_hash: u64,
 }
 
 impl ShaderCreateInfo {
@@ -68,7 +68,9 @@ impl Resource for Shader {
 
 impl Drop for Shader {
     fn drop(&mut self) {
-        unsafe { self.device.destroy_shader_module(self.handle, None); }
+        unsafe {
+            self.device.destroy_shader_module(self.handle, None);
+        }
     }
 }
 

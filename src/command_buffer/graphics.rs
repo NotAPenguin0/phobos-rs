@@ -22,29 +22,65 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
 
     /// Sets the viewport. Directly translates to [`vkCmdSetViewport`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdSetViewport.html).
     fn viewport(self, viewport: vk::Viewport) -> Self {
-        unsafe { self.device.cmd_set_viewport(self.handle, 0, std::slice::from_ref(&viewport)); }
+        unsafe {
+            self.device
+                .cmd_set_viewport(self.handle, 0, std::slice::from_ref(&viewport));
+        }
         self
     }
 
     /// Sets the scissor region. Directly translates to [`vkCmdSetScissor`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdSetScissor.html).
     fn scissor(self, scissor: vk::Rect2D) -> Self {
-        unsafe { self.device.cmd_set_scissor(self.handle, 0, std::slice::from_ref(&scissor)); }
+        unsafe {
+            self.device
+                .cmd_set_scissor(self.handle, 0, std::slice::from_ref(&scissor));
+        }
         self
     }
 
     /// Issue a drawcall. This will flush the current descriptor set state and actually bind the descriptor sets.
     /// Directly translates to [`vkCmdDraw`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdDraw.html).
-    fn draw(mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Result<Self> {
+    fn draw(
+        mut self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) -> Result<Self> {
         self = self.ensure_descriptor_state()?;
-        unsafe { self.device.cmd_draw(self.handle, vertex_count, instance_count, first_vertex, first_instance); }
+        unsafe {
+            self.device.cmd_draw(
+                self.handle,
+                vertex_count,
+                instance_count,
+                first_vertex,
+                first_instance,
+            );
+        }
         Ok(self)
     }
 
     /// Issue an indexed drawcall. This will flush the current descriptor state and actually bind the
     /// descriptor sets. Directly translates to [`vkCmdDrawIndexed`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdDrawIndexed.html).
-    fn draw_indexed(mut self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Result<Self> {
+    fn draw_indexed(
+        mut self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
+    ) -> Result<Self> {
         self = self.ensure_descriptor_state()?;
-        unsafe { self.device.cmd_draw_indexed(self.handle, index_count, instance_count, first_index, vertex_offset, first_instance) }
+        unsafe {
+            self.device.cmd_draw_indexed(
+                self.handle,
+                index_count,
+                instance_count,
+                first_index,
+                vertex_offset,
+                first_instance,
+            )
+        }
         Ok(self)
     }
 
@@ -57,7 +93,13 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
             let mut cache = cache.lock().unwrap();
             let Some(rendering_state) = &self.current_rendering_state else { return Err(Error::NoRenderpass.into()) };
             let pipeline = cache.get_pipeline(name, &rendering_state)?;
-            unsafe { self.device.cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle); }
+            unsafe {
+                self.device.cmd_bind_pipeline(
+                    self.handle,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    pipeline.handle,
+                );
+            }
             self.current_bindpoint = vk::PipelineBindPoint::GRAPHICS;
             self.current_pipeline_layout = pipeline.layout;
             self.current_set_layouts = pipeline.set_layouts.clone();
@@ -67,22 +109,48 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
 
     /// Binds a vertex buffer to the specified binding point. Note that currently there is no validation as to whether this
     /// binding actually exists for the given pipeline. Direct translation of [`vkCmdBindVertexBuffers`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindVertexBuffers.html).
-    fn bind_vertex_buffer(self, binding: u32, buffer: &BufferView) -> Self where Self: Sized {
+    fn bind_vertex_buffer(self, binding: u32, buffer: &BufferView) -> Self
+        where
+            Self: Sized,
+    {
         let handle = unsafe { buffer.handle() };
         let offset = buffer.offset();
-        unsafe { self.device.cmd_bind_vertex_buffers(self.handle, binding, std::slice::from_ref(&handle), std::slice::from_ref(&offset)) };
+        unsafe {
+            self.device.cmd_bind_vertex_buffers(
+                self.handle,
+                binding,
+                std::slice::from_ref(&handle),
+                std::slice::from_ref(&offset),
+            )
+        };
         self
     }
 
     /// Bind the an index buffer. The index type must match. Direct translation of [`vkCmdBindIndexBuffer`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBindIndexBuffer.html)
-    fn bind_index_buffer(self, buffer: &BufferView, ty: vk::IndexType) -> Self where Self: Sized {
-        unsafe { self.device.cmd_bind_index_buffer(self.handle, buffer.handle(), buffer.offset(), ty); }
+    fn bind_index_buffer(self, buffer: &BufferView, ty: vk::IndexType) -> Self
+        where
+            Self: Sized,
+    {
+        unsafe {
+            self.device
+                .cmd_bind_index_buffer(self.handle, buffer.handle(), buffer.offset(), ty);
+        }
         self
     }
 
     /// Blit a source image to a destination image, using the specified offsets into the images and a filter. Direct and thin wrapper around
     /// [`vkCmdBlitImage`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBlitImage.html)
-    fn blit_image(self, src: &ImageView, dst: &ImageView, src_offsets: &[vk::Offset3D; 2], dst_offsets: &[vk::Offset3D; 2], filter: vk::Filter) -> Self where Self: Sized {
+    fn blit_image(
+        self,
+        src: &ImageView,
+        dst: &ImageView,
+        src_offsets: &[vk::Offset3D; 2],
+        dst_offsets: &[vk::Offset3D; 2],
+        filter: vk::Filter,
+    ) -> Self
+        where
+            Self: Sized,
+    {
         let blit = vk::ImageBlit {
             src_subresource: vk::ImageSubresourceLayers {
                 aspect_mask: src.aspect(),
@@ -97,7 +165,7 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
                 base_array_layer: dst.base_layer(),
                 layer_count: dst.layer_count(),
             },
-            dst_offsets: *dst_offsets
+            dst_offsets: *dst_offsets,
         };
 
         unsafe {
@@ -107,7 +175,9 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
                 vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
                 dst.image(),
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                std::slice::from_ref(&blit), filter);
+                std::slice::from_ref(&blit),
+                filter,
+            );
         }
         self
     }

@@ -16,9 +16,12 @@ use crate::util::cache::{Cache, Resource};
 use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
 #[derive(Debug)]
-struct PipelineEntry<P> where P: std::fmt::Debug {
+struct PipelineEntry<P>
+    where
+        P: std::fmt::Debug,
+{
     pub info: P,
-    #[cfg(feature="shader-reflection")]
+    #[cfg(feature = "shader-reflection")]
     pub reflection: ReflectionInfo,
 }
 
@@ -43,39 +46,52 @@ pub struct PipelineCache {
     named_pipelines: HashMap<String, PipelineEntry<PipelineCreateInfo>>,
 }
 
-
 impl Resource for Pipeline {
     type Key = PipelineCreateInfo;
-    type ExtraParams<'a> = (&'a mut Cache<Shader>, &'a mut Cache<PipelineLayout>, &'a mut Cache<DescriptorSetLayout>);
+    type ExtraParams<'a> = (
+        &'a mut Cache<Shader>,
+        &'a mut Cache<PipelineLayout>,
+        &'a mut Cache<DescriptorSetLayout>,
+    );
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self> {
+    fn create(
+        device: Arc<Device>,
+        info: &Self::Key,
+        params: Self::ExtraParams<'_>,
+    ) -> Result<Self> {
         let (shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
         let mut pci = info.to_vk(unsafe { layout.handle() });
         // Set shader create info
         let entry = CString::new("main")?;
-        let shader_info: Vec<_> = info.shaders.iter().map(|shader| -> vk::PipelineShaderStageCreateInfo {
-            vk::PipelineShaderStageCreateInfo::builder()
-                .name(&entry)
-                .stage(shader.stage())
-                .module(unsafe { shaders.get_or_create(shader, ()).unwrap().handle() })
-                .build()
-        }).collect();
+        let shader_info: Vec<_> = info
+            .shaders
+            .iter()
+            .map(|shader| -> vk::PipelineShaderStageCreateInfo {
+                vk::PipelineShaderStageCreateInfo::builder()
+                    .name(&entry)
+                    .stage(shader.stage())
+                    .module(unsafe { shaders.get_or_create(shader, ()).unwrap().handle() })
+                    .build()
+            })
+            .collect();
         pci.stage_count = shader_info.len() as u32;
         pci.p_stages = shader_info.as_ptr();
 
         unsafe {
             Ok(Self {
                 device: device.clone(),
-                handle: device.create_graphics_pipelines(
-                    vk::PipelineCache::null(),
-                    std::slice::from_ref(&pci),
-                    None)
-                    .or_else(
-                        |(_, e)|
-                            Err(anyhow::Error::from(Error::VkError(e))))
-                    ?.first().cloned().unwrap(),
+                handle: device
+                    .create_graphics_pipelines(
+                        vk::PipelineCache::null(),
+                        std::slice::from_ref(&pci),
+                        None,
+                    )
+                    .or_else(|(_, e)| Err(anyhow::Error::from(Error::VkError(e))))?
+                    .first()
+                    .cloned()
+                    .unwrap(),
                 layout: layout.handle(),
                 set_layouts: layout.set_layouts().to_vec(),
             })
@@ -85,10 +101,11 @@ impl Resource for Pipeline {
 
 impl Drop for Pipeline {
     fn drop(&mut self) {
-        unsafe { self.device.destroy_pipeline(self.handle, None); }
+        unsafe {
+            self.device.destroy_pipeline(self.handle, None);
+        }
     }
 }
-
 
 // TODO: Maybe incorporate the vulkan pipeline cache api to improve startup times?
 
@@ -105,36 +122,45 @@ impl PipelineCache {
     }
 
     /// Create and register a new pipeline into the cache.
-    #[cfg(feature="shader-reflection")]
+    #[cfg(feature = "shader-reflection")]
     pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
         let refl = reflect_shaders(&info)?;
         // Using reflection, we can allow omitting the pipeline layout field.
         info.layout = build_pipeline_layout(&refl);
         let name = info.name.clone();
-        self.named_pipelines.insert(name.clone(), PipelineEntry {
-            info,
-            reflection: refl,
-        });
-        self.named_pipelines.get_mut(&name).unwrap().info.build_inner();
+        self.named_pipelines.insert(
+            name.clone(),
+            PipelineEntry {
+                info,
+                reflection: refl,
+            },
+        );
+        self.named_pipelines
+            .get_mut(&name)
+            .unwrap()
+            .info
+            .build_inner();
         Ok(())
     }
 
-
-    #[cfg(not(feature="shader-reflection"))]
+    #[cfg(not(feature = "shader-reflection"))]
     pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
         info.build_inner();
         let name = info.name.clone();
-        self.named_pipelines.insert(name.clone(), PipelineEntry {
-            info
-        });
-        self.named_pipelines.get_mut(&name).unwrap().info.build_inner();
+        self.named_pipelines
+            .insert(name.clone(), PipelineEntry { info });
+        self.named_pipelines
+            .get_mut(&name)
+            .unwrap()
+            .info
+            .build_inner();
         Ok(())
     }
 
     /// Get reflection info for a previously registered pipeline.
     /// # Errors
     /// Fails if the pipeline was not found in the cache.
-    #[cfg(feature="shader-reflection")]
+    #[cfg(feature = "shader-reflection")]
     pub fn reflection_info(&self, name: &str) -> Result<&ReflectionInfo> {
         Ok(&self.named_pipelines.get(name).unwrap().reflection)
     }
@@ -150,7 +176,11 @@ impl PipelineCache {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn get_pipeline(&mut self, name: &str, rendering_info: &PipelineRenderingInfo) -> Result<&Pipeline> {
+    pub(crate) fn get_pipeline(
+        &mut self,
+        name: &str,
+        rendering_info: &PipelineRenderingInfo,
+    ) -> Result<&Pipeline> {
         let entry = self.named_pipelines.get_mut(name);
         let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
         entry.info.rendering_info = rendering_info.clone();
@@ -159,8 +189,16 @@ impl PipelineCache {
         for layout in &entry.info.layout.set_layouts {
             self.set_layouts.get_or_create(layout, ())?;
         }
-        self.pipeline_layouts.get_or_create(&entry.info.layout, &mut self.set_layouts)?;
-        self.pipelines.get_or_create(&entry.info, (&mut self.shaders, &mut self.pipeline_layouts, &mut self.set_layouts))
+        self.pipeline_layouts
+            .get_or_create(&entry.info.layout, &mut self.set_layouts)?;
+        self.pipelines.get_or_create(
+            &entry.info,
+            (
+                &mut self.shaders,
+                &mut self.pipeline_layouts,
+                &mut self.set_layouts,
+            ),
+        )
     }
 
     /// Advance cache resource time to live so resources that have not been used in a while can be cleaned up

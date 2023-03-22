@@ -1,10 +1,10 @@
 use std::collections::HashMap;
+
+use anyhow::Result;
 use ash::vk;
 
 use crate::{ByteSize, Error, PipelineCreateInfo, ShaderCreateInfo};
 use crate::pipeline::create_info::*;
-
-use anyhow::Result;
 
 /// Used to facilitate creating a graphics pipeline. For an example, please check the
 /// [`pipeline`](crate::pipeline) module level documentation.
@@ -12,7 +12,6 @@ pub struct PipelineBuilder {
     inner: PipelineCreateInfo,
     vertex_binding_offsets: HashMap<u32, u32>,
 }
-
 
 impl PipelineBuilder {
     /// Create a new empty pipeline with default settings for everything.
@@ -31,7 +30,7 @@ impl PipelineBuilder {
                         flags: Default::default(),
                         topology: vk::PrimitiveTopology::TRIANGLE_LIST,
                         primitive_restart_enable: vk::FALSE,
-                    }
+                    },
                 },
                 depth_stencil: PipelineDepthStencilStateCreateInfo {
                     0: vk::PipelineDepthStencilStateCreateInfo {
@@ -63,7 +62,7 @@ impl PipelineBuilder {
                         },
                         min_depth_bounds: 0.0,
                         max_depth_bounds: 0.0,
-                    }
+                    },
                 },
                 dynamic_states: vec![],
                 rasterizer: PipelineRasterizationStateCreateInfo {
@@ -81,7 +80,7 @@ impl PipelineBuilder {
                         depth_bias_clamp: 0.0,
                         depth_bias_slope_factor: 0.0,
                         line_width: 1.0,
-                    }
+                    },
                 },
                 multisample: PipelineMultisampleStateCreateInfo {
                     0: vk::PipelineMultisampleStateCreateInfo {
@@ -93,8 +92,8 @@ impl PipelineBuilder {
                         min_sample_shading: 0.0,
                         p_sample_mask: std::ptr::null(),
                         alpha_to_coverage_enable: vk::FALSE,
-                        alpha_to_one_enable: vk::FALSE
-                    }
+                        alpha_to_one_enable: vk::FALSE,
+                    },
                 },
                 blend_attachments: vec![],
                 viewports: vec![],
@@ -132,27 +131,41 @@ impl PipelineBuilder {
     /// Add a vertex input binding. These are the binding indices for `vkCmdBindVertexBuffers`
     pub fn vertex_input(mut self, binding: u32, rate: vk::VertexInputRate) -> Self {
         self.vertex_binding_offsets.insert(0, 0);
-        self.inner.vertex_input_bindings.push(VertexInputBindingDescription{
-            0: vk::VertexInputBindingDescription {
-                binding,
-                stride: 0,
-                input_rate: rate,
-            }});
+        self.inner
+            .vertex_input_bindings
+            .push(VertexInputBindingDescription {
+                0: vk::VertexInputBindingDescription {
+                    binding,
+                    stride: 0,
+                    input_rate: rate,
+                },
+            });
         self
     }
 
     /// Add a vertex attribute to the specified binding.
     /// Doing this will automatically calculate offsets and sizes, so make sure to add these in order of declaration in
     /// the shader.
-    pub fn vertex_attribute(mut self, binding: u32, location: u32, format: vk::Format) -> Result<Self> {
-        let offset = self.vertex_binding_offsets.get_mut(&binding).ok_or(Error::NoVertexBinding)?;
-        self.inner.vertex_attributes.push(VertexInputAttributeDescription{
-            0: vk::VertexInputAttributeDescription {
-                location,
-                binding,
-                format,
-                offset: *offset,
-            }});
+    pub fn vertex_attribute(
+        mut self,
+        binding: u32,
+        location: u32,
+        format: vk::Format,
+    ) -> Result<Self> {
+        let offset = self
+            .vertex_binding_offsets
+            .get_mut(&binding)
+            .ok_or(Error::NoVertexBinding)?;
+        self.inner
+            .vertex_attributes
+            .push(VertexInputAttributeDescription {
+                0: vk::VertexInputAttributeDescription {
+                    location,
+                    binding,
+                    format,
+                    offset: *offset,
+                },
+            });
         *offset += format.byte_size() as u32;
         for binding in &mut self.inner.vertex_input_bindings {
             binding.0.stride += format.byte_size() as u32;
@@ -204,7 +217,7 @@ impl PipelineBuilder {
         self.inner.dynamic_states.push(state);
         // When setting a viewport dynamic state, we still need a dummy viewport to make validation shut up
         if state == vk::DynamicState::VIEWPORT {
-            self.inner.viewports.push(Viewport{
+            self.inner.viewports.push(Viewport {
                 0: vk::Viewport {
                     x: 0.0,
                     y: 0.0,
@@ -212,16 +225,17 @@ impl PipelineBuilder {
                     height: 0.0,
                     min_depth: 0.0,
                     max_depth: 0.0,
-                }
+                },
             })
         }
         // Same with scissor state
         if state == vk::DynamicState::SCISSOR {
-            self.inner.scissors.push(Rect2D{
+            self.inner.scissors.push(Rect2D {
                 0: vk::Rect2D {
                     offset: Default::default(),
                     extent: Default::default(),
-                }})
+                },
+            })
         }
 
         self
@@ -268,33 +282,45 @@ impl PipelineBuilder {
 
     /// Add a blend attachment, but with no blending enabled.
     pub fn blend_attachment_none(mut self) -> Self {
-        self.inner.blend_attachments.push(PipelineColorBlendAttachmentState{
-            0: vk::PipelineColorBlendAttachmentState {
-                blend_enable: vk::FALSE,
-                src_color_blend_factor: vk::BlendFactor::ONE,
-                dst_color_blend_factor: vk::BlendFactor::ONE,
-                color_blend_op: vk::BlendOp::ADD,
-                src_alpha_blend_factor: vk::BlendFactor::ONE,
-                dst_alpha_blend_factor: vk::BlendFactor::ONE,
-                alpha_blend_op: vk::BlendOp::ADD,
-                color_write_mask: vk::ColorComponentFlags::RGBA,
-            }});
+        self.inner
+            .blend_attachments
+            .push(PipelineColorBlendAttachmentState {
+                0: vk::PipelineColorBlendAttachmentState {
+                    blend_enable: vk::FALSE,
+                    src_color_blend_factor: vk::BlendFactor::ONE,
+                    dst_color_blend_factor: vk::BlendFactor::ONE,
+                    color_blend_op: vk::BlendOp::ADD,
+                    src_alpha_blend_factor: vk::BlendFactor::ONE,
+                    dst_alpha_blend_factor: vk::BlendFactor::ONE,
+                    alpha_blend_op: vk::BlendOp::ADD,
+                    color_write_mask: vk::ColorComponentFlags::RGBA,
+                },
+            });
         self
     }
 
     /// Add an additive blend attachment, writing to each color component.
-    pub fn blend_additive_unmasked(mut self, src: vk::BlendFactor, dst: vk::BlendFactor, src_alpha: vk::BlendFactor, dst_alpha: vk::BlendFactor) -> Self {
-        self.inner.blend_attachments.push(PipelineColorBlendAttachmentState{
-            0: vk::PipelineColorBlendAttachmentState {
-                blend_enable: vk::TRUE,
-                src_color_blend_factor: src,
-                dst_color_blend_factor: dst,
-                color_blend_op: vk::BlendOp::ADD,
-                src_alpha_blend_factor: src_alpha,
-                dst_alpha_blend_factor: dst_alpha,
-                alpha_blend_op: vk::BlendOp::ADD,
-                color_write_mask: vk::ColorComponentFlags::RGBA,
-            }});
+    pub fn blend_additive_unmasked(
+        mut self,
+        src: vk::BlendFactor,
+        dst: vk::BlendFactor,
+        src_alpha: vk::BlendFactor,
+        dst_alpha: vk::BlendFactor,
+    ) -> Self {
+        self.inner
+            .blend_attachments
+            .push(PipelineColorBlendAttachmentState {
+                0: vk::PipelineColorBlendAttachmentState {
+                    blend_enable: vk::TRUE,
+                    src_color_blend_factor: src,
+                    dst_color_blend_factor: dst,
+                    color_blend_op: vk::BlendOp::ADD,
+                    src_alpha_blend_factor: src_alpha,
+                    dst_alpha_blend_factor: dst_alpha,
+                    alpha_blend_op: vk::BlendOp::ADD,
+                    color_write_mask: vk::ColorComponentFlags::RGBA,
+                },
+            });
         self
     }
 

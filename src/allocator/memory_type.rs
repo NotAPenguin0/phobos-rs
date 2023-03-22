@@ -13,9 +13,9 @@ pub enum MemoryType {
 impl From<MemoryType> for gpu_allocator::MemoryLocation {
     fn from(value: MemoryType) -> Self {
         match value {
-            MemoryType::GpuOnly => { gpu_allocator::MemoryLocation::GpuOnly }
-            MemoryType::CpuToGpu => { gpu_allocator::MemoryLocation::CpuToGpu }
-            MemoryType::GpuToCpu => { gpu_allocator::MemoryLocation::GpuToCpu }
+            MemoryType::GpuOnly => gpu_allocator::MemoryLocation::GpuOnly,
+            MemoryType::CpuToGpu => gpu_allocator::MemoryLocation::CpuToGpu,
+            MemoryType::GpuToCpu => gpu_allocator::MemoryLocation::GpuToCpu,
         }
     }
 }

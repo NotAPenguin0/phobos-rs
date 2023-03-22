@@ -43,14 +43,33 @@ pub struct ScratchAllocator<A: Allocator = DefaultAllocator> {
 impl<A: Allocator> ScratchAllocator<A> {
     /// Create a new scratch allocator with a specified max capacity. All possible usages for buffers allocated from this should be
     /// given in the usage flags.
-    pub fn new(device: Arc<Device>, allocator: &mut A, max_size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
-        let buffer = Buffer::new(device.clone(), allocator, max_size, usage, MemoryType::CpuToGpu)?;
-        let alignment = if usage.intersects(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER) {
+    pub fn new(
+        device: Arc<Device>,
+        allocator: &mut A,
+        max_size: impl Into<vk::DeviceSize>,
+        usage: vk::BufferUsageFlags,
+    ) -> Result<Self> {
+        let buffer = Buffer::new(
+            device.clone(),
+            allocator,
+            max_size,
+            usage,
+            MemoryType::CpuToGpu,
+        )?;
+        let alignment = if usage
+            .intersects(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER)
+        {
             16
         } else if usage.contains(vk::BufferUsageFlags::UNIFORM_BUFFER) {
-            device.properties().limits.min_uniform_buffer_offset_alignment
+            device
+                .properties()
+                .limits
+                .min_uniform_buffer_offset_alignment
         } else if usage.contains(vk::BufferUsageFlags::STORAGE_BUFFER) {
-            device.properties().limits.min_storage_buffer_offset_alignment
+            device
+                .properties()
+                .limits
+                .min_storage_buffer_offset_alignment
         } else {
             unimplemented!()
         };
@@ -59,11 +78,11 @@ impl<A: Allocator> ScratchAllocator<A> {
             Ok(Self {
                 buffer,
                 offset: 0,
-                alignment
+                alignment,
             })
         } else {
             Err(anyhow::Error::from(Error::UnmappableBuffer))
-        }
+        };
     }
 
     /// Allocates a fixed amount of bytes from the allocator.
@@ -82,7 +101,7 @@ impl<A: Allocator> ScratchAllocator<A> {
             let offset = self.offset;
             self.offset += padded_size;
             self.buffer.view(offset, size)
-        }
+        };
     }
 
     /// Resets the linear allocator back to the beginning. Proper external synchronization needs to be

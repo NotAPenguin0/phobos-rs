@@ -17,16 +17,26 @@ impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteComma
         let copy = vk::BufferCopy {
             src_offset: src.offset(),
             dst_offset: dst.offset(),
-            size: src.size()
+            size: src.size(),
         };
 
-        unsafe { self.device.cmd_copy_buffer(self.handle, src.handle(), dst.handle(), std::slice::from_ref(&copy)); }
+        unsafe {
+            self.device.cmd_copy_buffer(
+                self.handle,
+                src.handle(),
+                dst.handle(),
+                std::slice::from_ref(&copy),
+            );
+        }
 
         Ok(self)
     }
 
     /// Copy a buffer to the base mip level of the specified image.
-    fn copy_buffer_to_image(self, src: &BufferView, dst: &ImageView) -> Result<Self> where Self: Sized {
+    fn copy_buffer_to_image(self, src: &BufferView, dst: &ImageView) -> Result<Self>
+        where
+            Self: Sized,
+    {
         let copy = vk::BufferImageCopy {
             buffer_offset: src.offset(),
             buffer_row_length: dst.width(),
@@ -41,7 +51,15 @@ impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteComma
             image_extent: dst.size(),
         };
 
-        unsafe { self.device.cmd_copy_buffer_to_image(self.handle, src.handle(), dst.image(), vk::ImageLayout::TRANSFER_DST_OPTIMAL, std::slice::from_ref(&copy)); }
+        unsafe {
+            self.device.cmd_copy_buffer_to_image(
+                self.handle,
+                src.handle(),
+                dst.image(),
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                std::slice::from_ref(&copy),
+            );
+        }
 
         Ok(self)
     }

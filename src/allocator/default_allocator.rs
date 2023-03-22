@@ -17,7 +17,7 @@ use crate::allocator::traits;
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
 pub struct DefaultAllocator {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     alloc: Arc<Mutex<vk_alloc::Allocator>>,
 }
 
@@ -30,19 +30,22 @@ pub struct Allocation {
 
 impl DefaultAllocator {
     /// Create a new default allocator.
-    pub fn new(instance: &VkInstance, device: &Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
+    pub fn new(
+        instance: &VkInstance,
+        device: &Arc<Device>,
+        physical_device: &PhysicalDevice,
+    ) -> Result<Self> {
         Ok(Self {
-                alloc: Arc::new(Mutex::new(vk_alloc::Allocator::new(
+            alloc: Arc::new(Mutex::new(vk_alloc::Allocator::new(
                 &vk_alloc::AllocatorCreateDesc {
                     instance: (*instance).clone(),
                     device: unsafe { device.handle() },
                     physical_device: unsafe { physical_device.handle() },
                     debug_settings: Default::default(),
-                    buffer_device_address: false // We might change this if the bufferDeviceAddress feature gets enabled.
-                    }
-                )?))
-            }
-        )
+                    buffer_device_address: false, // We might change this if the bufferDeviceAddress feature gets enabled.
+                },
+            )?)),
+        })
     }
 }
 
@@ -50,7 +53,12 @@ impl traits::Allocator for DefaultAllocator {
     type Allocation = Allocation;
 
     /// Allocates raw memory of a specific memory type. The given name is used for internal tracking.
-    fn allocate(&mut self, name: &'static str, requirements: &MemoryRequirements, ty: MemoryType) -> Result<Self::Allocation> {
+    fn allocate(
+        &mut self,
+        name: &'static str,
+        requirements: &MemoryRequirements,
+        ty: MemoryType,
+    ) -> Result<Self::Allocation> {
         let mut alloc = self.alloc.lock().map_err(|_| Error::PoisonError)?;
         let allocation = alloc.allocate(&vk_alloc::AllocationCreateDesc {
             name,
@@ -60,9 +68,7 @@ impl traits::Allocator for DefaultAllocator {
             allocation_scheme: AllocationScheme::GpuAllocatorManaged,
         })?;
 
-        Ok(Allocation {
-            allocation,
-        })
+        Ok(Allocation { allocation })
     }
 
     /// Free some memory allocated from this allocator.
