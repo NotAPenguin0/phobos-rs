@@ -52,6 +52,8 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
     size: vk::DeviceSize,
 }
 
+// SAFETY: The unsafe part of this is the mapped pointer, but this is a pointer to GPU memory
+// so its value is not dropped when sending this to a different thread.
 unsafe impl<A: Allocator> Send for Buffer<A> {}
 
 /// View into a specific offset and range of a [`Buffer`].
@@ -64,6 +66,10 @@ pub struct BufferView {
     offset: vk::DeviceSize,
     size: vk::DeviceSize,
 }
+
+// SAFETY: The unsafe part of this is the mapped pointer, but this is a pointer to GPU memory
+// so its value is not dropped when sending this to a different thread.
+unsafe impl<A: Allocator> Send for Buffer<A> {}
 
 impl<A: Allocator> Buffer<A> {
     /// Allocate a new buffer with a specific size, at a specific memory location.
