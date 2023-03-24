@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, NulError};
+use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -15,6 +16,12 @@ pub enum ExtensionID {
     ExtendedDynamicState3,
 }
 
+impl std::fmt::Display for ExtensionID {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
 /// Vulkan API.
 #[derive(Derivative)]
@@ -25,6 +32,7 @@ pub struct Device {
     queue_families: Vec<u32>,
     properties: vk::PhysicalDeviceProperties,
     extensions: HashSet<ExtensionID>,
+    #[derivative(Debug = "ignore")]
     dynamic_state3: Option<ash::extensions::ext::ExtendedDynamicState3>,
 }
 
@@ -99,7 +107,7 @@ impl Device {
             unsafe { instance.enumerate_device_extension_properties(physical_device.handle())? };
         let mut enabled_extensions = HashSet::new();
         // Add the extensions we want, but that are not required.
-        let dynamic_state3_requested = add_if_supported(
+        let dynamic_state3_supported = add_if_supported(
             ExtensionID::ExtendedDynamicState3,
             ash::extensions::ext::ExtendedDynamicState3::name(),
             &mut enabled_extensions,
@@ -123,18 +131,24 @@ impl Device {
         features_1_3.dynamic_rendering = vk::TRUE;
 
         let extension_names_raw = unwrap_to_raw_strings(extension_names.as_slice());
-        let info = vk::DeviceCreateInfo::builder()
+        let mut info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(queue_create_infos.as_slice())
             .enabled_extension_names(extension_names_raw.as_slice())
             .enabled_features(&settings.gpu_requirements.features)
             .push_next(&mut features_1_1)
             .push_next(&mut features_1_2)
-            .push_next(&mut features_1_3)
-            .build();
+            .push_next(&mut features_1_3);
+
+        let mut features_dynamic_state3 = vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT::default();
+        features_dynamic_state3.extended_dynamic_state3_polygon_mode = vk::TRUE;
+        if dynamic_state3_supported {
+            info = info.push_next(&mut features_dynamic_state3);
+        }
+        let info = info.build();
 
         let handle = unsafe { instance.create_device(physical_device.handle(), &info, None)? };
 
-        let dynamic_state3 = if dynamic_state3_requested {
+        let dynamic_state3 = if dynamic_state3_supported {
             Some(ash::extensions::ext::ExtendedDynamicState3::new(&instance, &handle))
         } else {
             None
