@@ -47,6 +47,11 @@ pub struct PipelineCache {
     named_pipelines: HashMap<String, PipelineEntry<PipelineCreateInfo>>,
 }
 
+// SAFETY: This is not automatically derived because of the pNext pointers inside the pipeline create infos.
+// Since we only temporarily set those when pipelines are created, this is safe to do. No pointers to pNext
+// structures are kept around.
+unsafe impl Send for PipelineCache {}
+
 macro_rules! require_extension {
     ($pci:ident, $device:ident, $state:expr, $ext:expr) => {
         if $pci.dynamic_states.contains(&$state) && !$device.is_extension_enabled($ext) {
