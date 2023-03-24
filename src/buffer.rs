@@ -69,7 +69,7 @@ pub struct BufferView {
 
 // SAFETY: The unsafe part of this is the mapped pointer, but this is a pointer to GPU memory
 // so its value is not dropped when sending this to a different thread.
-unsafe impl<A: Allocator> Send for BufferView {}
+unsafe impl Send for BufferView {}
 
 impl<A: Allocator> Buffer<A> {
     /// Allocate a new buffer with a specific size, at a specific memory location.
