@@ -107,6 +107,10 @@ pub struct Fence<T = ()> {
     handle: vk::Fence,
 }
 
+// SAFETY: Fences refer to a VkFence object on the gpu, which is not dropped when it goes out of scope and can
+// safely be sent between threads.
+unsafe impl<T> Send for Fence<T> {}
+
 pub type GpuFuture<T> = Fence<T>;
 
 impl<T> FenceValue<T> for Fence<T> {
