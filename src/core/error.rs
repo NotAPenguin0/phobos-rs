@@ -5,6 +5,8 @@ use ash;
 use gpu_allocator::AllocationError;
 use thiserror::Error;
 
+use crate::core::device::ExtensionID;
+
 #[derive(Error, Debug)]
 pub enum Error {
     /// Failed to load the Vulkan library
@@ -91,6 +93,8 @@ pub enum Error {
     NoPipelineCache,
     #[error("Tried to obtain a graphics pipeline outside of a render pass.")]
     NoRenderpass,
+    #[error("Extension {0} required for this feature, but not enabled.")]
+    ExtensionNotSupported(ExtensionID),
     /// Uncategorized error.
     #[error("Uncategorized error: `{0}`")]
     Uncategorized(&'static str),

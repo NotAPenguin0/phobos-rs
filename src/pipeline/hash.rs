@@ -104,6 +104,13 @@ impl Hash for PipelineColorBlendAttachmentState {
     }
 }
 
+impl Hash for PipelineTessellationStateCreateInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.flags.hash(state);
+        self.0.patch_control_points.hash(state);
+    }
+}
+
 impl Hash for Viewport {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         self.0.x.to_bits().hash(hasher);
@@ -251,6 +258,12 @@ impl PartialEq<Self> for PipelineColorBlendAttachmentState {
     }
 }
 
+impl PartialEq<Self> for PipelineTessellationStateCreateInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.flags == other.0.flags && self.0.patch_control_points == other.0.patch_control_points
+    }
+}
+
 impl PartialEq for Viewport {
     fn eq(&self, other: &Self) -> bool {
         self.0.x == other.0.x
@@ -277,6 +290,10 @@ impl Eq for PipelineInputAssemblyStateCreateInfo {}
 impl Eq for PipelineDepthStencilStateCreateInfo {}
 impl Eq for PipelineRasterizationStateCreateInfo {}
 impl Eq for PipelineMultisampleStateCreateInfo {}
+
 impl Eq for PipelineColorBlendAttachmentState {}
+
+impl Eq for PipelineTessellationStateCreateInfo {}
+
 impl Eq for Viewport {}
 impl Eq for Rect2D {}

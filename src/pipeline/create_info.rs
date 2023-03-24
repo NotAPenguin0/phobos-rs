@@ -34,6 +34,11 @@ pub(crate) struct PipelineColorBlendAttachmentState(
     pub(super) vk::PipelineColorBlendAttachmentState,
 );
 
+#[derive(Default, Debug, Copy, Clone)]
+pub(crate) struct PipelineTessellationStateCreateInfo(
+    pub(super) vk::PipelineTessellationStateCreateInfo
+);
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct PipelineRenderingInfo {
     pub view_mask: u32,
@@ -52,11 +57,11 @@ pub struct Rect2D(pub(super) vk::Rect2D);
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
+    pub shaders: Vec<ShaderCreateInfo>,
     pub(crate) name: String,
     pub(crate) layout: PipelineLayoutCreateInfo,
     pub(crate) vertex_input_bindings: Vec<VertexInputBindingDescription>,
     pub(crate) vertex_attributes: Vec<VertexInputAttributeDescription>,
-    pub(crate) shaders: Vec<ShaderCreateInfo>,
     pub(crate) input_assembly: PipelineInputAssemblyStateCreateInfo,
     pub(crate) depth_stencil: PipelineDepthStencilStateCreateInfo,
     pub(crate) dynamic_states: Vec<vk::DynamicState>,
@@ -67,6 +72,7 @@ pub struct PipelineCreateInfo {
     pub(crate) scissors: Vec<Rect2D>,
     pub(crate) blend_enable_logic_op: bool,
     pub(crate) rendering_info: PipelineRenderingInfo,
+    pub(crate) tesselation_info: Option<PipelineTessellationStateCreateInfo>,
 
     #[derivative(PartialEq = "ignore")]
     #[derivative(Hash = "ignore")]
@@ -98,6 +104,9 @@ pub struct PipelineCreateInfo {
     #[derivative(PartialEq = "ignore")]
     #[derivative(Hash = "ignore")]
     pub(super) vk_rendering_state: vk::PipelineRenderingCreateInfo,
+    #[derivative(PartialEq = "ignore")]
+    #[derivative(Hash = "ignore")]
+    pub(super) vk_tessellation_state: Option<vk::PipelineTessellationStateCreateInfo>,
 }
 
 impl PipelineCreateInfo {
@@ -143,6 +152,12 @@ impl PipelineCreateInfo {
         self.vk_dynamic_state = vk::PipelineDynamicStateCreateInfo::builder()
             .dynamic_states(self.dynamic_states.as_slice())
             .build();
+        self.vk_tessellation_state = self.tesselation_info.map(|info| {
+            vk::PipelineTessellationStateCreateInfo::builder()
+                .patch_control_points(info.0.patch_control_points)
+                .flags(info.0.flags)
+                .build()
+        });
         self.build_rendering_state();
     }
 
@@ -156,7 +171,10 @@ impl PipelineCreateInfo {
             p_stages: std::ptr::null(),
             p_vertex_input_state: &self.vertex_input_state,
             p_input_assembly_state: &self.input_assembly.0,
-            p_tessellation_state: std::ptr::null(),
+            p_tessellation_state: match &self.vk_tessellation_state {
+                None => { std::ptr::null() }
+                Some(info) => { info }
+            },
             p_viewport_state: &self.viewport_state,
             p_rasterization_state: &self.rasterizer.0,
             p_multisample_state: &self.multisample.0,
