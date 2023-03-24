@@ -75,6 +75,9 @@ pub trait GraphicsCmdBuffer: TransferCmdBuffer {
     ) -> Self
         where
             Self: Sized;
+
+    /// Set the polygon mode. Only available if VK_EXT_extended_dynamic_state3 was enabled. Equivalent to `vkCmdSetPolygonMode`
+    fn set_polygon_mode(self, mode: vk::PolygonMode) -> Result<Self>;
 }
 
 /// Trait representing a command buffer that supports compute commands.

@@ -3,6 +3,7 @@ use ash::vk;
 
 use crate::{BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::core::device::ExtensionID;
 use crate::domain::ExecutionDomain;
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D> {
@@ -180,5 +181,18 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
             );
         }
         self
+    }
+
+    /// Set the polygon mode. Only available if VK_EXT_extended_dynamic_state3 was enabled. Equivalent to `vkCmdSetPolygonModeEXT`
+    fn set_polygon_mode(self, mode: vk::PolygonMode) -> Result<Self> {
+        let funcs = self
+            .device
+            .dynamic_state3()
+            .ok_or(Error::ExtensionNotSupported(ExtensionID::ExtendedDynamicState3).into())?;
+        // SAFETY: Vulkan API call. This function pointer is not null because we just verified its availability.
+        unsafe {
+            funcs.cmd_set_polygon_mode(self.handle, mode);
+        }
+        Ok(self)
     }
 }

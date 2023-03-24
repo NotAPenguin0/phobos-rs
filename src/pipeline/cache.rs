@@ -6,6 +6,7 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{Device, Error, PipelineCreateInfo};
+use crate::core::device::ExtensionID;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::Pipeline;
 use crate::pipeline::pipeline_layout::PipelineLayout;
@@ -46,6 +47,19 @@ pub struct PipelineCache {
     named_pipelines: HashMap<String, PipelineEntry<PipelineCreateInfo>>,
 }
 
+macro_rules! require_extension {
+    ($pci:ident, $device:ident, $state:expr, $ext:expr) => {
+        if $pci.dynamic_states.contains(&$state) && !$device.is_extension_enabled($ext) {
+            error!("Pipeline {} requested dynamic state {:?}, but corresponding extension {:?} is not enabled. Maybe it is unsupported on the current device?", $pci.name, $state, $ext);
+        }
+    }
+}
+
+/// Check if dynamic states are supported by the enabled extension set
+fn verify_valid_dynamic_states(device: &Arc<Device>, pci: &PipelineCreateInfo) {
+    require_extension!(pci, device, vk::DynamicState::POLYGON_MODE_EXT, ExtensionID::ExtendedDynamicState3);
+}
+
 impl Resource for Pipeline {
     type Key = PipelineCreateInfo;
     type ExtraParams<'a> = (
@@ -63,6 +77,9 @@ impl Resource for Pipeline {
         let (shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
         let mut pci = info.to_vk(unsafe { layout.handle() });
+
+        verify_valid_dynamic_states(&device, &info);
+
         // Set shader create info
         let entry = CString::new("main")?;
         let shader_info: Vec<_> = info

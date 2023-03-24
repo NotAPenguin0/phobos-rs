@@ -11,7 +11,7 @@ use crate::util::string::unwrap_to_raw_strings;
 
 /// Device extensions that phobos requests but might not be available.
 #[derive(Debug, Eq, PartialEq, Hash)]
-pub enum Extension {
+pub enum ExtensionID {
     ExtendedDynamicState3,
 }
 
@@ -24,16 +24,17 @@ pub struct Device {
     handle: ash::Device,
     queue_families: Vec<u32>,
     properties: vk::PhysicalDeviceProperties,
-    extensions: HashSet<Extension>,
+    extensions: HashSet<ExtensionID>,
+    dynamic_state3: Option<ash::extensions::ext::ExtendedDynamicState3>,
 }
 
 fn add_if_supported(
-    ext: Extension,
+    ext: ExtensionID,
     name: &CStr,
-    enabled_set: &mut HashSet<Extension>,
+    enabled_set: &mut HashSet<ExtensionID>,
     names: &mut Vec<CString>,
     extensions: &Vec<vk::ExtensionProperties>,
-) {
+) -> bool {
     // First check if extension is supported
     if extensions
         .iter()
@@ -45,11 +46,13 @@ fn add_if_supported(
     {
         enabled_set.insert(ext);
         names.push(CString::from(name));
+        true
     } else {
         info!(
             "Requested extension {} is not available. Some features might be missing.",
             name.to_bytes().escape_ascii()
         );
+        false
     }
 }
 
@@ -96,13 +99,12 @@ impl Device {
             unsafe { instance.enumerate_device_extension_properties(physical_device.handle())? };
         let mut enabled_extensions = HashSet::new();
         // Add the extensions we want, but that are not required.
-        add_if_supported(
-            Extension::ExtendedDynamicState3,
+        let dynamic_state3_requested = add_if_supported(
+            ExtensionID::ExtendedDynamicState3,
             ash::extensions::ext::ExtendedDynamicState3::name(),
             &mut enabled_extensions,
             &mut extension_names,
-            &available_extensions,
-        );
+            &available_extensions);
 
         // Add required extensions
         if settings.window.is_some() {
@@ -130,17 +132,26 @@ impl Device {
             .push_next(&mut features_1_3)
             .build();
 
-        Ok(Arc::new(unsafe {
+        let handle = unsafe { instance.create_device(physical_device.handle(), &info, None)? };
+
+        let dynamic_state3 = if dynamic_state3_requested {
+            Some(ash::extensions::ext::ExtendedDynamicState3::new(&instance, &handle))
+        } else {
+            None
+        };
+
+        Ok(Arc::new(
             Device {
-                handle: instance.create_device(physical_device.handle(), &info, None)?,
+                handle,
                 queue_families: queue_create_infos
                     .iter()
                     .map(|info| info.queue_family_index)
                     .collect(),
                 properties: *physical_device.properties(),
                 extensions: enabled_extensions,
+                dynamic_state3,
             }
-        }))
+        ))
     }
 
     /// Wait for the device to be completely idle.
@@ -164,8 +175,12 @@ impl Device {
         &self.properties
     }
 
-    pub fn is_extension_enabled(&self, ext: Extension) -> bool {
+    pub fn is_extension_enabled(&self, ext: ExtensionID) -> bool {
         self.extensions.contains(&ext)
+    }
+
+    pub fn dynamic_state3(&self) -> Option<&ash::extensions::ext::ExtendedDynamicState3> {
+        self.dynamic_state3.as_ref()
     }
 }
 
