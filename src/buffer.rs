@@ -52,6 +52,8 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
     size: vk::DeviceSize,
 }
 
+unsafe impl<A: Allocator> Send for Buffer<A> {}
+
 /// View into a specific offset and range of a [`Buffer`].
 /// Care should be taken with the lifetime of this, as there is no checking that the buffer
 /// is not dropped while using this.
