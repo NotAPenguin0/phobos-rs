@@ -105,6 +105,7 @@ impl PipelineBuilder {
                     depth_format: None,
                     stencil_format: None,
                 },
+                tesselation_info: None,
                 vk_vertex_inputs: vec![],
                 vk_attributes: vec![],
                 vertex_input_state: vk::PipelineVertexInputStateCreateInfo {
@@ -123,6 +124,7 @@ impl PipelineBuilder {
                 blend_state: Default::default(),
                 vk_dynamic_state: Default::default(),
                 vk_rendering_state: Default::default(),
+                vk_tessellation_state: None,
             },
             vertex_binding_offsets: Default::default(),
         }
@@ -277,6 +279,15 @@ impl PipelineBuilder {
     pub fn sample_shading(mut self, value: f32) -> Self {
         self.inner.multisample.0.sample_shading_enable = vk::TRUE;
         self.inner.multisample.0.min_sample_shading = value;
+        self
+    }
+
+    /// Enable tesselation and set tesselation state.
+    pub fn tesselation(mut self, patch_control_points: u32, flags: vk::PipelineTessellationStateCreateFlags) -> Self {
+        let mut info = PipelineTessellationStateCreateInfo::default();
+        info.0.patch_control_points = patch_control_points;
+        info.0.flags = flags;
+        self.inner.tesselation_info = Some(info);
         self
     }
 
