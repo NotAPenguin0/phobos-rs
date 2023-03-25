@@ -20,6 +20,5 @@ impl ExampleApp for Compute {
 }
 
 fn main() -> Result<()> {
-    let window = WindowContext::new("02_headless_compute")?;
-    ExampleRunner::new("02_headless_compute", Some(&window))?.run::<Compute>(Some(window));
+    ExampleRunner::new("02_headless_compute", None)?.run::<Compute>(None);
 }
