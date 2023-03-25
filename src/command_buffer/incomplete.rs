@@ -225,7 +225,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         Ok(self)
     }
 
-    /// Binds a uniform buffer to teh specified slot.
+    /// Binds a uniform buffer to the specified slot.
     pub fn bind_uniform_buffer(
         mut self,
         set: u32,
@@ -234,6 +234,20 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     ) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_uniform_buffer(binding, buffer);
+            Ok(())
+        })?;
+        Ok(self)
+    }
+
+    /// Binds a storage buffer buffer to the specified slot.
+    pub fn bind_storage_buffer(
+        mut self,
+        set: u32,
+        binding: u32,
+        buffer: &BufferView,
+    ) -> Result<Self> {
+        self.modify_descriptor_set(set, |builder| {
+            builder.bind_storage_buffer(binding, buffer);
             Ok(())
         })?;
         Ok(self)

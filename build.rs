@@ -38,6 +38,7 @@ fn compile_shaders() {
     println!("cargo:rerun-if-changed=examples/data/vert.glsl");
     println!("cargo:rerun-if-changed=examples/data/frag.glsl");
     println!("cargo:rerun-if-changed=examples/data/blue.glsl");
+    println!("cargo:rerun-if-changed=examples/data/compute.glsl");
 
     compile_shader(
         Path::new("examples/data/vert.glsl"),
@@ -53,6 +54,11 @@ fn compile_shaders() {
         Path::new("examples/data/blue.glsl"),
         shaderc::ShaderKind::Fragment,
         Path::new("examples/data/blue.spv"),
+    );
+    compile_shader(
+        Path::new("examples/data/compute.glsl"),
+        shaderc::ShaderKind::Compute,
+        Path::new("examples/data/compute.spv"),
     );
 }
 

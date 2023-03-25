@@ -129,7 +129,7 @@ impl<'r> DescriptorSetBuilder<'r> {
     }
 
     /// Bind a uniform buffer to the specified slot.
-    pub fn bind_uniform_buffer(&mut self, binding: u32, buffer: &BufferView) -> () {
+    pub fn bind_uniform_buffer(&mut self, binding: u32, buffer: &BufferView) {
         self.inner.bindings.push(DescriptorBinding {
             binding,
             ty: vk::DescriptorType::UNIFORM_BUFFER,
@@ -138,7 +138,7 @@ impl<'r> DescriptorSetBuilder<'r> {
             })],
         });
     }
-
+    
     /// Bind a buffer to the given binding as a [`vk::DescriptorType::UNIFORM_BUFFER`].
     /// Uses the reflection information provided at construction to look up the correct binding slot by its name
     /// defined in the shader.
@@ -154,7 +154,18 @@ impl<'r> DescriptorSetBuilder<'r> {
         self.bind_uniform_buffer(binding.binding, buffer);
         Ok(())
     }
-
+    
+    /// Bind a storage buffer to the specified slot
+    pub fn bind_storage_buffer(&mut self, binding: u32, buffer: &BufferView) {
+        self.inner.bindings.push(DescriptorBinding {
+            binding,
+            ty: vk::DescriptorType::STORAGE_BUFFER,
+            descriptors: vec![DescriptorContents::Buffer(DescriptorBufferInfo {
+                buffer: buffer.clone(),
+            })],
+        })
+    }
+    
     /// Build the descriptor set creation info to pass into the cache.
     pub fn build(self) -> DescriptorSetBinding {
         self.inner

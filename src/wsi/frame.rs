@@ -212,7 +212,7 @@ impl<A: Allocator> FrameManager<A> {
 
     fn acquire_image(&self) -> Result<(u32 /*index*/, bool /*resize required*/)> {
         let frame = &self.per_frame[self.current_frame as usize];
-        frame.fence.wait()?;
+        unsafe { frame.fence.wait_without_cleanup()?; }
         let result = unsafe {
             self.swapchain.acquire_next_image(
                 self.swapchain.handle(),
@@ -351,7 +351,7 @@ impl<A: Allocator> FrameManager<A> {
         // Wait until this image is absolutely not in use anymore.
         let per_image = &mut self.per_image[self.current_image as usize];
         if let Some(image_fence) = per_image.fence.as_ref() {
-            image_fence.wait()? // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
+            unsafe { image_fence.wait_without_cleanup()?; } // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
         }
 
         // Grab the fence for this frame and assign it to the image.
@@ -433,7 +433,7 @@ impl<A: Allocator> FrameManager<A> {
         // Wait until this image is absolutely not in use anymore.
         let per_image = &mut self.per_image[self.current_image as usize];
         if let Some(image_fence) = per_image.fence.as_ref() {
-            image_fence.wait()? // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
+            unsafe { image_fence.wait_without_cleanup()?; } // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
         }
 
         // Grab the fence for this frame and assign it to the image.

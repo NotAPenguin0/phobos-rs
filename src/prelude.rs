@@ -31,6 +31,8 @@ pub use crate::pipeline::cache::PipelineCache;
 pub use crate::pipeline::create_info::PipelineCreateInfo;
 pub use crate::pipeline::hash::*;
 pub use crate::pipeline::PipelineStage;
+pub use crate::pipeline::compute::ComputePipelineBuilder;
+pub use crate::pipeline::compute::ComputePipelineCreateInfo;
 pub use crate::pipeline::shader::ShaderCreateInfo;
 pub use crate::sampler::Sampler;
 pub use crate::sync::execution_manager::ExecutionManager;

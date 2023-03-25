@@ -129,6 +129,9 @@ impl Resource for DescriptorSet {
                     vk::DescriptorType::UNIFORM_BUFFER => {
                         write.buffer_info = Some(binding_buffer_info(&binding));
                     }
+                    vk::DescriptorType::STORAGE_BUFFER => {
+                        write.buffer_info = Some(binding_buffer_info(&binding));
+                    }
                     _ => {
                         todo!();
                     }

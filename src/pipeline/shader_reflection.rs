@@ -6,7 +6,7 @@ use ash::vk;
 #[cfg(feature = "shader-reflection")]
 use spv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
 
-use crate::{Error, PipelineCreateInfo};
+use crate::{Error, PipelineCreateInfo, ShaderCreateInfo};
 use crate::pipeline::pipeline_layout::{PipelineLayoutCreateInfo, PushConstantRange};
 use crate::pipeline::set_layout::DescriptorSetLayoutCreateInfo;
 
@@ -116,6 +116,30 @@ fn find_uniform_buffers(
 }
 
 #[cfg(feature = "shader-reflection")]
+fn find_storage_buffers(
+    ast: &mut Ast,
+    stage: vk::ShaderStageFlags,
+    resources: &ShaderResources,
+    info: &mut ReflectionInfo,
+) -> Result<()> {
+    for buffer in &resources.storage_buffers {
+        let binding = ast.get_decoration(buffer.id, Decoration::Binding)?;
+        let set = ast.get_decoration(buffer.id, Decoration::DescriptorSet)?;
+        info.bindings.insert(
+            ast.get_name(buffer.id)?,
+            BindingInfo {
+                set,
+                binding,
+                stage,
+                count: 1,
+                ty: vk::DescriptorType::STORAGE_BUFFER,
+            },
+        );
+    }
+    Ok(())
+}
+
+#[cfg(feature = "shader-reflection")]
 fn find_push_constants(
     ast: &mut Ast,
     stage: vk::ShaderStageFlags,
@@ -147,6 +171,7 @@ fn reflect_module(module: spv_cross::spirv::Module) -> Result<ReflectionInfo> {
     };
     find_sampled_images(&mut ast, stage, &resources, &mut info)?;
     find_uniform_buffers(&mut ast, stage, &resources, &mut info)?;
+    find_storage_buffers(&mut ast, stage, &resources, &mut info)?;
     find_push_constants(&mut ast, stage, &resources, &mut info)?;
     Ok(info)
 }
@@ -174,9 +199,9 @@ fn merge_push_constants(reflected_shaders: &[ReflectionInfo]) -> Result<Vec<Push
 }
 
 #[cfg(feature = "shader-reflection")]
-pub(crate) fn reflect_shaders(info: &PipelineCreateInfo) -> Result<ReflectionInfo> {
+pub(crate) fn reflect_shaders(shaders: &[ShaderCreateInfo]) -> Result<ReflectionInfo> {
     let mut reflected_shaders = Vec::new();
-    for shader in &info.shaders {
+    for shader in shaders {
         let module = spv_cross::spirv::Module::from_words(shader.code());
         reflected_shaders.push(reflect_module(module)?);
     }

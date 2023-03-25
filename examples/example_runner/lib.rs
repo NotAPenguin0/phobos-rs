@@ -62,6 +62,7 @@ pub trait ExampleApp {
     where
         Self: Sized;
 
+    // Implement this for a windowed application
     fn frame(
         &mut self,
         _ctx: Context,
@@ -71,10 +72,14 @@ pub trait ExampleApp {
             "frame() not implemented for non-headless example app"
         ))
     }
+
+    // Implement this for a headless application
+    fn run(&mut self, _ctx: Context, _thread: ThreadContext) -> Result<()> {
+        Err(anyhow!("run() not implemented for headless example app"))
+    }
 }
 
 pub struct ExampleRunner {
-    headless: bool,
     vk: VulkanContext,
     pipelines: Arc<Mutex<PipelineCache>>,
     descriptors: Arc<Mutex<DescriptorCache>>,
@@ -82,6 +87,7 @@ pub struct ExampleRunner {
 
 impl ExampleRunner {
     pub fn new(name: impl Into<String>, window: Option<&WindowContext>) -> Result<Self> {
+        pretty_env_logger::init();
         let mut settings = AppBuilder::new()
             .version((1, 0, 0))
             .name(name)
@@ -137,7 +143,7 @@ impl ExampleRunner {
         let device = Device::new(&instance, &physical_device, &settings)?;
         let allocator = DefaultAllocator::new(&instance, &device, &physical_device)?;
         let exec = ExecutionManager::new(device.clone(), &physical_device)?;
-        let mut frame = match window {
+        let frame = match window {
             None => None,
             Some(_) => {
                 let swapchain = Swapchain::new(
@@ -170,14 +176,17 @@ impl ExampleRunner {
         let descriptors = DescriptorCache::new(vk.device.clone())?;
 
         Ok(Self {
-            headless: window.is_none(),
             vk,
             pipelines,
             descriptors,
         })
     }
 
-    fn run_headless<E: ExampleApp + 'static>(self, app: E) -> ! {
+    fn run_headless<E: ExampleApp + 'static>(self, mut app: E) -> ! {
+        let ctx = self.make_context();
+        let thread = ThreadContext::new(ctx.device.clone(), ctx.allocator.clone(), Some(1024 * 1024u64)).unwrap();
+        app.run(self.make_context(), thread).unwrap();
+        self.vk.device.wait_idle().unwrap();
         drop(app);
         std::process::exit(0);
     }
@@ -205,7 +214,7 @@ impl ExampleRunner {
         Ok(())
     }
 
-    fn run_windowed<E: ExampleApp + 'static>(mut self, mut app: E, window: WindowContext) -> ! {
+    fn run_windowed<E: ExampleApp + 'static>(mut self, app: E, window: WindowContext) -> ! {
         let event_loop = window.event_loop;
         let window = window.window;
         let mut app = Some(app);

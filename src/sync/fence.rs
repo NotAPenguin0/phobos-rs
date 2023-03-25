@@ -171,13 +171,27 @@ impl<T> Fence<T> {
         })
     }
 
+    pub(crate) unsafe fn wait_without_cleanup(&self) -> VkResult<()> {
+        self.device
+            .wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
+    }
+
     /// Waits for the fence to be signaled with no timeout. Note that this is a blocking call. For the nonblocking version, use the `Future` implementation by calling
     /// `.await`.
-    pub fn wait(&self) -> VkResult<()> {
-        unsafe {
+    pub fn wait(&mut self) -> VkResult<()> {
+        let result = unsafe {
             self.device
                 .wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
+        };
+        // Call cleanup functions
+        let mut f = self.first_cleanup_fn.take();
+        while let Some(_) = f {
+            let func = f.take().unwrap();
+            func.f.call_once(());
+            f = func.next
         }
+        // Return previous result
+        result
     }
 
     /// Resets a fence to the unsignaled status.
@@ -185,8 +199,8 @@ impl<T> Fence<T> {
         unsafe { self.device.reset_fences(slice::from_ref(&self.handle)) }
     }
 
-    /// Add a function to the front of the chain of functions to be called when this fence runs to completion ***AS A FUTURE***.
-    /// TODO: Possibly also call this after Self::wait()
+    /// Add a function to the front of the chain of functions to be called when this fence is completed, so either after
+    /// wait() or after .await
     pub fn with_cleanup(mut self, f: impl FnOnce() -> () + 'static) -> Self {
         if self.first_cleanup_fn.is_some() {
             let mut head = Box::new(CleanupFnLink {

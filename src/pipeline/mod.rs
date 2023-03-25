@@ -61,6 +61,7 @@ use crate::Device;
 
 pub mod builder;
 pub mod cache;
+pub mod compute;
 pub mod create_info;
 pub mod hash;
 pub mod pipeline_layout;
@@ -76,6 +77,18 @@ pub type PipelineStage = vk::PipelineStageFlags2;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Pipeline {
+    #[derivative(Debug = "ignore")]
+    device: Arc<Device>,
+    pub(crate) handle: vk::Pipeline,
+    pub(crate) layout: vk::PipelineLayout,
+    pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,
+}
+
+/// A fully built Vulkan compute pipeline. This is a managed resource, so it cannot be manually
+/// cloned or dropped.
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct ComputePipeline {
     #[derivative(Debug = "ignore")]
     device: Arc<Device>,
     pub(crate) handle: vk::Pipeline,
