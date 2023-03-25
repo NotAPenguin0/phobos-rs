@@ -3,9 +3,9 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::Device;
 use crate::pipeline::set_layout::{DescriptorSetLayout, DescriptorSetLayoutCreateInfo};
 use crate::util::cache::{Cache, Resource};
+use crate::Device;
 
 /// A fully built Vulkan pipeline layout. This is a managed resource, so it cannot be manually
 /// created or dropped.
@@ -50,22 +50,14 @@ impl Resource for PipelineLayout {
     type ExtraParams<'a> = &'a mut Cache<DescriptorSetLayout>;
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(
-        device: Arc<Device>,
-        key: &Self::Key,
-        set_layout_cache: Self::ExtraParams<'_>,
-    ) -> Result<Self> {
+    fn create(device: Arc<Device>, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self> {
         let set_layouts = key
             .set_layouts
             .iter()
             .map(|info| unsafe { set_layout_cache.get_or_create(&info, ()).unwrap().handle() })
             .collect::<Vec<_>>();
 
-        let pc = key
-            .push_constants
-            .iter()
-            .map(|pc| pc.to_vk())
-            .collect::<Vec<_>>();
+        let pc = key.push_constants.iter().map(|pc| pc.to_vk()).collect::<Vec<_>>();
         let info = vk::PipelineLayoutCreateInfo::builder()
             .flags(key.flags)
             .push_constant_ranges(pc.as_slice())

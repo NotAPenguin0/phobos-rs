@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
+use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 use crate::core::device::ExtensionID;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::pipeline_layout::PipelineLayout;
@@ -14,13 +15,10 @@ use crate::pipeline::{ComputePipeline, Pipeline};
 use crate::util::cache::{Cache, Resource};
 use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo, ShaderCreateInfo};
 
-use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
-
 #[derive(Debug)]
 struct PipelineEntry<P>
 where
-    P: std::fmt::Debug,
-{
+    P: std::fmt::Debug, {
     pub info: P,
     #[cfg(feature = "shader-reflection")]
     pub reflection: ReflectionInfo,
@@ -57,9 +55,12 @@ unsafe impl Send for PipelineCache {}
 macro_rules! require_extension {
     ($pci:ident, $device:ident, $state:expr, $ext:expr) => {
         if $pci.dynamic_states.contains(&$state) && !$device.is_extension_enabled($ext) {
-            error!("Pipeline {} requested dynamic state {:?}, but corresponding extension {:?} is not enabled. Maybe it is unsupported on the current device?", $pci.name, $state, $ext);
+            error!(
+                "Pipeline {} requested dynamic state {:?}, but corresponding extension {:?} is not enabled. Maybe it is unsupported on the current device?",
+                $pci.name, $state, $ext
+            );
         }
-    }
+    };
 }
 
 /// Check if dynamic states are supported by the enabled extension set
@@ -81,11 +82,7 @@ impl Resource for Pipeline {
     );
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(
-        device: Arc<Device>,
-        info: &Self::Key,
-        params: Self::ExtraParams<'_>,
-    ) -> Result<Self> {
+    fn create(device: Arc<Device>, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self> {
         let (shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
         let mut pci = info.to_vk(unsafe { layout.handle() });
@@ -112,11 +109,7 @@ impl Resource for Pipeline {
             Ok(Self {
                 device: device.clone(),
                 handle: device
-                    .create_graphics_pipelines(
-                        vk::PipelineCache::null(),
-                        std::slice::from_ref(&pci),
-                        None,
-                    )
+                    .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
                     .or_else(|(_, e)| Err(anyhow::Error::from(Error::VkError(e))))?
                     .first()
                     .cloned()
@@ -147,8 +140,7 @@ impl Resource for ComputePipeline {
 
     fn create(device: Arc<Device>, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
     where
-        Self: Sized,
-    {
+        Self: Sized, {
         let (shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
         let mut pci = info.to_vk(unsafe { layout.handle() });
@@ -170,11 +162,7 @@ impl Resource for ComputePipeline {
             Ok(Self {
                 device: device.clone(),
                 handle: device
-                    .create_compute_pipelines(
-                        vk::PipelineCache::null(),
-                        std::slice::from_ref(&pci),
-                        None,
-                    )
+                    .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
                     .or_else(|(_, e)| Err(anyhow::Error::from(Error::VkError(e))))?
                     .first()
                     .cloned()
@@ -224,11 +212,7 @@ impl PipelineCache {
                 reflection: refl,
             },
         );
-        self.pipeline_infos
-            .get_mut(&name)
-            .unwrap()
-            .info
-            .build_inner();
+        self.pipeline_infos.get_mut(&name).unwrap().info.build_inner();
         Ok(())
     }
 
@@ -236,22 +220,19 @@ impl PipelineCache {
     pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
         info.build_inner();
         let name = info.name.clone();
-        self.pipeline_infos
-            .insert(name.clone(), PipelineEntry { info });
-        self.pipeline_infos
-            .get_mut(&name)
-            .unwrap()
-            .info
-            .build_inner();
+        self.pipeline_infos.insert(
+            name.clone(),
+            PipelineEntry {
+                info,
+            },
+        );
+        self.pipeline_infos.get_mut(&name).unwrap().info.build_inner();
         Ok(())
     }
 
     /// Create and register a new compute pipeline into the cache
     #[cfg(feature = "shader-reflection")]
-    pub fn create_named_compute_pipeline(
-        &mut self,
-        mut info: ComputePipelineCreateInfo,
-    ) -> Result<()> {
+    pub fn create_named_compute_pipeline(&mut self, mut info: ComputePipelineCreateInfo) -> Result<()> {
         let refl = reflect_shaders(std::slice::from_ref(&info.shader.as_ref().unwrap()))?;
         // Using reflection, we can allow omitting the pipeline layout field.
         info.layout = build_pipeline_layout(&refl);
@@ -298,11 +279,7 @@ impl PipelineCache {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn get_pipeline(
-        &mut self,
-        name: &str,
-        rendering_info: &PipelineRenderingInfo,
-    ) -> Result<&Pipeline> {
+    pub(crate) fn get_pipeline(&mut self, name: &str, rendering_info: &PipelineRenderingInfo) -> Result<&Pipeline> {
         let entry = self.pipeline_infos.get_mut(name);
         let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
         entry.info.rendering_info = rendering_info.clone();
@@ -311,15 +288,10 @@ impl PipelineCache {
         for layout in &entry.info.layout.set_layouts {
             self.set_layouts.get_or_create(layout, ())?;
         }
-        self.pipeline_layouts
-            .get_or_create(&entry.info.layout, &mut self.set_layouts)?;
+        self.pipeline_layouts.get_or_create(&entry.info.layout, &mut self.set_layouts)?;
         self.pipelines.get_or_create(
             &entry.info,
-            (
-                &mut self.shaders,
-                &mut self.pipeline_layouts,
-                &mut self.set_layouts,
-            ),
+            (&mut self.shaders, &mut self.pipeline_layouts, &mut self.set_layouts),
         )
     }
 
@@ -327,25 +299,17 @@ impl PipelineCache {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn get_compute_pipeline(
-        &mut self,
-        name: &str
-    ) -> Result<&ComputePipeline> {
+    pub(crate) fn get_compute_pipeline(&mut self, name: &str) -> Result<&ComputePipeline> {
         let entry = self.compute_pipeline_infos.get_mut(name);
         let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
         // Also put in queries for descriptor set layouts and pipeline layout to make sure they are not destroyed.
         for layout in &entry.info.layout.set_layouts {
             self.set_layouts.get_or_create(layout, ())?;
         }
-        self.pipeline_layouts
-            .get_or_create(&entry.info.layout, &mut self.set_layouts)?;
+        self.pipeline_layouts.get_or_create(&entry.info.layout, &mut self.set_layouts)?;
         self.compute_pipelines.get_or_create(
             &entry.info,
-            (
-                &mut self.shaders,
-                &mut self.pipeline_layouts,
-                &mut self.set_layouts,
-            ),
+            (&mut self.shaders, &mut self.pipeline_layouts, &mut self.set_layouts),
         )
     }
 

@@ -3,10 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{
-    Allocator, Buffer, Device, domain, ExecutionManager, IncompleteCmdBuffer, MemoryType,
-    TransferCmdBuffer,
-};
+use crate::{domain, Allocator, Buffer, Device, ExecutionManager, IncompleteCmdBuffer, MemoryType, TransferCmdBuffer};
 
 /// Perform a staged upload to a GPU buffer. Returns a future that can be awaited to obtain the resulting buffer.
 pub async fn staged_buffer_upload<T: Copy, A: Allocator + 'static>(

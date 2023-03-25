@@ -3,9 +3,9 @@ use std::ffi::CStr;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
 use crate::core::queue::{QueueInfo, QueueType};
 use crate::util::string::wrap_c_str;
+use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
 
 /// Stores queried properties of a Vulkan extension.
 #[derive(Debug, Default)]
@@ -36,11 +36,7 @@ pub struct PhysicalDevice {
 
 impl PhysicalDevice {
     /// Selects the best available physical device from the given requirements and parameters.
-    pub fn select<Window: WindowInterface>(
-        instance: &VkInstance,
-        surface: Option<&Surface>,
-        settings: &AppSettings<Window>,
-    ) -> Result<Self> {
+    pub fn select<Window: WindowInterface>(instance: &VkInstance, surface: Option<&Surface>, settings: &AppSettings<Window>) -> Result<Self> {
         let devices = unsafe { instance.enumerate_physical_devices()? };
         if devices.is_empty() {
             return Err(anyhow::Error::from(Error::NoGPU));
@@ -52,9 +48,7 @@ impl PhysicalDevice {
                 let mut physical_device = PhysicalDevice {
                     handle: *device,
                     properties: unsafe { instance.get_physical_device_properties(*device) },
-                    memory_properties: unsafe {
-                        instance.get_physical_device_memory_properties(*device)
-                    },
+                    memory_properties: unsafe { instance.get_physical_device_memory_properties(*device) },
                     extension_properties: unsafe {
                         instance
                             .enumerate_device_extension_properties(*device)
@@ -66,25 +60,17 @@ impl PhysicalDevice {
                             })
                             .collect()
                     },
-                    queue_families: unsafe {
-                        instance.get_physical_device_queue_family_properties(*device)
-                    },
+                    queue_families: unsafe { instance.get_physical_device_queue_family_properties(*device) },
                     ..Default::default()
                 };
 
-                if settings.gpu_requirements.dedicated
-                    && physical_device.properties.device_type
-                    != vk::PhysicalDeviceType::DISCRETE_GPU
-                {
+                if settings.gpu_requirements.dedicated && physical_device.properties.device_type != vk::PhysicalDeviceType::DISCRETE_GPU {
                     return None;
                 }
-                if settings.gpu_requirements.min_video_memory > total_video_memory(&physical_device)
-                {
+                if settings.gpu_requirements.min_video_memory > total_video_memory(&physical_device) {
                     return None;
                 }
-                if settings.gpu_requirements.min_dedicated_video_memory
-                    > total_device_memory(&physical_device)
-                {
+                if settings.gpu_requirements.min_dedicated_video_memory > total_device_memory(&physical_device) {
                     return None;
                 }
 
@@ -114,11 +100,8 @@ impl PhysicalDevice {
                             };
 
                             return if let Some((index, dedicated)) =
-                                get_queue_family_prefer_dedicated(
-                                    physical_device.queue_families.as_slice(),
-                                    request.queue_type,
-                                    avoid,
-                                ) {
+                                get_queue_family_prefer_dedicated(physical_device.queue_families.as_slice(), request.queue_type, avoid)
+                            {
                                 Some(QueueInfo {
                                     queue_type: request.queue_type,
                                     dedicated,
@@ -144,11 +127,7 @@ impl PhysicalDevice {
                     // The surface is supported if one of the queues we found can present to it.
                     let supported_queue = physical_device.queues.iter_mut().find(|queue| unsafe {
                         surface
-                            .get_physical_device_surface_support(
-                                physical_device.handle,
-                                queue.family_index,
-                                surface.handle(),
-                            )
+                            .get_physical_device_surface_support(physical_device.handle, queue.family_index, surface.handle())
                             .unwrap()
                     });
                     if let Some(queue) = supported_queue {
@@ -161,23 +140,17 @@ impl PhysicalDevice {
                 }
 
                 // Check if all requested extensions are present
-                if !settings
-                    .gpu_requirements
-                    .device_extensions
-                    .iter()
-                    .all(|requested_extension| {
-                        physical_device
-                            .extension_properties
-                            .iter()
-                            .find(|ext| ext.name == *requested_extension)
-                            .is_some()
-                    })
-                {
+                if !settings.gpu_requirements.device_extensions.iter().all(|requested_extension| {
+                    physical_device
+                        .extension_properties
+                        .iter()
+                        .find(|ext| ext.name == *requested_extension)
+                        .is_some()
+                }) {
                     return None;
                 }
 
-                let name =
-                    unsafe { CStr::from_ptr(physical_device.properties.device_name.as_ptr()) };
+                let name = unsafe { CStr::from_ptr(physical_device.properties.device_name.as_ptr()) };
                 info!(
                     "Picked physical device {:?}, driver version {:?}.",
                     name, physical_device.properties.driver_version
@@ -235,36 +208,29 @@ fn total_device_memory(device: &PhysicalDevice) -> usize {
         .sum()
 }
 
-fn get_queue_family_prefer_dedicated(
-    families: &[vk::QueueFamilyProperties],
-    queue_type: QueueType,
-    avoid: vk::QueueFlags,
-) -> Option<(usize, bool)> {
+fn get_queue_family_prefer_dedicated(families: &[vk::QueueFamilyProperties], queue_type: QueueType, avoid: vk::QueueFlags) -> Option<(usize, bool)> {
     let required = vk::QueueFlags::from_raw(queue_type as vk::Flags);
     families
         .iter()
         .enumerate()
-        .fold(
-            None,
-            |current_best_match, (index, family)| -> Option<usize> {
-                // Does not contain required flags, must skip
-                if !family.queue_flags.contains(required) {
-                    return current_best_match;
-                }
-                // Contains required flags and does not contain *any* flags to avoid, this is an optimal match.
-                // Note that to check of it doesn't contain any of the avoid flags, contains() will not work, we need to use intersects()
-                if !family.queue_flags.intersects(avoid) {
-                    return Some(index);
-                }
+        .fold(None, |current_best_match, (index, family)| -> Option<usize> {
+            // Does not contain required flags, must skip
+            if !family.queue_flags.contains(required) {
+                return current_best_match;
+            }
+            // Contains required flags and does not contain *any* flags to avoid, this is an optimal match.
+            // Note that to check of it doesn't contain any of the avoid flags, contains() will not work, we need to use intersects()
+            if !family.queue_flags.intersects(avoid) {
+                return Some(index);
+            }
 
-                // Only if we don't have a match yet, settle for a suboptimal match
-                return if current_best_match.is_none() {
-                    Some(index)
-                } else {
-                    current_best_match
-                };
-            },
-        )
+            // Only if we don't have a match yet, settle for a suboptimal match
+            return if current_best_match.is_none() {
+                Some(index)
+            } else {
+                current_best_match
+            };
+        })
         .map(|index| {
             return (index, !families[index].queue_flags.intersects(avoid));
         })

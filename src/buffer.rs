@@ -74,13 +74,7 @@ unsafe impl Send for BufferView {}
 impl<A: Allocator> Buffer<A> {
     /// Allocate a new buffer with a specific size, at a specific memory location.
     /// All usage flags must be given.
-    pub fn new(
-        device: Arc<Device>,
-        allocator: &mut A,
-        size: impl Into<vk::DeviceSize>,
-        usage: vk::BufferUsageFlags,
-        location: MemoryType,
-    ) -> Result<Self> {
+    pub fn new(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
         let size = size.into();
         let handle = unsafe {
             device.create_buffer(
@@ -114,12 +108,7 @@ impl<A: Allocator> Buffer<A> {
     }
 
     /// Allocate a new buffer with device local memory (VRAM). This is usually the correct memory location for most buffers.
-    pub fn new_device_local(
-        device: Arc<Device>,
-        allocator: &mut A,
-        size: impl Into<vk::DeviceSize>,
-        usage: vk::BufferUsageFlags,
-    ) -> Result<Self> {
+    pub fn new_device_local(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
         Self::new(device, allocator, size, usage, MemoryType::GpuOnly)
     }
 
@@ -128,11 +117,7 @@ impl<A: Allocator> Buffer<A> {
     /// This view is valid as long as the buffer is valid.
     /// # Errors
     /// Fails if `offset + size >= self.size`.
-    pub fn view(
-        &self,
-        offset: impl Into<vk::DeviceSize>,
-        size: impl Into<vk::DeviceSize>,
-    ) -> Result<BufferView> {
+    pub fn view(&self, offset: impl Into<vk::DeviceSize>, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
         let offset = offset.into();
         let size = size.into();
         return if offset + size >= self.size {
@@ -141,10 +126,7 @@ impl<A: Allocator> Buffer<A> {
             Ok(BufferView {
                 handle: self.handle,
                 offset,
-                pointer: unsafe {
-                    self.pointer
-                        .map(|p| NonNull::new(p.as_ptr().offset(offset as isize)).unwrap())
-                },
+                pointer: unsafe { self.pointer.map(|p| NonNull::new(p.as_ptr().offset(offset as isize)).unwrap()) },
                 size,
             })
         };
@@ -192,12 +174,7 @@ impl BufferView {
     /// Fails if this buffer is not mappable (not `HOST_VISIBLE`).
     pub fn mapped_slice<T>(&mut self) -> Result<&mut [T]> {
         if let Some(pointer) = self.pointer {
-            Ok(unsafe {
-                std::slice::from_raw_parts_mut(
-                    pointer.cast::<T>().as_ptr(),
-                    self.size as usize / std::mem::size_of::<T>(),
-                )
-            })
+            Ok(unsafe { std::slice::from_raw_parts_mut(pointer.cast::<T>().as_ptr(), self.size as usize / std::mem::size_of::<T>()) })
         } else {
             Err(anyhow::Error::from(Error::UnmappableBuffer))
         }

@@ -5,7 +5,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
-
 #[cfg(feature = "shaderc")]
 fn load_file(path: &Path) -> String {
     let mut out = String::new();
@@ -22,13 +21,7 @@ fn save_file(path: &Path, binary: &[u8]) {
 fn compile_shader(path: &Path, kind: shaderc::ShaderKind, output: &Path) {
     let compiler = shaderc::Compiler::new().unwrap();
     let binary = compiler
-        .compile_into_spirv(
-            &load_file(path),
-            kind,
-            path.as_os_str().to_str().unwrap(),
-            "main",
-            None,
-        )
+        .compile_into_spirv(&load_file(path), kind, path.as_os_str().to_str().unwrap(), "main", None)
         .unwrap();
     save_file(output, binary.as_binary_u8());
 }

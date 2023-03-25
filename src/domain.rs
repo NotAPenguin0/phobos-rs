@@ -1,7 +1,7 @@
 use ash::vk;
 
-use crate::command_buffer::IncompleteCommandBuffer;
 use crate::command_buffer::traits::IncompleteCmdBuffer;
+use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::queue::Queue;
 use crate::QueueType;
 

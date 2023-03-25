@@ -3,14 +3,13 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
-use winit::window::{Window, WindowBuilder};
 
 use anyhow::{anyhow, Result};
 use futures::executor::block_on;
-use winit::event::{Event, WindowEvent};
-
 use phobos::prelude::*;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
+use winit::window::{Window, WindowBuilder};
 
 pub fn load_spirv_file(path: &Path) -> Vec<u32> {
     let mut f = File::open(&path).expect("no file found");
@@ -34,7 +33,10 @@ impl WindowContext {
             .with_title(title)
             .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
             .build(&event_loop)?;
-        Ok(Self { event_loop, window })
+        Ok(Self {
+            event_loop,
+            window,
+        })
     }
 }
 
@@ -63,14 +65,8 @@ pub trait ExampleApp {
         Self: Sized;
 
     // Implement this for a windowed application
-    fn frame(
-        &mut self,
-        _ctx: Context,
-        _ifc: InFlightContext,
-    ) -> Result<CommandBuffer<domain::All>> {
-        Err(anyhow!(
-            "frame() not implemented for non-headless example app"
-        ))
+    fn frame(&mut self, _ctx: Context, _ifc: InFlightContext) -> Result<CommandBuffer<domain::All>> {
+        Err(anyhow!("frame() not implemented for non-headless example app"))
     }
 
     // Implement this for a headless application
@@ -133,8 +129,7 @@ impl ExampleRunner {
                 }
                 Some(_) => {
                     let mut surface = Surface::new(&instance, &settings)?;
-                    let physical_device =
-                        PhysicalDevice::select(&instance, Some(&surface), &settings)?;
+                    let physical_device = PhysicalDevice::select(&instance, Some(&surface), &settings)?;
                     surface.query_details(&physical_device)?;
                     (Some(surface), physical_device)
                 }
@@ -146,18 +141,8 @@ impl ExampleRunner {
         let frame = match window {
             None => None,
             Some(_) => {
-                let swapchain = Swapchain::new(
-                    &instance,
-                    device.clone(),
-                    &settings,
-                    surface.as_ref().unwrap(),
-                )?;
-                Some(FrameManager::new(
-                    device.clone(),
-                    allocator.clone(),
-                    &settings,
-                    swapchain,
-                )?)
+                let swapchain = Swapchain::new(&instance, device.clone(), &settings, surface.as_ref().unwrap())?;
+                Some(FrameManager::new(device.clone(), allocator.clone(), &settings, swapchain)?)
             }
         };
 
@@ -205,11 +190,7 @@ impl ExampleRunner {
         let ctx = self.make_context();
         let frame = self.vk.frame.as_mut().unwrap();
         let surface = self.vk.surface.as_ref().unwrap();
-        block_on(
-            frame.new_frame(self.vk.exec.clone(), window, surface, |ifc| {
-                app.frame(ctx, ifc)
-            }),
-        )?;
+        block_on(frame.new_frame(self.vk.exec.clone(), window, surface, |ifc| app.frame(ctx, ifc)))?;
 
         Ok(())
     }

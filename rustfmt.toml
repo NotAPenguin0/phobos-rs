@@ -1,0 +1,7 @@
+brace_style = "PreferSameLine"
+use_small_heuristics = "Off"
+max_width = 160
+fn_call_width = 80
+chain_width = 80
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"

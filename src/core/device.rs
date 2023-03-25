@@ -7,8 +7,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{AppSettings, PhysicalDevice, VkInstance, WindowInterface};
 use crate::util::string::unwrap_to_raw_strings;
+use crate::{AppSettings, PhysicalDevice, VkInstance, WindowInterface};
 
 /// Device extensions that phobos requests but might not be available.
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -67,11 +67,7 @@ fn add_if_supported(
 impl Device {
     /// Create a new Vulkan device. This is wrapped in an Arc because it gets passed around and stored in a
     /// lot of Vulkan-related structures.
-    pub fn new<Window: WindowInterface>(
-        instance: &VkInstance,
-        physical_device: &PhysicalDevice,
-        settings: &AppSettings<Window>,
-    ) -> Result<Arc<Self>> {
+    pub fn new<Window: WindowInterface>(instance: &VkInstance, physical_device: &PhysicalDevice, settings: &AppSettings<Window>) -> Result<Arc<Self>> {
         let mut priorities = Vec::<f32>::new();
         let queue_create_infos = physical_device
             .queue_families()
@@ -103,8 +99,7 @@ impl Device {
             .collect::<Result<Vec<CString>, NulError>>()?;
 
         // SAFETY: Vulkan API call. We have a valid reference to a PhysicalDevice, so handle() is valid.
-        let available_extensions =
-            unsafe { instance.enumerate_device_extension_properties(physical_device.handle())? };
+        let available_extensions = unsafe { instance.enumerate_device_extension_properties(physical_device.handle())? };
         let mut enabled_extensions = HashSet::new();
         // Add the extensions we want, but that are not required.
         let dynamic_state3_supported = add_if_supported(
@@ -112,7 +107,8 @@ impl Device {
             ash::extensions::ext::ExtendedDynamicState3::name(),
             &mut enabled_extensions,
             &mut extension_names,
-            &available_extensions);
+            &available_extensions,
+        );
 
         // Add required extensions
         if settings.window.is_some() {
@@ -154,18 +150,13 @@ impl Device {
             None
         };
 
-        Ok(Arc::new(
-            Device {
-                handle,
-                queue_families: queue_create_infos
-                    .iter()
-                    .map(|info| info.queue_family_index)
-                    .collect(),
-                properties: *physical_device.properties(),
-                extensions: enabled_extensions,
-                dynamic_state3,
-            }
-        ))
+        Ok(Arc::new(Device {
+            handle,
+            queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
+            properties: *physical_device.properties(),
+            extensions: enabled_extensions,
+            dynamic_state3,
+        }))
     }
 
     /// Wait for the device to be completely idle.

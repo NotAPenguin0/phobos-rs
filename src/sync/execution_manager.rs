@@ -4,11 +4,11 @@ use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 use crate::command_buffer::*;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
+use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
@@ -85,12 +85,7 @@ impl ExecutionManager {
         descriptors: Option<Arc<Mutex<DescriptorCache>>>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(
-            self.device.clone(),
-            queue,
-            pipelines,
-            descriptors,
-        )
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
@@ -101,12 +96,7 @@ impl ExecutionManager {
         descriptors: Option<Arc<Mutex<DescriptorCache>>>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(
-            self.device.clone(),
-            queue,
-            pipelines,
-            descriptors,
-        )
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
     /// Begin a submit batch. Note that all submits in a batch are over a single domain (currently).
@@ -156,11 +146,7 @@ impl ExecutionManager {
         }))
     }
 
-    pub(crate) fn submit_batch<D: ExecutionDomain>(
-        &self,
-        submits: &[vk::SubmitInfo2],
-        fence: &Fence,
-    ) -> Result<()> {
+    pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         unsafe {
             queue.submit2(submits, Some(fence))?;

@@ -14,12 +14,7 @@ pub trait Allocator: Clone + Send + Sync {
     type Allocation: Allocation;
 
     /// Allocates raw memory of a specific memory type. The given name is used for internal tracking.
-    fn allocate(
-        &mut self,
-        name: &'static str,
-        requirements: &vk::MemoryRequirements,
-        ty: MemoryType,
-    ) -> Result<Self::Allocation>;
+    fn allocate(&mut self, name: &'static str, requirements: &vk::MemoryRequirements, ty: MemoryType) -> Result<Self::Allocation>;
     /// Free some memory allocated from this allocator.
     fn free(&mut self, allocation: Self::Allocation) -> Result<()>;
 }

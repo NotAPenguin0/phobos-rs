@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffer, PipelineCache};
 use crate::command_buffer::command_pool::CommandPool;
+use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffer, PipelineCache};
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.
@@ -51,11 +51,7 @@ impl Queue {
     pub(crate) fn new(device: Arc<Device>, handle: vk::Queue, info: QueueInfo) -> Result<Self> {
         // We create a transient command pool because command buffers will be allocated and deallocated
         // frequently.
-        let pool = CommandPool::new(
-            device.clone(),
-            info.family_index,
-            vk::CommandPoolCreateFlags::TRANSIENT,
-        )?;
+        let pool = CommandPool::new(device.clone(), info.family_index, vk::CommandPoolCreateFlags::TRANSIENT)?;
         Ok(Queue {
             device,
             handle,
@@ -70,11 +66,7 @@ impl Queue {
     /// <br>
     /// # Thread safety
     /// This function is **not yet** thread safe! This function is marked as unsafe for now to signal this.
-    pub unsafe fn submit(
-        &self,
-        submits: &[vk::SubmitInfo],
-        fence: Option<&Fence>,
-    ) -> Result<(), vk::Result> {
+    pub unsafe fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&Fence>) -> Result<(), vk::Result> {
         let fence = match fence {
             None => vk::Fence::null(),
             Some(fence) => fence.handle(),
@@ -88,11 +80,7 @@ impl Queue {
     /// <br>
     /// # Thread safety
     /// This function is **not yet** thread safe! This function is marked as unsafe for now to signal this.
-    pub unsafe fn submit2(
-        &self,
-        submits: &[vk::SubmitInfo2],
-        fence: Option<&Fence>,
-    ) -> Result<(), vk::Result> {
+    pub unsafe fn submit2(&self, submits: &[vk::SubmitInfo2], fence: Option<&Fence>) -> Result<(), vk::Result> {
         let fence = match fence {
             None => vk::Fence::null(),
             Some(fence) => fence.handle(),
@@ -135,13 +123,8 @@ impl Queue {
 
     /// Instantly delete a command buffer, without taking synchronization into account.
     /// This function **must** be externally synchronized.
-    pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(
-        &self,
-        cmd: vk::CommandBuffer,
-    ) -> Result<()> {
-        Ok(self
-            .device
-            .free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd)))
+    pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(&self, cmd: vk::CommandBuffer) -> Result<()> {
+        Ok(self.device.free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd)))
     }
 
     pub fn info(&self) -> &QueueInfo {

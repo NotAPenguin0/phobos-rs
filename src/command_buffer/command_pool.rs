@@ -14,11 +14,7 @@ pub struct CommandPool {
 }
 
 impl CommandPool {
-    pub fn new(
-        device: Arc<Device>,
-        family: u32,
-        flags: vk::CommandPoolCreateFlags,
-    ) -> Result<Self> {
+    pub fn new(device: Arc<Device>, family: u32, flags: vk::CommandPoolCreateFlags) -> Result<Self> {
         let info = vk::CommandPoolCreateInfo {
             s_type: vk::StructureType::COMMAND_POOL_CREATE_INFO,
             p_next: std::ptr::null(),
@@ -27,7 +23,10 @@ impl CommandPool {
         };
         let handle = unsafe { device.create_command_pool(&info, None)? };
 
-        Ok(CommandPool { device, handle })
+        Ok(CommandPool {
+            device,
+            handle,
+        })
     }
 
     pub unsafe fn handle(&self) -> vk::CommandPool {

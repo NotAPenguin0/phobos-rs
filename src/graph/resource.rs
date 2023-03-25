@@ -34,15 +34,9 @@ impl ResourceUsage {
         match self {
             ResourceUsage::Nothing => vk::AccessFlags2::NONE,
             ResourceUsage::Present => vk::AccessFlags2::NONE,
-            ResourceUsage::Attachment(AttachmentType::Color) => {
-                vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
-            }
-            ResourceUsage::Attachment(AttachmentType::Depth) => {
-                vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE
-            }
-            ResourceUsage::Attachment(AttachmentType::Resolve(_)) => {
-                vk::AccessFlags2::COLOR_ATTACHMENT_WRITE
-            }
+            ResourceUsage::Attachment(AttachmentType::Color) => vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
+            ResourceUsage::Attachment(AttachmentType::Depth) => vk::AccessFlags2::DEPTH_STENCIL_ATTACHMENT_WRITE,
+            ResourceUsage::Attachment(AttachmentType::Resolve(_)) => vk::AccessFlags2::COLOR_ATTACHMENT_WRITE,
             ResourceUsage::ShaderRead => vk::AccessFlags2::SHADER_READ,
             ResourceUsage::ShaderWrite => vk::AccessFlags2::SHADER_WRITE,
         }

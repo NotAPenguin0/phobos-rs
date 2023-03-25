@@ -148,11 +148,7 @@ impl<T> Fence<T> {
     }
 
     /// Create a new fence with the specified poll rate for awaiting it as a future.
-    pub fn new_with_poll_rate(
-        device: Arc<Device>,
-        signaled: bool,
-        poll_rate: Duration,
-    ) -> Result<Self, vk::Result> {
+    pub fn new_with_poll_rate(device: Arc<Device>, signaled: bool, poll_rate: Duration) -> Result<Self, vk::Result> {
         let info = vk::FenceCreateInfo {
             s_type: vk::StructureType::FENCE_CREATE_INFO,
             p_next: std::ptr::null(),
@@ -172,17 +168,13 @@ impl<T> Fence<T> {
     }
 
     pub(crate) unsafe fn wait_without_cleanup(&self) -> VkResult<()> {
-        self.device
-            .wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
+        self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
     }
 
     /// Waits for the fence to be signaled with no timeout. Note that this is a blocking call. For the nonblocking version, use the `Future` implementation by calling
     /// `.await`.
     pub fn wait(&mut self) -> VkResult<()> {
-        let result = unsafe {
-            self.device
-                .wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
-        };
+        let result = unsafe { self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX) };
         // Call cleanup functions
         let mut f = self.first_cleanup_fn.take();
         while let Some(_) = f {

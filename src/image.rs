@@ -12,8 +12,8 @@
 //! [`ImgView`] also owns a full Vulkan resource. For this reason, we wrap it in a reference-counted `Arc` so we can safely treat it as if it were
 //! a `str` to a `String`. Most API functions will ask for an [`ImageView`].
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
@@ -99,9 +99,7 @@ impl<A: Allocator> Image<A> {
         format: vk::Format,
         samples: vk::SampleCountFlags,
     ) -> Result<Self> {
-        let sharing_mode = if usage.intersects(
-            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-        ) {
+        let sharing_mode = if usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {
             vk::SharingMode::EXCLUSIVE
         } else {
             vk::SharingMode::CONCURRENT

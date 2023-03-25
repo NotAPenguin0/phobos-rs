@@ -1,6 +1,6 @@
 use ash::vk;
-use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
 
+use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
 use crate::ShaderCreateInfo;
 
 /// Create info for a compute pipeline. Use the [`ComputePipelineBuilder`](crate::ComputePipelineBuilder)

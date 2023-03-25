@@ -5,8 +5,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::Device;
 use crate::util::cache::Resource;
+use crate::Device;
 
 /// Shader resource object. This is managed by the pipeline cache internally.
 #[derive(Derivative)]

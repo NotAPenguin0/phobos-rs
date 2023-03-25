@@ -4,10 +4,12 @@
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
 
-use crate::example_runner::{load_spirv_file, Context, ExampleApp, ExampleRunner};
+use std::path::Path;
+
 use anyhow::Result;
 use phobos::prelude::*;
-use std::path::Path;
+
+use crate::example_runner::{load_spirv_file, Context, ExampleApp, ExampleRunner};
 
 struct Compute {
     buffer: Buffer,
@@ -16,8 +18,7 @@ struct Compute {
 impl ExampleApp for Compute {
     fn new(mut ctx: Context) -> Result<Self>
     where
-        Self: Sized,
-    {
+        Self: Sized, {
         // Create our output buffer, we make this CpuToGpu so it is both DEVICE_LOCAL and HOST_VISIBLE
         let buffer = Buffer::new(
             ctx.device,
@@ -30,25 +31,20 @@ impl ExampleApp for Compute {
         // Create our compute pipeline
         let shader_code = load_spirv_file(Path::new("examples/data/compute.spv"));
         let pci = ComputePipelineBuilder::new("compute")
-            .set_shader(ShaderCreateInfo::from_spirv(
-                vk::ShaderStageFlags::COMPUTE,
-                shader_code,
-            ))
+            .set_shader(ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::COMPUTE, shader_code))
             .build();
-        ctx.pipelines
-            .lock()
-            .unwrap()
-            .create_named_compute_pipeline(pci)?;
+        ctx.pipelines.lock().unwrap().create_named_compute_pipeline(pci)?;
 
-        Ok(Self { buffer })
+        Ok(Self {
+            buffer,
+        })
     }
 
     fn run(&mut self, ctx: Context, _thread: ThreadContext) -> Result<()> {
         // Allocate a command buffer on the compute domain
-        let cmd = ctx.exec.on_domain::<domain::Compute>(
-            Some(ctx.pipelines.clone()),
-            Some(ctx.descriptors.clone()),
-        )?;
+        let cmd = ctx
+            .exec
+            .on_domain::<domain::Compute>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
 
         // Record some commands, then obtain a finished command buffer to submit
         let cmd = cmd

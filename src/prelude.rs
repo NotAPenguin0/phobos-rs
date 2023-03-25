@@ -1,5 +1,4 @@
 pub use ash::vk;
-
 pub use traits::*;
 
 pub use crate::allocator::default_allocator;
@@ -7,8 +6,7 @@ pub use crate::allocator::default_allocator::DefaultAllocator;
 pub use crate::allocator::memory_type::MemoryType;
 pub use crate::allocator::scratch_allocator::ScratchAllocator;
 pub use crate::buffer::{Buffer, BufferView};
-pub use crate::command_buffer::CommandBuffer;
-pub use crate::command_buffer::IncompleteCommandBuffer;
+pub use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 pub use crate::core::app_info::*;
 pub use crate::core::debug::DebugMessenger;
 pub use crate::core::device::Device;
@@ -20,20 +18,18 @@ pub use crate::descriptor::builder::DescriptorSetBuilder;
 pub use crate::descriptor::cache::DescriptorCache;
 pub use crate::descriptor::descriptor_set::DescriptorSet;
 pub use crate::domain;
-pub use crate::graph::pass::Pass;
-pub use crate::graph::pass::PassBuilder;
+pub use crate::graph::pass::{Pass, PassBuilder};
 pub use crate::graph::pass_graph::PassGraph;
 pub use crate::graph::physical_resource::PhysicalResourceBindings;
 pub use crate::graph::virtual_resource::VirtualResource;
 pub use crate::image::{Image, ImageView};
 pub use crate::pipeline::builder::PipelineBuilder;
 pub use crate::pipeline::cache::PipelineCache;
+pub use crate::pipeline::compute::{ComputePipelineBuilder, ComputePipelineCreateInfo};
 pub use crate::pipeline::create_info::PipelineCreateInfo;
 pub use crate::pipeline::hash::*;
-pub use crate::pipeline::PipelineStage;
-pub use crate::pipeline::compute::ComputePipelineBuilder;
-pub use crate::pipeline::compute::ComputePipelineCreateInfo;
 pub use crate::pipeline::shader::ShaderCreateInfo;
+pub use crate::pipeline::PipelineStage;
 pub use crate::sampler::Sampler;
 pub use crate::sync::execution_manager::ExecutionManager;
 pub use crate::sync::fence::*;
@@ -53,4 +49,3 @@ pub mod traits {
     pub use crate::graph::record::RecordGraphToCommandBuffer;
     pub use crate::wsi::window::{WindowInterface, WindowSize};
 }
-

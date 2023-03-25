@@ -3,21 +3,18 @@ use std::ffi::CString;
 
 use anyhow::Result;
 use ash::vk;
-use petgraph::{Incoming, Outgoing};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
+use petgraph::{Incoming, Outgoing};
 
-use crate::{
-    Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph,
-    PhysicalResourceBindings,
-};
-use crate::command_buffer::IncompleteCommandBuffer;
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::command_buffer::IncompleteCommandBuffer;
 use crate::domain::ExecutionDomain;
 use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::task_graph::{Node, Resource};
+use crate::{Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings};
 
 pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, A: Allocator> {
     /// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names
@@ -31,8 +28,8 @@ pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, A: Allocator> {
         ifc: &mut InFlightContext<A>,
         debug: Option<&DebugMessenger>,
     ) -> Result<IncompleteCommandBuffer<'q, D>>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 }
 
 // Traversal
@@ -93,9 +90,7 @@ fn find_resolve_attachment<D: ExecutionDomain, A: Allocator>(
     pass.outputs
         .iter()
         .find(|output| match &output.usage {
-            ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => {
-                resource.resource.is_associated_with(&resolve)
-            }
+            ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => resource.resource.is_associated_with(&resolve),
             _ => false,
         })
         .map(|resolve| {
@@ -116,10 +111,7 @@ fn color_attachments<D: ExecutionDomain, A: Allocator>(
         .outputs
         .iter()
         .filter_map(|resource| -> Option<RenderingAttachmentInfo> {
-            if !matches!(
-                resource.usage,
-                ResourceUsage::Attachment(AttachmentType::Color)
-            ) {
+            if !matches!(resource.usage, ResourceUsage::Attachment(AttachmentType::Color)) {
                 return None;
             }
             let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
@@ -132,9 +124,7 @@ fn color_attachments<D: ExecutionDomain, A: Allocator>(
                 image_view: image.clone(),
                 image_layout: resource.layout,
                 resolve_mode: resolve.is_some().then(|| vk::ResolveModeFlags::AVERAGE),
-                resolve_image_layout: resolve
-                    .is_some()
-                    .then(|| vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+                resolve_image_layout: resolve.is_some().then(|| vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
                 resolve_image_view: resolve,
                 load_op: resource.load_op.unwrap(),
                 store_op: vk::AttachmentStoreOp::STORE,
@@ -175,10 +165,7 @@ fn depth_attachment<D: ExecutionDomain, A: Allocator>(
         .next()
 }
 
-fn render_area<D: ExecutionDomain, A: Allocator>(
-    pass: &PassNode<PassResource, D, A>,
-    bindings: &PhysicalResourceBindings,
-) -> vk::Rect2D {
+fn render_area<D: ExecutionDomain, A: Allocator>(pass: &PassNode<PassResource, D, A>, bindings: &PhysicalResourceBindings) -> vk::Rect2D {
     let resource = pass
         .outputs
         .iter()
@@ -193,7 +180,10 @@ fn render_area<D: ExecutionDomain, A: Allocator>(
         panic!("No resource bound");
     };
     vk::Rect2D {
-        offset: vk::Offset2D { x: 0, y: 0 },
+        offset: vk::Offset2D {
+            x: 0,
+            y: 0,
+        },
         // TODO: properly set size of current level?
         extent: vk::Extent2D {
             width: image.width(),
@@ -219,11 +209,7 @@ fn annotate_pass<'q, D: ExecutionDomain, A: Allocator>(
 }
 
 #[cfg(not(feature = "debug-markers"))]
-fn annotate_pass<D: ExecutionDomain>(
-    _: &PassNode<PassResource, D>,
-    _: &DebugMessenger,
-    cmd: IncompleteCommandBuffer<D>,
-) -> Result<IncompleteCommandBuffer<D>> {
+fn annotate_pass<D: ExecutionDomain>(_: &PassNode<PassResource, D>, _: &DebugMessenger, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
     Ok(cmd)
 }
 
@@ -347,9 +333,7 @@ fn record_barrier<'q, D: ExecutionDomain>(
     let Some(resource) = physical_resource else { return Err(anyhow::Error::from(Error::NoResourceBound(barrier.resource.uid().clone()))) };
     match resource {
         PhysicalResource::Image(image) => record_image_barrier(&barrier, image, dst_resource, cmd),
-        PhysicalResource::Buffer(buffer) => {
-            record_buffer_barrier(&barrier, buffer, dst_resource, cmd)
-        }
+        PhysicalResource::Buffer(buffer) => record_buffer_barrier(&barrier, buffer, dst_resource, cmd),
     }
 }
 
@@ -376,9 +360,7 @@ fn record_node<'exec, 'q, D: ExecutionDomain, A: Allocator>(
     }
 }
 
-impl<'q, 'exec, D: ExecutionDomain, A: Allocator> RecordGraphToCommandBuffer<'q, D, A>
-for BuiltPassGraph<'exec, 'q, D, A>
-{
+impl<'q, 'exec, D: ExecutionDomain, A: Allocator> RecordGraphToCommandBuffer<'q, D, A> for BuiltPassGraph<'exec, 'q, D, A> {
     fn record(
         &mut self,
         mut cmd: IncompleteCommandBuffer<'q, D>,
@@ -386,9 +368,8 @@ for BuiltPassGraph<'exec, 'q, D, A>
         ifc: &mut InFlightContext<A>,
         debug: Option<&DebugMessenger>,
     ) -> Result<IncompleteCommandBuffer<'q, D>>
-        where
-            Self: Sized,
-    {
+    where
+        Self: Sized, {
         let mut active = HashSet::new();
         let mut children = HashSet::new();
         for start in self.graph.sources() {

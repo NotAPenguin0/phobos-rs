@@ -167,9 +167,7 @@ impl PartialEq<Self> for DescriptorSetLayoutCreateInfo {
 
 impl PartialEq<Self> for PipelineLayoutCreateInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.flags == other.flags
-            && self.set_layouts == other.set_layouts
-            && self.push_constants == other.push_constants
+        self.flags == other.flags && self.set_layouts == other.set_layouts && self.push_constants == other.push_constants
     }
 }
 
@@ -181,26 +179,19 @@ impl PartialEq<Self> for ShaderCreateInfo {
 
 impl PartialEq<Self> for VertexInputBindingDescription {
     fn eq(&self, other: &Self) -> bool {
-        self.0.binding == other.0.binding
-            && self.0.stride == other.0.stride
-            && self.0.input_rate == other.0.input_rate
+        self.0.binding == other.0.binding && self.0.stride == other.0.stride && self.0.input_rate == other.0.input_rate
     }
 }
 
 impl PartialEq<Self> for VertexInputAttributeDescription {
     fn eq(&self, other: &Self) -> bool {
-        self.0.location == other.0.location
-            && self.0.binding == other.0.binding
-            && self.0.format == other.0.format
-            && self.0.offset == other.0.offset
+        self.0.location == other.0.location && self.0.binding == other.0.binding && self.0.format == other.0.format && self.0.offset == other.0.offset
     }
 }
 
 impl PartialEq<Self> for PipelineInputAssemblyStateCreateInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.0.flags == other.0.flags
-            && self.0.topology == other.0.topology
-            && self.0.primitive_restart_enable == other.0.primitive_restart_enable
+        self.0.flags == other.0.flags && self.0.topology == other.0.topology && self.0.primitive_restart_enable == other.0.primitive_restart_enable
     }
 }
 

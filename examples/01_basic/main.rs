@@ -9,15 +9,14 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use futures::executor::block_on;
-use winit;
-use winit::event::{Event, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoopBuilder};
-use winit::window::WindowBuilder;
-
 use phobos::command_buffer::traits::*;
 use phobos::domain::All;
 use phobos::prelude::*;
 use phobos::vk;
+use winit;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoopBuilder};
+use winit::window::WindowBuilder;
 
 use crate::example_runner::{load_spirv_file, Context, ExampleApp, ExampleRunner, WindowContext};
 
@@ -37,8 +36,7 @@ struct Basic {
 impl ExampleApp for Basic {
     fn new(mut ctx: Context) -> Result<Self>
     where
-        Self: Sized,
-    {
+        Self: Sized, {
         // create some pipelines
         // First, we need to load shaders
         let vtx_code = load_spirv_file(Path::new("examples/data/vert.spv"));
@@ -87,10 +85,7 @@ impl ExampleApp for Basic {
             vk::Format::R8G8B8A8_SRGB,
             vk::SampleCountFlags::TYPE_1,
         )?;
-        let data: Vec<f32> = vec![
-            -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0,
-            1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
-        ];
+        let data: Vec<f32> = vec![-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
 
         let resources = Resources {
             offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
@@ -104,7 +99,9 @@ impl ExampleApp for Basic {
             ))?,
         };
 
-        Ok(Self { resources })
+        Ok(Self {
+            resources,
+        })
     }
 
     fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<CommandBuffer<All>> {
@@ -112,10 +109,8 @@ impl ExampleApp for Basic {
         let swap_resource = VirtualResource::image("swapchain");
         let offscreen = VirtualResource::image("offscreen");
 
-        let vertices: Vec<f32> = vec![
-            -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0,
-            1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
-        ];
+        let vertices: Vec<f32> =
+            vec![-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
 
         // Define a render graph with one pass that clears the swapchain image
         let graph = PassGraph::new(Some(&swap_resource));
@@ -132,9 +127,7 @@ impl ExampleApp for Basic {
             )?
             .execute(|mut cmd, ifc, _bindings| {
                 // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
-                let mut buffer = ifc.allocate_scratch_vbo(
-                    (vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize,
-                )?;
+                let mut buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
                 let slice = buffer.mapped_slice::<f32>()?;
                 slice.copy_from_slice(vertices.as_slice());
                 cmd = cmd
@@ -156,20 +149,11 @@ impl ExampleApp for Basic {
                     float32: [1.0, 0.0, 0.0, 1.0],
                 }),
             )?
-            .sample_image(
-                &offscreen_pass.output(&offscreen).unwrap(),
-                PipelineStage::FRAGMENT_SHADER,
-            )
+            .sample_image(&offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
             .execute(|cmd, _ifc, bindings| {
                 cmd.full_viewport_scissor()
                     .bind_graphics_pipeline("sample")?
-                    .resolve_and_bind_sampled_image(
-                        0,
-                        0,
-                        &offscreen,
-                        &self.resources.sampler,
-                        &bindings,
-                    )?
+                    .resolve_and_bind_sampled_image(0, 0, &offscreen, &self.resources.sampler, &bindings)?
                     .draw(6, 1, 0, 0)
             })
             .build();
