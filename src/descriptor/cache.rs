@@ -3,10 +3,10 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{DeletionQueue, DescriptorSet, Device, Error};
 use crate::descriptor::descriptor_pool::{DescriptorPool, DescriptorPoolSize};
 use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::util::cache::Cache;
+use crate::{DeletionQueue, DescriptorSet, Device, Error};
 
 /// This structure uses a [`Cache`] over a [`DescriptorSet`] to automatically manage everything related to descriptor sets.
 /// It can intelligently allocate and deallocate descriptor sets, and grow its internal descriptor pool when necessary.
@@ -33,17 +33,9 @@ impl DescriptorCache {
         })))
     }
 
-    fn grow_pool_size(
-        mut old_size: DescriptorPoolSize,
-        request: &DescriptorSetBinding,
-    ) -> DescriptorPoolSize {
+    fn grow_pool_size(mut old_size: DescriptorPoolSize, request: &DescriptorSetBinding) -> DescriptorPoolSize {
         for (ty, count) in old_size.0.iter_mut() {
-            if request
-                .bindings
-                .iter()
-                .find(|&binding| binding.ty == *ty)
-                .is_some()
-            {
+            if request.bindings.iter().find(|&binding| binding.ty == *ty).is_some() {
                 *count = *count * 2;
             }
         }
@@ -57,10 +49,7 @@ impl DescriptorCache {
     /// - This function fails if no descriptor set layout was specified in `bindings`
     /// - This function fails the the requested descriptor set has no descriptors
     /// - This function fails if allocating a descriptor set failed due to an internal error.
-    pub fn get_descriptor_set(
-        &mut self,
-        mut bindings: DescriptorSetBinding,
-    ) -> Result<&DescriptorSet> {
+    pub fn get_descriptor_set(&mut self, mut bindings: DescriptorSetBinding) -> Result<&DescriptorSet> {
         if bindings.bindings.is_empty() {
             return Err(anyhow::Error::from(Error::EmptyDescriptorBinding));
         }

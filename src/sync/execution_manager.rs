@@ -4,11 +4,11 @@ use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 use crate::command_buffer::*;
-use crate::core::queue::Queue;
+use crate::core::queue::{DeviceQueue, Queue};
 use crate::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
+use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
@@ -43,21 +43,41 @@ pub struct ExecutionManager {
     queues: Arc<Vec<Mutex<Queue>>>,
 }
 
+fn max_queue_count(family: u32, families: &[vk::QueueFamilyProperties]) -> u32 {
+    // TODO: missing queue family in the middle will panic
+    families.get(family as usize).unwrap().queue_count
+}
+
 impl ExecutionManager {
     /// Create a new execution manager. You should only ever have on instance of this struct
     /// in your program.
     pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
         let mut counts = HashMap::new();
+        let mut device_queues = HashMap::new();
+
         let queues = physical_device
             .queues()
             .iter()
             .map(|queue| -> Result<Mutex<Queue>> {
                 let index = counts.entry(queue.family_index).or_insert(0 as u32);
-                let handle = unsafe { device.get_device_queue(queue.family_index, *index) };
-                // Note that we can unwrap() here, because if this does not return Some() then our algorithm is
-                // bugged and this should panic.
-                *counts.get_mut(&queue.family_index).unwrap() += 1;
-                Ok(Mutex::new(Queue::new(device.clone(), handle, *queue)?))
+                // If we have exceeded the max count for this family, we need to reuse a device queue from earlier
+                let device_queue = if *index >= max_queue_count(queue.family_index, physical_device.queue_families()) {
+                    // Re-use a previously requested device queue. If this panics, the code is bugged (this is not a user error)
+                    device_queues.get(&queue.family_index).cloned().unwrap()
+                } else {
+                    // Create a new DeviceQueue
+                    let device_queue = Arc::new(Mutex::new(DeviceQueue {
+                        handle: unsafe { device.get_device_queue(queue.family_index, *index) },
+                    }));
+                    // Note that we can unwrap() here, because if this does not return Some() then our algorithm is
+                    // bugged and this should panic.
+                    *counts.get_mut(&queue.family_index).unwrap() += 1;
+                    // Store it
+                    device_queues.insert(queue.family_index, device_queue.clone());
+                    // Use this for our queue
+                    device_queue
+                };
+                Ok(Mutex::new(Queue::new(device.clone(), device_queue, *queue)?))
             })
             .collect::<Result<Vec<Mutex<Queue>>>>()?;
 
@@ -85,12 +105,7 @@ impl ExecutionManager {
         descriptors: Option<Arc<Mutex<DescriptorCache>>>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(
-            self.device.clone(),
-            queue,
-            pipelines,
-            descriptors,
-        )
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
@@ -101,12 +116,7 @@ impl ExecutionManager {
         descriptors: Option<Arc<Mutex<DescriptorCache>>>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(
-            self.device.clone(),
-            queue,
-            pipelines,
-            descriptors,
-        )
+        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
     /// Begin a submit batch. Note that all submits in a batch are over a single domain (currently).
@@ -156,11 +166,7 @@ impl ExecutionManager {
         }))
     }
 
-    pub(crate) fn submit_batch<D: ExecutionDomain>(
-        &self,
-        submits: &[vk::SubmitInfo2],
-        fence: &Fence,
-    ) -> Result<()> {
+    pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         unsafe {
             queue.submit2(submits, Some(fence))?;

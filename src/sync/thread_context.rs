@@ -16,11 +16,7 @@ pub struct ThreadContext<A: Allocator = DefaultAllocator> {
 
 impl<A: Allocator> ThreadContext<A> {
     /// Spawn a new thread context with local scratch allocators.
-    pub fn new(
-        device: Arc<Device>,
-        mut allocator: A,
-        scratch_size: Option<impl Into<vk::DeviceSize>>,
-    ) -> Result<Self> {
+    pub fn new(device: Arc<Device>, mut allocator: A, scratch_size: Option<impl Into<vk::DeviceSize>>) -> Result<Self> {
         let scratch_size = match scratch_size {
             None => 1 as vk::DeviceSize,
             Some(size) => size.into(),
@@ -33,12 +29,7 @@ impl<A: Allocator> ThreadContext<A> {
                 scratch_size,
                 vk::BufferUsageFlags::VERTEX_BUFFER,
             )?,
-            ibo_allocator: ScratchAllocator::<A>::new(
-                device.clone(),
-                &mut allocator,
-                scratch_size,
-                vk::BufferUsageFlags::INDEX_BUFFER,
-            )?,
+            ibo_allocator: ScratchAllocator::<A>::new(device.clone(), &mut allocator, scratch_size, vk::BufferUsageFlags::INDEX_BUFFER)?,
             ubo_allocator: ScratchAllocator::<A>::new(
                 device.clone(),
                 &mut allocator,

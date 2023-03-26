@@ -5,12 +5,11 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::Result;
 use ash::vk;
-use petgraph::{Direction, Graph};
 use petgraph::dot::Dot;
 use petgraph::graph::NodeIndex;
 use petgraph::prelude::EdgeRef;
+use petgraph::{Direction, Graph};
 
-use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::domain::ExecutionDomain;
 use crate::graph::pass::Pass;
@@ -18,6 +17,7 @@ use crate::graph::resource::ResourceUsage;
 use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
 use crate::graph::virtual_resource::VirtualResource;
 use crate::pipeline::PipelineStage;
+use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings};
 
 /// Virtual GPU resource in a task graph.
 #[derive(Derivative, Default, Clone)]
@@ -48,21 +48,14 @@ pub struct PassNode<'exec, 'q, R: Resource, D: ExecutionDomain, A: Allocator = D
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<R>,
     pub(crate) outputs: Vec<R>,
-    pub(crate) execute: Box<
-        dyn FnMut(
-            IncompleteCommandBuffer<'q, D>,
-            &mut InFlightContext<A>,
-            &PhysicalResourceBindings,
-        ) -> Result<IncompleteCommandBuffer<'q, D>>
-        + 'exec,
-    >,
+    pub(crate) execute:
+        Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>> + 'exec>,
     pub(crate) is_renderpass: bool,
 }
 
 /// Pass graph, used for synchronizing resources over a single queue.
 pub struct PassGraph<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
-    pub(crate) graph:
-    TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>>,
+    pub(crate) graph: TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>>,
     // Note that this is guaranteed to be stable.
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
     // index is invalidated. Since the source is always the first node, this is never invalidated.
@@ -122,9 +115,9 @@ impl Resource for PassResource {
 }
 
 impl<R, D, A: Allocator> Task<R> for PassNode<'_, '_, R, D, A>
-    where
-        R: Resource,
-        D: ExecutionDomain,
+where
+    R: Resource,
+    D: ExecutionDomain,
 {
     fn inputs(&self) -> &Vec<R> {
         &self.inputs
@@ -224,14 +217,13 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
         self.graph.create_barrier_nodes();
         self.merge_identical_barriers()?;
 
-        Ok(BuiltPassGraph { graph: self })
+        Ok(BuiltPassGraph {
+            graph: self,
+        })
     }
 
     /// Returns the task graph built by the GPU task graph system, useful for outputting dotfiles.
-    pub fn task_graph(
-        &self,
-    ) -> &TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>>
-    {
+    pub fn task_graph(&self) -> &TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>> {
         &self.graph
     }
 
@@ -245,11 +237,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
         self.source
     }
 
-    fn update_last_usage(
-        &mut self,
-        resource: &VirtualResource,
-        stage: PipelineStage,
-    ) -> Result<()> {
+    fn update_last_usage(&mut self, resource: &VirtualResource, stage: PipelineStage) -> Result<()> {
         let entry = self.last_usages.entry(resource.name());
         match entry {
             Entry::Occupied(mut entry) => {
@@ -267,33 +255,20 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
 
     #[allow(dead_code)]
     fn barrier_src_resource<'a>(
-        graph: &'a Graph<
-            Node<PassResource, PassResourceBarrier, PassNode<PassResource, D, A>>,
-            String,
-        >,
+        graph: &'a Graph<Node<PassResource, PassResourceBarrier, PassNode<PassResource, D, A>>, String>,
         node: NodeIndex,
     ) -> Result<&'a PassResource> {
         let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(Error::NodeNotFound.into()) };
-        let edge = graph
-            .edges_directed(node, Direction::Incoming)
-            .next()
-            .unwrap();
+        let edge = graph.edges_directed(node, Direction::Incoming).next().unwrap();
         let src_node = edge.source();
         // An edge from a barrier always points to a task.
         let Node::Task(task) = graph.node_weight(src_node).unwrap() else { unimplemented!() };
         // This unwrap() cannot fail, or the graph was constructed incorrectly.
-        Ok(task
-            .inputs
-            .iter()
-            .find(|&input| input.uid() == barrier.resource.uid())
-            .unwrap())
+        Ok(task.inputs.iter().find(|&input| input.uid() == barrier.resource.uid()).unwrap())
     }
 
     pub(crate) fn barrier_dst_resource<'a>(
-        graph: &'a Graph<
-            Node<PassResource, PassResourceBarrier, PassNode<PassResource, D, A>>,
-            String,
-        >,
+        graph: &'a Graph<Node<PassResource, PassResourceBarrier, PassNode<PassResource, D, A>>, String>,
         node: NodeIndex,
     ) -> Result<&'a PassResource> {
         // We know that:
@@ -306,11 +281,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
         // An edge from a barrier always points to a task.
         let Node::Task(task) = graph.node_weight(dst_node).unwrap() else { unimplemented!() };
         // This unwrap() cannot fail, or the graph was constructed incorrectly.
-        Ok(task
-            .inputs
-            .iter()
-            .find(|&input| input.uid() == barrier.resource.uid())
-            .unwrap())
+        Ok(task.inputs.iter().find(|&input| input.uid() == barrier.resource.uid()).unwrap())
     }
 
     /// Set source barrier stages to the *last* usage in the frame, for cross-frame sync
@@ -320,10 +291,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
         for output in &mut source.outputs {
             // Will only succeed if swapchain is set and this resource is the swapchain
             let default = VirtualResource::image("__none__internal__");
-            if output
-                .resource
-                .is_associated_with(self.swapchain.as_ref().unwrap_or(&default))
-            {
+            if output.resource.is_associated_with(self.swapchain.as_ref().unwrap_or(&default)) {
                 output.stage = PipelineStage::COLOR_ATTACHMENT_OUTPUT;
             } else {
                 let (_, stage) = self.last_usages.get(&output.resource.name()).unwrap();
@@ -367,13 +335,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
                         other_resource.uid().clone(),
                     ));
                     let (stage, access) = barrier_flags.get(&node).cloned().unwrap();
-                    barrier_flags.insert(
-                        node,
-                        (
-                            other_resource.stage | stage,
-                            other_resource.usage.access() | access,
-                        ),
-                    );
+                    barrier_flags.insert(node, (other_resource.stage | stage, other_resource.usage.access() | access));
                 }
             }
         }
@@ -398,25 +360,16 @@ pub trait GraphViz {
     fn dot(&self) -> Result<String>;
 }
 
-impl<D: ExecutionDomain, A: Allocator> GraphViz
-for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>>
-{
+impl<D: ExecutionDomain, A: Allocator> GraphViz for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> {
     fn dot(&self) -> Result<String> {
         Ok(format!(
             "{}",
-            Dot::with_attr_getters(
-                &self.graph,
-                &[],
-                &Self::get_edge_attributes,
-                &Self::get_node_attributes,
-            )
+            Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes,)
         ))
     }
 }
 
-impl<D: ExecutionDomain, A: Allocator> Display
-for Node<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>>
-{
+impl<D: ExecutionDomain, A: Allocator> Display for Node<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),

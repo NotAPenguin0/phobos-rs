@@ -10,34 +10,22 @@ pub(crate) struct VertexInputBindingDescription(pub(super) vk::VertexInputBindin
 pub(crate) struct VertexInputAttributeDescription(pub(super) vk::VertexInputAttributeDescription);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineInputAssemblyStateCreateInfo(
-    pub(super) vk::PipelineInputAssemblyStateCreateInfo,
-);
+pub(crate) struct PipelineInputAssemblyStateCreateInfo(pub(super) vk::PipelineInputAssemblyStateCreateInfo);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineDepthStencilStateCreateInfo(
-    pub(super) vk::PipelineDepthStencilStateCreateInfo,
-);
+pub(crate) struct PipelineDepthStencilStateCreateInfo(pub(super) vk::PipelineDepthStencilStateCreateInfo);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineRasterizationStateCreateInfo(
-    pub(super) vk::PipelineRasterizationStateCreateInfo,
-);
+pub(crate) struct PipelineRasterizationStateCreateInfo(pub(super) vk::PipelineRasterizationStateCreateInfo);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineMultisampleStateCreateInfo(
-    pub(super) vk::PipelineMultisampleStateCreateInfo,
-);
+pub(crate) struct PipelineMultisampleStateCreateInfo(pub(super) vk::PipelineMultisampleStateCreateInfo);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineColorBlendAttachmentState(
-    pub(super) vk::PipelineColorBlendAttachmentState,
-);
+pub(crate) struct PipelineColorBlendAttachmentState(pub(super) vk::PipelineColorBlendAttachmentState);
 
 #[derive(Default, Debug, Copy, Clone)]
-pub(crate) struct PipelineTessellationStateCreateInfo(
-    pub(super) vk::PipelineTessellationStateCreateInfo
-);
+pub(crate) struct PipelineTessellationStateCreateInfo(pub(super) vk::PipelineTessellationStateCreateInfo);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct PipelineRenderingInfo {
@@ -114,26 +102,14 @@ impl PipelineCreateInfo {
         self.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
             .view_mask(self.rendering_info.view_mask)
             .color_attachment_formats(self.rendering_info.color_formats.as_slice())
-            .depth_attachment_format(
-                self.rendering_info
-                    .depth_format
-                    .unwrap_or(vk::Format::UNDEFINED),
-            )
-            .stencil_attachment_format(
-                self.rendering_info
-                    .stencil_format
-                    .unwrap_or(vk::Format::UNDEFINED),
-            )
+            .depth_attachment_format(self.rendering_info.depth_format.unwrap_or(vk::Format::UNDEFINED))
+            .stencil_attachment_format(self.rendering_info.stencil_format.unwrap_or(vk::Format::UNDEFINED))
             .build();
     }
 
     pub fn build_inner(&mut self) -> () {
         self.vk_attributes = self.vertex_attributes.iter().map(|v| v.0.clone()).collect();
-        self.vk_vertex_inputs = self
-            .vertex_input_bindings
-            .iter()
-            .map(|v| v.0.clone())
-            .collect();
+        self.vk_vertex_inputs = self.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
         self.vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(self.vk_vertex_inputs.as_slice())
             .vertex_attribute_descriptions(self.vk_attributes.as_slice())
@@ -172,8 +148,8 @@ impl PipelineCreateInfo {
             p_vertex_input_state: &self.vertex_input_state,
             p_input_assembly_state: &self.input_assembly.0,
             p_tessellation_state: match &self.vk_tessellation_state {
-                None => { std::ptr::null() }
-                Some(info) => { info }
+                None => std::ptr::null(),
+                Some(info) => info,
             },
             p_viewport_state: &self.viewport_state,
             p_rasterization_state: &self.rasterizer.0,

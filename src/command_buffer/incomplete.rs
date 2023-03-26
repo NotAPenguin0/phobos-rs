@@ -6,17 +6,16 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{
-    BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device,
-    Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, Sampler,
-    VirtualResource,
-};
-use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::core::queue::Queue;
 use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
+use crate::{
+    BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings,
+    PipelineCache, Sampler, VirtualResource,
+};
 
 impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer<'q, D> {
     type Domain = D;
@@ -76,16 +75,8 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     /// a full descriptor pool, but other errors are passed through.
     /// - This function errors if a requested set was not specified in the current pipeline's pipeline layout.
     /// - This function errors if no pipeline is bound.
-    pub(super) fn get_descriptor_set<'a>(
-        &mut self,
-        set: u32,
-        mut bindings: DescriptorSetBinding,
-        cache: &'a mut DescriptorCache,
-    ) -> Result<&'a DescriptorSet> {
-        let layout = self
-            .current_set_layouts
-            .get(set as usize)
-            .ok_or(Error::NoDescriptorSetLayout)?;
+    pub(super) fn get_descriptor_set<'a>(&mut self, set: u32, mut bindings: DescriptorSetBinding, cache: &'a mut DescriptorCache) -> Result<&'a DescriptorSet> {
+        let layout = self.current_set_layouts.get(set as usize).ok_or(Error::NoDescriptorSetLayout)?;
         bindings.layout = layout.clone();
         cache.get_descriptor_set(bindings)
     }
@@ -106,11 +97,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         }
     }
 
-    pub(super) fn modify_descriptor_set(
-        &mut self,
-        set: u32,
-        f: impl FnOnce(&mut DescriptorSetBuilder) -> Result<()>,
-    ) -> Result<()> {
+    pub(super) fn modify_descriptor_set(&mut self, set: u32, f: impl FnOnce(&mut DescriptorSetBuilder) -> Result<()>) -> Result<()> {
         if self.current_descriptor_sets.is_none() {
             self.current_descriptor_sets = Some(HashMap::new());
         }
@@ -168,19 +155,9 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     ///     .finish();
     ///
     /// ```
-    #[deprecated(
-    since = "0.5.0",
-    note = "Use the new bind_xxx functions of the command buffer."
-    )]
-    pub fn bind_new_descriptor_set(
-        mut self,
-        index: u32,
-        cache: &Arc<Mutex<DescriptorCache>>,
-        bindings: DescriptorSetBinding,
-    ) -> Result<Self> {
-        let mut cache = cache
-            .lock()
-            .or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?;
+    #[deprecated(since = "0.5.0", note = "Use the new bind_xxx functions of the command buffer.")]
+    pub fn bind_new_descriptor_set(mut self, index: u32, cache: &Arc<Mutex<DescriptorCache>>, bindings: DescriptorSetBinding) -> Result<Self> {
+        let mut cache = cache.lock().or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?;
         let set = self.get_descriptor_set(index, bindings, &mut cache)?;
         self.bind_descriptor_set(index, set);
         Ok(self)
@@ -211,13 +188,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     }
 
     /// Binds a combined image + sampler to the specified slot.
-    pub fn bind_sampled_image(
-        mut self,
-        set: u32,
-        binding: u32,
-        image: &ImageView,
-        sampler: &Sampler,
-    ) -> Result<Self> {
+    pub fn bind_sampled_image(mut self, set: u32, binding: u32, image: &ImageView, sampler: &Sampler) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_sampled_image(binding, image, sampler);
             Ok(())
@@ -225,15 +196,19 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         Ok(self)
     }
 
-    /// Binds a uniform buffer to teh specified slot.
-    pub fn bind_uniform_buffer(
-        mut self,
-        set: u32,
-        binding: u32,
-        buffer: &BufferView,
-    ) -> Result<Self> {
+    /// Binds a uniform buffer to the specified slot.
+    pub fn bind_uniform_buffer(mut self, set: u32, binding: u32, buffer: &BufferView) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_uniform_buffer(binding, buffer);
+            Ok(())
+        })?;
+        Ok(self)
+    }
+
+    /// Binds a storage buffer buffer to the specified slot.
+    pub fn bind_storage_buffer(mut self, set: u32, binding: u32, buffer: &BufferView) -> Result<Self> {
+        self.modify_descriptor_set(set, |builder| {
+            builder.bind_storage_buffer(binding, buffer);
             Ok(())
         })?;
         Ok(self)
@@ -292,22 +267,12 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     /// Direct translation of [`vkCmdPushConstants`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPushConstants.html).
     /// Tends to crash on some drivers if the specified push constant range does not exist (possible due to unused variable optimization in the shader,
     /// or incorrect stage flags specified)
-    pub fn push_constants<T: Copy>(
-        self,
-        stage: vk::ShaderStageFlags,
-        offset: u32,
-        data: &[T],
-    ) -> Self {
+    pub fn push_constants<T: Copy>(self, stage: vk::ShaderStageFlags, offset: u32, data: &[T]) -> Self {
         // TODO: Validate push constant ranges with current pipeline layout to prevent crashes.
         unsafe {
             let (_, data, _) = data.align_to::<u8>();
-            self.device.cmd_push_constants(
-                self.handle,
-                self.current_pipeline_layout,
-                stage,
-                offset,
-                data,
-            );
+            self.device
+                .cmd_push_constants(self.handle, self.current_pipeline_layout, stage, offset, data);
         }
         self
     }
@@ -318,26 +283,18 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
             p_next: std::ptr::null(),
             image_view: unsafe { attachment.image_view.handle() },
             image_layout: attachment.image_layout,
-            resolve_mode: attachment
-                .resolve_mode
-                .unwrap_or(vk::ResolveModeFlagsKHR::NONE),
+            resolve_mode: attachment.resolve_mode.unwrap_or(vk::ResolveModeFlagsKHR::NONE),
             resolve_image_view: match &attachment.resolve_image_view {
                 Some(view) => unsafe { view.handle() },
                 None => vk::ImageView::null(),
             },
-            resolve_image_layout: attachment
-                .resolve_image_layout
-                .unwrap_or(vk::ImageLayout::UNDEFINED),
+            resolve_image_layout: attachment.resolve_image_layout.unwrap_or(vk::ImageLayout::UNDEFINED),
             load_op: attachment.load_op,
             store_op: attachment.store_op,
             clear_value: attachment.clear_value,
         };
 
-        let color_attachments = info
-            .color_attachments
-            .iter()
-            .map(map_attachment)
-            .collect::<Vec<_>>();
+        let color_attachments = info.color_attachments.iter().map(map_attachment).collect::<Vec<_>>();
         let depth_attachment = info.depth_attachment.as_ref().map(map_attachment);
         let stencil_attachment = info.stencil_attachment.as_ref().map(map_attachment);
         let vk_info = vk::RenderingInfo {
@@ -370,10 +327,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
                 .iter()
                 .map(|attachment| attachment.image_view.format())
                 .collect(),
-            depth_format: info
-                .depth_attachment
-                .as_ref()
-                .map(|attachment| attachment.image_view.format()),
+            depth_format: info.depth_attachment.as_ref().map(|attachment| attachment.image_view.format()),
             stencil_format: info
                 .stencil_attachment
                 .as_ref()

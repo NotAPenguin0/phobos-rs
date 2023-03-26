@@ -14,14 +14,11 @@ ash = { version = "0.37.0", features = ["debug"] }
 ash-window = "0.12.0"
 raw-window-handle = "0.5.0"
 gpu-allocator = "0.22.0"
-smallvec = "1.10.0"
 derivative = "2.2.0"
 futures = "0.3.25"
 petgraph = "0.6.2"
 layout-rs = "0.1.1"
 winit = { version = "0.28.1", optional = true }
-bitflags = "1.3.2"
-dyn-clone = "1.0.10"
 anyhow = { version = "1.0.69", features = ["backtrace"] }
 thiserror = "1.0.38"
 spv-cross = { version = "0.23.2", optional = true, features = ["glsl", "hlsl"] }
@@ -29,6 +26,9 @@ log = "0.4.17"
 
 [build-dependencies]
 shaderc = { version = "0.8.2", optional = true, features = ["build-from-source"] }
+
+[dev-dependencies]
+pretty_env_logger = "0.4.0"
 
 [features]
 default = ["winit", "debug-markers", "shader-reflection"]
@@ -42,7 +42,3 @@ shader-reflection = ["dep:spv-cross"]
 shaderc = ["dep:shaderc"]
 # Use hlsl instead of glsl for shader reflection
 hlsl = []
-
-# compile winit with max optimizations
-[profile.dev.package.winit]
-opt-level = 3

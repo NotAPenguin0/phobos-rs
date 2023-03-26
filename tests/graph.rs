@@ -7,17 +7,15 @@ use ash::vk;
 use layout::backends::svg::SVGWriter;
 use layout::gv;
 use layout::gv::GraphBuilder;
-
 use ph::task_graph::*;
 use phobos as ph;
-use phobos::{domain, IncompleteCommandBuffer, record_graph};
 use phobos::pass::{Pass, PassBuilder};
 use phobos::pipeline::PipelineStage;
+use phobos::{domain, record_graph, IncompleteCommandBuffer};
 
 pub fn display_dot<G>(graph: &G, path: &str)
-    where
-        G: GraphViz,
-{
+where
+    G: GraphViz, {
     let dot = graph.dot().unwrap();
     let dot = format!("{}", dot);
     let mut parser = gv::DotParser::new(&dot);
@@ -98,10 +96,7 @@ fn test_graph() -> Result<(), ph::Error> {
         .get();
     let p3 = PassBuilder::render(String::from("Finalize output"))
         .color_attachment(swap.clone(), vk::AttachmentLoadOp::CLEAR)
-        .sample_image(
-            p2.output(&offscreen).unwrap(),
-            PipelineStage::FRAGMENT_SHADER,
-        )
+        .sample_image(p2.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
         .sample_image(p1.output(&depth).unwrap(), PipelineStage::FRAGMENT_SHADER)
         .get();
 

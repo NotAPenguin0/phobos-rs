@@ -19,29 +19,28 @@ impl DebugMessenger {
     /// Creates a new debug messenger. Requires the vulkan validation layers to be enabled to
     /// do anything useful.
     pub fn new(instance: &VkInstance) -> Result<Self> {
-        let functions =
-            ash::extensions::ext::DebugUtils::new(unsafe { instance.loader() }, &*instance);
+        let functions = ash::extensions::ext::DebugUtils::new(unsafe { instance.loader() }, &*instance);
         let info = vk::DebugUtilsMessengerCreateInfoEXT {
             s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
             p_next: std::ptr::null(),
             flags: Default::default(),
-            message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
-                | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
-            message_type: vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
-                | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
+            message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+            message_type: vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
             pfn_user_callback: Some(vk_debug_callback),
             p_user_data: std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
         };
         let handle = unsafe { functions.create_debug_utils_messenger(&info, None)? };
-        Ok(DebugMessenger { handle, functions })
+        Ok(DebugMessenger {
+            handle,
+            functions,
+        })
     }
 }
 
 impl Drop for DebugMessenger {
     fn drop(&mut self) {
         unsafe {
-            self.functions
-                .destroy_debug_utils_messenger(self.handle, None);
+            self.functions.destroy_debug_utils_messenger(self.handle, None);
         }
     }
 }

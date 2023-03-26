@@ -5,7 +5,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
-
 #[cfg(feature = "shaderc")]
 fn load_file(path: &Path) -> String {
     let mut out = String::new();
@@ -22,13 +21,7 @@ fn save_file(path: &Path, binary: &[u8]) {
 fn compile_shader(path: &Path, kind: shaderc::ShaderKind, output: &Path) {
     let compiler = shaderc::Compiler::new().unwrap();
     let binary = compiler
-        .compile_into_spirv(
-            &load_file(path),
-            kind,
-            path.as_os_str().to_str().unwrap(),
-            "main",
-            None,
-        )
+        .compile_into_spirv(&load_file(path), kind, path.as_os_str().to_str().unwrap(), "main", None)
         .unwrap();
     save_file(output, binary.as_binary_u8());
 }
@@ -38,6 +31,7 @@ fn compile_shaders() {
     println!("cargo:rerun-if-changed=examples/data/vert.glsl");
     println!("cargo:rerun-if-changed=examples/data/frag.glsl");
     println!("cargo:rerun-if-changed=examples/data/blue.glsl");
+    println!("cargo:rerun-if-changed=examples/data/compute.glsl");
 
     compile_shader(
         Path::new("examples/data/vert.glsl"),
@@ -53,6 +47,11 @@ fn compile_shaders() {
         Path::new("examples/data/blue.glsl"),
         shaderc::ShaderKind::Fragment,
         Path::new("examples/data/blue.spv"),
+    );
+    compile_shader(
+        Path::new("examples/data/compute.glsl"),
+        shaderc::ShaderKind::Compute,
+        Path::new("examples/data/compute.spv"),
     );
 }
 

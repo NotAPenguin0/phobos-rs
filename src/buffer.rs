@@ -74,14 +74,14 @@ unsafe impl Send for BufferView {}
 impl<A: Allocator> Buffer<A> {
     /// Allocate a new buffer with a specific size, at a specific memory location.
     /// All usage flags must be given.
-    pub fn new(
-        device: Arc<Device>,
-        allocator: &mut A,
-        size: impl Into<vk::DeviceSize>,
-        usage: vk::BufferUsageFlags,
-        location: MemoryType,
-    ) -> Result<Self> {
+    pub fn new(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
         let size = size.into();
+        let sharing_mode = if device.is_single_queue() {
+            vk::SharingMode::EXCLUSIVE
+        } else {
+            vk::SharingMode::CONCURRENT
+        };
+
         let handle = unsafe {
             device.create_buffer(
                 &vk::BufferCreateInfo {
@@ -90,9 +90,17 @@ impl<A: Allocator> Buffer<A> {
                     flags: vk::BufferCreateFlags::empty(),
                     size,
                     usage,
-                    sharing_mode: vk::SharingMode::CONCURRENT,
-                    queue_family_index_count: device.queue_families().len() as u32,
-                    p_queue_family_indices: device.queue_families().as_ptr(),
+                    sharing_mode,
+                    queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT {
+                        device.queue_families().len() as u32
+                    } else {
+                        0
+                    },
+                    p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT {
+                        device.queue_families().as_ptr()
+                    } else {
+                        std::ptr::null()
+                    },
                 },
                 None,
             )?
@@ -114,12 +122,7 @@ impl<A: Allocator> Buffer<A> {
     }
 
     /// Allocate a new buffer with device local memory (VRAM). This is usually the correct memory location for most buffers.
-    pub fn new_device_local(
-        device: Arc<Device>,
-        allocator: &mut A,
-        size: impl Into<vk::DeviceSize>,
-        usage: vk::BufferUsageFlags,
-    ) -> Result<Self> {
+    pub fn new_device_local(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
         Self::new(device, allocator, size, usage, MemoryType::GpuOnly)
     }
 
@@ -128,11 +131,7 @@ impl<A: Allocator> Buffer<A> {
     /// This view is valid as long as the buffer is valid.
     /// # Errors
     /// Fails if `offset + size >= self.size`.
-    pub fn view(
-        &self,
-        offset: impl Into<vk::DeviceSize>,
-        size: impl Into<vk::DeviceSize>,
-    ) -> Result<BufferView> {
+    pub fn view(&self, offset: impl Into<vk::DeviceSize>, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
         let offset = offset.into();
         let size = size.into();
         return if offset + size >= self.size {
@@ -141,10 +140,7 @@ impl<A: Allocator> Buffer<A> {
             Ok(BufferView {
                 handle: self.handle,
                 offset,
-                pointer: unsafe {
-                    self.pointer
-                        .map(|p| NonNull::new(p.as_ptr().offset(offset as isize)).unwrap())
-                },
+                pointer: unsafe { self.pointer.map(|p| NonNull::new(p.as_ptr().offset(offset as isize)).unwrap()) },
                 size,
             })
         };
@@ -192,12 +188,7 @@ impl BufferView {
     /// Fails if this buffer is not mappable (not `HOST_VISIBLE`).
     pub fn mapped_slice<T>(&mut self) -> Result<&mut [T]> {
         if let Some(pointer) = self.pointer {
-            Ok(unsafe {
-                std::slice::from_raw_parts_mut(
-                    pointer.cast::<T>().as_ptr(),
-                    self.size as usize / std::mem::size_of::<T>(),
-                )
-            })
+            Ok(unsafe { std::slice::from_raw_parts_mut(pointer.cast::<T>().as_ptr(), self.size as usize / std::mem::size_of::<T>()) })
         } else {
             Err(anyhow::Error::from(Error::UnmappableBuffer))
         }

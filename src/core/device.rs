@@ -7,8 +7,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{AppSettings, PhysicalDevice, VkInstance, WindowInterface};
 use crate::util::string::unwrap_to_raw_strings;
+use crate::{AppSettings, PhysicalDevice, VkInstance, WindowInterface};
 
 /// Device extensions that phobos requests but might not be available.
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -67,17 +67,13 @@ fn add_if_supported(
 impl Device {
     /// Create a new Vulkan device. This is wrapped in an Arc because it gets passed around and stored in a
     /// lot of Vulkan-related structures.
-    pub fn new<Window: WindowInterface>(
-        instance: &VkInstance,
-        physical_device: &PhysicalDevice,
-        settings: &AppSettings<Window>,
-    ) -> Result<Arc<Self>> {
+    pub fn new<Window: WindowInterface>(instance: &VkInstance, physical_device: &PhysicalDevice, settings: &AppSettings<Window>) -> Result<Arc<Self>> {
         let mut priorities = Vec::<f32>::new();
         let queue_create_infos = physical_device
             .queue_families()
             .iter()
             .enumerate()
-            .flat_map(|(index, _)| {
+            .flat_map(|(index, family_info)| {
                 let count = physical_device
                     .queues()
                     .iter()
@@ -86,6 +82,7 @@ impl Device {
                 if count == 0 {
                     return None;
                 }
+                let count = count.min(family_info.queue_count as usize);
                 priorities.resize(usize::max(priorities.len(), count), 1.0);
                 Some(vk::DeviceQueueCreateInfo {
                     queue_family_index: index as u32,
@@ -103,8 +100,7 @@ impl Device {
             .collect::<Result<Vec<CString>, NulError>>()?;
 
         // SAFETY: Vulkan API call. We have a valid reference to a PhysicalDevice, so handle() is valid.
-        let available_extensions =
-            unsafe { instance.enumerate_device_extension_properties(physical_device.handle())? };
+        let available_extensions = unsafe { instance.enumerate_device_extension_properties(physical_device.handle())? };
         let mut enabled_extensions = HashSet::new();
         // Add the extensions we want, but that are not required.
         let dynamic_state3_supported = add_if_supported(
@@ -112,7 +108,8 @@ impl Device {
             ash::extensions::ext::ExtendedDynamicState3::name(),
             &mut enabled_extensions,
             &mut extension_names,
-            &available_extensions);
+            &available_extensions,
+        );
 
         // Add required extensions
         if settings.window.is_some() {
@@ -129,6 +126,7 @@ impl Device {
         let mut features_1_3 = settings.gpu_requirements.features_1_3;
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
+        features_1_3.maintenance4 = vk::TRUE;
 
         let extension_names_raw = unwrap_to_raw_strings(extension_names.as_slice());
         let mut info = vk::DeviceCreateInfo::builder()
@@ -154,18 +152,13 @@ impl Device {
             None
         };
 
-        Ok(Arc::new(
-            Device {
-                handle,
-                queue_families: queue_create_infos
-                    .iter()
-                    .map(|info| info.queue_family_index)
-                    .collect(),
-                properties: *physical_device.properties(),
-                extensions: enabled_extensions,
-                dynamic_state3,
-            }
-        ))
+        Ok(Arc::new(Device {
+            handle,
+            queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
+            properties: *physical_device.properties(),
+            extensions: enabled_extensions,
+            dynamic_state3,
+        }))
     }
 
     /// Wait for the device to be completely idle.
@@ -189,12 +182,19 @@ impl Device {
         &self.properties
     }
 
+    /// Check if an extension is enabled.
     pub fn is_extension_enabled(&self, ext: ExtensionID) -> bool {
         self.extensions.contains(&ext)
     }
 
+    /// Access to the function pointers for VK_EXT_dynamic_state_3
     pub fn dynamic_state3(&self) -> Option<&ash::extensions::ext::ExtendedDynamicState3> {
         self.dynamic_state3.as_ref()
+    }
+
+    /// True we only have a single queue, and thus the sharing mode for resources is always EXCLUSIVE.
+    pub fn is_single_queue(&self) -> bool {
+        self.queue_families.len() == 1
     }
 }
 

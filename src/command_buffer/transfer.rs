@@ -1,9 +1,9 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::domain::ExecutionDomain;
+use crate::{BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
 
 impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteCommandBuffer<'_, D> {
     /// Copy one buffer to the other.
@@ -21,12 +21,8 @@ impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteComma
         };
 
         unsafe {
-            self.device.cmd_copy_buffer(
-                self.handle,
-                src.handle(),
-                dst.handle(),
-                std::slice::from_ref(&copy),
-            );
+            self.device
+                .cmd_copy_buffer(self.handle, src.handle(), dst.handle(), std::slice::from_ref(&copy));
         }
 
         Ok(self)
@@ -34,9 +30,8 @@ impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteComma
 
     /// Copy a buffer to the base mip level of the specified image.
     fn copy_buffer_to_image(self, src: &BufferView, dst: &ImageView) -> Result<Self>
-        where
-            Self: Sized,
-    {
+    where
+        Self: Sized, {
         let copy = vk::BufferImageCopy {
             buffer_offset: src.offset(),
             buffer_row_length: dst.width(),

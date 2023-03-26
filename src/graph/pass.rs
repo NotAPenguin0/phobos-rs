@@ -75,14 +75,12 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{
-    Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource,
-};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::domain::ExecutionDomain;
 use crate::graph::pass_graph::PassResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
+use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
 pub struct Pass<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
@@ -90,14 +88,8 @@ pub struct Pass<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> 
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<PassResource>,
     pub(crate) outputs: Vec<PassResource>,
-    pub(crate) execute: Box<
-        dyn FnMut(
-            IncompleteCommandBuffer<'q, D>,
-            &mut InFlightContext<A>,
-            &PhysicalResourceBindings,
-        ) -> Result<IncompleteCommandBuffer<'q, D>>
-        + 'exec,
-    >,
+    pub(crate) execute:
+        Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>> + 'exec>,
     pub(crate) is_renderpass: bool,
 }
 
@@ -183,17 +175,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     }
 
     /// Adds a color attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
-    pub fn color_attachment(
-        mut self,
-        resource: &VirtualResource,
-        op: vk::AttachmentLoadOp,
-        clear: Option<vk::ClearColorValue>,
-    ) -> Result<Self> {
+    pub fn color_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self> {
         if !self.inner.is_renderpass {
-            return Err(Error::Uncategorized(
-                "Cannot attach color attachment to a pass that is not a renderpass",
-            )
-                .into());
+            return Err(Error::Uncategorized("Cannot attach color attachment to a pass that is not a renderpass").into());
         }
         if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() {
             return Err(anyhow::Error::from(Error::NoClearValue));
@@ -219,7 +203,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
             resource: resource.upgrade(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT,
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-            clear_value: clear.map(|c| vk::ClearValue { color: c }),
+            clear_value: clear.map(|c| vk::ClearValue {
+                color: c,
+            }),
             load_op: Some(op),
         });
 
@@ -227,17 +213,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     }
 
     /// Adds a depth attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
-    pub fn depth_attachment(
-        mut self,
-        resource: &VirtualResource,
-        op: vk::AttachmentLoadOp,
-        clear: Option<vk::ClearDepthStencilValue>,
-    ) -> Result<Self> {
+    pub fn depth_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Result<Self> {
         if !self.inner.is_renderpass {
-            return Err(Error::Uncategorized(
-                "Cannot attach depth attachment to a pass that is not a renderpass",
-            )
-                .into());
+            return Err(Error::Uncategorized("Cannot attach depth attachment to a pass that is not a renderpass").into());
         }
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Depth),
@@ -261,7 +239,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
             // It's also legal to specify COLOR_ATTACHMENT_OUTPUT, but this is more precise.
             stage: PipelineStage::LATE_FRAGMENT_TESTS,
             layout: vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
-            clear_value: clear.map(|c| vk::ClearValue { depth_stencil: c }),
+            clear_value: clear.map(|c| vk::ClearValue {
+                depth_stencil: c,
+            }),
             load_op: Some(op),
         });
 
@@ -308,12 +288,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     /// Set the function to be called when recording this pass.
     pub fn execute(
         mut self,
-        exec: impl FnMut(
-            IncompleteCommandBuffer<'q, D>,
-            &mut InFlightContext<A>,
-            &PhysicalResourceBindings,
-        ) -> Result<IncompleteCommandBuffer<'q, D>>
-        + 'exec,
+        exec: impl FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>> + 'exec,
     ) -> Self {
         self.inner.execute = Box::new(exec);
         self

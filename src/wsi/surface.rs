@@ -24,13 +24,9 @@ pub struct Surface {
 
 impl Surface {
     /// Create a new surface.
-    pub fn new<Window: WindowInterface>(
-        instance: &VkInstance,
-        settings: &AppSettings<Window>,
-    ) -> Result<Self> {
+    pub fn new<Window: WindowInterface>(instance: &VkInstance, settings: &AppSettings<Window>) -> Result<Self> {
         if let Some(window) = settings.window {
-            let functions =
-                ash::extensions::khr::Surface::new(unsafe { instance.loader() }, &*instance);
+            let functions = ash::extensions::khr::Surface::new(unsafe { instance.loader() }, &*instance);
             let handle = unsafe {
                 ash_window::create_surface(
                     instance.loader(),
@@ -56,12 +52,9 @@ impl Surface {
     /// Because surface support varies per physical device, this function requires one to be selected.
     pub fn query_details(&mut self, physical_device: &PhysicalDevice) -> Result<()> {
         unsafe {
-            self.capabilities = self
-                .get_physical_device_surface_capabilities(physical_device.handle(), self.handle)?;
-            self.formats =
-                self.get_physical_device_surface_formats(physical_device.handle(), self.handle)?;
-            self.present_modes = self
-                .get_physical_device_surface_present_modes(physical_device.handle(), self.handle)?;
+            self.capabilities = self.get_physical_device_surface_capabilities(physical_device.handle(), self.handle)?;
+            self.formats = self.get_physical_device_surface_formats(physical_device.handle(), self.handle)?;
+            self.present_modes = self.get_physical_device_surface_present_modes(physical_device.handle(), self.handle)?;
         }
         Ok(())
     }

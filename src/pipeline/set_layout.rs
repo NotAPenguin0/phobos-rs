@@ -3,8 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::Device;
 use crate::util::cache::Resource;
+use crate::Device;
 
 /// A fully built Vulkan descriptor set layout. This is a managed resource, so it cannot be manually
 /// created or dropped.

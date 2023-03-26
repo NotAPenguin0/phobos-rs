@@ -31,9 +31,7 @@ pub enum Error {
     #[error("No queue found that supports presentation. Only headless mode is supported.")]
     NoPresentQueue,
     /// No queue was found for requested domain. Did you forget to request it?
-    #[error(
-    "No queue found for requested domain. Did you forget a queue request on initialization?"
-    )]
+    #[error("No queue found for requested domain. Did you forget a queue request on initialization?")]
     NoCapableQueue,
     /// Vulkan allocation error.
     #[error("Vulkan allocation error: `{0}`")]

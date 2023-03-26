@@ -69,15 +69,14 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{
-    Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error,
-    ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore, Surface, Swapchain,
-    WindowInterface,
-};
 use crate::command_buffer::CommandBuffer;
 use crate::domain::ExecutionDomain;
 use crate::util::deferred_delete::DeletionQueue;
 use crate::wsi::swapchain::SwapchainImage;
+use crate::{
+    Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore,
+    Surface, Swapchain, WindowInterface,
+};
 
 /// Information stored for each in-flight frame.
 #[derive(Derivative)]
@@ -151,14 +150,8 @@ pub struct FrameManager<A: Allocator = DefaultAllocator> {
 
 impl<A: Allocator> FrameManager<A> {
     /// Initialize frame manager with per-frame data.
-    pub fn new<Window: WindowInterface>(
-        device: Arc<Device>,
-        mut allocator: A,
-        settings: &AppSettings<Window>,
-        swapchain: Swapchain,
-    ) -> Result<Self> {
-        let scratch_flags_base =
-            vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC;
+    pub fn new<Window: WindowInterface>(device: Arc<Device>, mut allocator: A, settings: &AppSettings<Window>, swapchain: Swapchain) -> Result<Self> {
+        let scratch_flags_base = vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC;
         Ok(FrameManager {
             device: device.clone(),
             per_frame: (0..FRAMES_IN_FLIGHT)
@@ -201,7 +194,9 @@ impl<A: Allocator> FrameManager<A> {
             per_image: swapchain
                 .images()
                 .iter()
-                .map(|_| PerImage { fence: None })
+                .map(|_| PerImage {
+                    fence: None,
+                })
                 .collect(),
             current_frame: 0,
             current_image: 0,
@@ -212,14 +207,12 @@ impl<A: Allocator> FrameManager<A> {
 
     fn acquire_image(&self) -> Result<(u32 /*index*/, bool /*resize required*/)> {
         let frame = &self.per_frame[self.current_frame as usize];
-        frame.fence.wait()?;
+        unsafe {
+            frame.fence.wait_without_cleanup()?;
+        }
         let result = unsafe {
-            self.swapchain.acquire_next_image(
-                self.swapchain.handle(),
-                u64::MAX,
-                frame.image_ready.handle(),
-                vk::Fence::null(),
-            )
+            self.swapchain
+                .acquire_next_image(self.swapchain.handle(), u64::MAX, frame.image_ready.handle(), vk::Fence::null())
         };
 
         match result {
@@ -230,11 +223,7 @@ impl<A: Allocator> FrameManager<A> {
         }
     }
 
-    fn resize_swapchain<Window: WindowInterface>(
-        &mut self,
-        window: &Window,
-        surface: &Surface,
-    ) -> Result<Swapchain> {
+    fn resize_swapchain<Window: WindowInterface>(&mut self, window: &Window, surface: &Surface) -> Result<Swapchain> {
         let mut new_swapchain = Swapchain {
             handle: vk::SwapchainKHR::null(),
             images: vec![],
@@ -273,46 +262,41 @@ impl<A: Allocator> FrameManager<A> {
         new_swapchain.handle = unsafe { self.swapchain.create_swapchain(&info, None)? };
 
         // Now that the new swapchain is created, we still need to acquire the images again.
-        new_swapchain.images =
-            unsafe { self.swapchain.get_swapchain_images(new_swapchain.handle)? }
-                .iter()
-                .map(move |image| -> Result<SwapchainImage> {
-                    let image = Image::new_managed(
-                        self.device.clone(),
-                        *image,
-                        new_swapchain.format.format,
-                        vk::Extent3D {
-                            width: new_swapchain.extent.width,
-                            height: new_swapchain.extent.height,
-                            depth: 1,
-                        },
-                        1,
-                        1,
-                        vk::SampleCountFlags::TYPE_1,
-                    );
-                    // Create a trivial ImgView.
-                    let view = image.view(vk::ImageAspectFlags::COLOR)?;
-                    // Bundle them together into an owning ImageView
-                    Ok(SwapchainImage { image, view })
+        new_swapchain.images = unsafe { self.swapchain.get_swapchain_images(new_swapchain.handle)? }
+            .iter()
+            .map(move |image| -> Result<SwapchainImage> {
+                let image = Image::new_managed(
+                    self.device.clone(),
+                    *image,
+                    new_swapchain.format.format,
+                    vk::Extent3D {
+                        width: new_swapchain.extent.width,
+                        height: new_swapchain.extent.height,
+                        depth: 1,
+                    },
+                    1,
+                    1,
+                    vk::SampleCountFlags::TYPE_1,
+                );
+                // Create a trivial ImgView.
+                let view = image.view(vk::ImageAspectFlags::COLOR)?;
+                // Bundle them together into an owning ImageView
+                Ok(SwapchainImage {
+                    image,
+                    view,
                 })
-                .collect::<Result<Vec<SwapchainImage>>>()?;
+            })
+            .collect::<Result<Vec<SwapchainImage>>>()?;
 
         Ok(new_swapchain)
     }
 
     /// Obtain a new frame context to run commands in.
-    pub async fn new_frame<Window, D, F>(
-        &mut self,
-        exec: ExecutionManager,
-        window: &Window,
-        surface: &Surface,
-        f: F,
-    ) -> Result<()>
+    pub async fn new_frame<Window, D, F>(&mut self, exec: ExecutionManager, window: &Window, surface: &Surface, f: F) -> Result<()>
     where
         Window: WindowInterface,
         D: ExecutionDomain + 'static,
-        F: FnOnce(InFlightContext<A>) -> Result<CommandBuffer<D>>,
-    {
+        F: FnOnce(InFlightContext<A>) -> Result<CommandBuffer<D>>, {
         // Advance deletion queue by one frame
         self.swapchain_delete.next_frame();
 
@@ -321,18 +305,10 @@ impl<A: Allocator> FrameManager<A> {
 
         // Advance per-frame allocator to the next frame
         unsafe {
-            self.per_frame[self.current_frame as usize]
-                .vertex_allocator
-                .reset();
-            self.per_frame[self.current_frame as usize]
-                .index_allocator
-                .reset();
-            self.per_frame[self.current_frame as usize]
-                .uniform_allocator
-                .reset();
-            self.per_frame[self.current_frame as usize]
-                .storage_allocator
-                .reset();
+            self.per_frame[self.current_frame as usize].vertex_allocator.reset();
+            self.per_frame[self.current_frame as usize].index_allocator.reset();
+            self.per_frame[self.current_frame as usize].uniform_allocator.reset();
+            self.per_frame[self.current_frame as usize].storage_allocator.reset();
         }
 
         let (index, resize_required) = self.acquire_image()?;
@@ -351,7 +327,9 @@ impl<A: Allocator> FrameManager<A> {
         // Wait until this image is absolutely not in use anymore.
         let per_image = &mut self.per_image[self.current_image as usize];
         if let Some(image_fence) = per_image.fence.as_ref() {
-            image_fence.wait()? // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
+            unsafe {
+                image_fence.wait_without_cleanup()?;
+            } // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
         }
 
         // Grab the fence for this frame and assign it to the image.
@@ -363,9 +341,7 @@ impl<A: Allocator> FrameManager<A> {
                 unsafe { cmd.delete(exec.clone())? }
             }
             per_frame.command_buffer = None;
-            let image = self.swapchain.images()[self.current_image as usize]
-                .view
-                .clone();
+            let image = self.swapchain.images()[self.current_image as usize].view.clone();
 
             let ifc = InFlightContext::<A> {
                 swapchain_image: Some(image),
@@ -382,19 +358,12 @@ impl<A: Allocator> FrameManager<A> {
     }
 
     /// Obtain a new frame context to run commands in.
-    pub async fn new_async_frame<Window, D, F, Fut>(
-        &mut self,
-        exec: ExecutionManager,
-        window: &Window,
-        surface: &Surface,
-        f: F,
-    ) -> Result<()>
+    pub async fn new_async_frame<Window, D, F, Fut>(&mut self, exec: ExecutionManager, window: &Window, surface: &Surface, f: F) -> Result<()>
     where
         Window: WindowInterface,
         D: ExecutionDomain + 'static,
         F: FnOnce(InFlightContext<A>) -> Fut,
-        Fut: Future<Output = Result<CommandBuffer<D>>>,
-    {
+        Fut: Future<Output = Result<CommandBuffer<D>>>, {
         // Advance deletion queue by one frame
         self.swapchain_delete.next_frame();
 
@@ -403,18 +372,10 @@ impl<A: Allocator> FrameManager<A> {
 
         // Advance per-frame allocator to the next frame
         unsafe {
-            self.per_frame[self.current_frame as usize]
-                .vertex_allocator
-                .reset();
-            self.per_frame[self.current_frame as usize]
-                .index_allocator
-                .reset();
-            self.per_frame[self.current_frame as usize]
-                .uniform_allocator
-                .reset();
-            self.per_frame[self.current_frame as usize]
-                .storage_allocator
-                .reset();
+            self.per_frame[self.current_frame as usize].vertex_allocator.reset();
+            self.per_frame[self.current_frame as usize].index_allocator.reset();
+            self.per_frame[self.current_frame as usize].uniform_allocator.reset();
+            self.per_frame[self.current_frame as usize].storage_allocator.reset();
         }
 
         let (index, resize_required) = self.acquire_image()?;
@@ -433,7 +394,9 @@ impl<A: Allocator> FrameManager<A> {
         // Wait until this image is absolutely not in use anymore.
         let per_image = &mut self.per_image[self.current_image as usize];
         if let Some(image_fence) = per_image.fence.as_ref() {
-            image_fence.wait()? // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
+            unsafe {
+                image_fence.wait_without_cleanup()?;
+            } // TODO: Try to use await() here, but for this the fence cannot be inside an Arc
         }
 
         // Grab the fence for this frame and assign it to the image.
@@ -445,9 +408,7 @@ impl<A: Allocator> FrameManager<A> {
                 unsafe { cmd.delete(exec.clone())? }
             }
             per_frame.command_buffer = None;
-            let image = self.swapchain.images()[self.current_image as usize]
-                .view
-                .clone();
+            let image = self.swapchain.images()[self.current_image as usize].view.clone();
 
             let ifc = InFlightContext::<A> {
                 swapchain_image: Some(image),
@@ -469,19 +430,12 @@ impl<A: Allocator> FrameManager<A> {
     /// will signal. Any commands submitted from somewhere else must be synchronized to this submission.
     /// Note: it's possible this will be enforced through the type system later.
     /// TODO: examine possibilities for this.
-    fn submit<D: ExecutionDomain + 'static>(
-        &mut self,
-        cmd: CommandBuffer<D>,
-        exec: ExecutionManager,
-    ) -> Result<()> {
+    fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: ExecutionManager) -> Result<()> {
         // Reset frame fence
         let mut per_frame = &mut self.per_frame[self.current_frame as usize];
         per_frame.fence.reset()?;
 
-        let semaphores: Vec<vk::Semaphore> = vec![&per_frame.image_ready]
-            .iter()
-            .map(|sem| unsafe { sem.handle() })
-            .collect();
+        let semaphores: Vec<vk::Semaphore> = vec![&per_frame.image_ready].iter().map(|sem| unsafe { sem.handle() }).collect();
         let stages = vec![vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
 
         // Grab a copy of the command buffer handle for submission.
@@ -542,9 +496,7 @@ impl<A: Allocator> FrameManager<A> {
     /// This reference is valid as long as the swapchain is not resized.
     #[allow(dead_code)]
     unsafe fn get_swapchain_image(&self) -> Result<ImageView> {
-        Ok(self.swapchain.images[self.current_image as usize]
-            .view
-            .clone())
+        Ok(self.swapchain.images[self.current_image as usize].view.clone())
     }
 
     /// Unsafe access to the underlying swapchain.

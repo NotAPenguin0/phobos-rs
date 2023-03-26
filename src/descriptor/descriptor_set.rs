@@ -3,8 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{BufferView, Device, ImageView};
 use crate::util::cache::Resource;
+use crate::{BufferView, Device, ImageView};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct DescriptorImageInfo {
@@ -52,26 +52,32 @@ pub struct DescriptorSet {
 }
 
 fn binding_image_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorImageInfo> {
-    binding.descriptors.iter().map(|descriptor| {
-        let DescriptorContents::Image(image) = descriptor else { panic!("Missing descriptor type case?") };
-        vk::DescriptorImageInfo {
-            sampler: image.sampler,
-            image_view: unsafe { image.view.handle() },
-            image_layout: image.layout,
-        }
-    })
+    binding
+        .descriptors
+        .iter()
+        .map(|descriptor| {
+            let DescriptorContents::Image(image) = descriptor else { panic!("Missing descriptor type case?") };
+            vk::DescriptorImageInfo {
+                sampler: image.sampler,
+                image_view: unsafe { image.view.handle() },
+                image_layout: image.layout,
+            }
+        })
         .collect()
 }
 
 fn binding_buffer_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorBufferInfo> {
-    binding.descriptors.iter().map(|descriptor| {
-        let DescriptorContents::Buffer(buffer) = descriptor else { panic!("Missing descriptor type case?") };
-        vk::DescriptorBufferInfo {
-            buffer: unsafe { buffer.buffer.handle() },
-            offset: buffer.buffer.offset(),
-            range: buffer.buffer.size(),
-        }
-    })
+    binding
+        .descriptors
+        .iter()
+        .map(|descriptor| {
+            let DescriptorContents::Buffer(buffer) = descriptor else { panic!("Missing descriptor type case?") };
+            vk::DescriptorBufferInfo {
+                buffer: unsafe { buffer.buffer.handle() },
+                offset: buffer.buffer.offset(),
+                range: buffer.buffer.size(),
+            }
+        })
         .collect()
 }
 
@@ -91,9 +97,8 @@ impl Resource for DescriptorSet {
     const MAX_TIME_TO_LIVE: u32 = 8;
 
     fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self>
-        where
-            Self: Sized,
-    {
+    where
+        Self: Sized, {
         let info = vk::DescriptorSetAllocateInfo {
             s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
             p_next: std::ptr::null(),
@@ -101,10 +106,7 @@ impl Resource for DescriptorSet {
             descriptor_set_count: 1,
             p_set_layouts: &key.layout,
         };
-        let set = unsafe { device.allocate_descriptor_sets(&info) }?
-            .first()
-            .cloned()
-            .unwrap();
+        let set = unsafe { device.allocate_descriptor_sets(&info) }?.first().cloned().unwrap();
         let writes = key
             .bindings
             .iter()
@@ -127,6 +129,9 @@ impl Resource for DescriptorSet {
                         write.image_info = Some(binding_image_info(&binding));
                     }
                     vk::DescriptorType::UNIFORM_BUFFER => {
+                        write.buffer_info = Some(binding_buffer_info(&binding));
+                    }
+                    vk::DescriptorType::STORAGE_BUFFER => {
                         write.buffer_info = Some(binding_buffer_info(&binding));
                     }
                     _ => {

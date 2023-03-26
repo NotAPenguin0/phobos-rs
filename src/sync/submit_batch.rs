@@ -4,9 +4,9 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
 use crate::command_buffer::CommandBuffer;
 use crate::domain::ExecutionDomain;
+use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
 
 #[derive(Debug)]
 struct SubmitInfo<D: ExecutionDomain> {
@@ -51,12 +51,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
             .flatten()
     }
 
-    fn submit_after(
-        &mut self,
-        handles: &[SubmitHandle],
-        cmd: CommandBuffer<D>,
-        wait_stages: &[PipelineStage],
-    ) -> Result<SubmitHandle> {
+    fn submit_after(&mut self, handles: &[SubmitHandle], cmd: CommandBuffer<D>, wait_stages: &[PipelineStage]) -> Result<SubmitHandle> {
         let wait_semaphores = handles
             .iter()
             .map(|handle| self.get_submit_semaphore(*handle).unwrap())
@@ -152,8 +147,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
             })
             .collect::<Vec<_>>();
 
-        self.exec
-            .submit_batch::<D>(submits.as_slice(), &self.signal_fence)?;
+        self.exec.submit_batch::<D>(submits.as_slice(), &self.signal_fence)?;
         let fence = self.signal_fence.with_cleanup(move || {
             // Take ownership of every resource inside the submit batch, to delete it afterwards
             for mut submit in self.submits {
@@ -169,16 +163,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
 
 impl SubmitHandle {
     /// Add another submit to the batch that waits on this submit at the specified wait stage mask.
-    pub fn then<D: ExecutionDomain + 'static>(
-        &self,
-        wait_stage: PipelineStage,
-        cmd: CommandBuffer<D>,
-        batch: &mut SubmitBatch<D>,
-    ) -> Result<SubmitHandle> {
-        batch.submit_after(
-            std::slice::from_ref(&self),
-            cmd,
-            std::slice::from_ref(&wait_stage),
-        )
+    pub fn then<D: ExecutionDomain + 'static>(&self, wait_stage: PipelineStage, cmd: CommandBuffer<D>, batch: &mut SubmitBatch<D>) -> Result<SubmitHandle> {
+        batch.submit_after(std::slice::from_ref(&self), cmd, std::slice::from_ref(&wait_stage))
     }
 }
