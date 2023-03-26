@@ -99,11 +99,12 @@ impl<A: Allocator> Image<A> {
         format: vk::Format,
         samples: vk::SampleCountFlags,
     ) -> Result<Self> {
-        let sharing_mode = if usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {
-            vk::SharingMode::EXCLUSIVE
-        } else {
-            vk::SharingMode::CONCURRENT
-        };
+        let sharing_mode =
+            if device.is_single_queue() || usage.intersects(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT) {
+                vk::SharingMode::EXCLUSIVE
+            } else {
+                vk::SharingMode::CONCURRENT
+            };
 
         let handle = unsafe {
             device.create_image(

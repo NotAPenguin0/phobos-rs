@@ -73,7 +73,7 @@ impl Device {
             .queue_families()
             .iter()
             .enumerate()
-            .flat_map(|(index, _)| {
+            .flat_map(|(index, family_info)| {
                 let count = physical_device
                     .queues()
                     .iter()
@@ -82,6 +82,7 @@ impl Device {
                 if count == 0 {
                     return None;
                 }
+                let count = count.min(family_info.queue_count as usize);
                 priorities.resize(usize::max(priorities.len(), count), 1.0);
                 Some(vk::DeviceQueueCreateInfo {
                     queue_family_index: index as u32,
@@ -180,12 +181,19 @@ impl Device {
         &self.properties
     }
 
+    /// Check if an extension is enabled.
     pub fn is_extension_enabled(&self, ext: ExtensionID) -> bool {
         self.extensions.contains(&ext)
     }
 
+    /// Access to the function pointers for VK_EXT_dynamic_state_3
     pub fn dynamic_state3(&self) -> Option<&ash::extensions::ext::ExtendedDynamicState3> {
         self.dynamic_state3.as_ref()
+    }
+
+    /// True we only have a single queue, and thus the sharing mode for resources is always EXCLUSIVE.
+    pub fn is_single_queue(&self) -> bool {
+        self.queue_families.len() == 1
     }
 }
 

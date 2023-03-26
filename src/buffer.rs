@@ -76,6 +76,12 @@ impl<A: Allocator> Buffer<A> {
     /// All usage flags must be given.
     pub fn new(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
         let size = size.into();
+        let sharing_mode = if device.is_single_queue() {
+            vk::SharingMode::EXCLUSIVE
+        } else {
+            vk::SharingMode::CONCURRENT
+        };
+
         let handle = unsafe {
             device.create_buffer(
                 &vk::BufferCreateInfo {
@@ -84,9 +90,17 @@ impl<A: Allocator> Buffer<A> {
                     flags: vk::BufferCreateFlags::empty(),
                     size,
                     usage,
-                    sharing_mode: vk::SharingMode::CONCURRENT,
-                    queue_family_index_count: device.queue_families().len() as u32,
-                    p_queue_family_indices: device.queue_families().as_ptr(),
+                    sharing_mode,
+                    queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT {
+                        device.queue_families().len() as u32
+                    } else {
+                        0
+                    },
+                    p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT {
+                        device.queue_families().as_ptr()
+                    } else {
+                        std::ptr::null()
+                    },
                 },
                 None,
             )?

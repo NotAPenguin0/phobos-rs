@@ -23,7 +23,7 @@ pub struct PhysicalDevice {
     handle: vk::PhysicalDevice,
     /// [`VkPhysicalDeviceProperties`](vk::PhysicalDeviceProperties) structure with properties of this physical device.
     properties: vk::PhysicalDeviceProperties,
-    /// [`VkPhysicalDeviceMemoryProperties`](vk::PhysicalDeviceMemoryProperties) structure with memory properties of the physical device, such as
+    /// [`VkPhysicalDeviceMemoryProperties`](crate::vk::PhysicalDeviceMemoryProperties) structure with memory properties of the physical device, such as
     /// available memory types and heaps.
     memory_properties: vk::PhysicalDeviceMemoryProperties,
     /// Available Vulkan extensions.
