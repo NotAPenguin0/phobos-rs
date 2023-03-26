@@ -126,6 +126,7 @@ impl Device {
         let mut features_1_3 = settings.gpu_requirements.features_1_3;
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
+        features_1_3.maintenance4 = vk::TRUE;
 
         let extension_names_raw = unwrap_to_raw_strings(extension_names.as_slice());
         let mut info = vk::DeviceCreateInfo::builder()
