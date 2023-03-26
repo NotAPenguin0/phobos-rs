@@ -25,9 +25,10 @@ If you are simply looking for a safe, low-level wrapper around Vulkan, Vulkano i
   - Automatic memory barriers for buffers.
   - Virtual resources, meaning actual resources are only bound to a graph at record time. This allows general-purpose graphs to be re-used if desired.
 - Safe wrappers for Vulkan objects.
-- Automatic descriptor set management.
-- Automatic pipeline and pipeline layout management.
-- Shader reflection to make binding descriptors easy.
+- Descriptor sets are completely hidden. Simply bind resources directly to the command buffer.
+- Automatic pipeline management.
+- Shader reflection to automatically generate pipeline layouts.
+- Automatic double buffering of resources that need it.
 - A linear allocator for per-frame allocations like uniform buffers.
 - Typed command buffers per queue type.
 - Automatically thread safe command buffer recording.
@@ -119,7 +120,5 @@ Visit the [docs.rs](https://docs.rs/phobos/latest) page, or open an issue.
 
 ## Planned features
 
-- Compute shader support
 - Raytracing support
-- Automatic semaphore synchronization
 - Expose more Vulkan API features.
