@@ -211,6 +211,7 @@ impl<T> Fence<T> {
                 std::thread::yield_now();
             }
         }
+        self.call_cleanup_chain();
         Ok(self.value())
     }
 

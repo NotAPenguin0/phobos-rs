@@ -43,3 +43,4 @@ shader-reflection = ["dep:spv-cross"]
 shaderc = ["dep:shaderc"]
 # Use hlsl instead of glsl for shader reflection
 hlsl = []
+rayon = ["dep:rayon"]
