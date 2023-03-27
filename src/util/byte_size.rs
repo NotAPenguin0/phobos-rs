@@ -19,6 +19,7 @@ impl ByteSize for vk::Format {
             vk::Format::R8G8_UNORM => 2,
             vk::Format::R8G8B8_UNORM => 3,
             vk::Format::R8G8B8A8_UNORM => 4,
+            vk::Format::R16_UNORM => 2,
             _ => {
                 todo!()
             }
