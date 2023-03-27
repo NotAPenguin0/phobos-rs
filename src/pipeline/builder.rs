@@ -8,6 +8,7 @@ use crate::pipeline::create_info::*;
 
 /// Used to facilitate creating a graphics pipeline. For an example, please check the
 /// [`pipeline`](crate::pipeline) module level documentation.
+#[derive(Debug)]
 pub struct PipelineBuilder {
     inner: PipelineCreateInfo,
     vertex_binding_offsets: HashMap<u32, u32>,
