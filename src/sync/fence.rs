@@ -167,6 +167,15 @@ impl<T> Fence<T> {
         })
     }
 
+    fn call_cleanup_chain(&mut self) {
+        let mut f = self.first_cleanup_fn.take();
+        while let Some(_) = f {
+            let func = f.take().unwrap();
+            func.f.call_once(());
+            f = func.next
+        }
+    }
+
     pub(crate) unsafe fn wait_without_cleanup(&self) -> VkResult<()> {
         self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
     }
@@ -175,13 +184,7 @@ impl<T> Fence<T> {
     /// `.await`.
     pub fn wait(&mut self) -> VkResult<()> {
         let result = unsafe { self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX) };
-        // Call cleanup functions
-        let mut f = self.first_cleanup_fn.take();
-        while let Some(_) = f {
-            let func = f.take().unwrap();
-            func.f.call_once(());
-            f = func.next
-        }
+        self.call_cleanup_chain();
         // Return previous result
         result
     }
@@ -226,13 +229,7 @@ impl<T> std::future::Future for Fence<T> {
         let status = unsafe { self.device.get_fence_status(self.handle).unwrap() };
 
         if status {
-            // Call the whole chain of cleanup functions.
-            let mut f = self.first_cleanup_fn.take();
-            while let Some(_) = f {
-                let func = f.take().unwrap();
-                func.f.call_once(());
-                f = func.next
-            }
+            self.call_cleanup_chain();
             Poll::Ready(self.as_mut().value())
         } else {
             let waker = ctx.waker().clone();

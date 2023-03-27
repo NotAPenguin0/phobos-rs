@@ -5,15 +5,16 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
-use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
+use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo};
 use crate::core::device::ExtensionID;
+use crate::pipeline::{ComputePipeline, Pipeline};
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::pipeline_layout::PipelineLayout;
 use crate::pipeline::set_layout::DescriptorSetLayout;
 use crate::pipeline::shader::Shader;
-use crate::pipeline::{ComputePipeline, Pipeline};
 use crate::util::cache::{Cache, Resource};
-use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo, ShaderCreateInfo};
+
+use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
 #[derive(Debug)]
 struct PipelineEntry<P>
