@@ -6,16 +6,13 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
-use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, PipelineStage, Sampler, VirtualResource};
 use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
+use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
 use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
-use crate::{
-    BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings,
-    PipelineCache, Sampler, VirtualResource,
-};
 
 impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer<'q, D> {
     type Domain = D;
@@ -220,17 +217,19 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     pub fn transition_image(
         self,
         image: &ImageView,
-        src_stage: vk::PipelineStageFlags,
-        dst_stage: vk::PipelineStageFlags,
+        src_stage: PipelineStage,
+        dst_stage: PipelineStage,
         from: vk::ImageLayout,
         to: vk::ImageLayout,
-        src_access: vk::AccessFlags,
-        dst_access: vk::AccessFlags,
+        src_access: vk::AccessFlags2,
+        dst_access: vk::AccessFlags2,
     ) -> Self {
-        let barrier = vk::ImageMemoryBarrier {
-            s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
+        let barrier = vk::ImageMemoryBarrier2 {
+            s_type: vk::StructureType::IMAGE_MEMORY_BARRIER_2,
             p_next: std::ptr::null(),
+            src_stage_mask: src_stage,
             src_access_mask: src_access,
+            dst_stage_mask: dst_stage,
             dst_access_mask: dst_access,
             old_layout: from,
             new_layout: to,
@@ -239,19 +238,18 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
             image: unsafe { image.image() },
             subresource_range: image.subresource_range(),
         };
-        unsafe {
-            self.device.cmd_pipeline_barrier(
-                self.handle,
-                src_stage,
-                dst_stage,
-                vk::DependencyFlags::BY_REGION,
-                &[],
-                &[],
-                std::slice::from_ref(&barrier),
-            );
-        }
-
-        self
+        let dependency = vk::DependencyInfo {
+            s_type: vk::StructureType::DEPENDENCY_INFO,
+            p_next: std::ptr::null(),
+            dependency_flags: vk::DependencyFlags::BY_REGION,
+            memory_barrier_count: 0,
+            p_memory_barriers: std::ptr::null(),
+            buffer_memory_barrier_count: 0,
+            p_buffer_memory_barriers: std::ptr::null(),
+            image_memory_barrier_count: 1,
+            p_image_memory_barriers: &barrier,
+        };
+        self.pipeline_barrier_2(&dependency)
     }
 
     /// vkCmdPipelineBarrier2. Prefer using this over regular pipeline barriers if possible, to make
