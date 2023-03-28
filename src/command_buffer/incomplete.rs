@@ -252,6 +252,32 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self.pipeline_barrier_2(&dependency)
     }
 
+    /// Insert a global memory barrier
+    pub fn memory_barrier(self, src_stage: PipelineStage, src_access: vk::AccessFlags2, dst_stage: PipelineStage, dst_access: vk::AccessFlags2) -> Self {
+        let barrier = vk::MemoryBarrier2 {
+            s_type: vk::StructureType::MEMORY_BARRIER_2,
+            p_next: std::ptr::null(),
+            src_stage_mask: src_stage,
+            src_access_mask: src_access,
+            dst_stage_mask: dst_stage,
+            dst_access_mask: dst_access,
+        };
+
+        let dependency = vk::DependencyInfo {
+            s_type: vk::StructureType::DEPENDENCY_INFO,
+            p_next: std::ptr::null(),
+            dependency_flags: vk::DependencyFlags::BY_REGION,
+            memory_barrier_count: 1,
+            p_memory_barriers: &barrier,
+            buffer_memory_barrier_count: 0,
+            p_buffer_memory_barriers: std::ptr::null(),
+            image_memory_barrier_count: 0,
+            p_image_memory_barriers: std::ptr::null(),
+        };
+
+        self.pipeline_barrier_2(&dependency)
+    }
+
     /// vkCmdPipelineBarrier2. Prefer using this over regular pipeline barriers if possible, to make
     /// full use of `VK_KHR_SYNCHRONIZATION_2`.
     pub fn pipeline_barrier_2(self, dependency: &vk::DependencyInfo) -> Self {
