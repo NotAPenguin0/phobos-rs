@@ -133,7 +133,7 @@ impl PipelineBuilder {
 
     /// Add a vertex input binding. These are the binding indices for `vkCmdBindVertexBuffers`
     pub fn vertex_input(mut self, binding: u32, rate: vk::VertexInputRate) -> Self {
-        self.vertex_binding_offsets.insert(0, 0);
+        self.vertex_binding_offsets.insert(binding, 0);
         self.inner.vertex_input_bindings.push(VertexInputBindingDescription {
             0: vk::VertexInputBindingDescription {
                 binding,

@@ -252,7 +252,7 @@ impl PipelineCache {
     }
 
     #[cfg(not(feature = "shader-reflection"))]
-    pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
+    pub fn create_named_compute_pipeline(&mut self, mut info: ComputePipelineCreateInfo) -> Result<()> {
         let name = info.name.clone();
         self.compute_pipeline_infos.insert(
             name,
