@@ -29,6 +29,7 @@ impl ComputePipelineCreateInfo {
 
 /// Builder struct similar to [`PipelineBuilder`](crate::PipelineBuilder), but for compute pipelines. Since these are much simpler,
 /// it is also much easier to construct these.
+#[derive(Debug)]
 pub struct ComputePipelineBuilder {
     inner: ComputePipelineCreateInfo,
 }
