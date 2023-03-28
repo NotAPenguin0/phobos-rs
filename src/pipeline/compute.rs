@@ -57,4 +57,9 @@ impl ComputePipelineBuilder {
     pub fn build(self) -> ComputePipelineCreateInfo {
         self.inner
     }
+
+    /// Obtain the pipeline name.
+    pub fn get_name(&self) -> &str {
+        &self.inner.name
+    }
 }
