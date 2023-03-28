@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo};
+use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo, ShaderCreateInfo};
 use crate::core::device::ExtensionID;
 use crate::pipeline::{ComputePipeline, Pipeline, PipelineType};
 use crate::pipeline::create_info::PipelineRenderingInfo;
@@ -234,7 +234,10 @@ impl PipelineCache {
     /// Create and register a new compute pipeline into the cache
     #[cfg(feature = "shader-reflection")]
     pub fn create_named_compute_pipeline(&mut self, mut info: ComputePipelineCreateInfo) -> Result<()> {
-        let refl = reflect_shaders(std::slice::from_ref(&info.shader.as_ref().unwrap()))?;
+        let refl = match &info.shader {
+            None => { reflect_shaders(&[])? }
+            Some(info) => { reflect_shaders(std::slice::from_ref(info))? }
+        };
         // Using reflection, we can allow omitting the pipeline layout field.
         info.layout = build_pipeline_layout(&refl);
         let name = info.name.clone();
