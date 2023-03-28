@@ -191,7 +191,7 @@ impl<T> Fence<T> {
     /// <br>
     /// ## rayon
     /// If the rayon feature is enabled, this will first yield to rayon and then yield to the OS if there is no rayon work.
-    pub fn cooperative_wait(&mut self) -> Result<T> {
+    pub fn wait_and_yield(&mut self) -> Result<T> {
         loop {
             if self.poll_status()? {
                 break;
