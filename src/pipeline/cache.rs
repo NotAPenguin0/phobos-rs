@@ -7,7 +7,7 @@ use ash::vk;
 
 use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo};
 use crate::core::device::ExtensionID;
-use crate::pipeline::{ComputePipeline, Pipeline};
+use crate::pipeline::{ComputePipeline, Pipeline, PipelineType};
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::pipeline_layout::PipelineLayout;
 use crate::pipeline::set_layout::DescriptorSetLayout;
@@ -271,9 +271,27 @@ impl PipelineCache {
 
     /// Get the pipeline create info associated with a pipeline
     /// # Errors
-    /// Fails if the pipeline was not found in the cache.
+    /// Returns None if the pipeline was not found in the cache.
     pub fn pipeline_info(&self, name: &str) -> Option<&PipelineCreateInfo> {
         self.pipeline_infos.get(name).map(|entry| &entry.info)
+    }
+
+    /// Get the pipeline create info associated with a compute pipeline
+    /// # Errors
+    /// Returns None if the pipeline was not found in the cache.
+    pub fn compute_pipeline_info(&self, name: &str) -> Option<&ComputePipelineCreateInfo> {
+        self.compute_pipeline_infos.get(name).map(|entry| &entry.info)
+    }
+
+    /// Returns the pipeline type of a pipeline, or None if the pipeline does not exist.
+    pub fn pipeline_type(&self, name: &str) -> Option<PipelineType> {
+        if self.pipeline_infos.contains_key(name) {
+            Some(PipelineType::Graphics)
+        } else if self.compute_pipeline_infos.contains_key(name) {
+            Some(PipelineType::Compute)
+        } else {
+            None
+        }
     }
 
     /// Obtain a pipeline from the cache.

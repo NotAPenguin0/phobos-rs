@@ -95,3 +95,10 @@ pub struct ComputePipeline {
     pub(crate) layout: vk::PipelineLayout,
     pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,
 }
+
+/// Pipeline type.
+#[derive(Debug)]
+pub enum PipelineType {
+    Graphics,
+    Compute,
+}
