@@ -3,8 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::util::cache::Resource;
 use crate::{BufferView, Device, ImageView};
+use crate::util::cache::{Resource, ResourceKey};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct DescriptorImageInfo {
@@ -91,14 +91,20 @@ struct WriteDescriptorSet {
     pub buffer_info: Option<Vec<vk::DescriptorBufferInfo>>,
 }
 
+impl ResourceKey for DescriptorSetBinding {
+    fn persistent(&self) -> bool {
+        false
+    }
+}
+
 impl Resource for DescriptorSet {
     type Key = DescriptorSetBinding;
     type ExtraParams<'a> = ();
     const MAX_TIME_TO_LIVE: u32 = 8;
 
     fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self>
-    where
-        Self: Sized, {
+        where
+            Self: Sized, {
         let info = vk::DescriptorSetAllocateInfo {
             s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
             p_next: std::ptr::null(),

@@ -5,14 +5,14 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo, ShaderCreateInfo};
+use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo};
 use crate::core::device::ExtensionID;
 use crate::pipeline::{ComputePipeline, Pipeline, PipelineType};
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::pipeline_layout::PipelineLayout;
 use crate::pipeline::set_layout::DescriptorSetLayout;
 use crate::pipeline::shader::Shader;
-use crate::util::cache::{Cache, Resource};
+use crate::util::cache::{Cache, Resource, ResourceKey};
 
 use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
@@ -74,6 +74,12 @@ fn verify_valid_dynamic_states(device: &Arc<Device>, pci: &PipelineCreateInfo) {
     );
 }
 
+impl ResourceKey for PipelineCreateInfo {
+    fn persistent(&self) -> bool {
+        false
+    }
+}
+
 impl Resource for Pipeline {
     type Key = PipelineCreateInfo;
     type ExtraParams<'a> = (
@@ -127,6 +133,12 @@ impl Drop for Pipeline {
         unsafe {
             self.device.destroy_pipeline(self.handle, None);
         }
+    }
+}
+
+impl ResourceKey for ComputePipelineCreateInfo {
+    fn persistent(&self) -> bool {
+        self.persistent
     }
 }
 

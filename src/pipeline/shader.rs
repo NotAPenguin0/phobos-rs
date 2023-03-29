@@ -5,8 +5,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::util::cache::Resource;
 use crate::Device;
+use crate::util::cache::{Resource, ResourceKey};
 
 /// Shader resource object. This is managed by the pipeline cache internally.
 #[derive(Derivative)]
@@ -42,6 +42,12 @@ impl ShaderCreateInfo {
 
     pub fn code_hash(&self) -> u64 {
         self.code_hash
+    }
+}
+
+impl ResourceKey for ShaderCreateInfo {
+    fn persistent(&self) -> bool {
+        false
     }
 }
 

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::util::cache::Resource;
 use crate::Device;
+use crate::util::cache::{Resource, ResourceKey};
 
 /// A fully built Vulkan descriptor set layout. This is a managed resource, so it cannot be manually
 /// created or dropped.
@@ -28,6 +28,12 @@ impl DescriptorSetLayout {
 #[derive(Debug, Clone, Default)]
 pub struct DescriptorSetLayoutCreateInfo {
     pub bindings: Vec<vk::DescriptorSetLayoutBinding>,
+}
+
+impl ResourceKey for DescriptorSetLayoutCreateInfo {
+    fn persistent(&self) -> bool {
+        false
+    }
 }
 
 impl Resource for DescriptorSetLayout {

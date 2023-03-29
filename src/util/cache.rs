@@ -6,10 +6,14 @@ use anyhow::Result;
 
 use crate::Device;
 
+pub trait ResourceKey: Hash + Eq + Clone {
+    fn persistent(&self) -> bool;
+}
+
 /// Trait that needs to be implemented by types managed by a [`Cache`]
 pub trait Resource {
     /// Key type used for looking up and possibly creating new resources. Must be hashable and cloneable.
-    type Key: Hash + Eq + Clone;
+    type Key: ResourceKey;
     /// Additional parameter passed through from [`Cache::get_or_create`] to [`create`].
     type ExtraParams<'a>;
     /// Amount of calls to [`Cache::next_frame`] have to happen without accessing this resource for it to be deallocated.
@@ -24,6 +28,7 @@ pub trait Resource {
 struct Entry<R> {
     value: R,
     ttl: u32,
+    persistent: bool,
 }
 
 /// Implements a smart resource cache that deallocates resources that have not been accessed in a while.
@@ -60,6 +65,7 @@ impl<R: Resource + Sized> Cache<R> {
             hash_map::Entry::Vacant(entry) => entry.insert(Entry {
                 value: R::create(self.device.clone(), &key, params)?,
                 ttl: R::MAX_TIME_TO_LIVE,
+                persistent: key.persistent(),
             }),
         };
         entry.ttl = R::MAX_TIME_TO_LIVE;
@@ -68,7 +74,11 @@ impl<R: Resource + Sized> Cache<R> {
 
     /// Updates the cache to deallocate resources that have not been accessed for too long.
     pub(crate) fn next_frame(&mut self) {
-        self.store.iter_mut().for_each(|(_, entry)| entry.ttl = entry.ttl - 1);
-        self.store.retain(|_, entry| entry.ttl != 0);
+        self.store.iter_mut().for_each(|(_, entry)| {
+            if !entry.persistent {
+                entry.ttl = entry.ttl - 1
+            }
+        });
+        self.store.retain(|_, entry| entry.persistent || entry.ttl != 0);
     }
 }
