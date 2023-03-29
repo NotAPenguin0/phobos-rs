@@ -158,8 +158,10 @@ impl PipelineBuilder {
             },
         });
         *offset += format.byte_size() as u32;
-        for binding in &mut self.inner.vertex_input_bindings {
-            binding.0.stride += format.byte_size() as u32;
+        for descr in &mut self.inner.vertex_input_bindings {
+            if descr.0.binding == binding {
+                descr.0.stride += format.byte_size() as u32;
+            }
         }
 
         Ok(self)
