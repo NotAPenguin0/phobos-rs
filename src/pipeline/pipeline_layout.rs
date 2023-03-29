@@ -3,9 +3,9 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::pipeline::set_layout::{DescriptorSetLayout, DescriptorSetLayoutCreateInfo};
-use crate::util::cache::{Cache, Resource};
 use crate::Device;
+use crate::pipeline::set_layout::{DescriptorSetLayout, DescriptorSetLayoutCreateInfo};
+use crate::util::cache::{Cache, Resource, ResourceKey};
 
 /// A fully built Vulkan pipeline layout. This is a managed resource, so it cannot be manually
 /// created or dropped.
@@ -33,6 +33,7 @@ pub struct PipelineLayoutCreateInfo {
     pub flags: vk::PipelineLayoutCreateFlags,
     pub set_layouts: Vec<DescriptorSetLayoutCreateInfo>,
     pub push_constants: Vec<PushConstantRange>,
+    pub persistent: bool,
 }
 
 impl PipelineLayout {
@@ -42,6 +43,12 @@ impl PipelineLayout {
 
     pub fn set_layouts(&self) -> &[vk::DescriptorSetLayout] {
         self.set_layouts.as_slice()
+    }
+}
+
+impl ResourceKey for PipelineLayoutCreateInfo {
+    fn persistent(&self) -> bool {
+        self.persistent
     }
 }
 

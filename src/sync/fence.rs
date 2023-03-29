@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+use anyhow::Result;
 use ash::prelude::VkResult;
 use ash::vk;
 
@@ -14,7 +15,7 @@ struct CleanupFnLink<'f> {
     pub next: Option<Box<CleanupFnLink<'f>>>,
 }
 
-trait FenceValue<T> {
+pub trait FenceValue<T> {
     fn value(&mut self) -> T;
 }
 
@@ -167,23 +168,60 @@ impl<T> Fence<T> {
         })
     }
 
-    pub(crate) unsafe fn wait_without_cleanup(&self) -> VkResult<()> {
-        self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
-    }
-
-    /// Waits for the fence to be signaled with no timeout. Note that this is a blocking call. For the nonblocking version, use the `Future` implementation by calling
-    /// `.await`.
-    pub fn wait(&mut self) -> VkResult<()> {
-        let result = unsafe { self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX) };
-        // Call cleanup functions
+    fn call_cleanup_chain(&mut self) {
         let mut f = self.first_cleanup_fn.take();
         while let Some(_) = f {
             let func = f.take().unwrap();
             func.f.call_once(());
             f = func.next
         }
+    }
+
+    fn poll_status(&self) -> VkResult<bool> {
+        unsafe { self.device.get_fence_status(self.handle) }
+    }
+
+    pub(crate) unsafe fn wait_without_cleanup(&self) -> VkResult<()> {
+        self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
+    }
+
+    /// Waits for the fence by polling repeatedly and yielding execution to the OS. This is useful if you don't care about quickly knowing the fence is
+    /// available and just want to wait with minimal overhead.
+    /// <br>
+    /// <br>
+    /// ## rayon
+    /// If the rayon feature is enabled, this will first yield to rayon and then yield to the OS if there is no rayon work.
+    pub fn wait_and_yield(&mut self) -> Result<T> {
+        loop {
+            if self.poll_status()? {
+                break;
+            }
+
+            #[cfg(feature = "rayon")] {
+                match rayon::yield_now() {
+                    // If rayon found no work, yield to the OS scheduler.
+                    Some(rayon::Yield::Idle) => {
+                        std::thread::yield_now();
+                    },
+                    _ => {}
+                }
+            }
+
+            #[cfg(not(feature = "rayon"))] {
+                std::thread::yield_now();
+            }
+        }
+        self.call_cleanup_chain();
+        Ok(self.value())
+    }
+
+    /// Waits for the fence to be signaled with no timeout. Note that this is a blocking call. For the nonblocking version, use the `Future` implementation by calling
+    /// `.await`.
+    pub fn wait(&mut self) -> Result<T> {
+        let result = unsafe { self.wait_without_cleanup() };
+        self.call_cleanup_chain();
         // Return previous result
-        result
+        Ok(result.map(|_| self.value())?)
     }
 
     /// Resets a fence to the unsignaled status.
@@ -226,13 +264,7 @@ impl<T> std::future::Future for Fence<T> {
         let status = unsafe { self.device.get_fence_status(self.handle).unwrap() };
 
         if status {
-            // Call the whole chain of cleanup functions.
-            let mut f = self.first_cleanup_fn.take();
-            while let Some(_) = f {
-                let func = f.take().unwrap();
-                func.f.call_once(());
-                f = func.next
-            }
+            self.call_cleanup_chain();
             Poll::Ready(self.as_mut().value())
         } else {
             let waker = ctx.waker().clone();

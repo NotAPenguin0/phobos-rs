@@ -6,9 +6,9 @@ use ash::vk;
 #[cfg(feature = "shader-reflection")]
 use spv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
 
+use crate::{Error, ShaderCreateInfo};
 use crate::pipeline::pipeline_layout::{PipelineLayoutCreateInfo, PushConstantRange};
 use crate::pipeline::set_layout::DescriptorSetLayoutCreateInfo;
-use crate::{Error, PipelineCreateInfo, ShaderCreateInfo};
 
 #[cfg(all(feature = "shader-reflection", not(feature = "hlsl")))]
 type Ast = spv_cross::spirv::Ast<spv_cross::glsl::Target>;
@@ -214,6 +214,7 @@ pub(crate) fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCrea
         flags: Default::default(),
         set_layouts: vec![],
         push_constants: info.push_constants.clone(),
+        persistent: false,
     };
 
     let mut sets: HashMap<u32, DescriptorSetLayoutCreateInfo> = HashMap::new();
@@ -239,6 +240,7 @@ pub(crate) fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCrea
                         stage_flags: binding.stage,
                         p_immutable_samplers: std::ptr::null(),
                     }],
+                    persistent: false,
                 });
             }
         }

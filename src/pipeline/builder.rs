@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use anyhow::Result;
 use ash::vk;
 
-use crate::pipeline::create_info::*;
 use crate::{ByteSize, Error, PipelineCreateInfo, ShaderCreateInfo};
+use crate::pipeline::create_info::*;
 
 /// Used to facilitate creating a graphics pipeline. For an example, please check the
 /// [`pipeline`](crate::pipeline) module level documentation.
+#[derive(Debug)]
 pub struct PipelineBuilder {
     inner: PipelineCreateInfo,
     vertex_binding_offsets: HashMap<u32, u32>,
@@ -132,7 +133,7 @@ impl PipelineBuilder {
 
     /// Add a vertex input binding. These are the binding indices for `vkCmdBindVertexBuffers`
     pub fn vertex_input(mut self, binding: u32, rate: vk::VertexInputRate) -> Self {
-        self.vertex_binding_offsets.insert(0, 0);
+        self.vertex_binding_offsets.insert(binding, 0);
         self.inner.vertex_input_bindings.push(VertexInputBindingDescription {
             0: vk::VertexInputBindingDescription {
                 binding,
@@ -157,8 +158,10 @@ impl PipelineBuilder {
             },
         });
         *offset += format.byte_size() as u32;
-        for binding in &mut self.inner.vertex_input_bindings {
-            binding.0.stride += format.byte_size() as u32;
+        for descr in &mut self.inner.vertex_input_bindings {
+            if descr.0.binding == binding {
+                descr.0.stride += format.byte_size() as u32;
+            }
         }
 
         Ok(self)
@@ -267,12 +270,14 @@ impl PipelineBuilder {
         self
     }
 
-    /// Enable tesselation and set tesselation state.
-    pub fn tesselation(mut self, patch_control_points: u32, flags: vk::PipelineTessellationStateCreateFlags) -> Self {
+    /// Enable tessellation and set tessellation state.
+    pub fn tessellation(mut self, patch_control_points: u32, flags: vk::PipelineTessellationStateCreateFlags) -> Self {
         let mut info = PipelineTessellationStateCreateInfo::default();
         info.0.patch_control_points = patch_control_points;
         info.0.flags = flags;
         self.inner.tesselation_info = Some(info);
+        // When enabling tessellation, we need to set the primitive topology properly, see VUID-VkGraphicsPipelineCreateInfo-pStages-00736
+        self.inner.input_assembly.0.topology = vk::PrimitiveTopology::PATCH_LIST;
         self
     }
 

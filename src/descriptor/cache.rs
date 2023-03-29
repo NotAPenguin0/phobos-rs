@@ -37,9 +37,9 @@ impl DescriptorCache {
         for (ty, count) in old_size.0.iter_mut() {
             if request.bindings.iter().find(|&binding| binding.ty == *ty).is_some() {
                 *count = *count * 2;
+                trace!("Growing descriptor pool for type {:?} to new size {}", ty, *count);
             }
         }
-        trace!("Growing descriptor pool to new size {}.", &old_size);
         old_size
     }
 

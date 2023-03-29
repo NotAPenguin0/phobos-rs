@@ -5,8 +5,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::util::cache::Resource;
 use crate::Device;
+use crate::util::cache::{Resource, ResourceKey};
 
 /// Shader resource object. This is managed by the pipeline cache internally.
 #[derive(Derivative)]
@@ -29,6 +29,7 @@ pub struct ShaderCreateInfo {
     stage: vk::ShaderStageFlags,
     code: Vec<u32>,
     code_hash: u64,
+    pub(crate) persistent: bool,
 }
 
 impl ShaderCreateInfo {
@@ -42,6 +43,12 @@ impl ShaderCreateInfo {
 
     pub fn code_hash(&self) -> u64 {
         self.code_hash
+    }
+}
+
+impl ResourceKey for ShaderCreateInfo {
+    fn persistent(&self) -> bool {
+        self.persistent
     }
 }
 
@@ -83,6 +90,7 @@ impl ShaderCreateInfo {
             stage,
             code,
             code_hash: hasher.finish(),
+            persistent: false,
         }
     }
 }

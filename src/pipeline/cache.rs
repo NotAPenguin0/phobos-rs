@@ -5,15 +5,16 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
-use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
+use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo, ShaderCreateInfo};
 use crate::core::device::ExtensionID;
+use crate::pipeline::{ComputePipeline, Pipeline, PipelineType};
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::pipeline_layout::PipelineLayout;
 use crate::pipeline::set_layout::DescriptorSetLayout;
 use crate::pipeline::shader::Shader;
-use crate::pipeline::{ComputePipeline, Pipeline};
-use crate::util::cache::{Cache, Resource};
-use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo, ShaderCreateInfo};
+use crate::util::cache::{Cache, Resource, ResourceKey};
+
+use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
 #[derive(Debug)]
 struct PipelineEntry<P>
@@ -73,6 +74,12 @@ fn verify_valid_dynamic_states(device: &Arc<Device>, pci: &PipelineCreateInfo) {
     );
 }
 
+impl ResourceKey for PipelineCreateInfo {
+    fn persistent(&self) -> bool {
+        false
+    }
+}
+
 impl Resource for Pipeline {
     type Key = PipelineCreateInfo;
     type ExtraParams<'a> = (
@@ -126,6 +133,12 @@ impl Drop for Pipeline {
         unsafe {
             self.device.destroy_pipeline(self.handle, None);
         }
+    }
+}
+
+impl ResourceKey for ComputePipelineCreateInfo {
+    fn persistent(&self) -> bool {
+        self.persistent
     }
 }
 
@@ -233,9 +246,25 @@ impl PipelineCache {
     /// Create and register a new compute pipeline into the cache
     #[cfg(feature = "shader-reflection")]
     pub fn create_named_compute_pipeline(&mut self, mut info: ComputePipelineCreateInfo) -> Result<()> {
-        let refl = reflect_shaders(std::slice::from_ref(&info.shader.as_ref().unwrap()))?;
+        let refl = match &info.shader {
+            None => { reflect_shaders(&[])? }
+            Some(info) => { reflect_shaders(std::slice::from_ref(info))? }
+        };
         // Using reflection, we can allow omitting the pipeline layout field.
         info.layout = build_pipeline_layout(&refl);
+        // If this is persistent, then also make the pipeline and descriptor set layouts persistent
+        if info.persistent {
+            info.layout.persistent = true;
+            info.layout.set_layouts.iter_mut().for_each(|set_layout| {
+                set_layout.persistent = true;
+            });
+            match &mut info.shader {
+                None => {}
+                Some(shader) => {
+                    shader.persistent = true;
+                }
+            }
+        }
         let name = info.name.clone();
         self.compute_pipeline_infos.insert(
             name,
@@ -248,7 +277,7 @@ impl PipelineCache {
     }
 
     #[cfg(not(feature = "shader-reflection"))]
-    pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
+    pub fn create_named_compute_pipeline(&mut self, mut info: ComputePipelineCreateInfo) -> Result<()> {
         let name = info.name.clone();
         self.compute_pipeline_infos.insert(
             name,
@@ -270,9 +299,27 @@ impl PipelineCache {
 
     /// Get the pipeline create info associated with a pipeline
     /// # Errors
-    /// Fails if the pipeline was not found in the cache.
+    /// Returns None if the pipeline was not found in the cache.
     pub fn pipeline_info(&self, name: &str) -> Option<&PipelineCreateInfo> {
         self.pipeline_infos.get(name).map(|entry| &entry.info)
+    }
+
+    /// Get the pipeline create info associated with a compute pipeline
+    /// # Errors
+    /// Returns None if the pipeline was not found in the cache.
+    pub fn compute_pipeline_info(&self, name: &str) -> Option<&ComputePipelineCreateInfo> {
+        self.compute_pipeline_infos.get(name).map(|entry| &entry.info)
+    }
+
+    /// Returns the pipeline type of a pipeline, or None if the pipeline does not exist.
+    pub fn pipeline_type(&self, name: &str) -> Option<PipelineType> {
+        if self.pipeline_infos.contains_key(name) {
+            Some(PipelineType::Graphics)
+        } else if self.compute_pipeline_infos.contains_key(name) {
+            Some(PipelineType::Compute)
+        } else {
+            None
+        }
     }
 
     /// Obtain a pipeline from the cache.

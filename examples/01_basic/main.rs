@@ -1,6 +1,3 @@
-#[path = "../example_runner/lib.rs"]
-mod example_runner;
-
 use std::fs;
 use std::fs::File;
 use std::io::Read;
@@ -9,16 +6,20 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use futures::executor::block_on;
-use phobos::command_buffer::traits::*;
-use phobos::domain::All;
-use phobos::prelude::*;
-use phobos::vk;
 use winit;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoopBuilder};
 use winit::window::WindowBuilder;
 
-use crate::example_runner::{load_spirv_file, Context, ExampleApp, ExampleRunner, WindowContext};
+use phobos::command_buffer::traits::*;
+use phobos::domain::All;
+use phobos::prelude::*;
+use phobos::vk;
+
+use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file, WindowContext};
+
+#[path = "../example_runner/lib.rs"]
+mod example_runner;
 
 struct Resources {
     #[allow(dead_code)]
@@ -91,12 +92,11 @@ impl ExampleApp for Basic {
             offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
             offscreen: image,
             sampler: Sampler::default(ctx.device.clone())?,
-            vertex_buffer: block_on(staged_buffer_upload(
-                ctx.device.clone(),
-                ctx.allocator.clone(),
-                ctx.exec.clone(),
-                data.as_slice(),
-            ))?,
+            vertex_buffer: block_on(async {
+                staged_buffer_upload(ctx.device.clone(), ctx.allocator.clone(), ctx.exec.clone(), data.as_slice())
+                    .unwrap()
+                    .await
+            }),
         };
 
         Ok(Self {

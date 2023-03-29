@@ -1,4 +1,5 @@
 pub use ash::vk;
+
 pub use traits::*;
 
 pub use crate::allocator::default_allocator;
@@ -28,8 +29,9 @@ pub use crate::pipeline::cache::PipelineCache;
 pub use crate::pipeline::compute::{ComputePipelineBuilder, ComputePipelineCreateInfo};
 pub use crate::pipeline::create_info::PipelineCreateInfo;
 pub use crate::pipeline::hash::*;
-pub use crate::pipeline::shader::ShaderCreateInfo;
 pub use crate::pipeline::PipelineStage;
+pub use crate::pipeline::PipelineType;
+pub use crate::pipeline::shader::ShaderCreateInfo;
 pub use crate::sampler::Sampler;
 pub use crate::sync::execution_manager::ExecutionManager;
 pub use crate::sync::fence::*;

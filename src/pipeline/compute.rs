@@ -10,6 +10,7 @@ pub struct ComputePipelineCreateInfo {
     pub shader: Option<ShaderCreateInfo>,
     pub(crate) name: String,
     pub(crate) layout: PipelineLayoutCreateInfo,
+    pub(crate) persistent: bool,
 }
 
 impl ComputePipelineCreateInfo {
@@ -29,6 +30,7 @@ impl ComputePipelineCreateInfo {
 
 /// Builder struct similar to [`PipelineBuilder`](crate::PipelineBuilder), but for compute pipelines. Since these are much simpler,
 /// it is also much easier to construct these.
+#[derive(Debug)]
 pub struct ComputePipelineBuilder {
     inner: ComputePipelineCreateInfo,
 }
@@ -41,6 +43,7 @@ impl ComputePipelineBuilder {
                 shader: None,
                 name: name.into(),
                 layout: Default::default(),
+                persistent: false,
             },
         }
     }
@@ -52,8 +55,22 @@ impl ComputePipelineBuilder {
         self
     }
 
+    /// Make this compute pipeline persistent, meaning it will never get cleaned up by the cache.
+    /// Use this with caution, frequently recreating persistent pipelines will cause a pileup of memory.
+    /// This is intentionally not available for graphics pipelines to avoid this issue, since those
+    /// need to be recreated much more frequently.
+    pub fn persistent(mut self) -> Self {
+        self.inner.persistent = true;
+        self
+    }
+
     /// Build the compute pipeline create info.
     pub fn build(self) -> ComputePipelineCreateInfo {
         self.inner
+    }
+
+    /// Obtain the pipeline name.
+    pub fn get_name(&self) -> &str {
+        &self.inner.name
     }
 }
