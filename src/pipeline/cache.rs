@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo, ShaderCreateInfo};
+use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo};
 use crate::core::device::ExtensionID;
 use crate::pipeline::{ComputePipeline, Pipeline, PipelineType};
 use crate::pipeline::create_info::PipelineRenderingInfo;

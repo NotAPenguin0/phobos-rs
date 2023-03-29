@@ -134,6 +134,9 @@ impl Resource for DescriptorSet {
                     vk::DescriptorType::SAMPLED_IMAGE => {
                         write.image_info = Some(binding_image_info(&binding));
                     }
+                    vk::DescriptorType::STORAGE_IMAGE => {
+                        write.image_info = Some(binding_image_info(&binding));
+                    }
                     vk::DescriptorType::UNIFORM_BUFFER => {
                         write.buffer_info = Some(binding_buffer_info(&binding));
                     }

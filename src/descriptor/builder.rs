@@ -4,11 +4,11 @@
 use anyhow::Result;
 use ash::vk;
 
+use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
 use crate::descriptor::descriptor_set::{DescriptorBinding, DescriptorBufferInfo, DescriptorContents, DescriptorImageInfo, DescriptorSetBinding};
 use crate::graph::physical_resource::PhysicalResource;
 #[cfg(feature = "shader-reflection")]
 use crate::pipeline::shader_reflection::ReflectionInfo;
-use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
 
 /// This structure is used to build up `DescriptorSetBinding` objects for requesting descriptor sets.
 /// # Example usage
@@ -148,6 +148,19 @@ impl<'r> DescriptorSetBuilder<'r> {
             ty: vk::DescriptorType::STORAGE_BUFFER,
             descriptors: vec![DescriptorContents::Buffer(DescriptorBufferInfo {
                 buffer: buffer.clone(),
+            })],
+        })
+    }
+
+    /// Bind a storage image to the specified slot
+    pub fn bind_storage_image(&mut self, binding: u32, image: &ImageView) {
+        self.inner.bindings.push(DescriptorBinding {
+            binding,
+            ty: vk::DescriptorType::STORAGE_IMAGE,
+            descriptors: vec![DescriptorContents::Image(DescriptorImageInfo {
+                sampler: vk::Sampler::null(),
+                view: image.clone(),
+                layout: vk::ImageLayout::GENERAL,
             })],
         })
     }

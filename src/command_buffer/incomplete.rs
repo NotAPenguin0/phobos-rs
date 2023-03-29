@@ -202,10 +202,19 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         Ok(self)
     }
 
-    /// Binds a storage buffer buffer to the specified slot.
+    /// Binds a storage buffer to the specified slot.
     pub fn bind_storage_buffer(mut self, set: u32, binding: u32, buffer: &BufferView) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_storage_buffer(binding, buffer);
+            Ok(())
+        })?;
+        Ok(self)
+    }
+
+    /// Binds a storage image to the specified slot.
+    pub fn bind_storage_image(mut self, set: u32, binding: u32, image: &ImageView) -> Result<Self> {
+        self.modify_descriptor_set(set, |builder| {
+            builder.bind_storage_image(binding, image);
             Ok(())
         })?;
         Ok(self)
