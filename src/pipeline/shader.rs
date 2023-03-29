@@ -29,6 +29,7 @@ pub struct ShaderCreateInfo {
     stage: vk::ShaderStageFlags,
     code: Vec<u32>,
     code_hash: u64,
+    pub(crate) persistent: bool,
 }
 
 impl ShaderCreateInfo {
@@ -47,7 +48,7 @@ impl ShaderCreateInfo {
 
 impl ResourceKey for ShaderCreateInfo {
     fn persistent(&self) -> bool {
-        false
+        self.persistent
     }
 }
 
@@ -89,6 +90,7 @@ impl ShaderCreateInfo {
             stage,
             code,
             code_hash: hasher.finish(),
+            persistent: false,
         }
     }
 }

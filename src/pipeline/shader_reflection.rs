@@ -214,6 +214,7 @@ pub(crate) fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCrea
         flags: Default::default(),
         set_layouts: vec![],
         push_constants: info.push_constants.clone(),
+        persistent: false,
     };
 
     let mut sets: HashMap<u32, DescriptorSetLayoutCreateInfo> = HashMap::new();
@@ -239,6 +240,7 @@ pub(crate) fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCrea
                         stage_flags: binding.stage,
                         p_immutable_samplers: std::ptr::null(),
                     }],
+                    persistent: false,
                 });
             }
         }

@@ -33,6 +33,7 @@ pub struct PipelineLayoutCreateInfo {
     pub flags: vk::PipelineLayoutCreateFlags,
     pub set_layouts: Vec<DescriptorSetLayoutCreateInfo>,
     pub push_constants: Vec<PushConstantRange>,
+    pub persistent: bool,
 }
 
 impl PipelineLayout {
@@ -47,7 +48,7 @@ impl PipelineLayout {
 
 impl ResourceKey for PipelineLayoutCreateInfo {
     fn persistent(&self) -> bool {
-        false
+        self.persistent
     }
 }
 

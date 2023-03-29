@@ -28,11 +28,12 @@ impl DescriptorSetLayout {
 #[derive(Debug, Clone, Default)]
 pub struct DescriptorSetLayoutCreateInfo {
     pub bindings: Vec<vk::DescriptorSetLayoutBinding>,
+    pub persistent: bool,
 }
 
 impl ResourceKey for DescriptorSetLayoutCreateInfo {
     fn persistent(&self) -> bool {
-        false
+        self.persistent
     }
 }
 

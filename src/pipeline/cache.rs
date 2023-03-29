@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo};
+use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo, ShaderCreateInfo};
 use crate::core::device::ExtensionID;
 use crate::pipeline::{ComputePipeline, Pipeline, PipelineType};
 use crate::pipeline::create_info::PipelineRenderingInfo;
@@ -252,6 +252,19 @@ impl PipelineCache {
         };
         // Using reflection, we can allow omitting the pipeline layout field.
         info.layout = build_pipeline_layout(&refl);
+        // If this is persistent, then also make the pipeline and descriptor set layouts persistent
+        if info.persistent {
+            info.layout.persistent = true;
+            info.layout.set_layouts.iter_mut().for_each(|set_layout| {
+                set_layout.persistent = true;
+            });
+            match &mut info.shader {
+                None => {}
+                Some(shader) => {
+                    shader.persistent = true;
+                }
+            }
+        }
         let name = info.name.clone();
         self.compute_pipeline_infos.insert(
             name,
