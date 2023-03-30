@@ -382,7 +382,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     }
 
     #[cfg(feature = "debug-markers")]
-    pub fn begin_label(self, label: vk::DebugUtilsLabelEXT, debug: &DebugMessenger) -> Self {
+    pub fn begin_label(self, label: vk::DebugUtilsLabelEXT, debug: &Arc<DebugMessenger>) -> Self {
         unsafe {
             debug.cmd_begin_debug_utils_label(self.handle, &label);
         }
@@ -390,7 +390,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     }
 
     #[cfg(feature = "debug-markers")]
-    pub fn end_label(self, debug: &DebugMessenger) -> Self {
+    pub fn end_label(self, debug: &Arc<DebugMessenger>) -> Self {
         unsafe {
             debug.cmd_end_debug_utils_label(self.handle);
         }

@@ -1,20 +1,21 @@
 use std::collections::HashSet;
 use std::ffi::CString;
+use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
+use petgraph::{Incoming, Outgoing};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
-use petgraph::{Incoming, Outgoing};
 
-use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::{Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings};
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::domain::ExecutionDomain;
 use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::task_graph::{Node, Resource};
-use crate::{Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings};
 
 pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, A: Allocator> {
     /// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names
@@ -26,7 +27,7 @@ pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, A: Allocator> {
         cmd: IncompleteCommandBuffer<'q, D>,
         bindings: &PhysicalResourceBindings,
         ifc: &mut InFlightContext<A>,
-        debug: Option<&DebugMessenger>,
+        debug: Option<Arc<DebugMessenger>>,
     ) -> Result<IncompleteCommandBuffer<'q, D>>
     where
         Self: Sized;
@@ -195,7 +196,7 @@ fn render_area<D: ExecutionDomain, A: Allocator>(pass: &PassNode<PassResource, D
 #[cfg(feature = "debug-markers")]
 fn annotate_pass<'q, D: ExecutionDomain, A: Allocator>(
     pass: &PassNode<PassResource, D, A>,
-    debug: &DebugMessenger,
+    debug: &Arc<DebugMessenger>,
     cmd: IncompleteCommandBuffer<'q, D>,
 ) -> Result<IncompleteCommandBuffer<'q, D>> {
     let name = CString::new(pass.identifier.clone())?;
@@ -209,7 +210,7 @@ fn annotate_pass<'q, D: ExecutionDomain, A: Allocator>(
 }
 
 #[cfg(not(feature = "debug-markers"))]
-fn annotate_pass<D: ExecutionDomain>(_: &PassNode<PassResource, D>, _: &DebugMessenger, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
+fn annotate_pass<D: ExecutionDomain>(_: &PassNode<PassResource, D>, _: &Arc<DebugMessenger>, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
     Ok(cmd)
 }
 
@@ -218,10 +219,10 @@ fn record_pass<'exec, 'q, D: ExecutionDomain, A: Allocator>(
     bindings: &PhysicalResourceBindings,
     ifc: &mut InFlightContext<A>,
     mut cmd: IncompleteCommandBuffer<'q, D>,
-    debug: Option<&DebugMessenger>,
+    debug: Option<Arc<DebugMessenger>>,
 ) -> Result<IncompleteCommandBuffer<'q, D>> {
-    if let Some(debug) = debug {
-        cmd = annotate_pass(&pass, debug, cmd)?;
+    if let Some(debug) = debug.clone() {
+        cmd = annotate_pass(&pass, &debug, cmd)?;
     }
 
     if pass.is_renderpass {
@@ -245,7 +246,7 @@ fn record_pass<'exec, 'q, D: ExecutionDomain, A: Allocator>(
 
     if let Some(debug) = debug {
         if cfg!(feature = "debug-markers") {
-            cmd = cmd.end_label(debug);
+            cmd = cmd.end_label(&debug);
         }
     }
 
@@ -343,7 +344,7 @@ fn record_node<'exec, 'q, D: ExecutionDomain, A: Allocator>(
     bindings: &PhysicalResourceBindings,
     ifc: &mut InFlightContext<A>,
     cmd: IncompleteCommandBuffer<'q, D>,
-    debug: Option<&DebugMessenger>,
+    debug: Option<Arc<DebugMessenger>>,
 ) -> Result<IncompleteCommandBuffer<'q, D>> {
     let graph = &mut graph.graph.graph;
     let dst_resource_res = PassGraph::barrier_dst_resource(&graph, node).cloned();
@@ -366,7 +367,7 @@ impl<'q, 'exec, D: ExecutionDomain, A: Allocator> RecordGraphToCommandBuffer<'q,
         mut cmd: IncompleteCommandBuffer<'q, D>,
         bindings: &PhysicalResourceBindings,
         ifc: &mut InFlightContext<A>,
-        debug: Option<&DebugMessenger>,
+        debug: Option<Arc<DebugMessenger>>,
     ) -> Result<IncompleteCommandBuffer<'q, D>>
     where
         Self: Sized, {
@@ -377,7 +378,7 @@ impl<'q, 'exec, D: ExecutionDomain, A: Allocator> RecordGraphToCommandBuffer<'q,
         }
         // Record each initial active node.
         for node in &active {
-            cmd = record_node(self, node.clone(), &bindings, ifc, cmd, debug)?;
+            cmd = record_node(self, node.clone(), &bindings, ifc, cmd, debug.clone())?;
         }
 
         while active.len() != self.num_nodes() {
@@ -386,7 +387,7 @@ impl<'q, 'exec, D: ExecutionDomain, A: Allocator> RecordGraphToCommandBuffer<'q,
             for child in &children {
                 // If all parents of this child node are in the active set, record it.
                 if parents!(child, self).all(|parent| active.contains(&parent)) {
-                    cmd = record_node(self, child.clone(), &bindings, ifc, cmd, debug)?;
+                    cmd = record_node(self, child.clone(), &bindings, ifc, cmd, debug.clone())?;
                     recorded_nodes.push(child.clone());
                 }
             }
