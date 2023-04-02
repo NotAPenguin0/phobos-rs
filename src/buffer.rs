@@ -133,7 +133,7 @@ impl<A: Allocator> Buffer<A> {
     pub fn view(&self, offset: impl Into<vk::DeviceSize>, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
         let offset = offset.into();
         let size = size.into();
-        return if offset + size >= self.size {
+        if offset + size >= self.size {
             Err(anyhow::Error::from(Error::BufferViewOutOfRange))
         } else {
             Ok(BufferView {
@@ -142,7 +142,7 @@ impl<A: Allocator> Buffer<A> {
                 pointer: unsafe { self.pointer.map(|p| NonNull::new(p.as_ptr().offset(offset as isize)).unwrap()) },
                 size,
             })
-        };
+        }
     }
 
     /// Creates a view of the entire buffer.
@@ -162,6 +162,10 @@ impl<A: Allocator> Buffer<A> {
         self.pointer.is_some()
     }
 
+    /// Obtain a handle to the raw vulkan buffer object.
+    /// # Safety
+    /// * The caller must make sure to not use this handle after `self` is dropped.
+    /// * The caller must not call `vkDestroyBuffer` on this handle.
     pub unsafe fn handle(&self) -> vk::Buffer {
         self.handle
     }
@@ -193,6 +197,10 @@ impl BufferView {
         }
     }
 
+    /// Obtain a handle to the raw vulkan buffer object.
+    /// # Safety
+    /// * The caller must make sure to not use this handle after `self` is dropped.
+    /// * The caller must not call `vkDestroyBuffer` on this handle.
     pub unsafe fn handle(&self) -> vk::Buffer {
         self.handle
     }

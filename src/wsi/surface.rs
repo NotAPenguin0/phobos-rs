@@ -26,11 +26,11 @@ impl Surface {
     /// Create a new surface.
     pub fn new<Window: WindowInterface>(instance: &VkInstance, settings: &AppSettings<Window>) -> Result<Self> {
         if let Some(window) = settings.window {
-            let functions = ash::extensions::khr::Surface::new(unsafe { instance.loader() }, &*instance);
+            let functions = ash::extensions::khr::Surface::new(unsafe { instance.loader() }, instance);
             let handle = unsafe {
                 ash_window::create_surface(
                     instance.loader(),
-                    &*instance,
+                    instance,
                     window.raw_display_handle(),
                     window.raw_window_handle(),
                     None,
@@ -59,6 +59,9 @@ impl Surface {
         Ok(())
     }
 
+    /// Get unsafe access to the underlying `VkSurfaceKHR` object.
+    /// # Safety
+    /// Any vulkan calls that mutate the surface may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::SurfaceKHR {
         self.handle
     }

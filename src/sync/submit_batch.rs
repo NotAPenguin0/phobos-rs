@@ -46,8 +46,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
     fn get_submit_semaphore(&self, submit: SubmitHandle) -> Option<Rc<Semaphore>> {
         self.submits
             .get(submit.index)
-            .map(|submit| submit.signal_semaphore.clone())
-            .flatten()
+            .and_then(|submit| submit.signal_semaphore.clone())
     }
 
     fn submit_after(&mut self, handles: &[SubmitHandle], cmd: CommandBuffer<D>, wait_stages: &[PipelineStage]) -> Result<SubmitHandle> {
@@ -163,6 +162,6 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
 impl SubmitHandle {
     /// Add another submit to the batch that waits on this submit at the specified wait stage mask.
     pub fn then<D: ExecutionDomain + 'static>(&self, wait_stage: PipelineStage, cmd: CommandBuffer<D>, batch: &mut SubmitBatch<D>) -> Result<SubmitHandle> {
-        batch.submit_after(std::slice::from_ref(&self), cmd, std::slice::from_ref(&wait_stage))
+        batch.submit_after(std::slice::from_ref(self), cmd, std::slice::from_ref(&wait_stage))
     }
 }

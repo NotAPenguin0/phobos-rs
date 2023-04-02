@@ -127,19 +127,19 @@ impl Resource for DescriptorSet {
 
                 match binding.ty {
                     vk::DescriptorType::COMBINED_IMAGE_SAMPLER => {
-                        write.image_info = Some(binding_image_info(&binding));
+                        write.image_info = Some(binding_image_info(binding));
                     }
                     vk::DescriptorType::SAMPLED_IMAGE => {
-                        write.image_info = Some(binding_image_info(&binding));
+                        write.image_info = Some(binding_image_info(binding));
                     }
                     vk::DescriptorType::STORAGE_IMAGE => {
-                        write.image_info = Some(binding_image_info(&binding));
+                        write.image_info = Some(binding_image_info(binding));
                     }
                     vk::DescriptorType::UNIFORM_BUFFER => {
-                        write.buffer_info = Some(binding_buffer_info(&binding));
+                        write.buffer_info = Some(binding_buffer_info(binding));
                     }
                     vk::DescriptorType::STORAGE_BUFFER => {
-                        write.buffer_info = Some(binding_buffer_info(&binding));
+                        write.buffer_info = Some(binding_buffer_info(binding));
                     }
                     _ => {
                         todo!();

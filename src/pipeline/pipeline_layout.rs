@@ -35,6 +35,9 @@ pub struct PipelineLayoutCreateInfo {
 }
 
 impl PipelineLayout {
+    /// Get unsafe access to the internal `VkPipelineLayout`.
+    /// # Safety
+    /// Any vulkan calls that mutate this pipeline layout may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::PipelineLayout {
         self.handle
     }
@@ -59,7 +62,7 @@ impl Resource for PipelineLayout {
         let set_layouts = key
             .set_layouts
             .iter()
-            .map(|info| unsafe { set_layout_cache.get_or_create(&info, ()).unwrap().handle() })
+            .map(|info| unsafe { set_layout_cache.get_or_create(info, ()).unwrap().handle() })
             .collect::<Vec<_>>();
 
         let pc = key.push_constants.iter().map(|pc| pc.to_vk()).collect::<Vec<_>>();
@@ -71,7 +74,7 @@ impl Resource for PipelineLayout {
         Ok(Self {
             device: device.clone(),
             handle: unsafe { device.create_pipeline_layout(&info, None)? },
-            set_layouts: set_layouts.clone(),
+            set_layouts,
         })
     }
 }

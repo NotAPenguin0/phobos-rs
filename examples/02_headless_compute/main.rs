@@ -1,15 +1,16 @@
+use std::path::Path;
+
+use anyhow::Result;
+
+use phobos::prelude::*;
+
+use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file};
+
 /// This example illustrates using compute shaders in phobos, as well as
 /// how phobos can be used without creating a window.
 
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
-
-use std::path::Path;
-
-use anyhow::Result;
-use phobos::prelude::*;
-
-use crate::example_runner::{load_spirv_file, Context, ExampleApp, ExampleRunner};
 
 struct Compute {
     buffer: Buffer,
@@ -33,7 +34,7 @@ impl ExampleApp for Compute {
         let pci = ComputePipelineBuilder::new("compute")
             .set_shader(ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::COMPUTE, shader_code))
             .build();
-        ctx.pipelines.lock().unwrap().create_named_compute_pipeline(pci)?;
+        ctx.pipelines.create_named_compute_pipeline(pci)?;
 
         Ok(Self {
             buffer,
@@ -59,7 +60,7 @@ impl ExampleApp for Compute {
 
         let mut view = self.buffer.view_full();
         let data = view.mapped_slice::<f32>()?;
-        println!("Output data: {:?}", data);
+        println!("Output data: {data:?}");
 
         Ok(())
     }

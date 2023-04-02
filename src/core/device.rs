@@ -18,7 +18,7 @@ pub enum ExtensionID {
 
 impl std::fmt::Display for ExtensionID {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -47,16 +47,14 @@ fn add_if_supported(
     name: &CStr,
     enabled_set: &mut HashSet<ExtensionID>,
     names: &mut Vec<CString>,
-    extensions: &Vec<vk::ExtensionProperties>,
+    extensions: &[vk::ExtensionProperties],
 ) -> bool {
     // First check if extension is supported
     if extensions
         .iter()
         // SAFETY: This pointer is obtained from a c string that was returned from a Vulkan API call. We can assume the
         // Vulkan API always returns valid strings.
-        .filter(|ext| name == unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) })
-        .next()
-        .is_some()
+        .any(|ext| name == unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) })
     {
         enabled_set.insert(ext);
         names.push(CString::from(name));
@@ -114,7 +112,7 @@ impl Device {
             ash::extensions::ext::ExtendedDynamicState3::name(),
             &mut enabled_extensions,
             &mut extension_names,
-            &available_extensions,
+            available_extensions.as_slice(),
         );
 
         // Add required extensions
@@ -143,8 +141,10 @@ impl Device {
             .push_next(&mut features_1_2)
             .push_next(&mut features_1_3);
 
-        let mut features_dynamic_state3 = vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT::default();
-        features_dynamic_state3.extended_dynamic_state3_polygon_mode = vk::TRUE;
+        let mut features_dynamic_state3 = vk::PhysicalDeviceExtendedDynamicState3FeaturesEXT {
+            extended_dynamic_state3_polygon_mode: vk::TRUE,
+            ..Default::default()
+        };
         if dynamic_state3_supported {
             info = info.push_next(&mut features_dynamic_state3);
         }
@@ -153,7 +153,7 @@ impl Device {
         let handle = unsafe { instance.create_device(physical_device.handle(), &info, None)? };
 
         let dynamic_state3 = if dynamic_state3_supported {
-            Some(ash::extensions::ext::ExtendedDynamicState3::new(&instance, &handle))
+            Some(ash::extensions::ext::ExtendedDynamicState3::new(instance, &handle))
         } else {
             None
         };
@@ -178,6 +178,9 @@ impl Device {
     }
 
     /// Get unsafe access to the underlying VkDevice handle
+    /// # Safety
+    /// * The caller should not call `vkDestroyDevice` on this.
+    /// * This handle is valid as long as there is a copy of `self` alive.
     pub unsafe fn handle(&self) -> ash::Device {
         self.inner.handle.clone()
     }

@@ -252,7 +252,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     /// full use of `VK_KHR_SYNCHRONIZATION_2`.
     pub fn pipeline_barrier_2(self, dependency: &vk::DependencyInfo) -> Self {
         unsafe {
-            self.device.cmd_pipeline_barrier2(self.handle, &dependency);
+            self.device.cmd_pipeline_barrier2(self.handle, dependency);
         }
         self
     }
@@ -358,6 +358,9 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self
     }
 
+    /// Get unsafe access to the underlying `VkCommandBuffer` handle.
+    /// # Safety
+    /// Any vulkan calls that mutate the command buffer's state may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::CommandBuffer {
         self.handle
     }

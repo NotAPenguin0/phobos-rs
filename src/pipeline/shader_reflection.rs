@@ -58,7 +58,7 @@ fn find_sampled_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &S
         let set = ast.get_decoration(image.id, Decoration::DescriptorSet)?;
         let ty = ast.get_type(image.type_id)?;
         let Type::SampledImage { array, .. } = ty else { unimplemented!() };
-        let count = if array.len() > 0 {
+        let count = if !array.is_empty() {
             if array[0] == 0 {
                 4096 // Max unbounded array size. If this is ever exceeded, I'll fix it.
             } else {
@@ -239,7 +239,7 @@ pub(crate) fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCrea
     };
 
     let mut sets: HashMap<u32, DescriptorSetLayoutCreateInfo> = HashMap::new();
-    for (_, binding) in &info.bindings {
+    for binding in info.bindings.values() {
         let entry = sets.entry(binding.set);
         match entry {
             Entry::Occupied(entry) => {

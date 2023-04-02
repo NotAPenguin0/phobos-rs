@@ -59,7 +59,7 @@ impl ExecutionManager {
             .queues()
             .iter()
             .map(|queue| -> Result<Mutex<Queue>> {
-                let index = counts.entry(queue.family_index).or_insert(0 as u32);
+                let index = counts.entry(queue.family_index).or_insert(0);
                 // If we have exceeded the max count for this family, we need to reuse a device queue from earlier
                 let device_queue = if *index >= max_queue_count(queue.family_index, physical_device.queue_families()) {
                     // Re-use a previously requested device queue. If this panics, the code is bugged (this is not a user error)
@@ -92,7 +92,7 @@ impl ExecutionManager {
         }
 
         Ok(ExecutionManager {
-            device: device.clone(),
+            device,
             queues: Arc::new(queues),
         })
     }
@@ -157,9 +157,7 @@ impl ExecutionManager {
         };
 
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        unsafe {
-            queue.submit(std::slice::from_ref(&info), Some(&fence))?;
-        }
+        queue.submit(std::slice::from_ref(&info), Some(&fence))?;
         let exec = self.clone();
         Ok(fence.with_cleanup(move || unsafe {
             cmd.delete(exec).unwrap();
@@ -168,9 +166,7 @@ impl ExecutionManager {
 
     pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        unsafe {
-            queue.submit2(submits, Some(fence))?;
-        }
+        queue.submit2(submits, Some(fence))?;
         Ok(())
     }
 
@@ -178,7 +174,7 @@ impl ExecutionManager {
     pub(crate) fn get_present_queue(&self) -> Option<MutexGuard<Queue>> {
         self.queues
             .iter()
-            .find(|&queue| queue.lock().unwrap().info().can_present.clone())
+            .find(|&queue| queue.lock().unwrap().info().can_present)
             .map(|q| q.lock().unwrap())
     }
 
@@ -188,7 +184,7 @@ impl ExecutionManager {
         let q = self.queues.iter().find(|&q| {
             let q = q.try_lock();
             match q {
-                Ok(queue) => D::queue_is_compatible(&*queue),
+                Ok(queue) => D::queue_is_compatible(&queue),
                 Err(_) => false,
             }
         });
@@ -204,7 +200,7 @@ impl ExecutionManager {
             .iter()
             .find(|&q| {
                 let q = q.lock().unwrap();
-                D::queue_is_compatible(&*q)
+                D::queue_is_compatible(&q)
             })
             .map(|q| q.lock().unwrap())
     }

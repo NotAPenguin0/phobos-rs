@@ -97,7 +97,7 @@ impl Resource for Pipeline {
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
         let mut pci = info.to_vk(unsafe { layout.handle() });
 
-        verify_valid_dynamic_states(&device, &info);
+        verify_valid_dynamic_states(&device, info);
 
         // Set shader create info
         let entry = CString::new("main")?;
@@ -120,7 +120,7 @@ impl Resource for Pipeline {
                 device: device.clone(),
                 handle: device
                     .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
-                    .or_else(|(_, e)| Err(anyhow::Error::from(Error::VkError(e))))?
+                    .map_err(|(_, e)| Error::VkError(e))?
                     .first()
                     .cloned()
                     .unwrap(),
@@ -179,7 +179,7 @@ impl Resource for ComputePipeline {
                 device: device.clone(),
                 handle: device
                     .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
-                    .or_else(|(_, e)| Err(anyhow::Error::from(Error::VkError(e))))?
+                    .map_err(|(_, e)| Error::VkError(e))?
                     .first()
                     .cloned()
                     .unwrap(),
@@ -240,7 +240,7 @@ impl PipelineCache {
             set_layouts: Cache::new(device.clone()),
             pipeline_layouts: Cache::new(device.clone()),
             pipelines: Cache::new(device.clone()),
-            compute_pipelines: Cache::new(device.clone()),
+            compute_pipelines: Cache::new(device),
             pipeline_infos: Default::default(),
             compute_pipeline_infos: Default::default(),
         };

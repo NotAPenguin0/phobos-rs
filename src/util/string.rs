@@ -6,7 +6,7 @@ pub(crate) unsafe fn wrap_c_str(s: *const c_char) -> String {
     return if s.is_null() {
         String::default()
     } else {
-        CStr::from_ptr(s).to_string_lossy().to_owned().to_string()
+        CStr::from_ptr(s).to_string_lossy().into_owned()
     };
 }
 

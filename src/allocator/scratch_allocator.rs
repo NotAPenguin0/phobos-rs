@@ -53,7 +53,7 @@ impl<A: Allocator> ScratchAllocator<A> {
             unimplemented!()
         };
 
-        return if buffer.is_mapped() {
+        if buffer.is_mapped() {
             Ok(Self {
                 buffer,
                 offset: 0,
@@ -61,7 +61,7 @@ impl<A: Allocator> ScratchAllocator<A> {
             })
         } else {
             Err(anyhow::Error::from(Error::UnmappableBuffer))
-        };
+        }
     }
 
     /// Allocates a fixed amount of bytes from the allocator.
@@ -74,13 +74,13 @@ impl<A: Allocator> ScratchAllocator<A> {
         // Amount of padding bytes to insert
         let padding = self.alignment - unaligned_part;
         let padded_size = size + padding;
-        return if self.offset + padded_size > self.buffer.size() {
+        if self.offset + padded_size > self.buffer.size() {
             Err(anyhow::Error::from(AllocationError(OutOfMemory)))
         } else {
             let offset = self.offset;
             self.offset += padded_size;
             self.buffer.view(offset, size)
-        };
+        }
     }
 
     /// Resets the linear allocator back to the beginning. Proper external synchronization needs to be

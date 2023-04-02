@@ -6,8 +6,8 @@ use anyhow::Result;
 use ash;
 use ash::vk;
 
-use crate::util::string::unwrap_to_raw_strings;
 use crate::{AppSettings, WindowInterface};
+use crate::util::string::unwrap_to_raw_strings;
 
 /// Represents the loaded vulkan instance.
 /// You need to create this to initialize the Vulkan API.
@@ -24,13 +24,16 @@ impl VkInstance {
     /// Initializes the Vulkan API.
     pub fn new<Window: WindowInterface>(settings: &AppSettings<Window>) -> Result<Self> {
         let entry = unsafe { ash::Entry::load()? };
-        let instance = create_vk_instance(&entry, &settings)?;
+        let instance = create_vk_instance(&entry, settings)?;
         Ok(VkInstance {
             entry,
             instance,
         })
     }
 
+    /// Get unsafe access to the vulkan entry point.
+    /// # Safety
+    /// Any vulkan calls that modify the system's state may put the system in an undefined state.
     pub unsafe fn loader(&self) -> &ash::Entry {
         &self.entry
     }

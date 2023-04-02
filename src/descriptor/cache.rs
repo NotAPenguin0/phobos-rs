@@ -26,8 +26,8 @@ pub struct DescriptorCache {
 
 fn grow_pool_size(mut old_size: DescriptorPoolSize, request: &DescriptorSetBinding) -> DescriptorPoolSize {
     for (ty, count) in old_size.0.iter_mut() {
-        if request.bindings.iter().find(|&binding| binding.ty == *ty).is_some() {
-            *count = *count * 2;
+        if request.bindings.iter().any(|binding| binding.ty == *ty) {
+            *count *= 2;
             trace!("Growing descriptor pool for type {:?} to new size {}", ty, *count);
         }
     }
@@ -68,7 +68,7 @@ impl DescriptorCache {
         let inner = DescriptorCacheInner {
             device: device.clone(),
             cache: Cache::new(device.clone()),
-            pool: DescriptorPool::new(device.clone(), DescriptorPoolSize::new(1))?,
+            pool: DescriptorPool::new(device, DescriptorPoolSize::new(1))?,
             deferred_pool_delete: DeletionQueue::new(16),
         };
         Ok(Self {

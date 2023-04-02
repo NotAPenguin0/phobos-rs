@@ -98,7 +98,7 @@ pub struct PipelineCreateInfo {
 }
 
 impl PipelineCreateInfo {
-    pub(crate) fn build_rendering_state(&mut self) -> () {
+    pub(crate) fn build_rendering_state(&mut self) {
         self.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
             .view_mask(self.rendering_info.view_mask)
             .color_attachment_formats(self.rendering_info.color_formats.as_slice())
@@ -107,20 +107,20 @@ impl PipelineCreateInfo {
             .build();
     }
 
-    pub fn build_inner(&mut self) -> () {
-        self.vk_attributes = self.vertex_attributes.iter().map(|v| v.0.clone()).collect();
-        self.vk_vertex_inputs = self.vertex_input_bindings.iter().map(|v| v.0.clone()).collect();
+    pub fn build_inner(&mut self) {
+        self.vk_attributes = self.vertex_attributes.iter().map(|v| v.0).collect();
+        self.vk_vertex_inputs = self.vertex_input_bindings.iter().map(|v| v.0).collect();
         self.vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(self.vk_vertex_inputs.as_slice())
             .vertex_attribute_descriptions(self.vk_attributes.as_slice())
             .build();
-        self.vk_viewports = self.viewports.iter().map(|v| v.0.clone()).collect();
-        self.vk_scissors = self.scissors.iter().map(|v| v.0.clone()).collect();
+        self.vk_viewports = self.viewports.iter().map(|v| v.0).collect();
+        self.vk_scissors = self.scissors.iter().map(|v| v.0).collect();
         self.viewport_state = vk::PipelineViewportStateCreateInfo::builder()
             .viewports(self.vk_viewports.as_slice())
             .scissors(self.vk_scissors.as_slice())
             .build();
-        self.vk_blend_attachments = self.blend_attachments.iter().map(|v| v.0.clone()).collect();
+        self.vk_blend_attachments = self.blend_attachments.iter().map(|v| v.0).collect();
         self.blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
             .logic_op_enable(self.blend_enable_logic_op)
             .attachments(self.vk_blend_attachments.as_slice())

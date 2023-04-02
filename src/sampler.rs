@@ -55,6 +55,9 @@ impl Sampler {
         })
     }
 
+    /// Get unsafe access to the underlying `VkSampler` object.
+    /// # Safety
+    /// Any vulkan calls that mutate the sampler may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::Sampler {
         self.handle
     }

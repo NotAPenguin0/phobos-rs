@@ -19,7 +19,7 @@ impl DebugMessenger {
     /// Creates a new debug messenger. Requires the vulkan validation layers to be enabled to
     /// do anything useful.
     pub fn new(instance: &VkInstance) -> Result<Self> {
-        let functions = ash::extensions::ext::DebugUtils::new(unsafe { instance.loader() }, &*instance);
+        let functions = ash::extensions::ext::DebugUtils::new(unsafe { instance.loader() }, instance);
         let info = vk::DebugUtilsMessengerCreateInfoEXT {
             s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
             p_next: std::ptr::null(),
@@ -60,7 +60,7 @@ extern "system" fn vk_debug_callback(
     _user_data: *mut std::os::raw::c_void,
 ) -> vk::Bool32 {
     let callback_data = unsafe { *p_callback_data };
-    let message_id_number = callback_data.message_id_number as i32;
+    let message_id_number = callback_data.message_id_number;
     let message_id_name = unsafe { wrap_c_str(callback_data.p_message_id_name) };
     let message = unsafe { wrap_c_str(callback_data.p_message) };
 

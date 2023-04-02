@@ -22,7 +22,7 @@ pub fn staged_buffer_upload<T: Copy, A: Allocator + 'static>(
     staging_view.mapped_slice()?.copy_from_slice(data);
 
     let buffer = Buffer::new_device_local(
-        device.clone(),
+        device,
         &mut allocator,
         staging.size(),
         vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,

@@ -72,35 +72,38 @@ impl Queue {
 
     /// Submits a batch of submissions to the queue, and signals the given fence when the
     /// submission is done
-    /// <br>
-    /// <br>
-    /// # Thread safety
-    /// This function is **not yet** thread safe! This function is marked as unsafe for now to signal this.
-    pub unsafe fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&Fence>) -> Result<()> {
+    pub fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&Fence>) -> Result<()> {
         let fence = match fence {
             None => vk::Fence::null(),
-            Some(fence) => fence.handle(),
+            // SAFETY: The user supplied a valid fence
+            Some(fence) => unsafe { fence.handle() },
         };
         let queue = self.acquire_device_queue()?;
-        Ok(self.device.queue_submit(queue.handle, submits, fence)?)
+        // SAFETY:
+        // * `fence` is null or a valid fence handle (see above).
+        // * The user supplied a valid range of `VkSubmitInfo` structures.
+        // * `queue` is a valid queue object.
+        unsafe { Ok(self.device.queue_submit(queue.handle, submits, fence)?) }
     }
 
     /// Submits a batch of submissions to the queue, and signals the given fence when the
     /// submission is done
-    /// <br>
-    /// <br>
-    /// # Thread safety
-    /// This function is **not yet** thread safe! This function is marked as unsafe for now to signal this.
-    pub unsafe fn submit2(&self, submits: &[vk::SubmitInfo2], fence: Option<&Fence>) -> Result<()> {
+    pub fn submit2(&self, submits: &[vk::SubmitInfo2], fence: Option<&Fence>) -> Result<()> {
         let fence = match fence {
             None => vk::Fence::null(),
-            Some(fence) => fence.handle(),
+            // SAFETY: The user supplied a valid fence
+            Some(fence) => unsafe { fence.handle() },
         };
         let queue = self.acquire_device_queue()?;
-        Ok(self.device.queue_submit2(queue.handle, submits, fence)?)
+        // * `fence` is null or a valid fence handle (see above).
+        // * The user supplied a valid range of `VkSubmitInfo2` structures.
+        // * `queue` is a valid queue object.
+        unsafe { Ok(self.device.queue_submit2(queue.handle, submits, fence)?) }
     }
 
     /// Obtain the raw vulkan handle of a queue.
+    /// # Safety
+    /// Any vulkan calls that mutate the `VkQueue` object may lead to race conditions or undefined behaviour.
     pub unsafe fn handle(&self) -> vk::Queue {
         let queue = self.acquire_device_queue().unwrap();
         queue.handle
@@ -137,7 +140,8 @@ impl Queue {
     /// Instantly delete a command buffer, without taking synchronization into account.
     /// This function **must** be externally synchronized.
     pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(&self, cmd: vk::CommandBuffer) -> Result<()> {
-        Ok(self.device.free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd)))
+        self.device.free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd));
+        Ok(())
     }
 
     pub fn info(&self) -> &QueueInfo {

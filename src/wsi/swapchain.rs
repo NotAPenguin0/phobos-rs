@@ -64,7 +64,7 @@ impl Swapchain {
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
             .build();
 
-        let functions = ash::extensions::khr::Swapchain::new(&*instance, unsafe { &device.handle() });
+        let functions = ash::extensions::khr::Swapchain::new(instance, unsafe { &device.handle() });
         let swapchain = unsafe { functions.create_swapchain(&info, None)? };
 
         let images: Vec<SwapchainImage> = unsafe { functions.get_swapchain_images(swapchain)? }
@@ -102,7 +102,9 @@ impl Swapchain {
         })
     }
 
-    /// Unsafe access to the underlying vulkan handle.
+    /// Get unsafe access to the underlying `VkSwapchainKHR` object.
+    /// # Safety
+    /// Any vulkan calls that mutate the swapchain may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::SwapchainKHR {
         self.handle
     }

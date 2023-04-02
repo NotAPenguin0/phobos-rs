@@ -15,6 +15,9 @@ pub struct DescriptorSetLayout {
 }
 
 impl DescriptorSetLayout {
+    /// Get unsafe access to the underlying `VkDescriptorSetLayout` object.
+    /// # Safety
+    /// Any vulkan calls that mutate the descriptor set layout may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::DescriptorSetLayout {
         self.handle
     }

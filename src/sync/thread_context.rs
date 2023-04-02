@@ -35,7 +35,7 @@ impl<A: Allocator> ThreadContext<A> {
                 vk::BufferUsageFlags::UNIFORM_BUFFER,
             )?,
             ssbo_allocator: ScratchAllocator::<A>::new(
-                device.clone(),
+                device,
                 &mut allocator,
                 scratch_size,
                 vk::BufferUsageFlags::STORAGE_BUFFER,

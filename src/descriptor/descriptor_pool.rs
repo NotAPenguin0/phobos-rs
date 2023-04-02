@@ -33,9 +33,7 @@ impl DescriptorPoolSize {
         sizes.insert(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::STORAGE_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::INPUT_ATTACHMENT, min_capacity);
-        Self {
-            0: sizes,
-        }
+        Self(sizes)
     }
 }
 
@@ -91,7 +89,7 @@ impl Display for DescriptorPoolSize {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut result = writeln!(f, "DescriptorPoolSize (");
         for (ty, size) in &self.0 {
-            result = result.and_then(|_| writeln!(f, "{:?} => {}", ty, size))
+            result = result.and_then(|_| writeln!(f, "{ty:?} => {size}"))
         }
         result
     }

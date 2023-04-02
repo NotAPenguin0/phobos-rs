@@ -62,7 +62,7 @@ impl<R: Resource + Sized> Cache<R> {
         let entry = match entry {
             hash_map::Entry::Occupied(entry) => entry.into_mut(),
             hash_map::Entry::Vacant(entry) => entry.insert(Entry {
-                value: R::create(self.device.clone(), &key, params)?,
+                value: R::create(self.device.clone(), key, params)?,
                 ttl: R::MAX_TIME_TO_LIVE,
                 persistent: key.persistent(),
             }),
@@ -75,7 +75,7 @@ impl<R: Resource + Sized> Cache<R> {
     pub(crate) fn next_frame(&mut self) {
         self.store.iter_mut().for_each(|(_, entry)| {
             if !entry.persistent {
-                entry.ttl = entry.ttl - 1
+                entry.ttl -= 1
             }
         });
         self.store.retain(|_, entry| entry.persistent || entry.ttl != 0);

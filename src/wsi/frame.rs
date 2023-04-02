@@ -155,7 +155,6 @@ impl<A: Allocator> FrameManager<A> {
         Ok(FrameManager {
             device: device.clone(),
             per_frame: (0..FRAMES_IN_FLIGHT)
-                .into_iter()
                 .map(|_| -> Result<PerFrame<A>> {
                     Ok(PerFrame::<A> {
                         fence: Arc::new(Fence::new(device.clone(), true)?),
@@ -459,7 +458,7 @@ impl<A: Allocator> FrameManager<A> {
 
         // Use the command buffer's domain to determine the correct queue to use.
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        unsafe { Ok(queue.submit(std::slice::from_ref(&submit), Some(&per_frame.fence))?) }
+        queue.submit(std::slice::from_ref(&submit), Some(&per_frame.fence))
     }
 
     /// Present a frame to the swapchain. This is the same as calling
@@ -500,6 +499,8 @@ impl<A: Allocator> FrameManager<A> {
     }
 
     /// Unsafe access to the underlying swapchain.
+    /// # Safety
+    /// * Any vulkan calls on the `VkSwapchainKHR` handle may put the system in an undefined state.
     pub unsafe fn get_swapchain(&self) -> &Swapchain {
         &self.swapchain
     }

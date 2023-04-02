@@ -23,6 +23,9 @@ impl Semaphore {
         })
     }
 
+    /// Get unsafe access to the underlying `VkSemaphore` object.
+    /// # Safety
+    /// Any vulkan calls that mutate the semaphore may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::Semaphore {
         self.handle
     }

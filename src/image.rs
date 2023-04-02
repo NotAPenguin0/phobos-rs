@@ -150,7 +150,7 @@ impl<A: Allocator> Image<A> {
         }
 
         Ok(Self {
-            device: device.clone(),
+            device,
             allocator: Some(alloc.clone()),
             handle,
             format,
@@ -216,7 +216,7 @@ impl<A: Allocator> Image<A> {
         Ok(ImageView::new(ImgView {
             device: self.device.clone(),
             handle: view_handle,
-            image: self.handle.clone(),
+            image: self.handle,
             format: self.format,
             samples: self.samples,
             aspect,
@@ -234,6 +234,9 @@ impl<A: Allocator> Image<A> {
         self.memory.is_some()
     }
 
+    /// Get unsafe access to the underlying `VkImage` handle.
+    /// # Safety
+    /// Any vulkan calls that mutate this image's state may put the system into an undefined state.
     pub unsafe fn handle(&self) -> vk::Image {
         self.handle
     }
@@ -304,10 +307,16 @@ impl ImgView {
         }
     }
 
+    /// Get unsafe access to the underlying `VkImageView` handle.
+    /// # Safety
+    /// Any vulkan calls that mutate this image view's state may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::ImageView {
         self.handle
     }
 
+    /// Get unsafe access to the underlying `VkImage` handle.
+    /// # Safety
+    /// Any vulkan calls that mutate this image's state may put the system in an undefined state.
     pub unsafe fn image(&self) -> vk::Image {
         self.image
     }

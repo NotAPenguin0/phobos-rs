@@ -79,6 +79,8 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
 pub trait CmdBuffer {
     /// Delete the command buffer immediately.
     /// This is marked unsafe because there is no guarantee that the command buffer is not in use.
+    /// # Safety
+    /// The caller must ensure this command buffer is not in use on the GPU.
     unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()>;
 }
 

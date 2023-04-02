@@ -99,8 +99,10 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     _domain: PhantomData<D>,
 }
 
-impl<'q, D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
-    /// Immediately delete a command buffer. Must be externally synchronized.
+impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
+    /// Immediately delete a command buffer.
+    /// # Safety
+    /// * This command buffer must not currently be executing on the GPU.
     unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()> {
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         let handle = self.handle;
@@ -110,6 +112,10 @@ impl<'q, D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
 }
 
 impl<D: ExecutionDomain> CommandBuffer<D> {
+    /// Get unsafe access to the underlying command buffer
+    /// # Safety
+    /// Any vulkan calls that modify the command buffer state may lead to validation errors or put the
+    /// system in an undefined state.
     pub unsafe fn handle(&self) -> vk::CommandBuffer {
         self.handle
     }

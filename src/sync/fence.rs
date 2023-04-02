@@ -10,7 +10,7 @@ use ash::vk;
 use crate::Device;
 
 struct CleanupFnLink<'f> {
-    pub f: Box<dyn FnOnce() -> () + 'f>,
+    pub f: Box<dyn FnOnce() + 'f>,
     pub next: Option<Box<CleanupFnLink<'f>>>,
 }
 
@@ -120,7 +120,7 @@ impl<T> FenceValue<T> for Fence<T> {
 }
 
 impl FenceValue<()> for Fence<()> {
-    fn value(&mut self) -> () {}
+    fn value(&mut self) {}
 }
 
 impl Fence<()> {
@@ -134,7 +134,7 @@ impl Fence<()> {
             first_cleanup_fn: self.first_cleanup_fn.take(),
             device: self.device.clone(),
             value: Some(value),
-            poll_rate: self.poll_rate.clone(),
+            poll_rate: self.poll_rate,
         }
     }
 }
@@ -169,7 +169,7 @@ impl<T> Fence<T> {
 
     fn call_cleanup_chain(&mut self) {
         let mut f = self.first_cleanup_fn.take();
-        while let Some(_) = f {
+        while f.is_some() {
             let func = f.take().unwrap();
             func.f.call_once(());
             f = func.next
@@ -230,7 +230,7 @@ impl<T> Fence<T> {
 
     /// Add a function to the front of the chain of functions to be called when this fence is completed, so either after
     /// wait() or after .await
-    pub fn with_cleanup(mut self, f: impl FnOnce() -> () + 'static) -> Self {
+    pub fn with_cleanup(mut self, f: impl FnOnce() + 'static) -> Self {
         if self.first_cleanup_fn.is_some() {
             let mut head = Box::new(CleanupFnLink {
                 f: Box::new(f),
@@ -249,6 +249,9 @@ impl<T> Fence<T> {
         }
     }
 
+    /// Get unsafe access to the `VkFence` handle.
+    /// # Safety
+    /// Any vulkan calls that mutate the fence's state may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::Fence {
         self.handle
     }
@@ -267,11 +270,10 @@ impl<T> std::future::Future for Fence<T> {
             Poll::Ready(self.as_mut().value())
         } else {
             let waker = ctx.waker().clone();
-            let poll_rate = self.poll_rate.clone();
+            let poll_rate = self.poll_rate;
             std::thread::spawn(move || {
                 std::thread::sleep(poll_rate);
                 waker.wake();
-                return;
             });
             Poll::Pending
         }

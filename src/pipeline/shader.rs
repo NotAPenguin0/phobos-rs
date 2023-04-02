@@ -17,6 +17,9 @@ pub struct Shader {
 }
 
 impl Shader {
+    /// Get unsafe access to the underlying `VkShaderModule` object.
+    /// # Safety
+    /// Any vulkan calls that mutate the shader module may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::ShaderModule {
         self.handle
     }

@@ -24,78 +24,70 @@ impl PipelineBuilder {
                 vertex_input_bindings: vec![],
                 vertex_attributes: vec![],
                 shaders: vec![],
-                input_assembly: PipelineInputAssemblyStateCreateInfo {
-                    0: vk::PipelineInputAssemblyStateCreateInfo {
-                        s_type: vk::StructureType::PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                        p_next: std::ptr::null(),
-                        flags: Default::default(),
-                        topology: vk::PrimitiveTopology::TRIANGLE_LIST,
-                        primitive_restart_enable: vk::FALSE,
+                input_assembly: PipelineInputAssemblyStateCreateInfo(vk::PipelineInputAssemblyStateCreateInfo {
+                    s_type: vk::StructureType::PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+                    p_next: std::ptr::null(),
+                    flags: Default::default(),
+                    topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                    primitive_restart_enable: vk::FALSE,
+                }),
+                depth_stencil: PipelineDepthStencilStateCreateInfo(vk::PipelineDepthStencilStateCreateInfo {
+                    s_type: vk::StructureType::PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+                    p_next: std::ptr::null(),
+                    flags: Default::default(),
+                    depth_test_enable: vk::FALSE,
+                    depth_write_enable: vk::FALSE,
+                    depth_compare_op: Default::default(),
+                    depth_bounds_test_enable: vk::FALSE,
+                    stencil_test_enable: vk::FALSE,
+                    front: vk::StencilOpState {
+                        fail_op: Default::default(),
+                        pass_op: Default::default(),
+                        depth_fail_op: Default::default(),
+                        compare_op: Default::default(),
+                        compare_mask: 0,
+                        write_mask: 0,
+                        reference: 0,
                     },
-                },
-                depth_stencil: PipelineDepthStencilStateCreateInfo {
-                    0: vk::PipelineDepthStencilStateCreateInfo {
-                        s_type: vk::StructureType::PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-                        p_next: std::ptr::null(),
-                        flags: Default::default(),
-                        depth_test_enable: vk::FALSE,
-                        depth_write_enable: vk::FALSE,
-                        depth_compare_op: Default::default(),
-                        depth_bounds_test_enable: vk::FALSE,
-                        stencil_test_enable: vk::FALSE,
-                        front: vk::StencilOpState {
-                            fail_op: Default::default(),
-                            pass_op: Default::default(),
-                            depth_fail_op: Default::default(),
-                            compare_op: Default::default(),
-                            compare_mask: 0,
-                            write_mask: 0,
-                            reference: 0,
-                        },
-                        back: vk::StencilOpState {
-                            fail_op: Default::default(),
-                            pass_op: Default::default(),
-                            depth_fail_op: Default::default(),
-                            compare_op: Default::default(),
-                            compare_mask: 0,
-                            write_mask: 0,
-                            reference: 0,
-                        },
-                        min_depth_bounds: 0.0,
-                        max_depth_bounds: 0.0,
+                    back: vk::StencilOpState {
+                        fail_op: Default::default(),
+                        pass_op: Default::default(),
+                        depth_fail_op: Default::default(),
+                        compare_op: Default::default(),
+                        compare_mask: 0,
+                        write_mask: 0,
+                        reference: 0,
                     },
-                },
+                    min_depth_bounds: 0.0,
+                    max_depth_bounds: 0.0,
+                }),
                 dynamic_states: vec![],
-                rasterizer: PipelineRasterizationStateCreateInfo {
-                    0: vk::PipelineRasterizationStateCreateInfo {
-                        s_type: vk::StructureType::PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-                        p_next: std::ptr::null(),
-                        flags: Default::default(),
-                        depth_clamp_enable: vk::FALSE,
-                        rasterizer_discard_enable: vk::FALSE,
-                        polygon_mode: vk::PolygonMode::FILL,
-                        cull_mode: vk::CullModeFlags::NONE,
-                        front_face: vk::FrontFace::COUNTER_CLOCKWISE,
-                        depth_bias_enable: vk::FALSE,
-                        depth_bias_constant_factor: 0.0,
-                        depth_bias_clamp: 0.0,
-                        depth_bias_slope_factor: 0.0,
-                        line_width: 1.0,
-                    },
-                },
-                multisample: PipelineMultisampleStateCreateInfo {
-                    0: vk::PipelineMultisampleStateCreateInfo {
-                        s_type: vk::StructureType::PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-                        p_next: std::ptr::null(),
-                        flags: Default::default(),
-                        rasterization_samples: vk::SampleCountFlags::TYPE_1,
-                        sample_shading_enable: vk::FALSE,
-                        min_sample_shading: 0.0,
-                        p_sample_mask: std::ptr::null(),
-                        alpha_to_coverage_enable: vk::FALSE,
-                        alpha_to_one_enable: vk::FALSE,
-                    },
-                },
+                rasterizer: PipelineRasterizationStateCreateInfo(vk::PipelineRasterizationStateCreateInfo {
+                    s_type: vk::StructureType::PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+                    p_next: std::ptr::null(),
+                    flags: Default::default(),
+                    depth_clamp_enable: vk::FALSE,
+                    rasterizer_discard_enable: vk::FALSE,
+                    polygon_mode: vk::PolygonMode::FILL,
+                    cull_mode: vk::CullModeFlags::NONE,
+                    front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                    depth_bias_enable: vk::FALSE,
+                    depth_bias_constant_factor: 0.0,
+                    depth_bias_clamp: 0.0,
+                    depth_bias_slope_factor: 0.0,
+                    line_width: 1.0,
+                }),
+                multisample: PipelineMultisampleStateCreateInfo(vk::PipelineMultisampleStateCreateInfo {
+                    s_type: vk::StructureType::PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+                    p_next: std::ptr::null(),
+                    flags: Default::default(),
+                    rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                    sample_shading_enable: vk::FALSE,
+                    min_sample_shading: 0.0,
+                    p_sample_mask: std::ptr::null(),
+                    alpha_to_coverage_enable: vk::FALSE,
+                    alpha_to_one_enable: vk::FALSE,
+                }),
                 blend_attachments: vec![],
                 viewports: vec![],
                 scissors: vec![],
@@ -134,13 +126,13 @@ impl PipelineBuilder {
     /// Add a vertex input binding. These are the binding indices for `vkCmdBindVertexBuffers`
     pub fn vertex_input(mut self, binding: u32, rate: vk::VertexInputRate) -> Self {
         self.vertex_binding_offsets.insert(binding, 0);
-        self.inner.vertex_input_bindings.push(VertexInputBindingDescription {
-            0: vk::VertexInputBindingDescription {
+        self.inner
+            .vertex_input_bindings
+            .push(VertexInputBindingDescription(vk::VertexInputBindingDescription {
                 binding,
                 stride: 0,
                 input_rate: rate,
-            },
-        });
+            }));
         self
     }
 
@@ -149,14 +141,14 @@ impl PipelineBuilder {
     /// the shader.
     pub fn vertex_attribute(mut self, binding: u32, location: u32, format: vk::Format) -> Result<Self> {
         let offset = self.vertex_binding_offsets.get_mut(&binding).ok_or(Error::NoVertexBinding)?;
-        self.inner.vertex_attributes.push(VertexInputAttributeDescription {
-            0: vk::VertexInputAttributeDescription {
+        self.inner
+            .vertex_attributes
+            .push(VertexInputAttributeDescription(vk::VertexInputAttributeDescription {
                 location,
                 binding,
                 format,
                 offset: *offset,
-            },
-        });
+            }));
         *offset += format.byte_size() as u32;
         for descr in &mut self.inner.vertex_input_bindings {
             if descr.0.binding == binding {
@@ -207,25 +199,21 @@ impl PipelineBuilder {
         self.inner.dynamic_states.push(state);
         // When setting a viewport dynamic state, we still need a dummy viewport to make validation shut up
         if state == vk::DynamicState::VIEWPORT {
-            self.inner.viewports.push(Viewport {
-                0: vk::Viewport {
-                    x: 0.0,
-                    y: 0.0,
-                    width: 0.0,
-                    height: 0.0,
-                    min_depth: 0.0,
-                    max_depth: 0.0,
-                },
-            })
+            self.inner.viewports.push(Viewport(vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: 0.0,
+                height: 0.0,
+                min_depth: 0.0,
+                max_depth: 0.0,
+            }))
         }
         // Same with scissor state
         if state == vk::DynamicState::SCISSOR {
-            self.inner.scissors.push(Rect2D {
-                0: vk::Rect2D {
-                    offset: Default::default(),
-                    extent: Default::default(),
-                },
-            })
+            self.inner.scissors.push(Rect2D(vk::Rect2D {
+                offset: Default::default(),
+                extent: Default::default(),
+            }))
         }
 
         self
@@ -283,8 +271,9 @@ impl PipelineBuilder {
 
     /// Add a blend attachment, but with no blending enabled.
     pub fn blend_attachment_none(mut self) -> Self {
-        self.inner.blend_attachments.push(PipelineColorBlendAttachmentState {
-            0: vk::PipelineColorBlendAttachmentState {
+        self.inner
+            .blend_attachments
+            .push(PipelineColorBlendAttachmentState(vk::PipelineColorBlendAttachmentState {
                 blend_enable: vk::FALSE,
                 src_color_blend_factor: vk::BlendFactor::ONE,
                 dst_color_blend_factor: vk::BlendFactor::ONE,
@@ -293,15 +282,15 @@ impl PipelineBuilder {
                 dst_alpha_blend_factor: vk::BlendFactor::ONE,
                 alpha_blend_op: vk::BlendOp::ADD,
                 color_write_mask: vk::ColorComponentFlags::RGBA,
-            },
-        });
+            }));
         self
     }
 
     /// Add an additive blend attachment, writing to each color component.
     pub fn blend_additive_unmasked(mut self, src: vk::BlendFactor, dst: vk::BlendFactor, src_alpha: vk::BlendFactor, dst_alpha: vk::BlendFactor) -> Self {
-        self.inner.blend_attachments.push(PipelineColorBlendAttachmentState {
-            0: vk::PipelineColorBlendAttachmentState {
+        self.inner
+            .blend_attachments
+            .push(PipelineColorBlendAttachmentState(vk::PipelineColorBlendAttachmentState {
                 blend_enable: vk::TRUE,
                 src_color_blend_factor: src,
                 dst_color_blend_factor: dst,
@@ -310,8 +299,7 @@ impl PipelineBuilder {
                 dst_alpha_blend_factor: dst_alpha,
                 alpha_blend_op: vk::BlendOp::ADD,
                 color_write_mask: vk::ColorComponentFlags::RGBA,
-            },
-        });
+            }));
         self
     }
 
