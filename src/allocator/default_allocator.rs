@@ -7,13 +7,26 @@ use ash::vk::{DeviceMemory, DeviceSize, MemoryRequirements};
 use gpu_allocator::vulkan as vk_alloc;
 use gpu_allocator::vulkan::AllocationScheme;
 
-use crate::{Device, Error, PhysicalDevice, VkInstance};
+use crate::{Allocator, Device, Error, PhysicalDevice, VkInstance};
 use crate::allocator::memory_type::MemoryType;
 use crate::allocator::traits;
 
 /// The default allocator. This calls into the `gpu_allocator` crate.
 /// It's important to note that this allocator is `Clone`, `Send` and `Sync`. All its internal state is safely
 /// wrapped inside an `Arc<Mutex<T>>`. This is to facilitate passing it around everywhere.
+///
+/// See also: [`Allocator`](traits::Allocator), [`Allocation`](traits::Allocation)
+///
+/// # Example
+/// ```
+/// # use phobos::*;
+///
+/// let mut allocator = DefaultAllocator::new(&instance, &device, &physical_device)?;
+/// let requirements: vk::MemoryRequirements = vkGetMemoryRequirements(device, buffer);
+/// let memory = allocator.allocate("buffer_memory", &requirements, MemoryType::GpuOnly)?;
+/// // SAFETY: We are passing `memory.offset()` correctly.
+/// vkBindBufferMemory(device, buffer, unsafe { memory.memory() }, memory.offset());
+/// ```
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
 pub struct DefaultAllocator {
@@ -21,11 +34,12 @@ pub struct DefaultAllocator {
     alloc: Arc<Mutex<vk_alloc::Allocator>>,
 }
 
-/// Allocation returned from the default allocator. This must be freed explicitly by calling [`DefaultAllocator::free()`](crate::DefaultAllocator::free)
-#[derive(Default, Derivative)]
-#[derivative(Debug)]
+/// Allocation returned from the default allocator.
+#[derive(Derivative)]
+#[derivative(Default, Debug)]
 pub struct Allocation {
-    allocation: vk_alloc::Allocation,
+    allocator: Option<DefaultAllocator>,
+    allocation: Option<vk_alloc::Allocation>,
 }
 
 impl DefaultAllocator {
@@ -43,7 +57,16 @@ impl DefaultAllocator {
     }
 }
 
-impl traits::Allocator for DefaultAllocator {
+impl DefaultAllocator {
+    fn free_impl(&mut self, allocation: &mut <Self as Allocator>::Allocation) -> Result<()> {
+        let mut alloc = self.alloc.lock().map_err(|_| Error::PoisonError)?;
+        let memory = allocation.allocation.take().unwrap();
+        alloc.free(memory)?;
+        Ok(())
+    }
+}
+
+impl Allocator for DefaultAllocator {
     type Allocation = Allocation;
 
     /// Allocates raw memory of a specific memory type. The given name is used for internal tracking.
@@ -58,28 +81,34 @@ impl traits::Allocator for DefaultAllocator {
         })?;
 
         Ok(Allocation {
-            allocation,
+            allocator: Some(self.clone()),
+            allocation: Some(allocation),
         })
     }
 
     /// Free some memory allocated from this allocator.
-    fn free(&mut self, allocation: Self::Allocation) -> Result<()> {
-        let mut alloc = self.alloc.lock().map_err(|_| Error::PoisonError)?;
-        alloc.free(allocation.allocation)?;
-        Ok(())
+    fn free(&mut self, mut allocation: Self::Allocation) -> Result<()> {
+        self.free_impl(&mut allocation)
     }
 }
 
 impl traits::Allocation for Allocation {
     unsafe fn memory(&self) -> DeviceMemory {
-        self.allocation.memory()
+        self.allocation.as_ref().unwrap().memory()
     }
 
     fn offset(&self) -> DeviceSize {
-        self.allocation.offset()
+        self.allocation.as_ref().unwrap().offset()
     }
 
     fn mapped_ptr(&self) -> Option<NonNull<c_void>> {
-        self.allocation.mapped_ptr()
+        self.allocation.as_ref().unwrap().mapped_ptr()
+    }
+}
+
+impl Drop for Allocation {
+    fn drop(&mut self) {
+        let mut allocator = self.allocator.clone().unwrap();
+        allocator.free_impl(self).unwrap();
     }
 }
