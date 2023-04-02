@@ -48,6 +48,18 @@ pub(crate) mod state;
 
 /// This struct represents a finished command buffer. This command buffer can't be recorded to anymore.
 /// It can only be obtained by calling [`IncompleteCommandBuffer::finish()`].
+/// # Example
+/// ```
+/// # use phobos::*;
+/// # use phobos::domain::ExecutionDomain;
+/// # use anyhow::Result;
+///
+/// fn finish_and_wait<D: ExecutionDomain + 'static>(exec: ExecutionManager, cmd: IncompleteCommandBuffer<D>) -> Result<()> {
+///     let cmd: CommandBuffer<D> = cmd.finish()?;
+///     let mut fence = exec.submit(cmd)?;
+///     fence.wait()
+/// }
+/// ```
 #[derive(Debug)]
 pub struct CommandBuffer<D: ExecutionDomain> {
     handle: vk::CommandBuffer,
@@ -61,22 +73,25 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 ///
 /// # Example
 /// ```
-/// use phobos::prelude::*;
+/// # use phobos::*;
+/// # use phobos::domain::{ExecutionDomain, Graphics};
+/// # use anyhow::Result;
 ///
-/// let exec = ExecutionManager::new(device.clone(), &physical_device);
-/// let cmd = exec.on_domain::<domain::All>()?
-///               // record commands to this command buffer
-///               // ...
-///               // convert into a complete command buffer by calling finish().
-///               // This allows the command buffer to be submitted.
-///               .finish();
+/// fn submit_some_commands(exec: ExecutionManager) -> Result<()> {
+///     let cmd: IncompleteCommandBuffer<Graphics> = exec.on_domain::<Graphics>(None, None)?;
+///     // ... record some commands
+///     let mut fence = exec.submit(cmd.finish()?)?;
+///     fence.wait()?;
+///     Ok(())
+/// }
 /// ```
 /// # Descriptor sets
-/// Descriptor sets can be bound simply by calling the associated `bind_xxx` functions on the command buffer.
+/// Descriptor sets can be bound simply by calling the correct `bind_xxx` functions on the command buffer.
+/// (see for example [`IncompleteCommandBuffer::bind_uniform_buffer()`])
 /// It should be noted that these are not actually bound yet on calling this function.
 /// Instead, the next `draw()` or `dispatch()` call flushes these bind calls and does an actual `vkCmdBindDescriptorSets` call.
 /// This also forgets the old binding state, so to update the bindings you need to re-bind all previously bound sets (this is something
-/// that could change in the future, see https://github.com/NotAPenguin0/phobos-rs/issues/23)
+/// that could change in the future, see <https://github.com/NotAPenguin0/phobos-rs/issues/23>)
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
@@ -91,7 +106,6 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     current_rendering_state: Option<PipelineRenderingInfo>,
     current_render_area: vk::Rect2D,
     current_descriptor_sets: Option<HashMap<u32, DescriptorSetBuilder<'static>>>,
-    // Note static lifetime, we dont currently support adding reflection to this
     descriptor_state_needs_update: bool,
     // TODO: Only update disturbed descriptor sets
     descriptor_cache: Option<DescriptorCache>,
@@ -100,7 +114,8 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
 }
 
 impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
-    /// Immediately delete a command buffer.
+    /// Immediately delete a command buffer. Generally you do not need to call this manually, since
+    /// commands buffers submitted through the [`ExecutionManager`] already do this cleanup.
     /// # Safety
     /// * This command buffer must not currently be executing on the GPU.
     unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()> {

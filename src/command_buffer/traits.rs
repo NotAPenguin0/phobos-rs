@@ -10,12 +10,15 @@ use crate::domain::ExecutionDomain;
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {
+    /// Copy one buffer view to another buffer view.
+    /// Both views must have the same length.
     fn copy_buffer(self, src: &BufferView, dst: &BufferView) -> Result<Self>
-    where
-        Self: Sized;
+        where
+            Self: Sized;
+    /// Copy a buffer to an image.
     fn copy_buffer_to_image(self, src: &BufferView, dst: &ImageView) -> Result<Self>
-    where
-        Self: Sized;
+        where
+            Self: Sized;
 }
 
 /// Trait representing a command buffer that supports graphics commands.
@@ -101,10 +104,15 @@ pub trait IncompleteCmdBuffer<'q> {
     fn finish(self) -> Result<CommandBuffer<Self::Domain>>;
 }
 
+/// Whether this domain supports graphics operations. Per the Vulkan spec, this
+/// also implies it supports transfer operations.
 pub trait GfxSupport: TransferSupport {}
 
+/// Whether this domain supports transfer operations.
 pub trait TransferSupport {}
 
+/// Whether this domain supports compute operations. Per the Vulkan spec, this
+/// also implies it supports transfer operations.
 pub trait ComputeSupport: TransferSupport {}
 
 impl GfxSupport for domain::Graphics {}

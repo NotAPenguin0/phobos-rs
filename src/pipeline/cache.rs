@@ -199,10 +199,10 @@ impl Drop for ComputePipeline {
 }
 
 impl PipelineCacheInner {
-    pub(crate) fn get_pipeline(&mut self, name: &str, rendering_info: &PipelineRenderingInfo) -> Result<&Pipeline> {
+    pub(crate) fn get_pipeline(&mut self, name: &str, rendering_info: PipelineRenderingInfo) -> Result<&Pipeline> {
         let entry = self.pipeline_infos.get_mut(name);
         let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
-        entry.info.rendering_info = rendering_info.clone();
+        entry.info.rendering_info = rendering_info;
         entry.info.build_rendering_state();
         // Also put in queries for descriptor set layouts and pipeline layout to make sure they are not destroyed.
         for layout in &entry.info.layout.set_layouts {
@@ -371,7 +371,7 @@ impl PipelineCache {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn with_pipeline<F: FnOnce(&Pipeline) -> Result<()>>(&mut self, name: &str, rendering_info: &PipelineRenderingInfo, f: F) -> Result<()> {
+    pub(crate) fn with_pipeline<F: FnOnce(&Pipeline) -> Result<()>>(&mut self, name: &str, rendering_info: PipelineRenderingInfo, f: F) -> Result<()> {
         let mut inner = self.inner.write().unwrap();
         let pipeline = inner.get_pipeline(name, rendering_info)?;
         f(pipeline)

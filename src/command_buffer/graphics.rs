@@ -71,17 +71,10 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     fn bind_graphics_pipeline(mut self, name: &str) -> Result<Self> {
         let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
         {
-            let Some(rendering_state) = &self.current_rendering_state else { return Err(Error::NoRenderpass.into()) };
-            cache.with_pipeline(name, rendering_state, |pipeline| {
-                unsafe {
-                    self.device
-                        .cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle);
-                }
-                self.current_bindpoint = vk::PipelineBindPoint::GRAPHICS;
-                self.current_pipeline_layout = pipeline.layout;
-                self.current_set_layouts = pipeline.set_layouts.clone();
-                Ok(())
-            })?;
+            let Some(rendering_state) = self.current_rendering_state.clone() else { return Err(Error::NoRenderpass.into()) };
+            cache.with_pipeline(name, rendering_state, |pipeline|
+                self.bind_pipeline_impl(pipeline.handle, pipeline.layout, pipeline.set_layouts.clone(), vk::PipelineBindPoint::GRAPHICS),
+            )?;
         }
         Ok(self)
     }
