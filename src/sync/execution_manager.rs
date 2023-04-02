@@ -4,11 +4,11 @@ use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use anyhow::Result;
 use ash::vk;
 
+use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 use crate::command_buffer::*;
 use crate::core::queue::{DeviceQueue, Queue};
 use crate::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
-use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
@@ -39,7 +39,7 @@ use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, Pi
 /// ```
 #[derive(Debug, Clone)]
 pub struct ExecutionManager {
-    device: Arc<Device>,
+    device: Device,
     queues: Arc<Vec<Mutex<Queue>>>,
 }
 
@@ -51,7 +51,7 @@ fn max_queue_count(family: u32, families: &[vk::QueueFamilyProperties]) -> u32 {
 impl ExecutionManager {
     /// Create a new execution manager. You should only ever have on instance of this struct
     /// in your program.
-    pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
+    pub fn new(device: Device, physical_device: &PhysicalDevice) -> Result<Self> {
         let mut counts = HashMap::new();
         let mut device_queues = HashMap::new();
 

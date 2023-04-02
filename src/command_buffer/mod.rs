@@ -32,10 +32,10 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
+use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
-use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
 
 pub mod compute;
 pub mod graphics;
@@ -81,16 +81,19 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 #[derivative(Debug)]
 pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::CommandBuffer,
     queue_lock: MutexGuard<'q, Queue>,
     current_pipeline_layout: vk::PipelineLayout,
     current_set_layouts: Vec<vk::DescriptorSetLayout>,
-    current_bindpoint: vk::PipelineBindPoint, // TODO: Note: technically not correct
+    current_bindpoint: vk::PipelineBindPoint,
+    // TODO: Note: technically not correct
     current_rendering_state: Option<PipelineRenderingInfo>,
     current_render_area: vk::Rect2D,
-    current_descriptor_sets: Option<HashMap<u32, DescriptorSetBuilder<'static>>>, // Note static lifetime, we dont currently support adding reflection to this
-    descriptor_state_needs_update: bool,                                          // TODO: Only update disturbed descriptor sets
+    current_descriptor_sets: Option<HashMap<u32, DescriptorSetBuilder<'static>>>,
+    // Note static lifetime, we dont currently support adding reflection to this
+    descriptor_state_needs_update: bool,
+    // TODO: Only update disturbed descriptor sets
     descriptor_cache: Option<Arc<Mutex<DescriptorCache>>>,
     pipeline_cache: Option<Arc<Mutex<PipelineCache>>>,
     _domain: PhantomData<D>,

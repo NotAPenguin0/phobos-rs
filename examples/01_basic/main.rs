@@ -1,15 +1,7 @@
-use std::fs;
-use std::fs::File;
-use std::io::Read;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use futures::executor::block_on;
-use winit;
-use winit::event::{Event, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoopBuilder};
-use winit::window::WindowBuilder;
 
 use phobos::command_buffer::traits::*;
 use phobos::domain::All;

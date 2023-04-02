@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
@@ -15,7 +14,7 @@ pub(super) struct DescriptorPoolSize(pub(super) HashMap<vk::DescriptorType, u32>
 #[derivative(Debug)]
 pub(super) struct DescriptorPool {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::DescriptorPool,
     size: DescriptorPoolSize,
 }
@@ -41,7 +40,7 @@ impl DescriptorPoolSize {
 }
 
 impl DescriptorPool {
-    pub(super) fn new(device: Arc<Device>, size: DescriptorPoolSize) -> Result<Self> {
+    pub(super) fn new(device: Device, size: DescriptorPoolSize) -> Result<Self> {
         // TODO: this max_sets value is overly pessimistic as it doesnt account for multiple
         // descriptors being held in the same descriptor set. Ideally this grows with the pool too.
         let max_sets = size.0.values().fold(0, |a, x| x + a);

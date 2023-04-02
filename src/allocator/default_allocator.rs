@@ -7,9 +7,9 @@ use ash::vk::{DeviceMemory, DeviceSize, MemoryRequirements};
 use gpu_allocator::vulkan as vk_alloc;
 use gpu_allocator::vulkan::AllocationScheme;
 
+use crate::{Device, Error, PhysicalDevice, VkInstance};
 use crate::allocator::memory_type::MemoryType;
 use crate::allocator::traits;
-use crate::{Device, Error, PhysicalDevice, VkInstance};
 
 /// The default allocator. This calls into the `gpu_allocator` crate.
 /// It's important to note that this allocator is `Clone`, `Send` and `Sync`. All its internal state is safely
@@ -30,7 +30,7 @@ pub struct Allocation {
 
 impl DefaultAllocator {
     /// Create a new default allocator.
-    pub fn new(instance: &VkInstance, device: &Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
+    pub fn new(instance: &VkInstance, device: &Device, physical_device: &PhysicalDevice) -> Result<Self> {
         Ok(Self {
             alloc: Arc::new(Mutex::new(vk_alloc::Allocator::new(&vk_alloc::AllocatorCreateDesc {
                 instance: (*instance).clone(),

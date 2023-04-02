@@ -1,12 +1,11 @@
 use std::rc::Rc;
-use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
 
+use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
 use crate::command_buffer::CommandBuffer;
 use crate::domain::ExecutionDomain;
-use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
 
 #[derive(Debug)]
 struct SubmitInfo<D: ExecutionDomain> {
@@ -28,14 +27,14 @@ pub struct SubmitHandle {
 /// [`ExecutionManager::start_submit_batch`].
 #[derive(Debug)]
 pub struct SubmitBatch<D: ExecutionDomain> {
-    device: Arc<Device>,
+    device: Device,
     exec: ExecutionManager,
     submits: Vec<SubmitInfo<D>>,
     signal_fence: Fence,
 }
 
 impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
-    pub(crate) fn new(device: Arc<Device>, exec: ExecutionManager) -> Result<Self> {
+    pub(crate) fn new(device: Device, exec: ExecutionManager) -> Result<Self> {
         Ok(Self {
             submits: vec![],
             signal_fence: Fence::new(device.clone(), false)?,

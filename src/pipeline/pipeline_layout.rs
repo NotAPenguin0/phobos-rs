@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use ash::vk;
 
@@ -13,7 +11,7 @@ use crate::util::cache::{Cache, Resource, ResourceKey};
 #[derivative(Debug)]
 pub struct PipelineLayout {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::PipelineLayout,
     set_layouts: Vec<vk::DescriptorSetLayout>,
 }
@@ -57,7 +55,7 @@ impl Resource for PipelineLayout {
     type ExtraParams<'a> = &'a mut Cache<DescriptorSetLayout>;
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self> {
+    fn create(device: Device, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self> {
         let set_layouts = key
             .set_layouts
             .iter()

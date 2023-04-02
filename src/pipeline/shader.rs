@@ -1,6 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
@@ -13,7 +12,7 @@ use crate::util::cache::{Resource, ResourceKey};
 #[derivative(Debug)]
 pub struct Shader {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::ShaderModule,
 }
 
@@ -57,7 +56,7 @@ impl Resource for Shader {
     type ExtraParams<'a> = ();
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self> {
+    fn create(device: Device, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self> {
         let info = vk::ShaderModuleCreateInfo {
             s_type: vk::StructureType::SHADER_MODULE_CREATE_INFO,
             p_next: std::ptr::null(),

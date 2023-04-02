@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use ash::vk;
 
@@ -9,12 +7,12 @@ use crate::prelude::*;
 #[derivative(Debug)]
 pub struct CommandPool {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::CommandPool,
 }
 
 impl CommandPool {
-    pub fn new(device: Arc<Device>, family: u32, flags: vk::CommandPoolCreateFlags) -> Result<Self> {
+    pub fn new(device: Device, family: u32, flags: vk::CommandPoolCreateFlags) -> Result<Self> {
         let info = vk::CommandPoolCreateInfo {
             s_type: vk::StructureType::COMMAND_POOL_CREATE_INFO,
             p_next: std::ptr::null(),

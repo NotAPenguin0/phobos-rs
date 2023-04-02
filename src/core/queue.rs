@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
-use crate::command_buffer::command_pool::CommandPool;
 use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffer, PipelineCache};
+use crate::command_buffer::command_pool::CommandPool;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.
@@ -43,7 +43,7 @@ pub(crate) struct DeviceQueue {
 #[derivative(Debug)]
 pub struct Queue {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     queue: Arc<Mutex<DeviceQueue>>,
     /// Note that we are only creating one command pool.
     /// We will need to provide thread-safe access to this pool.
@@ -54,7 +54,7 @@ pub struct Queue {
 }
 
 impl Queue {
-    pub(crate) fn new(device: Arc<Device>, queue: Arc<Mutex<DeviceQueue>>, info: QueueInfo) -> Result<Self> {
+    pub(crate) fn new(device: Device, queue: Arc<Mutex<DeviceQueue>>, info: QueueInfo) -> Result<Self> {
         // We create a transient command pool because command buffers will be allocated and deallocated
         // frequently.
         let pool = CommandPool::new(device.clone(), info.family_index, vk::CommandPoolCreateFlags::TRANSIENT)?;
@@ -107,7 +107,7 @@ impl Queue {
     }
 
     pub(crate) fn allocate_command_buffer<'q, CmdBuf: IncompleteCmdBuffer<'q>>(
-        device: Arc<Device>,
+        device: Device,
         queue_lock: MutexGuard<'q, Queue>,
         pipelines: Option<Arc<Mutex<PipelineCache>>>,
         descriptors: Option<Arc<Mutex<DescriptorCache>>>,

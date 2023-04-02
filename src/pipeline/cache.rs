@@ -65,7 +65,7 @@ macro_rules! require_extension {
 }
 
 /// Check if dynamic states are supported by the enabled extension set
-fn verify_valid_dynamic_states(device: &Arc<Device>, pci: &PipelineCreateInfo) {
+fn verify_valid_dynamic_states(device: &Device, pci: &PipelineCreateInfo) {
     require_extension!(
         pci,
         device,
@@ -89,7 +89,7 @@ impl Resource for Pipeline {
     );
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self> {
+    fn create(device: Device, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self> {
         let (shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
         let mut pci = info.to_vk(unsafe { layout.handle() });
@@ -151,9 +151,9 @@ impl Resource for ComputePipeline {
     );
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
-    where
-        Self: Sized, {
+    fn create(device: Device, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
+        where
+            Self: Sized, {
         let (shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
         let mut pci = info.to_vk(unsafe { layout.handle() });
@@ -199,7 +199,7 @@ impl Drop for ComputePipeline {
 
 impl PipelineCache {
     /// Create a new empty pipeline cache.
-    pub fn new(device: Arc<Device>) -> Result<Arc<Mutex<Self>>> {
+    pub fn new(device: Device) -> Result<Arc<Mutex<Self>>> {
         Ok(Arc::new(Mutex::new(Self {
             shaders: Cache::new(device.clone()),
             set_layouts: Cache::new(device.clone()),

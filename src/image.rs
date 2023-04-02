@@ -12,8 +12,8 @@
 //! [`ImgView`] also owns a full Vulkan resource. For this reason, we wrap it in a reference-counted `Arc` so we can safely treat it as if it were
 //! a `str` to a `String`. Most API functions will ask for an [`ImageView`].
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::Result;
 use ash::vk;
@@ -27,7 +27,7 @@ use crate::{Allocation, Allocator, DefaultAllocator, Device, MemoryType};
 pub struct Image<A: Allocator = DefaultAllocator> {
     /// Reference to the [`VkDevice`](vk::Device).
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     #[derivative(Debug = "ignore")]
     allocator: Option<A>,
     /// [`VkImage`](vk::Image) handle.
@@ -59,7 +59,7 @@ pub struct ImgView {
     #[derivative(Debug = "ignore")]
     #[derivative(Hash = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     /// [`VkImageView`](vk::ImageView) handle
     handle: vk::ImageView,
     /// Reference to the [`VkImage`](vk::Image).
@@ -91,7 +91,7 @@ impl<A: Allocator> Image<A> {
     // TODO: Allow specifying an initial layout for convenience
     /// Create a new simple [`VkImage`] and allocate some memory to it.
     pub fn new(
-        device: Arc<Device>,
+        device: Device,
         alloc: &mut A,
         width: u32,
         height: u32,
@@ -167,7 +167,7 @@ impl<A: Allocator> Image<A> {
     }
 
     pub(crate) fn new_managed(
-        device: Arc<Device>,
+        device: Device,
         handle: vk::Image,
         format: vk::Format,
         size: vk::Extent3D,

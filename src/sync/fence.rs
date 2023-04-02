@@ -1,6 +1,5 @@
 use std::pin::Pin;
 use std::slice;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -50,7 +49,7 @@ pub trait FenceValue<T> {
 ///
 /// use phobos::prelude::*;
 ///
-/// async fn upload_buffer<T: Copy>(device: Arc<Device>, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
+/// async fn upload_buffer<T: Copy>(device: Device, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
 ///     // Create our result buffer
 ///     let size = (src.len() * size_of::<T>()) as u64;
 ///     let buffer = Buffer::new_device_local(device.clone(), &mut allocator, size, vk::BufferUsageFlags::TRANSFER_DST)?;
@@ -81,7 +80,7 @@ pub trait FenceValue<T> {
 /// use phobos::prelude::*;
 ///
 ///
-/// async fn upload_buffer<T: Copy>(device: Arc<Device>, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
+/// async fn upload_buffer<T: Copy>(device: Device, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
 ///     // ... snip
 ///     // Submit our command buffer and obtain a fence
 ///     let fence = exec.submit(cmd)?;
@@ -100,7 +99,7 @@ pub trait FenceValue<T> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Fence<T = ()> {
-    device: Arc<Device>,
+    device: Device,
     #[derivative(Debug = "ignore")]
     first_cleanup_fn: Option<Box<CleanupFnLink<'static>>>,
     value: Option<T>,
@@ -144,12 +143,12 @@ impl<T> Unpin for Fence<T> {}
 
 impl<T> Fence<T> {
     /// Create a new fence, possibly in the singaled status.
-    pub fn new(device: Arc<Device>, signaled: bool) -> Result<Self, vk::Result> {
+    pub fn new(device: Device, signaled: bool) -> Result<Self, vk::Result> {
         Self::new_with_poll_rate(device, signaled, Duration::from_millis(5))
     }
 
     /// Create a new fence with the specified poll rate for awaiting it as a future.
-    pub fn new_with_poll_rate(device: Arc<Device>, signaled: bool, poll_rate: Duration) -> Result<Self, vk::Result> {
+    pub fn new_with_poll_rate(device: Device, signaled: bool, poll_rate: Duration) -> Result<Self, vk::Result> {
         let info = vk::FenceCreateInfo {
             s_type: vk::StructureType::FENCE_CREATE_INFO,
             p_next: std::ptr::null(),

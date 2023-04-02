@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use ash::vk;
 
@@ -46,7 +44,7 @@ pub struct DescriptorSetBinding {
 pub struct DescriptorSet {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    pub(crate) device: Arc<Device>,
+    pub(crate) device: Device,
     pub(crate) pool: vk::DescriptorPool,
     pub(crate) handle: vk::DescriptorSet,
 }
@@ -102,7 +100,7 @@ impl Resource for DescriptorSet {
     type ExtraParams<'a> = ();
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self>
+    fn create(device: Device, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self>
         where
             Self: Sized, {
         let info = vk::DescriptorSetAllocateInfo {

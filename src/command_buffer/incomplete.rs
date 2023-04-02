@@ -18,7 +18,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
     type Domain = D;
 
     fn new(
-        device: Arc<Device>,
+        device: Device,
         queue_lock: MutexGuard<'q, Queue>,
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,

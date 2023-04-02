@@ -3,10 +3,10 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
+use crate::{BufferView, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache};
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
-use crate::{domain, BufferView, DescriptorCache, Device, ExecutionManager, ImageView, PipelineCache};
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {
@@ -87,7 +87,7 @@ pub trait IncompleteCmdBuffer<'q> {
     type Domain: ExecutionDomain;
 
     fn new(
-        device: Arc<Device>,
+        device: Device,
         queue_lock: MutexGuard<'q, Queue>,
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,

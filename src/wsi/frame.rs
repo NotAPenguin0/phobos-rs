@@ -69,14 +69,14 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::command_buffer::CommandBuffer;
-use crate::domain::ExecutionDomain;
-use crate::util::deferred_delete::DeletionQueue;
-use crate::wsi::swapchain::SwapchainImage;
 use crate::{
     Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore,
     Surface, Swapchain, WindowInterface,
 };
+use crate::command_buffer::CommandBuffer;
+use crate::domain::ExecutionDomain;
+use crate::util::deferred_delete::DeletionQueue;
+use crate::wsi::swapchain::SwapchainImage;
 
 /// Information stored for each in-flight frame.
 #[derive(Derivative)]
@@ -139,7 +139,7 @@ const FRAMES_IN_FLIGHT: usize = 2;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct FrameManager<A: Allocator = DefaultAllocator> {
-    device: Arc<Device>,
+    device: Device,
     per_frame: [PerFrame<A>; FRAMES_IN_FLIGHT],
     per_image: Vec<PerImage>,
     current_frame: u32,
@@ -150,7 +150,7 @@ pub struct FrameManager<A: Allocator = DefaultAllocator> {
 
 impl<A: Allocator> FrameManager<A> {
     /// Initialize frame manager with per-frame data.
-    pub fn new<Window: WindowInterface>(device: Arc<Device>, mut allocator: A, settings: &AppSettings<Window>, swapchain: Swapchain) -> Result<Self> {
+    pub fn new<Window: WindowInterface>(device: Device, mut allocator: A, settings: &AppSettings<Window>, swapchain: Swapchain) -> Result<Self> {
         let scratch_flags_base = vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC;
         Ok(FrameManager {
             device: device.clone(),

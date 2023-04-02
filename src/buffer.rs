@@ -30,7 +30,6 @@
 
 use std::ffi::c_void;
 use std::ptr::NonNull;
-use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
@@ -42,7 +41,7 @@ use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 #[derivative(Debug)]
 pub struct Buffer<A: Allocator = DefaultAllocator> {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     #[derivative(Debug = "ignore")]
     allocator: A,
     #[derivative(Debug = "ignore")]
@@ -74,7 +73,7 @@ unsafe impl Send for BufferView {}
 impl<A: Allocator> Buffer<A> {
     /// Allocate a new buffer with a specific size, at a specific memory location.
     /// All usage flags must be given.
-    pub fn new(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
+    pub fn new(device: Device, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
         let size = size.into();
         let sharing_mode = if device.is_single_queue() {
             vk::SharingMode::EXCLUSIVE
@@ -122,7 +121,7 @@ impl<A: Allocator> Buffer<A> {
     }
 
     /// Allocate a new buffer with device local memory (VRAM). This is usually the correct memory location for most buffers.
-    pub fn new_device_local(device: Arc<Device>, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
+    pub fn new_device_local(device: Device, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
         Self::new(device, allocator, size, usage, MemoryType::GpuOnly)
     }
 

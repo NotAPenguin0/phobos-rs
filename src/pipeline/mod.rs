@@ -53,7 +53,6 @@
 //! The pipeline cache internally frees up resources by destroying pipelines that have not been accessed in a long time.
 //! To ensure this happens periodically, call [`PipelineCache::next_frame()`](crate::PipelineCache::next_frame) at the end of each iteration of your render loop.
 
-use std::sync::Arc;
 
 use ash::vk;
 
@@ -78,7 +77,7 @@ pub type PipelineStage = vk::PipelineStageFlags2;
 #[derivative(Debug)]
 pub struct Pipeline {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     pub(crate) handle: vk::Pipeline,
     pub(crate) layout: vk::PipelineLayout,
     pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,
@@ -90,7 +89,7 @@ pub struct Pipeline {
 #[derivative(Debug)]
 pub struct ComputePipeline {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     pub(crate) handle: vk::Pipeline,
     pub(crate) layout: vk::PipelineLayout,
     pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,

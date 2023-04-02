@@ -1,11 +1,10 @@
 use std::ops::Deref;
-use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
 
-use crate::image::*;
 use crate::{AppSettings, Device, Error, Surface, VkInstance, WindowInterface};
+use crate::image::*;
 
 #[derive(Debug)]
 pub(crate) struct SwapchainImage {
@@ -36,7 +35,7 @@ pub struct Swapchain {
 
 impl Swapchain {
     /// Create a new swapchain.
-    pub fn new<Window: WindowInterface>(instance: &VkInstance, device: Arc<Device>, settings: &AppSettings<Window>, surface: &Surface) -> Result<Self> {
+    pub fn new<Window: WindowInterface>(instance: &VkInstance, device: Device, settings: &AppSettings<Window>, surface: &Surface) -> Result<Self> {
         let format = choose_surface_format(settings, surface)?;
         let present_mode = choose_present_mode(settings, surface);
         let extent = choose_swapchain_extent(settings, surface);

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use ash::vk;
 
@@ -12,7 +10,7 @@ use crate::util::cache::{Resource, ResourceKey};
 #[derivative(Debug)]
 pub struct DescriptorSetLayout {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::DescriptorSetLayout,
 }
 
@@ -42,7 +40,7 @@ impl Resource for DescriptorSetLayout {
     type ExtraParams<'a> = ();
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self> {
+    fn create(device: Device, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self> {
         let info = vk::DescriptorSetLayoutCreateInfo::builder()
             .bindings(key.bindings.as_slice())
             .build();

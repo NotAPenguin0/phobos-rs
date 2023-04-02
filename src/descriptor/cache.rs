@@ -3,10 +3,10 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
+use crate::{DeletionQueue, DescriptorSet, Device, Error};
 use crate::descriptor::descriptor_pool::{DescriptorPool, DescriptorPoolSize};
 use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::util::cache::Cache;
-use crate::{DeletionQueue, DescriptorSet, Device, Error};
 
 /// This structure uses a [`Cache`] over a [`DescriptorSet`] to automatically manage everything related to descriptor sets.
 /// It can intelligently allocate and deallocate descriptor sets, and grow its internal descriptor pool when necessary.
@@ -14,7 +14,7 @@ use crate::{DeletionQueue, DescriptorSet, Device, Error};
 #[derivative(Debug)]
 pub struct DescriptorCache {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     cache: Cache<DescriptorSet>,
     pool: DescriptorPool,
     deferred_pool_delete: DeletionQueue<DescriptorPool>,
@@ -24,7 +24,7 @@ impl DescriptorCache {
     /// Create a new descriptor cache object.
     /// # Errors
     /// - This can fail if creating the initial descriptor pool fails.
-    pub fn new(device: Arc<Device>) -> Result<Arc<Mutex<Self>>> {
+    pub fn new(device: Device) -> Result<Arc<Mutex<Self>>> {
         Ok(Arc::new(Mutex::new(Self {
             device: device.clone(),
             cache: Cache::new(device.clone()),

@@ -7,8 +7,8 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::util::string::unwrap_to_raw_strings;
 use crate::{AppSettings, PhysicalDevice, VkInstance, WindowInterface};
+use crate::util::string::unwrap_to_raw_strings;
 
 /// Device extensions that phobos requests but might not be available.
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -22,11 +22,9 @@ impl std::fmt::Display for ExtensionID {
     }
 }
 
-/// Wrapper around a `VkDevice`. The device provides access to almost the entire
-/// Vulkan API.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct Device {
+struct DeviceInner {
     #[derivative(Debug = "ignore")]
     handle: ash::Device,
     queue_families: Vec<u32>,
@@ -34,6 +32,14 @@ pub struct Device {
     extensions: HashSet<ExtensionID>,
     #[derivative(Debug = "ignore")]
     dynamic_state3: Option<ash::extensions::ext::ExtendedDynamicState3>,
+}
+
+/// Wrapper around a `VkDevice`. The device provides access to almost the entire
+/// Vulkan API. Internal state is wrapped in an `Arc<DeviceInner>`, so this is safe
+/// to clone
+#[derive(Debug, Clone)]
+pub struct Device {
+    inner: Arc<DeviceInner>,
 }
 
 fn add_if_supported(
@@ -67,7 +73,7 @@ fn add_if_supported(
 impl Device {
     /// Create a new Vulkan device. This is wrapped in an Arc because it gets passed around and stored in a
     /// lot of Vulkan-related structures.
-    pub fn new<Window: WindowInterface>(instance: &VkInstance, physical_device: &PhysicalDevice, settings: &AppSettings<Window>) -> Result<Arc<Self>> {
+    pub fn new<Window: WindowInterface>(instance: &VkInstance, physical_device: &PhysicalDevice, settings: &AppSettings<Window>) -> Result<Self> {
         let mut priorities = Vec::<f32>::new();
         let queue_create_infos = physical_device
             .queue_families()
@@ -152,49 +158,53 @@ impl Device {
             None
         };
 
-        Ok(Arc::new(Device {
+        let inner = DeviceInner {
             handle,
             queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
             properties: *physical_device.properties(),
             extensions: enabled_extensions,
             dynamic_state3,
-        }))
+        };
+
+        Ok(Device {
+            inner: Arc::new(inner),
+        })
     }
 
     /// Wait for the device to be completely idle.
     /// This should not be used as a synchronization measure, except on exit.
     pub fn wait_idle(&self) -> Result<()> {
-        unsafe { Ok(self.device_wait_idle()?) }
+        unsafe { Ok(self.inner.handle.device_wait_idle()?) }
     }
 
     /// Get unsafe access to the underlying VkDevice handle
     pub unsafe fn handle(&self) -> ash::Device {
-        self.handle.clone()
+        self.inner.handle.clone()
     }
 
     /// Get the queue families we requested on this device.
     pub fn queue_families(&self) -> &[u32] {
-        self.queue_families.as_slice()
+        self.inner.queue_families.as_slice()
     }
 
     /// Get the device properties
     pub fn properties(&self) -> &vk::PhysicalDeviceProperties {
-        &self.properties
+        &self.inner.properties
     }
 
     /// Check if an extension is enabled.
     pub fn is_extension_enabled(&self, ext: ExtensionID) -> bool {
-        self.extensions.contains(&ext)
+        self.inner.extensions.contains(&ext)
     }
 
     /// Access to the function pointers for VK_EXT_dynamic_state_3
     pub fn dynamic_state3(&self) -> Option<&ash::extensions::ext::ExtendedDynamicState3> {
-        self.dynamic_state3.as_ref()
+        self.inner.dynamic_state3.as_ref()
     }
 
     /// True we only have a single queue, and thus the sharing mode for resources is always EXCLUSIVE.
     pub fn is_single_queue(&self) -> bool {
-        self.queue_families.len() == 1
+        self.inner.queue_families.len() == 1
     }
 }
 
@@ -202,14 +212,14 @@ impl Deref for Device {
     type Target = ash::Device;
 
     fn deref(&self) -> &Self::Target {
-        &self.handle
+        &self.inner.handle
     }
 }
 
-impl Drop for Device {
+impl Drop for DeviceInner {
     fn drop(&mut self) {
         unsafe {
-            self.destroy_device(None);
+            self.handle.destroy_device(None);
         }
     }
 }

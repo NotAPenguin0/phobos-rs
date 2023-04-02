@@ -6,10 +6,11 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Result};
 use futures::executor::block_on;
-use phobos::prelude::*;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use winit::window::{Window, WindowBuilder};
+
+use phobos::prelude::*;
 
 pub fn load_spirv_file(path: &Path) -> Vec<u32> {
     let mut f = File::open(&path).expect("no file found");
@@ -44,7 +45,7 @@ pub struct VulkanContext {
     pub frame: Option<FrameManager>,
     pub exec: ExecutionManager,
     pub allocator: DefaultAllocator,
-    pub device: Arc<Device>,
+    pub device: Device,
     pub physical_device: PhysicalDevice,
     pub surface: Option<Surface>,
     pub debug_messenger: DebugMessenger,
@@ -52,7 +53,7 @@ pub struct VulkanContext {
 }
 
 pub struct Context {
-    pub device: Arc<Device>,
+    pub device: Device,
     pub exec: ExecutionManager,
     pub allocator: DefaultAllocator,
     pub pipelines: Arc<Mutex<PipelineCache>>,
