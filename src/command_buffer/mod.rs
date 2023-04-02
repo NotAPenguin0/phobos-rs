@@ -94,7 +94,7 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     // Note static lifetime, we dont currently support adding reflection to this
     descriptor_state_needs_update: bool,
     // TODO: Only update disturbed descriptor sets
-    descriptor_cache: Option<Arc<Mutex<DescriptorCache>>>,
+    descriptor_cache: Option<DescriptorCache>,
     pipeline_cache: Option<Arc<Mutex<PipelineCache>>>,
     _domain: PhantomData<D>,
 }

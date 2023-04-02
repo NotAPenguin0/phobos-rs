@@ -57,7 +57,7 @@ pub struct Context {
     pub exec: ExecutionManager,
     pub allocator: DefaultAllocator,
     pub pipelines: Arc<Mutex<PipelineCache>>,
-    pub descriptors: Arc<Mutex<DescriptorCache>>,
+    pub descriptors: DescriptorCache,
 }
 
 pub trait ExampleApp {
@@ -79,7 +79,7 @@ pub trait ExampleApp {
 pub struct ExampleRunner {
     vk: VulkanContext,
     pipelines: Arc<Mutex<PipelineCache>>,
-    descriptors: Arc<Mutex<DescriptorCache>>,
+    descriptors: DescriptorCache,
 }
 
 impl ExampleRunner {
@@ -235,7 +235,7 @@ impl ExampleRunner {
                     Some(app) => {
                         self.frame(app, &window).unwrap();
                         self.pipelines.lock().unwrap().next_frame();
-                        self.descriptors.lock().unwrap().next_frame();
+                        self.descriptors.next_frame();
                     }
                 },
                 _ => (),

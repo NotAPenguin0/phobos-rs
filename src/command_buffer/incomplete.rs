@@ -6,11 +6,13 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, PipelineStage, Sampler, VirtualResource};
+use crate::{
+    BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings,
+    PipelineCache, PipelineStage, Sampler, VirtualResource,
+};
 use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
-use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 
@@ -23,7 +25,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,
         pipelines: Option<Arc<Mutex<PipelineCache>>>,
-        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+        descriptors: Option<DescriptorCache>,
     ) -> Result<Self> {
         unsafe {
             let begin_info = vk::CommandBufferBeginInfo {
@@ -63,24 +65,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
 }
 
 impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
-    /// Obtain a reference to a descriptor set inside the given cache that stores the requested bindings.
-    /// This potentially allocates a new descriptor set and writes to it.
-    /// # Lifetime
-    /// The returned descriptor set lives as long as the cache allows it to live, so it should not be stored across multiple frames.
-    /// # Errors
-    /// - This function can potentially error if allocating the descriptor set fails. The descriptor cache has builtin ways to handle
-    /// a full descriptor pool, but other errors are passed through.
-    /// - This function errors if a requested set was not specified in the current pipeline's pipeline layout.
-    /// - This function errors if no pipeline is bound.
-    pub(super) fn get_descriptor_set<'a>(&mut self, set: u32, mut bindings: DescriptorSetBinding, cache: &'a mut DescriptorCache) -> Result<&'a DescriptorSet> {
-        let layout = self.current_set_layouts.get(set as usize).ok_or(Error::NoDescriptorSetLayout)?;
-        bindings.layout = layout.clone();
-        cache.get_descriptor_set(bindings)
-    }
-
-    /// Bind a descriptor set to the command buffer. This descriptor set can be obtained by calling
-    /// [`Self::get_descriptor_set`]. Note that the index should be the same as the one used in get_descriptor_set.
-    /// To safely do this, prefer using [`Self::bind_new_descriptor_set`] to combine these two functions into one call.
+    /// Bind a descriptor set to the command buffer.
     pub(super) fn bind_descriptor_set(&self, index: u32, set: &DescriptorSet) {
         unsafe {
             self.device.cmd_bind_descriptor_sets(
@@ -119,14 +104,15 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
             return Ok(self);
         }
 
-        let Some(cache) = &self.descriptor_cache else { return Err(Error::NoDescriptorCache.into()); };
+        let Some(mut cache) = self.descriptor_cache.clone() else { return Err(Error::NoDescriptorCache.into()); };
         {
-            let mut cache = cache.lock().unwrap();
             for (index, builder) in self.current_descriptor_sets.take().unwrap() {
                 let mut info = builder.build();
                 info.layout = *self.current_set_layouts.get(index as usize).unwrap();
-                let set = cache.get_descriptor_set(info)?;
-                self.bind_descriptor_set(index, set);
+                cache.with_descriptor_set(info, |set| {
+                    self.bind_descriptor_set(index, set);
+                    Ok(())
+                })?;
             }
         }
 
@@ -135,30 +121,6 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         Ok(self)
     }
 
-    /// Obtain a descriptor set from the cache, and immediately bind it to the given index.
-    /// # Errors
-    /// - This function can error if locking the descriptor cache fails
-    /// - This function can error if allocating the descriptor set fails.
-    /// # Example
-    /// ```
-    /// use phobos::prelude::*;
-    /// let exec = ExecutionManager::new(device.clone(), &physical_device);    ///
-    /// let cmd = exec.on_domain::<domain::All>()?
-    ///     .bind_graphics_pipeline("my_pipeline", pipeline_cache.clone())
-    ///     .bind_new_descriptor_set(0, descriptor_cache.clone(), DescriptorSetBuilder::new()
-    ///         .bind_sampled_image(0, image_view, &sampler)
-    ///         .build())
-    ///     // ...
-    ///     .finish();
-    ///
-    /// ```
-    #[deprecated(since = "0.5.0", note = "Use the new bind_xxx functions of the command buffer.")]
-    pub fn bind_new_descriptor_set(mut self, index: u32, cache: &Arc<Mutex<DescriptorCache>>, bindings: DescriptorSetBinding) -> Result<Self> {
-        let mut cache = cache.lock().or_else(|_| Err(anyhow::Error::from(Error::PoisonError)))?;
-        let set = self.get_descriptor_set(index, bindings, &mut cache)?;
-        self.bind_descriptor_set(index, set);
-        Ok(self)
-    }
 
     /// Clears all currently bound descriptors.
     pub fn forget_descriptor_state(mut self) -> Self {

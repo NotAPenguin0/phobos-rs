@@ -102,7 +102,7 @@ impl ExecutionManager {
     pub fn try_on_domain<'q, D: ExecutionDomain>(
         &'q self,
         pipelines: Option<Arc<Mutex<PipelineCache>>>,
-        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+        descriptors: Option<DescriptorCache>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
@@ -113,7 +113,7 @@ impl ExecutionManager {
     pub fn on_domain<'q, D: ExecutionDomain>(
         &'q self,
         pipelines: Option<Arc<Mutex<PipelineCache>>>,
-        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+        descriptors: Option<DescriptorCache>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)

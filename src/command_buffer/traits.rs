@@ -92,7 +92,7 @@ pub trait IncompleteCmdBuffer<'q> {
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,
         pipelines: Option<Arc<Mutex<PipelineCache>>>,
-        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+        descriptors: Option<DescriptorCache>,
     ) -> Result<Self>
     where
         Self: Sized;

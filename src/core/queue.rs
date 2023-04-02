@@ -110,7 +110,7 @@ impl Queue {
         device: Device,
         queue_lock: MutexGuard<'q, Queue>,
         pipelines: Option<Arc<Mutex<PipelineCache>>>,
-        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+        descriptors: Option<DescriptorCache>,
     ) -> Result<CmdBuf> {
         let info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
