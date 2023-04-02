@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
@@ -15,7 +14,7 @@ pub(super) struct DescriptorPoolSize(pub(super) HashMap<vk::DescriptorType, u32>
 #[derivative(Debug)]
 pub(super) struct DescriptorPool {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::DescriptorPool,
     size: DescriptorPoolSize,
 }
@@ -34,14 +33,12 @@ impl DescriptorPoolSize {
         sizes.insert(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::STORAGE_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::INPUT_ATTACHMENT, min_capacity);
-        Self {
-            0: sizes,
-        }
+        Self(sizes)
     }
 }
 
 impl DescriptorPool {
-    pub(super) fn new(device: Arc<Device>, size: DescriptorPoolSize) -> Result<Self> {
+    pub(super) fn new(device: Device, size: DescriptorPoolSize) -> Result<Self> {
         // TODO: this max_sets value is overly pessimistic as it doesnt account for multiple
         // descriptors being held in the same descriptor set. Ideally this grows with the pool too.
         let max_sets = size.0.values().fold(0, |a, x| x + a);
@@ -92,7 +89,7 @@ impl Display for DescriptorPoolSize {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut result = writeln!(f, "DescriptorPoolSize (");
         for (ty, size) in &self.0 {
-            result = result.and_then(|_| writeln!(f, "{:?} => {}", ty, size))
+            result = result.and_then(|_| writeln!(f, "{ty:?} => {size}"))
         }
         result
     }

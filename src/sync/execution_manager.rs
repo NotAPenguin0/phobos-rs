@@ -4,11 +4,11 @@ use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use anyhow::Result;
 use ash::vk;
 
+use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 use crate::command_buffer::*;
 use crate::core::queue::{DeviceQueue, Queue};
 use crate::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
-use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
@@ -39,7 +39,7 @@ use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, Pi
 /// ```
 #[derive(Debug, Clone)]
 pub struct ExecutionManager {
-    device: Arc<Device>,
+    device: Device,
     queues: Arc<Vec<Mutex<Queue>>>,
 }
 
@@ -51,7 +51,7 @@ fn max_queue_count(family: u32, families: &[vk::QueueFamilyProperties]) -> u32 {
 impl ExecutionManager {
     /// Create a new execution manager. You should only ever have on instance of this struct
     /// in your program.
-    pub fn new(device: Arc<Device>, physical_device: &PhysicalDevice) -> Result<Self> {
+    pub fn new(device: Device, physical_device: &PhysicalDevice) -> Result<Self> {
         let mut counts = HashMap::new();
         let mut device_queues = HashMap::new();
 
@@ -59,7 +59,7 @@ impl ExecutionManager {
             .queues()
             .iter()
             .map(|queue| -> Result<Mutex<Queue>> {
-                let index = counts.entry(queue.family_index).or_insert(0 as u32);
+                let index = counts.entry(queue.family_index).or_insert(0);
                 // If we have exceeded the max count for this family, we need to reuse a device queue from earlier
                 let device_queue = if *index >= max_queue_count(queue.family_index, physical_device.queue_families()) {
                     // Re-use a previously requested device queue. If this panics, the code is bugged (this is not a user error)
@@ -92,7 +92,7 @@ impl ExecutionManager {
         }
 
         Ok(ExecutionManager {
-            device: device.clone(),
+            device,
             queues: Arc::new(queues),
         })
     }
@@ -101,8 +101,8 @@ impl ExecutionManager {
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
     pub fn try_on_domain<'q, D: ExecutionDomain>(
         &'q self,
-        pipelines: Option<Arc<Mutex<PipelineCache>>>,
-        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+        pipelines: Option<PipelineCache>,
+        descriptors: Option<DescriptorCache>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
@@ -112,8 +112,8 @@ impl ExecutionManager {
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
     pub fn on_domain<'q, D: ExecutionDomain>(
         &'q self,
-        pipelines: Option<Arc<Mutex<PipelineCache>>>,
-        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+        pipelines: Option<PipelineCache>,
+        descriptors: Option<DescriptorCache>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
@@ -157,9 +157,7 @@ impl ExecutionManager {
         };
 
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        unsafe {
-            queue.submit(std::slice::from_ref(&info), Some(&fence))?;
-        }
+        queue.submit(std::slice::from_ref(&info), Some(&fence))?;
         let exec = self.clone();
         Ok(fence.with_cleanup(move || unsafe {
             cmd.delete(exec).unwrap();
@@ -168,9 +166,7 @@ impl ExecutionManager {
 
     pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        unsafe {
-            queue.submit2(submits, Some(fence))?;
-        }
+        queue.submit2(submits, Some(fence))?;
         Ok(())
     }
 
@@ -178,7 +174,7 @@ impl ExecutionManager {
     pub(crate) fn get_present_queue(&self) -> Option<MutexGuard<Queue>> {
         self.queues
             .iter()
-            .find(|&queue| queue.lock().unwrap().info().can_present.clone())
+            .find(|&queue| queue.lock().unwrap().info().can_present)
             .map(|q| q.lock().unwrap())
     }
 
@@ -188,7 +184,7 @@ impl ExecutionManager {
         let q = self.queues.iter().find(|&q| {
             let q = q.try_lock();
             match q {
-                Ok(queue) => D::queue_is_compatible(&*queue),
+                Ok(queue) => D::queue_is_compatible(&queue),
                 Err(_) => false,
             }
         });
@@ -204,7 +200,7 @@ impl ExecutionManager {
             .iter()
             .find(|&q| {
                 let q = q.lock().unwrap();
-                D::queue_is_compatible(&*q)
+                D::queue_is_compatible(&q)
             })
             .map(|q| q.lock().unwrap())
     }

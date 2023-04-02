@@ -4,11 +4,11 @@
 use anyhow::Result;
 use ash::vk;
 
+use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
 use crate::descriptor::descriptor_set::{DescriptorBinding, DescriptorBufferInfo, DescriptorContents, DescriptorImageInfo, DescriptorSetBinding};
 use crate::graph::physical_resource::PhysicalResource;
 #[cfg(feature = "shader-reflection")]
 use crate::pipeline::shader_reflection::ReflectionInfo;
-use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
 
 /// This structure is used to build up `DescriptorSetBinding` objects for requesting descriptor sets.
 /// # Example usage
@@ -43,9 +43,8 @@ pub struct DescriptorSetBuilder<'a> {
     _phantom: PhantomData<&'a i32>,
 }
 
-impl<'r> DescriptorSetBuilder<'r> {
-    /// Create a new empty descriptor set builder with no reflection information.
-    pub fn new() -> Self {
+impl<'r> Default for DescriptorSetBuilder<'r> {
+    fn default() -> Self {
         Self {
             inner: DescriptorSetBinding {
                 pool: vk::DescriptorPool::null(),
@@ -57,6 +56,13 @@ impl<'r> DescriptorSetBuilder<'r> {
             #[cfg(not(feature = "shader-reflection"))]
             _phantom: PhantomData::default(),
         }
+    }
+}
+
+impl<'r> DescriptorSetBuilder<'r> {
+    /// Create a new empty descriptor set builder with no reflection information.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Create a new empty descriptor set builder with associated reflection information.
@@ -92,7 +98,7 @@ impl<'r> DescriptorSetBuilder<'r> {
     }
 
     /// Bind an image view to the given binding as a [`vk::DescriptorType::COMBINED_IMAGE_SAMPLER`]
-    pub fn bind_sampled_image(&mut self, binding: u32, image: &ImageView, sampler: &Sampler) -> () {
+    pub fn bind_sampled_image(&mut self, binding: u32, image: &ImageView, sampler: &Sampler) {
         self.inner.bindings.push(DescriptorBinding {
             binding,
             ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
@@ -123,7 +129,7 @@ impl<'r> DescriptorSetBuilder<'r> {
             binding,
             ty: vk::DescriptorType::UNIFORM_BUFFER,
             descriptors: vec![DescriptorContents::Buffer(DescriptorBufferInfo {
-                buffer: buffer.clone(),
+                buffer: *buffer,
             })],
         });
     }
@@ -147,7 +153,20 @@ impl<'r> DescriptorSetBuilder<'r> {
             binding,
             ty: vk::DescriptorType::STORAGE_BUFFER,
             descriptors: vec![DescriptorContents::Buffer(DescriptorBufferInfo {
-                buffer: buffer.clone(),
+                buffer: *buffer,
+            })],
+        })
+    }
+
+    /// Bind a storage image to the specified slot
+    pub fn bind_storage_image(&mut self, binding: u32, image: &ImageView) {
+        self.inner.bindings.push(DescriptorBinding {
+            binding,
+            ty: vk::DescriptorType::STORAGE_IMAGE,
+            descriptors: vec![DescriptorContents::Image(DescriptorImageInfo {
+                sampler: vk::Sampler::null(),
+                view: image.clone(),
+                layout: vk::ImageLayout::GENERAL,
             })],
         })
     }

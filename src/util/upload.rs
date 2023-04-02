@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use ash::vk;
 
@@ -7,7 +5,7 @@ use crate::{Allocator, Buffer, Device, domain, ExecutionManager, Fence, Incomple
 
 /// Perform a staged upload to a GPU buffer. Returns a fence that can be awaited to obtain the resulting buffer.
 pub fn staged_buffer_upload<T: Copy, A: Allocator + 'static>(
-    device: Arc<Device>,
+    device: Device,
     mut allocator: A,
     exec: ExecutionManager,
     data: &[T],
@@ -24,7 +22,7 @@ pub fn staged_buffer_upload<T: Copy, A: Allocator + 'static>(
     staging_view.mapped_slice()?.copy_from_slice(data);
 
     let buffer = Buffer::new_device_local(
-        device.clone(),
+        device,
         &mut allocator,
         staging.size(),
         vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,

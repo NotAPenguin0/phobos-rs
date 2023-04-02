@@ -1,12 +1,11 @@
 use std::rc::Rc;
-use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
 
+use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
 use crate::command_buffer::CommandBuffer;
 use crate::domain::ExecutionDomain;
-use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
 
 #[derive(Debug)]
 struct SubmitInfo<D: ExecutionDomain> {
@@ -28,14 +27,14 @@ pub struct SubmitHandle {
 /// [`ExecutionManager::start_submit_batch`].
 #[derive(Debug)]
 pub struct SubmitBatch<D: ExecutionDomain> {
-    device: Arc<Device>,
+    device: Device,
     exec: ExecutionManager,
     submits: Vec<SubmitInfo<D>>,
     signal_fence: Fence,
 }
 
 impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
-    pub(crate) fn new(device: Arc<Device>, exec: ExecutionManager) -> Result<Self> {
+    pub(crate) fn new(device: Device, exec: ExecutionManager) -> Result<Self> {
         Ok(Self {
             submits: vec![],
             signal_fence: Fence::new(device.clone(), false)?,
@@ -47,8 +46,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
     fn get_submit_semaphore(&self, submit: SubmitHandle) -> Option<Rc<Semaphore>> {
         self.submits
             .get(submit.index)
-            .map(|submit| submit.signal_semaphore.clone())
-            .flatten()
+            .and_then(|submit| submit.signal_semaphore.clone())
     }
 
     fn submit_after(&mut self, handles: &[SubmitHandle], cmd: CommandBuffer<D>, wait_stages: &[PipelineStage]) -> Result<SubmitHandle> {
@@ -164,6 +162,6 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
 impl SubmitHandle {
     /// Add another submit to the batch that waits on this submit at the specified wait stage mask.
     pub fn then<D: ExecutionDomain + 'static>(&self, wait_stage: PipelineStage, cmd: CommandBuffer<D>, batch: &mut SubmitBatch<D>) -> Result<SubmitHandle> {
-        batch.submit_after(std::slice::from_ref(&self), cmd, std::slice::from_ref(&wait_stage))
+        batch.submit_after(std::slice::from_ref(self), cmd, std::slice::from_ref(&wait_stage))
     }
 }

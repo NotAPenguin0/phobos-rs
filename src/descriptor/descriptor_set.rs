@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use ash::vk;
 
@@ -46,7 +44,7 @@ pub struct DescriptorSetBinding {
 pub struct DescriptorSet {
     #[derivative(Debug = "ignore")]
     #[derivative(PartialEq = "ignore")]
-    pub(crate) device: Arc<Device>,
+    pub(crate) device: Device,
     pub(crate) pool: vk::DescriptorPool,
     pub(crate) handle: vk::DescriptorSet,
 }
@@ -102,7 +100,7 @@ impl Resource for DescriptorSet {
     type ExtraParams<'a> = ();
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self>
+    fn create(device: Device, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self>
         where
             Self: Sized, {
         let info = vk::DescriptorSetAllocateInfo {
@@ -129,16 +127,19 @@ impl Resource for DescriptorSet {
 
                 match binding.ty {
                     vk::DescriptorType::COMBINED_IMAGE_SAMPLER => {
-                        write.image_info = Some(binding_image_info(&binding));
+                        write.image_info = Some(binding_image_info(binding));
                     }
                     vk::DescriptorType::SAMPLED_IMAGE => {
-                        write.image_info = Some(binding_image_info(&binding));
+                        write.image_info = Some(binding_image_info(binding));
+                    }
+                    vk::DescriptorType::STORAGE_IMAGE => {
+                        write.image_info = Some(binding_image_info(binding));
                     }
                     vk::DescriptorType::UNIFORM_BUFFER => {
-                        write.buffer_info = Some(binding_buffer_info(&binding));
+                        write.buffer_info = Some(binding_buffer_info(binding));
                     }
                     vk::DescriptorType::STORAGE_BUFFER => {
-                        write.buffer_info = Some(binding_buffer_info(&binding));
+                        write.buffer_info = Some(binding_buffer_info(binding));
                     }
                     _ => {
                         todo!();

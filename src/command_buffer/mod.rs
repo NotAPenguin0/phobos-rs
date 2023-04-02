@@ -27,15 +27,15 @@
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::MutexGuard;
 
 use anyhow::Result;
 use ash::vk;
 
+use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
-use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
 
 pub mod compute;
 pub mod graphics;
@@ -81,23 +81,28 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 #[derivative(Debug)]
 pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::CommandBuffer,
     queue_lock: MutexGuard<'q, Queue>,
     current_pipeline_layout: vk::PipelineLayout,
     current_set_layouts: Vec<vk::DescriptorSetLayout>,
-    current_bindpoint: vk::PipelineBindPoint, // TODO: Note: technically not correct
+    current_bindpoint: vk::PipelineBindPoint,
+    // TODO: Note: technically not correct
     current_rendering_state: Option<PipelineRenderingInfo>,
     current_render_area: vk::Rect2D,
-    current_descriptor_sets: Option<HashMap<u32, DescriptorSetBuilder<'static>>>, // Note static lifetime, we dont currently support adding reflection to this
-    descriptor_state_needs_update: bool,                                          // TODO: Only update disturbed descriptor sets
-    descriptor_cache: Option<Arc<Mutex<DescriptorCache>>>,
-    pipeline_cache: Option<Arc<Mutex<PipelineCache>>>,
+    current_descriptor_sets: Option<HashMap<u32, DescriptorSetBuilder<'static>>>,
+    // Note static lifetime, we dont currently support adding reflection to this
+    descriptor_state_needs_update: bool,
+    // TODO: Only update disturbed descriptor sets
+    descriptor_cache: Option<DescriptorCache>,
+    pipeline_cache: Option<PipelineCache>,
     _domain: PhantomData<D>,
 }
 
-impl<'q, D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
-    /// Immediately delete a command buffer. Must be externally synchronized.
+impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
+    /// Immediately delete a command buffer.
+    /// # Safety
+    /// * This command buffer must not currently be executing on the GPU.
     unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()> {
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         let handle = self.handle;
@@ -107,6 +112,10 @@ impl<'q, D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
 }
 
 impl<D: ExecutionDomain> CommandBuffer<D> {
+    /// Get unsafe access to the underlying command buffer
+    /// # Safety
+    /// Any vulkan calls that modify the command buffer state may lead to validation errors or put the
+    /// system in an undefined state.
     pub unsafe fn handle(&self) -> vk::CommandBuffer {
         self.handle
     }

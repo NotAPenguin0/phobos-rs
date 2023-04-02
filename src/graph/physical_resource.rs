@@ -25,7 +25,7 @@ pub enum PhysicalResource {
 /// // ... Later, lookup the physical image handle from a virtual resource handle
 /// let view = bindings.resolve(&resource).ok_or(Error::NoResourceBound)?;
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PhysicalResourceBindings {
     bindings: HashMap<String, PhysicalResource>,
 }
@@ -33,9 +33,7 @@ pub struct PhysicalResourceBindings {
 impl PhysicalResourceBindings {
     /// Create a new physical resource binding map.
     pub fn new() -> Self {
-        PhysicalResourceBindings {
-            bindings: Default::default(),
-        }
+        Self::default()
     }
 
     /// Bind an image to all virtual resources with `name(+*)` as their uid.
@@ -45,7 +43,7 @@ impl PhysicalResourceBindings {
 
     /// Bind a buffer to all virtual resources with this name as their uid.
     pub fn bind_buffer(&mut self, name: impl Into<String>, buffer: &BufferView) {
-        self.bindings.insert(name.into(), PhysicalResource::Buffer(buffer.clone()));
+        self.bindings.insert(name.into(), PhysicalResource::Buffer(*buffer));
     }
 
     /// Alias a resource by giving it an alternative name

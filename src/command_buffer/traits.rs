@@ -1,12 +1,12 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::MutexGuard;
 
 use anyhow::Result;
 use ash::vk;
 
+use crate::{BufferView, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache};
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
-use crate::{domain, BufferView, DescriptorCache, Device, ExecutionManager, ImageView, PipelineCache};
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {
@@ -79,6 +79,8 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
 pub trait CmdBuffer {
     /// Delete the command buffer immediately.
     /// This is marked unsafe because there is no guarantee that the command buffer is not in use.
+    /// # Safety
+    /// The caller must ensure this command buffer is not in use on the GPU.
     unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()>;
 }
 
@@ -87,12 +89,12 @@ pub trait IncompleteCmdBuffer<'q> {
     type Domain: ExecutionDomain;
 
     fn new(
-        device: Arc<Device>,
+        device: Device,
         queue_lock: MutexGuard<'q, Queue>,
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,
-        pipelines: Option<Arc<Mutex<PipelineCache>>>,
-        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+        pipelines: Option<PipelineCache>,
+        descriptors: Option<DescriptorCache>,
     ) -> Result<Self>
     where
         Self: Sized;

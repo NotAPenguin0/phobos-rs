@@ -88,6 +88,14 @@ pub struct AppBuilder<'a, Window: WindowInterface> {
     inner: AppSettings<'a, Window>,
 }
 
+impl<'a, Window: WindowInterface> Default for AppBuilder<'a, Window> {
+    fn default() -> Self {
+        Self {
+            inner: AppSettings::default(),
+        }
+    }
+}
+
 impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
     pub fn new() -> Self {
         AppBuilder {

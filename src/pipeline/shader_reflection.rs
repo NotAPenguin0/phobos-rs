@@ -58,7 +58,7 @@ fn find_sampled_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &S
         let set = ast.get_decoration(image.id, Decoration::DescriptorSet)?;
         let ty = ast.get_type(image.type_id)?;
         let Type::SampledImage { array, .. } = ty else { unimplemented!() };
-        let count = if array.len() > 0 {
+        let count = if !array.is_empty() {
             if array[0] == 0 {
                 4096 // Max unbounded array size. If this is ever exceeded, I'll fix it.
             } else {
@@ -121,6 +121,26 @@ fn find_storage_buffers(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &
 }
 
 #[cfg(feature = "shader-reflection")]
+fn find_storage_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+    for image in &resources.storage_images {
+        let binding = ast.get_decoration(image.id, Decoration::Binding)?;
+        let set = ast.get_decoration(image.id, Decoration::DescriptorSet)?;
+        info.bindings.insert(
+            ast.get_name(image.id)?,
+            BindingInfo {
+                set,
+                binding,
+                stage,
+                count: 1,
+                ty: vk::DescriptorType::STORAGE_IMAGE,
+            },
+        );
+    }
+    Ok(())
+}
+
+
+#[cfg(feature = "shader-reflection")]
 fn find_push_constants(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
     for pc in &resources.push_constant_buffers {
         let ranges = ast.get_active_buffer_ranges(pc.id)?;
@@ -149,6 +169,7 @@ fn reflect_module(module: spv_cross::spirv::Module) -> Result<ReflectionInfo> {
     find_uniform_buffers(&mut ast, stage, &resources, &mut info)?;
     find_storage_buffers(&mut ast, stage, &resources, &mut info)?;
     find_push_constants(&mut ast, stage, &resources, &mut info)?;
+    find_storage_images(&mut ast, stage, &resources, &mut info)?;
     Ok(info)
 }
 
@@ -218,7 +239,7 @@ pub(crate) fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCrea
     };
 
     let mut sets: HashMap<u32, DescriptorSetLayoutCreateInfo> = HashMap::new();
-    for (_, binding) in &info.bindings {
+    for binding in info.bindings.values() {
         let entry = sets.entry(binding.set);
         match entry {
             Entry::Occupied(entry) => {

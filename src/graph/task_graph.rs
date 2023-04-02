@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use anyhow::Result;
-use petgraph::graph::{EdgeReference, NodeIndex};
 use petgraph::{Graph, Incoming};
+use petgraph::graph::{EdgeReference, NodeIndex};
 
 use crate::Error;
 
@@ -37,11 +37,17 @@ pub struct TaskGraph<R: Resource, B: Barrier<R> + Clone, T: Task<R>> {
     pub(crate) graph: Graph<Node<R, B, T>, String>,
 }
 
+impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> Default for TaskGraph<R, B, T> {
+    fn default() -> Self {
+        Self {
+            graph: Default::default(),
+        }
+    }
+}
+
 impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph<R, B, T> {
     pub fn new() -> Self {
-        TaskGraph {
-            graph: Graph::new(),
-        }
+        Self::default()
     }
 
     fn is_dependent(&self, graph: &Graph<Node<R, B, T>, String>, child: NodeIndex, parent: NodeIndex) -> Result<Option<R>> {
@@ -52,7 +58,7 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
                 return Ok(child
                     .inputs()
                     .iter()
-                    .find(|&input| parent.outputs().iter().any(|output| input.is_dependency_of(&output)))
+                    .find(|&input| parent.outputs().iter().any(|output| input.is_dependency_of(output)))
                     .cloned());
             }
         }
@@ -79,10 +85,10 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
     }
 
     /// Return all source nodes in the graph, these are the nodes with no parent node.
-    pub fn sources<'a>(&'a self) -> impl Iterator<Item = NodeIndex> + 'a {
+    pub fn sources(&self) -> impl Iterator<Item=NodeIndex> + '_ {
         self.graph
             .node_indices()
-            .filter(|node| self.graph.edges_directed(node.clone(), Incoming).next().is_none())
+            .filter(|node| self.graph.edges_directed(*node, Incoming).next().is_none())
     }
 
     /// Add a task to the task graph.
@@ -136,7 +142,7 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
         // Note that this algorithm creates too many barriers for practical usage.
         // We will compact the amount of dependency barriers when translating this graph to a render graph
 
-        self.graph.node_indices().clone().for_each(|node| {
+        self.graph.node_indices().for_each(|node| {
             if !Self::is_task_node(&self.graph, node).unwrap() {
                 return;
             }

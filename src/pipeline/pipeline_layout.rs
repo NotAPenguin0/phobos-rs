@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use ash::vk;
 
@@ -13,7 +11,7 @@ use crate::util::cache::{Cache, Resource, ResourceKey};
 #[derivative(Debug)]
 pub struct PipelineLayout {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::PipelineLayout,
     set_layouts: Vec<vk::DescriptorSetLayout>,
 }
@@ -37,6 +35,9 @@ pub struct PipelineLayoutCreateInfo {
 }
 
 impl PipelineLayout {
+    /// Get unsafe access to the internal `VkPipelineLayout`.
+    /// # Safety
+    /// Any vulkan calls that mutate this pipeline layout may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::PipelineLayout {
         self.handle
     }
@@ -57,11 +58,11 @@ impl Resource for PipelineLayout {
     type ExtraParams<'a> = &'a mut Cache<DescriptorSetLayout>;
     const MAX_TIME_TO_LIVE: u32 = 8;
 
-    fn create(device: Arc<Device>, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self> {
+    fn create(device: Device, key: &Self::Key, set_layout_cache: Self::ExtraParams<'_>) -> Result<Self> {
         let set_layouts = key
             .set_layouts
             .iter()
-            .map(|info| unsafe { set_layout_cache.get_or_create(&info, ()).unwrap().handle() })
+            .map(|info| unsafe { set_layout_cache.get_or_create(info, ()).unwrap().handle() })
             .collect::<Vec<_>>();
 
         let pc = key.push_constants.iter().map(|pc| pc.to_vk()).collect::<Vec<_>>();
@@ -73,7 +74,7 @@ impl Resource for PipelineLayout {
         Ok(Self {
             device: device.clone(),
             handle: unsafe { device.create_pipeline_layout(&info, None)? },
-            set_layouts: set_layouts.clone(),
+            set_layouts,
         })
     }
 }

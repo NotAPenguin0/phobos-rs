@@ -33,7 +33,7 @@ impl<T> DeletionQueue<T> {
     /// Advance the frame counter by one, decreasing time to live by one on each element.
     /// If time to live of an element reaches zero, it is deleted.
     pub fn next_frame(&mut self) {
-        self.items.iter_mut().for_each(|mut item| item.ttl = item.ttl - 1);
+        self.items.iter_mut().for_each(|mut item| item.ttl -= 1);
         self.items.retain(|item| item.ttl != 0);
     }
 }

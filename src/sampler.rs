@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use ash::vk;
 
@@ -10,7 +8,7 @@ use crate::Device;
 #[derivative(Debug)]
 pub struct Sampler {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     handle: vk::Sampler,
 }
 
@@ -25,7 +23,7 @@ impl Sampler {
     /// - Min mipmap level `0`
     /// - Unbounded max mipmap level
     /// - Normalized coordinates
-    pub fn default(device: Arc<Device>) -> Result<Self> {
+    pub fn default(device: Device) -> Result<Self> {
         let info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
@@ -50,13 +48,16 @@ impl Sampler {
     }
 
     /// Create a new `VkSampler` object with given settings.
-    pub fn new(device: Arc<Device>, info: vk::SamplerCreateInfo) -> Result<Self> {
+    pub fn new(device: Device, info: vk::SamplerCreateInfo) -> Result<Self> {
         Ok(Self {
             device: device.clone(),
             handle: unsafe { device.create_sampler(&info, None)? },
         })
     }
 
+    /// Get unsafe access to the underlying `VkSampler` object.
+    /// # Safety
+    /// Any vulkan calls that mutate the sampler may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::Sampler {
         self.handle
     }

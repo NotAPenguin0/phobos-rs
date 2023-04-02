@@ -21,7 +21,10 @@ pub trait Allocator: Clone + Send + Sync {
 
 /// Represents an allocation. This trait exposes methods for accessing the underlying device memory, obtain a mapped pointer, etc.
 pub trait Allocation: Default {
-    /// Access the underlying [`VkDeviceMemory`]. Remember to always `Self::offset()` into this.
+    /// Access the underlying [`VkDeviceMemory`]. Remember to always [`Self::offset()`] into this.
+    /// # Safety
+    /// * The caller must always pass [`Self::offset()`] when using this memory
+    /// * The caller must not free this memory except through [`Allocator::free()`]
     unsafe fn memory(&self) -> vk::DeviceMemory;
     /// The offset of this allocation in the underlying memory block.
     fn offset(&self) -> vk::DeviceSize;

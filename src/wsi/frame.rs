@@ -69,14 +69,14 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::command_buffer::CommandBuffer;
-use crate::domain::ExecutionDomain;
-use crate::util::deferred_delete::DeletionQueue;
-use crate::wsi::swapchain::SwapchainImage;
 use crate::{
     Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore,
     Surface, Swapchain, WindowInterface,
 };
+use crate::command_buffer::CommandBuffer;
+use crate::domain::ExecutionDomain;
+use crate::util::deferred_delete::DeletionQueue;
+use crate::wsi::swapchain::SwapchainImage;
 
 /// Information stored for each in-flight frame.
 #[derive(Derivative)]
@@ -139,7 +139,7 @@ const FRAMES_IN_FLIGHT: usize = 2;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct FrameManager<A: Allocator = DefaultAllocator> {
-    device: Arc<Device>,
+    device: Device,
     per_frame: [PerFrame<A>; FRAMES_IN_FLIGHT],
     per_image: Vec<PerImage>,
     current_frame: u32,
@@ -150,12 +150,11 @@ pub struct FrameManager<A: Allocator = DefaultAllocator> {
 
 impl<A: Allocator> FrameManager<A> {
     /// Initialize frame manager with per-frame data.
-    pub fn new<Window: WindowInterface>(device: Arc<Device>, mut allocator: A, settings: &AppSettings<Window>, swapchain: Swapchain) -> Result<Self> {
+    pub fn new<Window: WindowInterface>(device: Device, mut allocator: A, settings: &AppSettings<Window>, swapchain: Swapchain) -> Result<Self> {
         let scratch_flags_base = vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC;
         Ok(FrameManager {
             device: device.clone(),
             per_frame: (0..FRAMES_IN_FLIGHT)
-                .into_iter()
                 .map(|_| -> Result<PerFrame<A>> {
                     Ok(PerFrame::<A> {
                         fence: Arc::new(Fence::new(device.clone(), true)?),
@@ -459,7 +458,7 @@ impl<A: Allocator> FrameManager<A> {
 
         // Use the command buffer's domain to determine the correct queue to use.
         let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        unsafe { Ok(queue.submit(std::slice::from_ref(&submit), Some(&per_frame.fence))?) }
+        queue.submit(std::slice::from_ref(&submit), Some(&per_frame.fence))
     }
 
     /// Present a frame to the swapchain. This is the same as calling
@@ -500,6 +499,8 @@ impl<A: Allocator> FrameManager<A> {
     }
 
     /// Unsafe access to the underlying swapchain.
+    /// # Safety
+    /// * Any vulkan calls on the `VkSwapchainKHR` handle may put the system in an undefined state.
     pub unsafe fn get_swapchain(&self) -> &Swapchain {
         &self.swapchain
     }

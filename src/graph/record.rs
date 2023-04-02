@@ -1,20 +1,21 @@
 use std::collections::HashSet;
 use std::ffi::CString;
+use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
+use petgraph::{Incoming, Outgoing};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
-use petgraph::{Incoming, Outgoing};
 
-use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::{Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings};
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::domain::ExecutionDomain;
 use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::task_graph::{Node, Resource};
-use crate::{Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings};
 
 pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, A: Allocator> {
     /// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names
@@ -26,7 +27,7 @@ pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, A: Allocator> {
         cmd: IncompleteCommandBuffer<'q, D>,
         bindings: &PhysicalResourceBindings,
         ifc: &mut InFlightContext<A>,
-        debug: Option<&DebugMessenger>,
+        debug: Option<Arc<DebugMessenger>>,
     ) -> Result<IncompleteCommandBuffer<'q, D>>
     where
         Self: Sized;
@@ -69,9 +70,9 @@ macro_rules! parents {
     };
 }
 
-fn insert_in_active_set<'a, 'e, 'q, D: ExecutionDomain, A: Allocator>(
+fn insert_in_active_set<D: ExecutionDomain, A: Allocator>(
     node: NodeIndex,
-    graph: &'a PassGraph<'e, 'q, D, A>,
+    graph: &PassGraph<'_, '_, D, A>,
     active: &mut HashSet<NodeIndex>,
     children: &mut HashSet<NodeIndex>,
 ) {
@@ -90,7 +91,7 @@ fn find_resolve_attachment<D: ExecutionDomain, A: Allocator>(
     pass.outputs
         .iter()
         .find(|output| match &output.usage {
-            ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => resource.resource.is_associated_with(&resolve),
+            ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => resource.resource.is_associated_with(resolve),
             _ => false,
         })
         .map(|resolve| {
@@ -118,13 +119,13 @@ fn color_attachments<D: ExecutionDomain, A: Allocator>(
                 // TODO: handle or report this error better
                 panic!("No resource bound");
             };
-            let resolve = find_resolve_attachment(&pass, bindings, resource);
+            let resolve = find_resolve_attachment(pass, bindings, resource);
             // Attachment should always have a load op set, or our library is bugged
             let info = RenderingAttachmentInfo {
                 image_view: image.clone(),
                 image_layout: resource.layout,
-                resolve_mode: resolve.is_some().then(|| vk::ResolveModeFlags::AVERAGE),
-                resolve_image_layout: resolve.is_some().then(|| vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+                resolve_mode: resolve.is_some().then_some(vk::ResolveModeFlags::AVERAGE),
+                resolve_image_layout: resolve.is_some().then_some(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
                 resolve_image_view: resolve,
                 load_op: resource.load_op.unwrap(),
                 store_op: vk::AttachmentStoreOp::STORE,
@@ -169,11 +170,7 @@ fn render_area<D: ExecutionDomain, A: Allocator>(pass: &PassNode<PassResource, D
     let resource = pass
         .outputs
         .iter()
-        .filter(|resource| match resource.usage {
-            ResourceUsage::Attachment(_) => true,
-            _ => false,
-        })
-        .next()
+        .find(|resource| matches!(resource.usage, ResourceUsage::Attachment(_)))
         .unwrap();
     let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
         // TODO: handle or report this error better
@@ -195,7 +192,7 @@ fn render_area<D: ExecutionDomain, A: Allocator>(pass: &PassNode<PassResource, D
 #[cfg(feature = "debug-markers")]
 fn annotate_pass<'q, D: ExecutionDomain, A: Allocator>(
     pass: &PassNode<PassResource, D, A>,
-    debug: &DebugMessenger,
+    debug: &Arc<DebugMessenger>,
     cmd: IncompleteCommandBuffer<'q, D>,
 ) -> Result<IncompleteCommandBuffer<'q, D>> {
     let name = CString::new(pass.identifier.clone())?;
@@ -209,29 +206,29 @@ fn annotate_pass<'q, D: ExecutionDomain, A: Allocator>(
 }
 
 #[cfg(not(feature = "debug-markers"))]
-fn annotate_pass<D: ExecutionDomain>(_: &PassNode<PassResource, D>, _: &DebugMessenger, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
+fn annotate_pass<D: ExecutionDomain>(_: &PassNode<PassResource, D>, _: &Arc<DebugMessenger>, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
     Ok(cmd)
 }
 
-fn record_pass<'exec, 'q, D: ExecutionDomain, A: Allocator>(
-    pass: &mut PassNode<'exec, 'q, PassResource, D, A>,
+fn record_pass<'q, D: ExecutionDomain, A: Allocator>(
+    pass: &mut PassNode<'_, 'q, PassResource, D, A>,
     bindings: &PhysicalResourceBindings,
     ifc: &mut InFlightContext<A>,
     mut cmd: IncompleteCommandBuffer<'q, D>,
-    debug: Option<&DebugMessenger>,
+    debug: Option<Arc<DebugMessenger>>,
 ) -> Result<IncompleteCommandBuffer<'q, D>> {
-    if let Some(debug) = debug {
-        cmd = annotate_pass(&pass, debug, cmd)?;
+    if let Some(debug) = debug.clone() {
+        cmd = annotate_pass(pass, &debug, cmd)?;
     }
 
     if pass.is_renderpass {
         let info = RenderingInfo {
             flags: Default::default(),
-            render_area: render_area(&pass, &bindings),
+            render_area: render_area(pass, bindings),
             layer_count: 1, // TODO: Multilayer rendering fix
             view_mask: 0,
-            color_attachments: color_attachments(&pass, &bindings)?,
-            depth_attachment: depth_attachment(&pass, &bindings),
+            color_attachments: color_attachments(pass, bindings)?,
+            depth_attachment: depth_attachment(pass, bindings),
             stencil_attachment: None, // TODO: Stencil
         };
         cmd = cmd.begin_rendering(&info);
@@ -245,7 +242,7 @@ fn record_pass<'exec, 'q, D: ExecutionDomain, A: Allocator>(
 
     if let Some(debug) = debug {
         if cfg!(feature = "debug-markers") {
-            cmd = cmd.end_label(debug);
+            cmd = cmd.end_label(&debug);
         }
     }
 
@@ -332,27 +329,27 @@ fn record_barrier<'q, D: ExecutionDomain>(
     let physical_resource = bindings.resolve(&barrier.resource.resource);
     let Some(resource) = physical_resource else { return Err(anyhow::Error::from(Error::NoResourceBound(barrier.resource.uid().clone()))) };
     match resource {
-        PhysicalResource::Image(image) => record_image_barrier(&barrier, image, dst_resource, cmd),
-        PhysicalResource::Buffer(buffer) => record_buffer_barrier(&barrier, buffer, dst_resource, cmd),
+        PhysicalResource::Image(image) => record_image_barrier(barrier, image, dst_resource, cmd),
+        PhysicalResource::Buffer(buffer) => record_buffer_barrier(barrier, buffer, dst_resource, cmd),
     }
 }
 
-fn record_node<'exec, 'q, D: ExecutionDomain, A: Allocator>(
-    graph: &mut BuiltPassGraph<'exec, 'q, D, A>,
+fn record_node<'q, D: ExecutionDomain, A: Allocator>(
+    graph: &mut BuiltPassGraph<'_, 'q, D, A>,
     node: NodeIndex,
     bindings: &PhysicalResourceBindings,
     ifc: &mut InFlightContext<A>,
     cmd: IncompleteCommandBuffer<'q, D>,
-    debug: Option<&DebugMessenger>,
+    debug: Option<Arc<DebugMessenger>>,
 ) -> Result<IncompleteCommandBuffer<'q, D>> {
     let graph = &mut graph.graph.graph;
-    let dst_resource_res = PassGraph::barrier_dst_resource(&graph, node).cloned();
+    let dst_resource_res = PassGraph::barrier_dst_resource(graph, node).cloned();
     let weight = graph.node_weight_mut(node).unwrap();
     match weight {
-        Node::Task(pass) => record_pass(pass, &bindings, ifc, cmd, debug),
+        Node::Task(pass) => record_pass(pass, bindings, ifc, cmd, debug),
         Node::Barrier(barrier) => {
             // Find destination resource in graph
-            record_barrier(&barrier, &dst_resource_res?, &bindings, cmd)
+            record_barrier(barrier, &dst_resource_res?, bindings, cmd)
         }
         Node::_Unreachable(_) => {
             unreachable!()
@@ -366,18 +363,18 @@ impl<'q, 'exec, D: ExecutionDomain, A: Allocator> RecordGraphToCommandBuffer<'q,
         mut cmd: IncompleteCommandBuffer<'q, D>,
         bindings: &PhysicalResourceBindings,
         ifc: &mut InFlightContext<A>,
-        debug: Option<&DebugMessenger>,
+        debug: Option<Arc<DebugMessenger>>,
     ) -> Result<IncompleteCommandBuffer<'q, D>>
     where
         Self: Sized, {
         let mut active = HashSet::new();
         let mut children = HashSet::new();
         for start in self.graph.sources() {
-            insert_in_active_set(start, &self, &mut active, &mut children);
+            insert_in_active_set(start, self, &mut active, &mut children);
         }
         // Record each initial active node.
         for node in &active {
-            cmd = record_node(self, node.clone(), &bindings, ifc, cmd, debug)?;
+            cmd = record_node(self, *node, bindings, ifc, cmd, debug.clone())?;
         }
 
         while active.len() != self.num_nodes() {
@@ -386,13 +383,13 @@ impl<'q, 'exec, D: ExecutionDomain, A: Allocator> RecordGraphToCommandBuffer<'q,
             for child in &children {
                 // If all parents of this child node are in the active set, record it.
                 if parents!(child, self).all(|parent| active.contains(&parent)) {
-                    cmd = record_node(self, child.clone(), &bindings, ifc, cmd, debug)?;
-                    recorded_nodes.push(child.clone());
+                    cmd = record_node(self, *child, bindings, ifc, cmd, debug.clone())?;
+                    recorded_nodes.push(*child);
                 }
             }
             // Now we swap all recorded nodes to the active set
             for node in recorded_nodes {
-                insert_in_active_set(node.clone(), &self, &mut active, &mut children);
+                insert_in_active_set(node, self, &mut active, &mut children);
             }
         }
 

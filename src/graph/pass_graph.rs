@@ -5,19 +5,18 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::Result;
 use ash::vk;
+use petgraph::{Direction, Graph};
 use petgraph::dot::Dot;
 use petgraph::graph::NodeIndex;
 use petgraph::prelude::EdgeRef;
-use petgraph::{Direction, Graph};
 
-use crate::command_buffer::IncompleteCommandBuffer;
+use crate::{Allocator, DefaultAllocator, Error};
 use crate::domain::ExecutionDomain;
-use crate::graph::pass::Pass;
+use crate::graph::pass::{BoxedPassFn, Pass};
 use crate::graph::resource::ResourceUsage;
 use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
 use crate::graph::virtual_resource::VirtualResource;
 use crate::pipeline::PipelineStage;
-use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings};
 
 /// Virtual GPU resource in a task graph.
 #[derive(Derivative, Default, Clone)]
@@ -48,10 +47,11 @@ pub struct PassNode<'exec, 'q, R: Resource, D: ExecutionDomain, A: Allocator = D
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<R>,
     pub(crate) outputs: Vec<R>,
-    pub(crate) execute:
-        Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>> + 'exec>,
+    pub(crate) execute: BoxedPassFn<'q, 'exec, D, A>,
     pub(crate) is_renderpass: bool,
 }
+
+pub(crate) type PassGraphInner<'exec, 'q, D, A> = Graph<Node<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>>, String>;
 
 /// Pass graph, used for synchronizing resources over a single queue.
 pub struct PassGraph<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
@@ -93,7 +93,7 @@ impl Barrier<PassResource> for PassResourceBarrier {
         Self {
             src_access: resource.usage.access(),
             dst_access: vk::AccessFlags2::NONE,
-            src_stage: resource.stage.clone(),
+            src_stage: resource.stage,
             dst_stage: PipelineStage::NONE,
             resource,
         }
@@ -255,7 +255,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
 
     #[allow(dead_code)]
     fn barrier_src_resource<'a>(
-        graph: &'a Graph<Node<PassResource, PassResourceBarrier, PassNode<PassResource, D, A>>, String>,
+        graph: &'a PassGraphInner<D, A>,
         node: NodeIndex,
     ) -> Result<&'a PassResource> {
         let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(Error::NodeNotFound.into()) };
@@ -268,7 +268,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
     }
 
     pub(crate) fn barrier_dst_resource<'a>(
-        graph: &'a Graph<Node<PassResource, PassResourceBarrier, PassNode<PassResource, D, A>>, String>,
+        graph: &'a PassGraphInner<D, A>,
         node: NodeIndex,
     ) -> Result<&'a PassResource> {
         // We know that:
@@ -310,9 +310,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
         let mut barrier_flags: HashMap<NodeIndex, _> = HashMap::new();
 
         for (node, barrier) in barriers!(graph) {
-            let dst_resource = &Self::barrier_dst_resource(&graph, node)?;
+            let dst_resource = &Self::barrier_dst_resource(graph, node)?;
             let dst_usage = dst_resource.usage.clone();
-            barrier_flags.insert(node, (dst_resource.stage.clone(), dst_usage.access()));
+            barrier_flags.insert(node, (dst_resource.stage, dst_usage.access()));
             // Now we know the usage of this barrier, we can find all other barriers with the exact same resource usage and
             // merge those with this one
             for (other_node, other_barrier) in barriers!(graph) {
@@ -322,7 +322,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
                 if to_remove.contains(&node) {
                     continue;
                 }
-                let other_resource = Self::barrier_dst_resource(&graph, other_node)?;
+                let other_resource = Self::barrier_dst_resource(graph, other_node)?;
                 let other_usage = &other_resource.usage;
                 if other_barrier.resource.uid() == barrier.resource.uid() {
                     if !other_usage.is_read() && !dst_usage.is_read() && other_usage != &dst_usage {

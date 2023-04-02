@@ -1,25 +1,26 @@
 use anyhow::Result;
 use ash::vk;
 
+use crate::{ComputeCmdBuffer, ComputeSupport, Error};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::domain::ExecutionDomain;
-use crate::{ComputeCmdBuffer, ComputeSupport, Error};
 
 impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D> {
     fn bind_compute_pipeline(mut self, name: &str) -> Result<Self>
     where
         Self: Sized, {
-        let Some(cache) = &self.pipeline_cache else { return Err(Error::NoPipelineCache.into()); };
+        let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
         {
-            let mut cache = cache.lock().unwrap();
-            let pipeline = cache.get_compute_pipeline(name)?;
-            unsafe {
-                self.device
-                    .cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::COMPUTE, pipeline.handle);
-            }
-            self.current_bindpoint = vk::PipelineBindPoint::COMPUTE;
-            self.current_pipeline_layout = pipeline.layout;
-            self.current_set_layouts = pipeline.set_layouts.clone();
+            cache.with_compute_pipeline(name, |pipeline| {
+                unsafe {
+                    self.device
+                        .cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::COMPUTE, pipeline.handle);
+                }
+                self.current_bindpoint = vk::PipelineBindPoint::COMPUTE;
+                self.current_pipeline_layout = pipeline.layout;
+                self.current_set_layouts = pipeline.set_layouts.clone();
+                Ok(())
+            })?;
         }
         Ok(self)
     }

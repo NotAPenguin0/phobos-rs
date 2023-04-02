@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
-use crate::command_buffer::command_pool::CommandPool;
 use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffer, PipelineCache};
+use crate::command_buffer::command_pool::CommandPool;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics queue and transfer could point to the same hardware queue.
@@ -43,7 +43,7 @@ pub(crate) struct DeviceQueue {
 #[derivative(Debug)]
 pub struct Queue {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     queue: Arc<Mutex<DeviceQueue>>,
     /// Note that we are only creating one command pool.
     /// We will need to provide thread-safe access to this pool.
@@ -54,7 +54,7 @@ pub struct Queue {
 }
 
 impl Queue {
-    pub(crate) fn new(device: Arc<Device>, queue: Arc<Mutex<DeviceQueue>>, info: QueueInfo) -> Result<Self> {
+    pub(crate) fn new(device: Device, queue: Arc<Mutex<DeviceQueue>>, info: QueueInfo) -> Result<Self> {
         // We create a transient command pool because command buffers will be allocated and deallocated
         // frequently.
         let pool = CommandPool::new(device.clone(), info.family_index, vk::CommandPoolCreateFlags::TRANSIENT)?;
@@ -72,45 +72,48 @@ impl Queue {
 
     /// Submits a batch of submissions to the queue, and signals the given fence when the
     /// submission is done
-    /// <br>
-    /// <br>
-    /// # Thread safety
-    /// This function is **not yet** thread safe! This function is marked as unsafe for now to signal this.
-    pub unsafe fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&Fence>) -> Result<()> {
+    pub fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&Fence>) -> Result<()> {
         let fence = match fence {
             None => vk::Fence::null(),
-            Some(fence) => fence.handle(),
+            // SAFETY: The user supplied a valid fence
+            Some(fence) => unsafe { fence.handle() },
         };
         let queue = self.acquire_device_queue()?;
-        Ok(self.device.queue_submit(queue.handle, submits, fence)?)
+        // SAFETY:
+        // * `fence` is null or a valid fence handle (see above).
+        // * The user supplied a valid range of `VkSubmitInfo` structures.
+        // * `queue` is a valid queue object.
+        unsafe { Ok(self.device.queue_submit(queue.handle, submits, fence)?) }
     }
 
     /// Submits a batch of submissions to the queue, and signals the given fence when the
     /// submission is done
-    /// <br>
-    /// <br>
-    /// # Thread safety
-    /// This function is **not yet** thread safe! This function is marked as unsafe for now to signal this.
-    pub unsafe fn submit2(&self, submits: &[vk::SubmitInfo2], fence: Option<&Fence>) -> Result<()> {
+    pub fn submit2(&self, submits: &[vk::SubmitInfo2], fence: Option<&Fence>) -> Result<()> {
         let fence = match fence {
             None => vk::Fence::null(),
-            Some(fence) => fence.handle(),
+            // SAFETY: The user supplied a valid fence
+            Some(fence) => unsafe { fence.handle() },
         };
         let queue = self.acquire_device_queue()?;
-        Ok(self.device.queue_submit2(queue.handle, submits, fence)?)
+        // * `fence` is null or a valid fence handle (see above).
+        // * The user supplied a valid range of `VkSubmitInfo2` structures.
+        // * `queue` is a valid queue object.
+        unsafe { Ok(self.device.queue_submit2(queue.handle, submits, fence)?) }
     }
 
     /// Obtain the raw vulkan handle of a queue.
+    /// # Safety
+    /// Any vulkan calls that mutate the `VkQueue` object may lead to race conditions or undefined behaviour.
     pub unsafe fn handle(&self) -> vk::Queue {
         let queue = self.acquire_device_queue().unwrap();
         queue.handle
     }
 
     pub(crate) fn allocate_command_buffer<'q, CmdBuf: IncompleteCmdBuffer<'q>>(
-        device: Arc<Device>,
+        device: Device,
         queue_lock: MutexGuard<'q, Queue>,
-        pipelines: Option<Arc<Mutex<PipelineCache>>>,
-        descriptors: Option<Arc<Mutex<DescriptorCache>>>,
+        pipelines: Option<PipelineCache>,
+        descriptors: Option<DescriptorCache>,
     ) -> Result<CmdBuf> {
         let info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
@@ -137,7 +140,8 @@ impl Queue {
     /// Instantly delete a command buffer, without taking synchronization into account.
     /// This function **must** be externally synchronized.
     pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(&self, cmd: vk::CommandBuffer) -> Result<()> {
-        Ok(self.device.free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd)))
+        self.device.free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd));
+        Ok(())
     }
 
     pub fn info(&self) -> &QueueInfo {

@@ -75,12 +75,27 @@
 use anyhow::Result;
 use ash::vk;
 
+use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::domain::ExecutionDomain;
 use crate::graph::pass_graph::PassResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
-use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
+
+pub type PassFnResult<'q, D> = Result<IncompleteCommandBuffer<'q, D>>;
+
+pub trait PassFn<'q, D: ExecutionDomain, A: Allocator>:
+FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> PassFnResult<'q, D> {}
+
+impl<'q, D, A, F> PassFn<'q, D, A> for F
+    where
+        D: ExecutionDomain,
+        A: Allocator,
+        F: FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> PassFnResult<'q, D>,
+{}
+
+pub(crate) type BoxedPassFn<'q, 'exec, D, A> =
+Box<dyn PassFn<'q, D, A, Output=PassFnResult<'q, D>> + 'exec>;
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
 pub struct Pass<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
@@ -88,8 +103,7 @@ pub struct Pass<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> 
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<PassResource>,
     pub(crate) outputs: Vec<PassResource>,
-    pub(crate) execute:
-        Box<dyn FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>> + 'exec>,
+    pub(crate) execute: BoxedPassFn<'q, 'exec, D, A>,
     pub(crate) is_renderpass: bool,
 }
 
@@ -288,7 +302,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     /// Set the function to be called when recording this pass.
     pub fn execute(
         mut self,
-        exec: impl FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> Result<IncompleteCommandBuffer<'q, D>> + 'exec,
+        exec: impl PassFn<'q, D, A> + 'exec,
     ) -> Self {
         self.inner.execute = Box::new(exec);
         self

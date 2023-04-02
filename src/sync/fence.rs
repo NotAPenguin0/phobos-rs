@@ -1,6 +1,5 @@
 use std::pin::Pin;
 use std::slice;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -11,7 +10,7 @@ use ash::vk;
 use crate::Device;
 
 struct CleanupFnLink<'f> {
-    pub f: Box<dyn FnOnce() -> () + 'f>,
+    pub f: Box<dyn FnOnce() + 'f>,
     pub next: Option<Box<CleanupFnLink<'f>>>,
 }
 
@@ -50,7 +49,7 @@ pub trait FenceValue<T> {
 ///
 /// use phobos::prelude::*;
 ///
-/// async fn upload_buffer<T: Copy>(device: Arc<Device>, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
+/// async fn upload_buffer<T: Copy>(device: Device, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
 ///     // Create our result buffer
 ///     let size = (src.len() * size_of::<T>()) as u64;
 ///     let buffer = Buffer::new_device_local(device.clone(), &mut allocator, size, vk::BufferUsageFlags::TRANSFER_DST)?;
@@ -81,7 +80,7 @@ pub trait FenceValue<T> {
 /// use phobos::prelude::*;
 ///
 ///
-/// async fn upload_buffer<T: Copy>(device: Arc<Device>, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
+/// async fn upload_buffer<T: Copy>(device: Device, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
 ///     // ... snip
 ///     // Submit our command buffer and obtain a fence
 ///     let fence = exec.submit(cmd)?;
@@ -100,7 +99,7 @@ pub trait FenceValue<T> {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Fence<T = ()> {
-    device: Arc<Device>,
+    device: Device,
     #[derivative(Debug = "ignore")]
     first_cleanup_fn: Option<Box<CleanupFnLink<'static>>>,
     value: Option<T>,
@@ -121,7 +120,7 @@ impl<T> FenceValue<T> for Fence<T> {
 }
 
 impl FenceValue<()> for Fence<()> {
-    fn value(&mut self) -> () {}
+    fn value(&mut self) {}
 }
 
 impl Fence<()> {
@@ -135,7 +134,7 @@ impl Fence<()> {
             first_cleanup_fn: self.first_cleanup_fn.take(),
             device: self.device.clone(),
             value: Some(value),
-            poll_rate: self.poll_rate.clone(),
+            poll_rate: self.poll_rate,
         }
     }
 }
@@ -144,12 +143,12 @@ impl<T> Unpin for Fence<T> {}
 
 impl<T> Fence<T> {
     /// Create a new fence, possibly in the singaled status.
-    pub fn new(device: Arc<Device>, signaled: bool) -> Result<Self, vk::Result> {
+    pub fn new(device: Device, signaled: bool) -> Result<Self, vk::Result> {
         Self::new_with_poll_rate(device, signaled, Duration::from_millis(5))
     }
 
     /// Create a new fence with the specified poll rate for awaiting it as a future.
-    pub fn new_with_poll_rate(device: Arc<Device>, signaled: bool, poll_rate: Duration) -> Result<Self, vk::Result> {
+    pub fn new_with_poll_rate(device: Device, signaled: bool, poll_rate: Duration) -> Result<Self, vk::Result> {
         let info = vk::FenceCreateInfo {
             s_type: vk::StructureType::FENCE_CREATE_INFO,
             p_next: std::ptr::null(),
@@ -170,7 +169,7 @@ impl<T> Fence<T> {
 
     fn call_cleanup_chain(&mut self) {
         let mut f = self.first_cleanup_fn.take();
-        while let Some(_) = f {
+        while f.is_some() {
             let func = f.take().unwrap();
             func.f.call_once(());
             f = func.next
@@ -231,7 +230,7 @@ impl<T> Fence<T> {
 
     /// Add a function to the front of the chain of functions to be called when this fence is completed, so either after
     /// wait() or after .await
-    pub fn with_cleanup(mut self, f: impl FnOnce() -> () + 'static) -> Self {
+    pub fn with_cleanup(mut self, f: impl FnOnce() + 'static) -> Self {
         if self.first_cleanup_fn.is_some() {
             let mut head = Box::new(CleanupFnLink {
                 f: Box::new(f),
@@ -250,6 +249,9 @@ impl<T> Fence<T> {
         }
     }
 
+    /// Get unsafe access to the `VkFence` handle.
+    /// # Safety
+    /// Any vulkan calls that mutate the fence's state may put the system in an undefined state.
     pub unsafe fn handle(&self) -> vk::Fence {
         self.handle
     }
@@ -268,11 +270,10 @@ impl<T> std::future::Future for Fence<T> {
             Poll::Ready(self.as_mut().value())
         } else {
             let waker = ctx.waker().clone();
-            let poll_rate = self.poll_rate.clone();
+            let poll_rate = self.poll_rate;
             std::thread::spawn(move || {
                 std::thread::sleep(poll_rate);
                 waker.wake();
-                return;
             });
             Poll::Pending
         }

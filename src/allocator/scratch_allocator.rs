@@ -23,14 +23,12 @@
 //! allocator.reset();
 //! ```
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use ash::vk;
 use gpu_allocator::AllocationError::OutOfMemory;
 
-use crate::Error::AllocationError;
 use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};
+use crate::Error::AllocationError;
 
 /// Very simple linear allocator. For example usage, see the module level documentation.
 #[derive(Debug)]
@@ -43,7 +41,7 @@ pub struct ScratchAllocator<A: Allocator = DefaultAllocator> {
 impl<A: Allocator> ScratchAllocator<A> {
     /// Create a new scratch allocator with a specified max capacity. All possible usages for buffers allocated from this should be
     /// given in the usage flags.
-    pub fn new(device: Arc<Device>, allocator: &mut A, max_size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
+    pub fn new(device: Device, allocator: &mut A, max_size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
         let buffer = Buffer::new(device.clone(), allocator, max_size, usage, MemoryType::CpuToGpu)?;
         let alignment = if usage.intersects(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER) {
             16
@@ -55,7 +53,7 @@ impl<A: Allocator> ScratchAllocator<A> {
             unimplemented!()
         };
 
-        return if buffer.is_mapped() {
+        if buffer.is_mapped() {
             Ok(Self {
                 buffer,
                 offset: 0,
@@ -63,7 +61,7 @@ impl<A: Allocator> ScratchAllocator<A> {
             })
         } else {
             Err(anyhow::Error::from(Error::UnmappableBuffer))
-        };
+        }
     }
 
     /// Allocates a fixed amount of bytes from the allocator.
@@ -76,13 +74,13 @@ impl<A: Allocator> ScratchAllocator<A> {
         // Amount of padding bytes to insert
         let padding = self.alignment - unaligned_part;
         let padded_size = size + padding;
-        return if self.offset + padded_size > self.buffer.size() {
+        if self.offset + padded_size > self.buffer.size() {
             Err(anyhow::Error::from(AllocationError(OutOfMemory)))
         } else {
             let offset = self.offset;
             self.offset += padded_size;
             self.buffer.view(offset, size)
-        };
+        }
     }
 
     /// Resets the linear allocator back to the beginning. Proper external synchronization needs to be

@@ -3,9 +3,9 @@ use std::ffi::CStr;
 use anyhow::Result;
 use ash::vk;
 
+use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
 use crate::core::queue::{QueueInfo, QueueType};
 use crate::util::string::wrap_c_str;
-use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
 
 /// Stores queried properties of a Vulkan extension.
 #[derive(Debug, Default)]
@@ -144,8 +144,7 @@ impl PhysicalDevice {
                     physical_device
                         .extension_properties
                         .iter()
-                        .find(|ext| ext.name == *requested_extension)
-                        .is_some()
+                        .any(|ext| ext.name == *requested_extension)
                 }) {
                     return None;
                 }
@@ -160,7 +159,7 @@ impl PhysicalDevice {
                     total_video_memory(&physical_device),
                     total_device_memory(&physical_device)
                 );
-                return Some(physical_device);
+                Some(physical_device)
             })
             .ok_or(anyhow::Error::from(Error::NoGPU))
     }
@@ -176,6 +175,9 @@ impl PhysicalDevice {
     }
 
     /// Get unsafe access to the physical device handle
+    /// # Safety
+    /// Any vulkan calls that mutate this physical device may leave the system in an undefined
+    /// state.
     pub unsafe fn handle(&self) -> vk::PhysicalDevice {
         self.handle
     }
@@ -225,13 +227,13 @@ fn get_queue_family_prefer_dedicated(families: &[vk::QueueFamilyProperties], que
             }
 
             // Only if we don't have a match yet, settle for a suboptimal match
-            return if current_best_match.is_none() {
+            if current_best_match.is_none() {
                 Some(index)
             } else {
                 current_best_match
-            };
+            }
         })
         .map(|index| {
-            return (index, !families[index].queue_flags.intersects(avoid));
+            (index, !families[index].queue_flags.intersects(avoid))
         })
 }

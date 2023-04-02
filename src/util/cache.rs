@@ -1,6 +1,5 @@
 use std::collections::{hash_map, HashMap};
 use std::hash::Hash;
-use std::sync::Arc;
 
 use anyhow::Result;
 
@@ -20,9 +19,9 @@ pub trait Resource {
     const MAX_TIME_TO_LIVE: u32;
 
     /// Allocates a new resource to be stored in the cache. This function may error, but this error will propagate through the cache's access function.
-    fn create(device: Arc<Device>, key: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
-    where
-        Self: Sized;
+    fn create(device: Device, key: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
+        where
+            Self: Sized;
 }
 
 struct Entry<R> {
@@ -37,14 +36,14 @@ struct Entry<R> {
 #[derivative(Debug)]
 pub struct Cache<R: Resource + Sized> {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     #[derivative(Debug = "ignore")]
     store: HashMap<R::Key, Entry<R>>,
 }
 
 impl<R: Resource + Sized> Cache<R> {
     /// Create a new resource cache from a Vulkan device.
-    pub fn new(device: Arc<Device>) -> Self {
+    pub fn new(device: Device) -> Self {
         Self {
             device,
             store: Default::default(),
@@ -63,7 +62,7 @@ impl<R: Resource + Sized> Cache<R> {
         let entry = match entry {
             hash_map::Entry::Occupied(entry) => entry.into_mut(),
             hash_map::Entry::Vacant(entry) => entry.insert(Entry {
-                value: R::create(self.device.clone(), &key, params)?,
+                value: R::create(self.device.clone(), key, params)?,
                 ttl: R::MAX_TIME_TO_LIVE,
                 persistent: key.persistent(),
             }),
@@ -76,7 +75,7 @@ impl<R: Resource + Sized> Cache<R> {
     pub(crate) fn next_frame(&mut self) {
         self.store.iter_mut().for_each(|(_, entry)| {
             if !entry.persistent {
-                entry.ttl = entry.ttl - 1
+                entry.ttl -= 1
             }
         });
         self.store.retain(|_, entry| entry.persistent || entry.ttl != 0);

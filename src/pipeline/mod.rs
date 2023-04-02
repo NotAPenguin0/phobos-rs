@@ -1,7 +1,8 @@
 //! The pipeline module mainly exposes the [`PipelineCache`](crate::PipelineCache) struct. This is a helper that manages creating
 //! pipelines, obtaining reflection information from them (if the `shader-reflection` feature is enabled).
 //! You probably only want one of these in the entire application. Since it's used everywhere, to ensure safe access
-//! is possible, [`PipelineCache::new()`](crate::PipelineCache::new) returns itself wrapped in an `Arc<Mutex<PipelineCache>>`.
+//! is possible, the inner state of a [`PipelineCache`](crate::PipelineCache) is wrapped in an `Arc<RwLock<PipelineCacheInner>>`,
+//! so this is `Send`, `Sync` and `Clone`.
 //!
 //! # Example
 //! The following example uses the [`PipelineBuilder`](crate::PipelineBuilder) utility to make a graphics pipeline and add it to the pipeline cache.
@@ -53,7 +54,6 @@
 //! The pipeline cache internally frees up resources by destroying pipelines that have not been accessed in a long time.
 //! To ensure this happens periodically, call [`PipelineCache::next_frame()`](crate::PipelineCache::next_frame) at the end of each iteration of your render loop.
 
-use std::sync::Arc;
 
 use ash::vk;
 
@@ -78,7 +78,7 @@ pub type PipelineStage = vk::PipelineStageFlags2;
 #[derivative(Debug)]
 pub struct Pipeline {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     pub(crate) handle: vk::Pipeline,
     pub(crate) layout: vk::PipelineLayout,
     pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,
@@ -90,7 +90,7 @@ pub struct Pipeline {
 #[derivative(Debug)]
 pub struct ComputePipeline {
     #[derivative(Debug = "ignore")]
-    device: Arc<Device>,
+    device: Device,
     pub(crate) handle: vk::Pipeline,
     pub(crate) layout: vk::PipelineLayout,
     pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,

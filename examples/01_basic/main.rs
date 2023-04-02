@@ -1,15 +1,7 @@
-use std::fs;
-use std::fs::File;
-use std::io::Read;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use futures::executor::block_on;
-use winit;
-use winit::event::{Event, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoopBuilder};
-use winit::window::WindowBuilder;
 
 use phobos::command_buffer::traits::*;
 use phobos::domain::All;
@@ -59,7 +51,7 @@ impl ExampleApp for Basic {
             .build();
 
         // Store the pipeline in the pipeline cache
-        ctx.pipelines.lock().unwrap().create_named_pipeline(pci)?;
+        ctx.pipelines.create_named_pipeline(pci)?;
 
         let frag_code = load_spirv_file(Path::new("examples/data/blue.spv"));
         let fragment = ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
@@ -74,7 +66,7 @@ impl ExampleApp for Basic {
             .attach_shader(vertex)
             .attach_shader(fragment)
             .build();
-        ctx.pipelines.lock().unwrap().create_named_pipeline(pci)?;
+        ctx.pipelines.create_named_pipeline(pci)?;
 
         // Define some resources we will use for rendering
         let image = Image::new(
@@ -149,11 +141,11 @@ impl ExampleApp for Basic {
                     float32: [1.0, 0.0, 0.0, 1.0],
                 }),
             )?
-            .sample_image(&offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
+            .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
             .execute(|cmd, _ifc, bindings| {
                 cmd.full_viewport_scissor()
                     .bind_graphics_pipeline("sample")?
-                    .resolve_and_bind_sampled_image(0, 0, &offscreen, &self.resources.sampler, &bindings)?
+                    .resolve_and_bind_sampled_image(0, 0, &offscreen, &self.resources.sampler, bindings)?
                     .draw(6, 1, 0, 0)
             })
             .build();
@@ -161,7 +153,7 @@ impl ExampleApp for Basic {
         let present_pass = PassBuilder::present(
             "present",
             // This pass uses the output from the clear pass on the swap resource as its input
-            &sample_pass.output(&swap_resource).unwrap(),
+            sample_pass.output(&swap_resource).unwrap(),
         );
         let mut graph = graph
             .add_pass(offscreen_pass)?
@@ -171,7 +163,7 @@ impl ExampleApp for Basic {
             .build()?;
 
         let mut bindings = PhysicalResourceBindings::new();
-        bindings.bind_image("swapchain", &ifc.swapchain_image.as_ref().unwrap());
+        bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
         bindings.bind_image("offscreen", &self.resources.offscreen_view);
         // create a command buffer capable of executing graphics commands
         let cmd = ctx
