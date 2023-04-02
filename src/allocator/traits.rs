@@ -97,8 +97,7 @@ pub trait Allocation: Default {
     /// * If this memory comes from a [`HOST_VISIBLE`](ash::vk::MemoryPropertyFlags::HOST_VISIBLE) heap, this returns `Some(ptr)`, with `ptr` a non-null pointer pointing to the allocation memory.
     /// # Example
     /// ```
-    /// use phobos::*;
-    ///
+    /// # use phobos::*;
     /// // Writes the integer '5' into the first std::mem::size_of::<i32>() bytes of the allocation.
     /// // Assumes this allocation is mappable and at least std::mem::size_of::<i32>() bytes large.
     /// unsafe fn write_five<A: Allocation>(allocation: &A) {

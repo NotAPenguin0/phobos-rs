@@ -8,7 +8,6 @@
 //! ```
 //! # use phobos::prelude::*;
 //! # use anyhow::Result;
-//!
 //! // Function that uses the buffer in some way and returns a fence
 //! // that is signaled when the work is done.
 //! fn use_the_buffer(buffer: BufferView) -> Fence<()> {
@@ -46,7 +45,6 @@ use crate::Error::AllocationError;
 /// ```
 /// # use phobos::prelude::*;
 /// # use anyhow::Result;
-///
 /// // Function that uses the buffer in some way and returns a fence
 /// // that is signaled when the work is done.
 /// fn use_the_buffer(buffer: BufferView) -> Fence<()> {
@@ -82,7 +80,6 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// ```
     /// # use phobos::*;
     /// # use anyhow::Result;
-    ///
     /// fn make_scratch_allocator<A: Allocator>(device: Device, alloc: &mut A) -> Result<ScratchAllocator<A>> {
     ///     ScratchAllocator::new(device, alloc, 1024 as usize, vk::BufferUsageFlags::UNIFORM_BUFFER)
     /// }
@@ -150,7 +147,6 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// ```
     /// # use phobos::prelude::*;
     /// # use anyhow::Result;
-    ///
     /// // Function that uses the buffer in some way and returns a fence
     /// // that is signaled when the work is done.
     /// fn use_the_buffer(buffer: BufferView) -> Fence<()> {

@@ -15,7 +15,6 @@ impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommand
     /// # use phobos::*;
     /// # use phobos::domain::ExecutionDomain;
     /// # use anyhow::Result;
-    ///
     /// // Assumes "my_pipeline" was previously added to the pipeline cache with `PipelineCache::create_named_compute_pipeline()`,
     /// // and that cmd was created with this cache.
     /// fn compute_pipeline<D: ExecutionDomain + ComputeSupport>(cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
@@ -51,7 +50,6 @@ impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommand
     /// # use phobos::*;
     /// # use phobos::domain::ExecutionDomain;
     /// # use anyhow::Result;
-    ///
     /// // Assumes "my_pipeline" was previously added to the pipeline cache with `PipelineCache::create_named_compute_pipeline()`,
     /// // and that cmd was created with this cache.
     /// fn compute_pipeline<D: ExecutionDomain + ComputeSupport>(cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {

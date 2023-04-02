@@ -67,7 +67,7 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 }
 
 /// This struct represents an incomplete command buffer.
-/// This is a command buffer that has not been called [`IncompleteCommandBuffer::finish()`] on yet.
+/// This is a command buffer that has not been called [`IncompleteCommandBuffer::finish()`](crate::IncompleteCommandBuffer::finish) on yet.
 /// Calling this method will turn it into an immutable command buffer which can then be submitted
 /// to the queue it was allocated from. See also [`ExecutionManager`].
 ///
@@ -76,7 +76,6 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 /// # use phobos::*;
 /// # use phobos::domain::{ExecutionDomain, Graphics};
 /// # use anyhow::Result;
-///
 /// fn submit_some_commands(exec: ExecutionManager) -> Result<()> {
 ///     let cmd: IncompleteCommandBuffer<Graphics> = exec.on_domain::<Graphics>(None, None)?;
 ///     // ... record some commands

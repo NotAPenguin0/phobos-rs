@@ -13,7 +13,6 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn set_viewport<C: GraphicsCmdBuffer>(cmd: C) -> C {
     ///     // Now the current viewport and scissor cover the current attachment's entire area
     ///     cmd.full_viewport_scissor()
@@ -38,7 +37,6 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn set_viewport<C: GraphicsCmdBuffer>(cmd: C) -> C {
     ///     cmd.viewport(vk::Viewport {
     ///         x: 0.0,
@@ -63,7 +61,6 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn set_scissor<C: GraphicsCmdBuffer>(cmd: C) -> C {
     ///     cmd.scissor(vk::Rect2D {
     ///         offset: Default::default(),
@@ -90,7 +87,6 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn draw<C: GraphicsCmdBuffer>(cmd: C, vertex_buffer: &BufferView) -> Result<C> {
     ///     cmd.full_viewport_scissor()
     ///        .bind_graphics_pipeline("my_pipeline")?
@@ -116,7 +112,6 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn draw_indexed<C: GraphicsCmdBuffer>(cmd: C, vertex_buffer: &BufferView, index_buffer: &BufferView) -> Result<C> {
     ///     cmd.full_viewport_scissor()
     ///        .bind_graphics_pipeline("my_pipeline")?
@@ -149,7 +144,6 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # use phobos::*;
     /// # use phobos::domain::ExecutionDomain;
     /// # use anyhow::Result;
-    ///
     /// // Assumes "my_pipeline" was previously added to the pipeline cache with `PipelineCache::create_named_pipeline()`,
     /// // and that cmd was created with this cache.
     /// fn compute_pipeline<C: GraphicsCmdBuffer>(cmd: C) -> Result<C> {
@@ -174,7 +168,6 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn draw<C: GraphicsCmdBuffer>(cmd: C, vertex_buffer: &BufferView) -> Result<C> {
     ///     cmd.bind_vertex_buffer(0, vertex_buffer)
     ///        .draw(6, 1, 0, 0)
@@ -203,7 +196,6 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn draw_indexed<C: GraphicsCmdBuffer>(cmd: C, vertex_buffer: &BufferView, index_buffer: &BufferView) -> Result<C> {
     ///     cmd.bind_vertex_buffer(0, vertex_buffer)
     ///        .bind_index_buffer(index_buffer, vk::IndexType::UINT32)
@@ -263,7 +255,6 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn set_polygon_mode<C: GraphicsCmdBuffer>(cmd: C) -> Result<C> {
     ///     // Subsequent drawcalls will get a wireframe view.
     ///     cmd.set_polygon_mode(vk::PolygonMode::LINE)

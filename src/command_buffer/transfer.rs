@@ -14,7 +14,6 @@ impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteComma
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn copy_buffer<C: TransferCmdBuffer>(cmd: C, src: &BufferView, dst: &BufferView) -> Result<C> {
     ///     cmd.copy_buffer(src, dst)
     /// }
@@ -44,7 +43,6 @@ impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteComma
     /// # use anyhow::Result;
     /// # use phobos::*;
     /// # use phobos::domain::*;
-    ///
     /// fn copy_buffer_to_image<C: TransferCmdBuffer>(cmd: C, src: &BufferView, dst: &ImageView) -> Result<C> {
     ///     cmd.copy_buffer_to_image(src, dst)
     /// }

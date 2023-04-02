@@ -67,7 +67,6 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
     /// # use phobos::*;
     /// # use anyhow::Result;
     /// # use phobos::domain::{ExecutionDomain, Graphics};
-    ///
     /// fn finish_command_buffer<D: ExecutionDomain>(cmd: IncompleteCommandBuffer<D>) -> Result<CommandBuffer<D>> {
     ///     // Releases the lock on a queue associated with the domain `D`, allowing other command
     ///     // buffers to start recording on this domain.

@@ -3,8 +3,6 @@
 /// where your allocation should live.
 ///
 /// See also: [`Allocator::allocate()`](crate::Allocator::allocate()), [`DefaultAllocator::allocate()`](crate::DefaultAllocator::allocate())
-/// # Example
-///
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum MemoryType {
     /// Store the allocation in GPU only accessible memory - typically this is the faster GPU resource and this should be

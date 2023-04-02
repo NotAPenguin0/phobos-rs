@@ -158,7 +158,7 @@ impl Allocator for DefaultAllocator {
 
 impl traits::Allocation for Allocation {
     /// Get unsafe access to the underlying [`VkDeviceMemory`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html).
-    /// Should always be used together with [`Allocation::offset()`].
+    /// Should always be used together with [`Allocation::offset()`](crate::traits::Allocation::offset()).
     /// # Example
     /// This is useful when binding memory to a buffer or image. For [`Buffer`](crate::Buffer) and [`Image`](crate::Image) this is already
     /// done internally.
@@ -208,7 +208,6 @@ impl traits::Allocation for Allocation {
     /// # Example
     /// ```
     /// use phobos::*;
-    ///
     /// // Writes the integer '5' into the first std::mem::size_of::<i32>() bytes of the allocation.
     /// // Assumes this allocation is mappable and at least std::mem::size_of::<i32>() bytes large.
     /// unsafe fn write_five<A: Allocation>(allocation: &A) {
