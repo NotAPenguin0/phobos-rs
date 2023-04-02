@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, MutexGuard};
 
 use anyhow::Result;
 use ash::vk;
@@ -24,7 +24,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
         queue_lock: MutexGuard<'q, Queue>,
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,
-        pipelines: Option<Arc<Mutex<PipelineCache>>>,
+        pipelines: Option<PipelineCache>,
         descriptors: Option<DescriptorCache>,
     ) -> Result<Self> {
         unsafe {
@@ -120,7 +120,6 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self.descriptor_state_needs_update = false;
         Ok(self)
     }
-
 
     /// Clears all currently bound descriptors.
     pub fn forget_descriptor_state(mut self) -> Self {

@@ -109,7 +109,7 @@ impl Queue {
     pub(crate) fn allocate_command_buffer<'q, CmdBuf: IncompleteCmdBuffer<'q>>(
         device: Device,
         queue_lock: MutexGuard<'q, Queue>,
-        pipelines: Option<Arc<Mutex<PipelineCache>>>,
+        pipelines: Option<PipelineCache>,
         descriptors: Option<DescriptorCache>,
     ) -> Result<CmdBuf> {
         let info = vk::CommandBufferAllocateInfo {

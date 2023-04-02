@@ -51,7 +51,7 @@ impl ExampleApp for Basic {
             .build();
 
         // Store the pipeline in the pipeline cache
-        ctx.pipelines.lock().unwrap().create_named_pipeline(pci)?;
+        ctx.pipelines.create_named_pipeline(pci)?;
 
         let frag_code = load_spirv_file(Path::new("examples/data/blue.spv"));
         let fragment = ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
@@ -66,7 +66,7 @@ impl ExampleApp for Basic {
             .attach_shader(vertex)
             .attach_shader(fragment)
             .build();
-        ctx.pipelines.lock().unwrap().create_named_pipeline(pci)?;
+        ctx.pipelines.create_named_pipeline(pci)?;
 
         // Define some resources we will use for rendering
         let image = Image::new(

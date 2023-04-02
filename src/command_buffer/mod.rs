@@ -27,7 +27,7 @@
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::MutexGuard;
 
 use anyhow::Result;
 use ash::vk;
@@ -95,7 +95,7 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     descriptor_state_needs_update: bool,
     // TODO: Only update disturbed descriptor sets
     descriptor_cache: Option<DescriptorCache>,
-    pipeline_cache: Option<Arc<Mutex<PipelineCache>>>,
+    pipeline_cache: Option<PipelineCache>,
     _domain: PhantomData<D>,
 }
 

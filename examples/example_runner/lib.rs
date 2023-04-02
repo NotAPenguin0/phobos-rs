@@ -2,7 +2,6 @@ use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Result};
 use futures::executor::block_on;
@@ -56,7 +55,7 @@ pub struct Context {
     pub device: Device,
     pub exec: ExecutionManager,
     pub allocator: DefaultAllocator,
-    pub pipelines: Arc<Mutex<PipelineCache>>,
+    pub pipelines: PipelineCache,
     pub descriptors: DescriptorCache,
 }
 
@@ -78,7 +77,7 @@ pub trait ExampleApp {
 
 pub struct ExampleRunner {
     vk: VulkanContext,
-    pipelines: Arc<Mutex<PipelineCache>>,
+    pipelines: PipelineCache,
     descriptors: DescriptorCache,
 }
 
@@ -234,7 +233,7 @@ impl ExampleRunner {
                     None => {}
                     Some(app) => {
                         self.frame(app, &window).unwrap();
-                        self.pipelines.lock().unwrap().next_frame();
+                        self.pipelines.next_frame();
                         self.descriptors.next_frame();
                     }
                 },

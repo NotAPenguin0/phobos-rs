@@ -101,7 +101,7 @@ impl ExecutionManager {
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
     pub fn try_on_domain<'q, D: ExecutionDomain>(
         &'q self,
-        pipelines: Option<Arc<Mutex<PipelineCache>>>,
+        pipelines: Option<PipelineCache>,
         descriptors: Option<DescriptorCache>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
@@ -112,7 +112,7 @@ impl ExecutionManager {
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
     pub fn on_domain<'q, D: ExecutionDomain>(
         &'q self,
-        pipelines: Option<Arc<Mutex<PipelineCache>>>,
+        pipelines: Option<PipelineCache>,
         descriptors: Option<DescriptorCache>,
     ) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;

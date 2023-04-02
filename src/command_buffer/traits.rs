@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::MutexGuard;
 
 use anyhow::Result;
 use ash::vk;
@@ -91,7 +91,7 @@ pub trait IncompleteCmdBuffer<'q> {
         queue_lock: MutexGuard<'q, Queue>,
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,
-        pipelines: Option<Arc<Mutex<PipelineCache>>>,
+        pipelines: Option<PipelineCache>,
         descriptors: Option<DescriptorCache>,
     ) -> Result<Self>
     where

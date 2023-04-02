@@ -1,10 +1,10 @@
 use anyhow::Result;
 use ash::vk;
 
+use crate::{BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::domain::ExecutionDomain;
-use crate::{BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 
 impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D> {
     /// Sets the viewport and scissor regions to the entire render area. Can only be called inside a renderpass.
@@ -69,18 +69,19 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
     /// # Errors
     /// Fails if the pipeline was not previously registered in the pipeline cache.
     fn bind_graphics_pipeline(mut self, name: &str) -> Result<Self> {
-        let Some(cache) = &self.pipeline_cache else { return Err(Error::NoPipelineCache.into()); };
+        let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
         {
-            let mut cache = cache.lock().unwrap();
             let Some(rendering_state) = &self.current_rendering_state else { return Err(Error::NoRenderpass.into()) };
-            let pipeline = cache.get_pipeline(name, &rendering_state)?;
-            unsafe {
-                self.device
-                    .cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle);
-            }
-            self.current_bindpoint = vk::PipelineBindPoint::GRAPHICS;
-            self.current_pipeline_layout = pipeline.layout;
-            self.current_set_layouts = pipeline.set_layouts.clone();
+            cache.with_pipeline(name, &rendering_state, |pipeline| {
+                unsafe {
+                    self.device
+                        .cmd_bind_pipeline(self.handle, vk::PipelineBindPoint::GRAPHICS, pipeline.handle);
+                }
+                self.current_bindpoint = vk::PipelineBindPoint::GRAPHICS;
+                self.current_pipeline_layout = pipeline.layout;
+                self.current_set_layouts = pipeline.set_layouts.clone();
+                Ok(())
+            })?;
         }
         Ok(self)
     }

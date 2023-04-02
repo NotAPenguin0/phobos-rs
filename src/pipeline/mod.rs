@@ -1,7 +1,8 @@
 //! The pipeline module mainly exposes the [`PipelineCache`](crate::PipelineCache) struct. This is a helper that manages creating
 //! pipelines, obtaining reflection information from them (if the `shader-reflection` feature is enabled).
 //! You probably only want one of these in the entire application. Since it's used everywhere, to ensure safe access
-//! is possible, [`PipelineCache::new()`](crate::PipelineCache::new) returns itself wrapped in an `Arc<Mutex<PipelineCache>>`.
+//! is possible, the inner state of a [`PipelineCache`](crate::PipelineCache) is wrapped in an `Arc<RwLock<PipelineCacheInner>>`,
+//! so this is `Send`, `Sync` and `Clone`.
 //!
 //! # Example
 //! The following example uses the [`PipelineBuilder`](crate::PipelineBuilder) utility to make a graphics pipeline and add it to the pipeline cache.
