@@ -13,6 +13,8 @@ pub struct DeletionQueue<T> {
 }
 
 impl<T> DeletionQueue<T> {
+    /// Create a new deletion queue. Items that are pushed onto this queue will be kept alive
+    /// for `max_ttl` calls to [`DeletionQueue::next_frame`]
     pub fn new(max_ttl: u32) -> DeletionQueue<T> {
         DeletionQueue {
             max_ttl,

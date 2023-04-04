@@ -113,14 +113,17 @@ impl Swapchain {
         self.images.as_slice()
     }
 
+    /// Get the available present modes of this swapchain
     pub fn present_mode(&self) -> vk::PresentModeKHR {
         self.present_mode
     }
 
+    /// Get the current size of this swapchain
     pub fn extent(&self) -> &vk::Extent2D {
         &self.extent
     }
 
+    /// Get the surface format of this swapchain
     pub fn format(&self) -> vk::SurfaceFormatKHR {
         self.format
     }

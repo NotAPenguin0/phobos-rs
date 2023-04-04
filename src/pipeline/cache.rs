@@ -78,6 +78,7 @@ fn verify_valid_dynamic_states(device: &Device, pci: &PipelineCreateInfo) {
 }
 
 impl ResourceKey for PipelineCreateInfo {
+    /// Whether this resource is persistent.
     fn persistent(&self) -> bool {
         false
     }
@@ -140,6 +141,7 @@ impl Drop for Pipeline {
 }
 
 impl ResourceKey for ComputePipelineCreateInfo {
+    /// Whether this pipeline is persistent.
     fn persistent(&self) -> bool {
         self.persistent
     }
@@ -268,6 +270,7 @@ impl PipelineCache {
         Ok(())
     }
 
+    /// Create and register a new pipeline into the cache
     #[cfg(not(feature = "shader-reflection"))]
     pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
         info.build_inner();
@@ -317,6 +320,7 @@ impl PipelineCache {
         Ok(())
     }
 
+    /// Create and register a new compute pipeline into the cache
     #[cfg(not(feature = "shader-reflection"))]
     pub fn create_named_compute_pipeline(&mut self, mut info: ComputePipelineCreateInfo) -> Result<()> {
         let name = info.name.clone();

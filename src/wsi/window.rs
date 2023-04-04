@@ -4,7 +4,9 @@ use winit;
 
 /// Trait for windows that exposes the content width and height of a window.
 pub trait WindowSize {
+    /// Get the width of the window
     fn width(&self) -> u32;
+    /// Get the height of the window
     fn height(&self) -> u32;
 }
 

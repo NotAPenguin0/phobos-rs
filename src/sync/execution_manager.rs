@@ -32,7 +32,7 @@ use crate::sync::submit_batch::SubmitBatch;
 /// // Obtain a command buffer on the Transfer domain
 /// let cmd = exec.on_domain::<domain::Transfer>(None, None)?
 ///               .copy_image(/*command parameters*/)
-///               .finish();
+///               .finish()?;
 /// // Submit the command buffer, either to this frame's command list,
 /// // or to the execution manager for submitting commands outside of a
 /// // frame context (such as on another thread).
@@ -124,22 +124,20 @@ impl ExecutionManager {
     /// ```
     /// use phobos::prelude::*;
     /// let exec = ExecutionManager::new(device.clone(), &physical_device)?;
-    /// async {
-    ///     let cmd1 = exec.on_domain::<domain::All>(None, None)?.finish()?;
-    ///     let cmd2 = exec.on_domain::<domain::All>(None, None)?.finish()?;
-    ///     let mut batch = exec.start_submit_batch()?;
-    ///     // Submit the first command buffer first
-    ///     batch.submit(cmd1)?
-    ///          // The second command buffer waits at COLOR_ATTACHMENT_OUTPUT on the first command buffer's completion.
-    ///          .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
-    ///     batch.finish()?.await;
-    /// }
+    /// let cmd1 = exec.on_domain::<domain::All>(None, None)?.finish()?;
+    /// let cmd2 = exec.on_domain::<domain::All>(None, None)?.finish()?;
+    /// let mut batch = exec.start_submit_batch()?;
+    /// // Submit the first command buffer first
+    /// batch.submit(cmd1)?
+    ///      // The second command buffer waits at COLOR_ATTACHMENT_OUTPUT on the first command buffer's completion.
+    ///      .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
+    /// batch.finish()?.wait()?;
     /// ```
     pub fn start_submit_batch<D: ExecutionDomain + 'static>(&self) -> Result<SubmitBatch<D>> {
         SubmitBatch::new(self.device.clone(), self.clone())
     }
 
-    /// Submit a command buffer to its queue. TODO: Add semaphores
+    /// Submit a command buffer to its queue.
     pub fn submit<D: ExecutionDomain + 'static>(&self, mut cmd: CommandBuffer<D>) -> Result<Fence> {
         let fence = Fence::new(self.device.clone(), false)?;
 
@@ -164,6 +162,7 @@ impl ExecutionManager {
         }))
     }
 
+    /// Submit multiple SubmitInfo2 structures.
     pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         queue.submit2(submits, Some(fence))?;

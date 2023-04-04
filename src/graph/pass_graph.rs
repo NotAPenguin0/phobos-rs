@@ -64,31 +64,37 @@ pub struct PassGraph<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAlloca
     last_usages: HashMap<String, (usize, PipelineStage)>,
 }
 
+/// A completely built pass graph, ready for recording.
 pub struct BuiltPassGraph<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
     graph: PassGraph<'exec, 'q, D, A>,
 }
 
 impl<'exec, 'q, D: ExecutionDomain, A: Allocator> Deref for BuiltPassGraph<'exec, 'q, D, A> {
+    /// The stored pass graph type.
     type Target = PassGraph<'exec, 'q, D, A>;
 
+    /// Get the stored pass graph.
     fn deref(&self) -> &Self::Target {
         &self.graph
     }
 }
 
 impl<'exec, 'q, D: ExecutionDomain, A: Allocator> DerefMut for BuiltPassGraph<'exec, 'q, D, A> {
+    /// Get the stored pass graph.
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.graph
     }
 }
 
 impl PassResource {
+    /// Get the virtual resource associated with this pass resource.
     pub fn virtual_resource(&self) -> &VirtualResource {
         &self.resource
     }
 }
 
 impl Barrier<PassResource> for PassResourceBarrier {
+    /// Create a new barrier node.
     fn new(resource: PassResource) -> Self {
         Self {
             src_access: resource.usage.access(),
@@ -99,16 +105,19 @@ impl Barrier<PassResource> for PassResourceBarrier {
         }
     }
 
+    /// Get the resource this barrier operates on.
     fn resource(&self) -> &PassResource {
         &self.resource
     }
 }
 
 impl Resource for PassResource {
+    /// Returns true if `self` is a dependency of `lhs`
     fn is_dependency_of(&self, lhs: &Self) -> bool {
         self.virtual_resource().uid() == lhs.virtual_resource().uid()
     }
 
+    /// Return the uid of this virtual resource.
     fn uid(&self) -> &String {
         self.virtual_resource().uid()
     }
@@ -144,7 +153,8 @@ macro_rules! barriers {
 
 impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
     /// Create a new task graph. If rendering to a swapchain, also give it the virtual resource you are planning to use for this.
-    /// This is necessary for proper sync
+    /// This is necessary for proper synchronization.
+    /// There is a tracking issue for improving this part of the API, see <https://github.com/NotAPenguin0/phobos-rs/issues/16>
     pub fn new(swapchain: Option<&VirtualResource>) -> Self {
         let mut graph = PassGraph {
             graph: TaskGraph::new(),
@@ -169,9 +179,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
         graph
     }
 
-    /// Add a pass to a task graph.
+    /// Add a pass to a task graph. To obtain a pass, use the [`PassBuilder`](crate::graph::pass::PassBuilder)
     /// # Errors
-    /// - This function can fail if adding the pass results in a cyclic dependency in the graph.
+    /// - Fails if adding the pass results in a cyclic dependency in the graph.
     pub fn add_pass(mut self, pass: Pass<'exec, 'q, D, A>) -> Result<Self> {
         {
             // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
@@ -212,6 +222,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
     }
 
     /// Builds the task graph so it can be recorded into a command buffer.
+    /// # Errors
+    /// * Fails if there are multiple usages of the same resource, which makes it impossible to
+    ///   construct an unambiguous graph.
     pub fn build(mut self) -> Result<BuiltPassGraph<'exec, 'q, D, A>> {
         self.set_source_stages()?;
         self.graph.create_barrier_nodes();
@@ -222,16 +235,18 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
         })
     }
 
-    /// Returns the task graph built by the GPU task graph system, useful for outputting dotfiles.
+    /// Returns the internal task graph structure, useful for creating debug visualizations.
     pub fn task_graph(&self) -> &TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>> {
         &self.graph
     }
 
-    /// Returns the total amount of nodes in the graph.
+    /// Returns the total amount of nodes in the graph. This can be used as a metric of how
+    /// complex the graph is.
     pub fn num_nodes(&self) -> usize {
         self.graph.graph.node_count()
     }
 
+    /// Get the source node of the graph.
     #[allow(dead_code)]
     pub(crate) fn source(&self) -> NodeIndex {
         self.source
@@ -356,7 +371,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
     }
 }
 
+/// Trait that is implemented for the task graph to help with debugging and visualizing the graph.
 pub trait GraphViz {
+    /// Get the string representation of this graph in `dot` format.
     fn dot(&self) -> Result<String>;
 }
 

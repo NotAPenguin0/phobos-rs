@@ -28,11 +28,15 @@ impl DescriptorSetLayout {
 /// information necessary.
 #[derive(Debug, Clone, Default)]
 pub struct DescriptorSetLayoutCreateInfo {
+    /// Descriptor set bindings for this set layout
     pub bindings: Vec<vk::DescriptorSetLayoutBinding>,
+    /// Whether this descriptor set layout is persistent. Should only be true if the pipeline layout
+    /// this belongs to is also persistent.
     pub persistent: bool,
 }
 
 impl ResourceKey for DescriptorSetLayoutCreateInfo {
+    /// Whether this descriptor set layout is persistent.
     fn persistent(&self) -> bool {
         self.persistent
     }

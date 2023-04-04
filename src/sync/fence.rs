@@ -14,7 +14,10 @@ struct CleanupFnLink<'f> {
     pub next: Option<Box<CleanupFnLink<'f>>>,
 }
 
+/// Trait that allows accessing the value of a fence.
 pub trait FenceValue<T> {
+    /// Get the value of this fence. Note that using this without an attached value will panic.
+    /// Using this before the fence was awaited may result in undefined behaviour.
     fn value(&mut self) -> T;
 }
 
@@ -40,7 +43,7 @@ pub trait FenceValue<T> {
 /// # Caveats
 /// Since returning a fence and awaiting it later would make objects
 /// local to the function go out of scope and drop them, this is a problem when you consider the fact
-/// that the GPU might still be using those resources.
+/// that the GPU might still be using those resources. Unfortunately, the compiler cannot catch this.
 /// Consider the following case
 /// ```
 /// use std::mem::size_of;
@@ -111,15 +114,19 @@ pub struct Fence<T = ()> {
 // safely be sent between threads.
 unsafe impl<T> Send for Fence<T> {}
 
+/// Type alias that more expressively conveys the intent that this Fence is a Future.
 pub type GpuFuture<T> = Fence<T>;
 
 impl<T> FenceValue<T> for Fence<T> {
+    /// Get the value of this fence. Note that using this without an attached value will panic.
+    /// Using this before the fence was awaited may result in undefined behaviour.
     default fn value(&mut self) -> T {
         self.value.take().unwrap()
     }
 }
 
 impl FenceValue<()> for Fence<()> {
+    /// For fences that do not hold a value, this does nothing.
     fn value(&mut self) {}
 }
 

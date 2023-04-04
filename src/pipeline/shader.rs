@@ -35,20 +35,24 @@ pub struct ShaderCreateInfo {
 }
 
 impl ShaderCreateInfo {
+    /// Get the shader stage of this shader
     pub fn stage(&self) -> vk::ShaderStageFlags {
         self.stage
     }
 
+    /// Get the SPIR-V bytecode of this shader
     pub fn code(&self) -> &[u32] {
         self.code.as_slice()
     }
 
+    /// Get the hash of this shader's SPIR-V bytecode.
     pub fn code_hash(&self) -> u64 {
         self.code_hash
     }
 }
 
 impl ResourceKey for ShaderCreateInfo {
+    /// Whether this shader is persistent.
     fn persistent(&self) -> bool {
         self.persistent
     }

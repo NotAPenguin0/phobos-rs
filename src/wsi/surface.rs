@@ -66,14 +66,17 @@ impl Surface {
         self.handle
     }
 
+    /// Get the surface capabilities.
     pub fn capabilities(&self) -> &vk::SurfaceCapabilitiesKHR {
         &self.capabilities
     }
 
+    /// Get the available surface formats.
     pub fn formats(&self) -> &[vk::SurfaceFormatKHR] {
         self.formats.as_slice()
     }
 
+    /// Get the available surface present modes.
     pub fn present_modes(&self) -> &[vk::PresentModeKHR] {
         self.present_modes.as_slice()
     }
@@ -82,6 +85,7 @@ impl Surface {
 impl Deref for Surface {
     type Target = ash::extensions::khr::Surface;
 
+    /// Get access to the `VK_KHR_surface` extension functions.
     fn deref(&self) -> &Self::Target {
         &self.functions
     }

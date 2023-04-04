@@ -8,6 +8,10 @@ use crate::pipeline::create_info::*;
 
 /// Used to facilitate creating a graphics pipeline. For an example, please check the
 /// [`pipeline`](crate::pipeline) module level documentation.
+///
+/// For information on each method, please check the Vulkan spec for
+/// [`VkGraphicsPipelineCreateInfo`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkGraphicsPipelineCreateInfo.html).
+/// All builder methods correspond to entries directly, with minimal utilities added on top to enforce some invariants.
 #[derive(Debug)]
 pub struct PipelineBuilder {
     inner: PipelineCreateInfo,
@@ -309,7 +313,7 @@ impl PipelineBuilder {
     }
 
     /// Obtain the pipeline name.
-    pub fn get_name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.inner.name
     }
 }

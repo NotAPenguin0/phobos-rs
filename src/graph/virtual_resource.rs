@@ -84,10 +84,12 @@ impl VirtualResource {
         rhs.uid.len() < lhs.uid.len()
     }
 
+    /// Get the resource type of this virtual resource
     pub fn resource_type(&self) -> ResourceType {
         self.ty
     }
 
+    /// Get the uid of this virtual resource
     pub fn uid(&self) -> &String {
         &self.uid
     }

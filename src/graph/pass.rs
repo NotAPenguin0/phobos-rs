@@ -82,8 +82,10 @@ use crate::graph::pass_graph::PassResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
 
+/// The returned value from a pass callback function.
 pub type PassFnResult<'q, D> = Result<IncompleteCommandBuffer<'q, D>>;
 
+/// Blanket trait for the pass callback function.
 pub trait PassFn<'q, D: ExecutionDomain, A: Allocator>:
 FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> PassFnResult<'q, D> {}
 
@@ -108,6 +110,8 @@ pub struct Pass<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> 
 }
 
 /// Used to create [`Pass`] objects correctly.
+/// # Example
+/// See the [`pass`](crate::graph::pass) module level documentation.
 pub struct PassBuilder<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
     inner: Pass<'exec, 'q, D, A>,
 }
@@ -147,7 +151,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
         }
     }
 
-    /// Create a new renderpass.
+    /// Create a new renderpass. This constructor is required for passes that render to any attachments.
     pub fn render(name: impl Into<String>) -> Self {
         PassBuilder {
             inner: Pass {
@@ -162,7 +166,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     }
 
     /// Create a pass for presenting to the swapchain.
-    /// Note that this doesn't actually do the presentation, it just adds the proper sync for it.
+    /// Note that this doesn't actually do the presentation, it just adds the proper synchronization for it.
     /// If you are presenting to an output of the graph, this is required.
     pub fn present(name: impl Into<String>, swapchain: &VirtualResource) -> Pass<'exec, 'q, D, A> {
         Pass {
@@ -182,6 +186,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
         }
     }
 
+    /// Set the color of this pass. This can show up in graphics debuggers like RenderDoc.
     #[cfg(feature = "debug-markers")]
     pub fn color(mut self, color: [f32; 4]) -> Self {
         self.inner.color = Some(color);
@@ -189,6 +194,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     }
 
     /// Adds a color attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
+    /// # Errors
+    /// * Fails if this pass was not created using [`PassBuilder::render()`]
+    /// * Fails if `op` was [`vk::AttachmentLoadOp::CLEAR`], but `clear` was [`None`].
     pub fn color_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self> {
         if !self.inner.is_renderpass {
             return Err(Error::Uncategorized("Cannot attach color attachment to a pass that is not a renderpass").into());
@@ -227,6 +235,9 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     }
 
     /// Adds a depth attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
+    /// # Errors
+    /// * Fails if this pass was not created using [`PassBuilder::render()`]
+    /// * Fails if `op` was [`vk::AttachmentLoadOp::CLEAR`], but `clear` was [`None`].
     pub fn depth_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Result<Self> {
         if !self.inner.is_renderpass {
             return Err(Error::Uncategorized("Cannot attach depth attachment to a pass that is not a renderpass").into());
@@ -262,8 +273,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
         Ok(self)
     }
 
-    /// Resolves src into dst
-    /// TODO: Add check for existence of src
+    /// Does a hardware MSAA resolve from `src` into `dst`.
     pub fn resolve(mut self, src: &VirtualResource, dst: &VirtualResource) -> Self {
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Resolve(src.clone())),

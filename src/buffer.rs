@@ -170,6 +170,7 @@ impl<A: Allocator> Buffer<A> {
         self.handle
     }
 
+    /// Get the size of this buffer
     pub fn size(&self) -> vk::DeviceSize {
         self.size
     }
@@ -205,10 +206,12 @@ impl BufferView {
         self.handle
     }
 
+    /// Get the offset of this buffer view into the owning buffer
     pub fn offset(&self) -> vk::DeviceSize {
         self.offset
     }
 
+    /// Get the size of this buffer view.
     pub fn size(&self) -> vk::DeviceSize {
         self.size
     }

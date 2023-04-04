@@ -11,12 +11,12 @@
 //! use std::path::Path;
 //! use phobos::prelude::*;
 //!
-//! let mut cache = ph::PipelineCache::new(device.clone())?;
+//! let mut cache = PipelineCache::new(device.clone())?;
 //!
 //! // Load in some shader code for our pipelines.
 //! // Note that `load_spirv_binary()` does not ship with phobos.
 //! let vtx_code = load_spirv_binary(Path::new("path/to/vertex.glsl"));
-//! let frag_code = load_spirv_binary(Path::new("path/to/fragment.glsl"));//!
+//! let frag_code = load_spirv_binary(Path::new("path/to/fragment.glsl"));
 //!
 //! // Create shaders, these can safely be discarded after building the pipeline
 //! // as they are just create info structs that are also stored internally
@@ -44,11 +44,7 @@
 //!     .attach_shader(fragment)
 //!     .build();
 //!
-//! // Now store it in the pipeline cache
-//! {
-//!     let mut cache = cache.lock()?;
-//!     cache.create_named_pipeline(pci)?;
-//! }
+//! cache.create_named_pipeline(pci)?;
 //! ```
 //! # Correct usage
 //! The pipeline cache internally frees up resources by destroying pipelines that have not been accessed in a long time.
@@ -70,6 +66,7 @@ pub mod shader;
 
 pub(crate) mod shader_reflection;
 
+/// Pipeline stage in the GPU pipeline.
 pub type PipelineStage = vk::PipelineStageFlags2;
 
 /// A fully built Vulkan pipeline. This is a managed resource, so it cannot be manually
@@ -99,6 +96,8 @@ pub struct ComputePipeline {
 /// Pipeline type.
 #[derive(Debug)]
 pub enum PipelineType {
+    /// Graphics pipeline
     Graphics,
+    /// Compute pipeline
     Compute,
 }

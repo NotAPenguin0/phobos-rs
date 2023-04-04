@@ -7,7 +7,9 @@ use crate::{BufferView, Error, ImageView, VirtualResource};
 /// Describes any physical resource handle on the GPU.
 #[derive(Debug, Clone)]
 pub enum PhysicalResource {
+    /// An image resource
     Image(ImageView),
+    /// A buffer resource
     Buffer(BufferView),
 }
 

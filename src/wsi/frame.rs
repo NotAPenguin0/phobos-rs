@@ -92,10 +92,13 @@ struct PerFrame<A: Allocator = DefaultAllocator> {
     /// Can be deleted once this frame's data is used again.
     #[derivative(Debug = "ignore")]
     pub command_buffer: Option<Box<dyn CmdBuffer>>,
-    // Scratch allocators
+    /// Scratch vertex buffer allocator. See [`ScratchAllocator`](crate::ScratchAllocator)
     pub vertex_allocator: ScratchAllocator<A>,
+    /// Scratch index buffer allocator. See [`ScratchAllocator`](crate::ScratchAllocator)
     pub index_allocator: ScratchAllocator<A>,
+    /// Scratch uniform buffer allocator. See [`ScratchAllocator`](crate::ScratchAllocator)
     pub uniform_allocator: ScratchAllocator<A>,
+    /// Scratch storage buffer allocator. See [`ScratchAllocator`](crate::ScratchAllocator)
     pub storage_allocator: ScratchAllocator<A>,
 }
 
@@ -424,11 +427,9 @@ impl<A: Allocator> FrameManager<A> {
     }
 
     /// Submit this frame's commands to be processed. Note that this is the only way a frame's commands
-    /// should ever be submitted to a queue. Any other ways to submit should be synchronized properly to this
+    /// should ever be submitted to a queue. Any other ways to submit commands for this frame should be synchronized properly to this
     /// submission. The reason for this is that [`FrameManager::present`] waits on a semaphore this function's submission
-    /// will signal. Any commands submitted from somewhere else must be synchronized to this submission.
-    /// Note: it's possible this will be enforced through the type system later.
-    /// TODO: examine possibilities for this.
+    /// will signal. Any commands for this frame submitted from somewhere else must be synchronized to this submission.
     fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: ExecutionManager) -> Result<()> {
         // Reset frame fence
         let mut per_frame = &mut self.per_frame[self.current_frame as usize];
@@ -508,18 +509,22 @@ impl<A: Allocator> FrameManager<A> {
 
 impl<'f, A: Allocator> InFlightContext<'f, A> {
     /// Allocate a scratch vertex buffer, which is only valid for the duration of this frame.
+    /// See also: [`ScratchAllocator`](crate::ScratchAllocator)
     pub fn allocate_scratch_vbo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
         self.vertex_allocator.allocate(size)
     }
     /// Allocate a scratch index buffer, which is only valid for the duration of this frame.
+    /// See also: [`ScratchAllocator`](crate::ScratchAllocator)
     pub fn allocate_scratch_ibo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
         self.index_allocator.allocate(size)
     }
     /// Allocate a scratch uniform buffer, which is only valid for the duration of this frame.
+    /// See also: [`ScratchAllocator`](crate::ScratchAllocator)
     pub fn allocate_scratch_ubo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
         self.uniform_allocator.allocate(size)
     }
     /// Allocate a scratch shader storage buffer, which is only valid for the duration of this frame.
+    /// See also: [`ScratchAllocator`](crate::ScratchAllocator)
     pub fn allocate_scratch_ssbo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
         self.storage_allocator.allocate(size)
     }
