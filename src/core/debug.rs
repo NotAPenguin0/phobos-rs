@@ -7,6 +7,12 @@ use crate::util::string::wrap_c_str;
 use crate::VkInstance;
 
 /// Vulkan debug messenger, can be passed to certain functions to extend debugging functionality.
+///
+/// This also dereferences into [`ash::extensions::ext::DebugUtils`], to directly call into the functions
+/// of the `VK_EXT_debug_utils` extension.
+///
+/// Using this requires the Vulkan SDK to be installed, so do not ship production applications with this
+/// enabled.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct DebugMessenger {
@@ -19,6 +25,7 @@ impl DebugMessenger {
     /// Creates a new debug messenger. Requires the vulkan validation layers to be enabled to
     /// do anything useful.
     pub fn new(instance: &VkInstance) -> Result<Self> {
+        // SAFETY: We do not mutate this loader in any way, so the safety contract is satisfied
         let functions = ash::extensions::ext::DebugUtils::new(unsafe { instance.loader() }, instance);
         let info = vk::DebugUtilsMessengerCreateInfoEXT {
             s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -29,6 +36,7 @@ impl DebugMessenger {
             pfn_user_callback: Some(vk_debug_callback),
             p_user_data: std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
         };
+        // SAFETY: Both p_user_data and p_next are allowed to be NULL, sType is correct and there are no other pointers passed in.
         let handle = unsafe { functions.create_debug_utils_messenger(&info, None)? };
         Ok(DebugMessenger {
             handle,
@@ -40,6 +48,7 @@ impl DebugMessenger {
 impl Drop for DebugMessenger {
     fn drop(&mut self) {
         unsafe {
+            // SAFETY: self is valid, so self.functions and self.handle are valid, non-null objects.
             self.functions.destroy_debug_utils_messenger(self.handle, None);
         }
     }

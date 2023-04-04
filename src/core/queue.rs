@@ -7,12 +7,21 @@ use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffe
 use crate::command_buffer::command_pool::CommandPool;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
-/// e.g. graphics queue and transfer could point to the same hardware queue.
+/// e.g. graphics and transfer queues could point to the same hardware queue. Synchronization for this is handled for you.
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
 pub enum QueueType {
+    /// Queue that supports graphics operations. Per the vulkan spec, this queue also always supports
+    /// transfer operations. Phobos will try to match this to a hardware queue that also
+    /// supports compute operations. This is always guaranteed to be available if graphics operations
+    /// are supported.
     #[default]
     Graphics = vk::QueueFlags::GRAPHICS.as_raw() as isize,
+    /// Queue that supports compute operations. Per the vulkan spec, this queue also always supports
+    /// transfer operations. Phobos will try to match this to a hardware queue that does not support
+    /// graphics operations if possible, to make full use of async compute when available.
     Compute = vk::QueueFlags::COMPUTE.as_raw() as isize,
+    /// Queue that supports transfer operations. Phobos will try to match this to a hardware queue that only supports
+    /// transfer operations if possible.
     Transfer = vk::QueueFlags::TRANSFER.as_raw() as isize,
 }
 
@@ -71,7 +80,8 @@ impl Queue {
     }
 
     /// Submits a batch of submissions to the queue, and signals the given fence when the
-    /// submission is done
+    /// submission is done. When possible, prefer submitting through the
+    /// execution manager.
     pub fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&Fence>) -> Result<()> {
         let fence = match fence {
             None => vk::Fence::null(),
@@ -87,7 +97,11 @@ impl Queue {
     }
 
     /// Submits a batch of submissions to the queue, and signals the given fence when the
-    /// submission is done
+    /// submission is done. When possible, prefer submitting through the
+    /// execution manager.
+    ///
+    /// This function is different from [`Queue::submit()`] only because it accepts `VkSubmitInfo2`[vk::SubmitInfo2] structures.
+    /// This is a more modern version of the old API. The old API will be deprecated and removed eventually.
     pub fn submit2(&self, submits: &[vk::SubmitInfo2], fence: Option<&Fence>) -> Result<()> {
         let fence = match fence {
             None => vk::Fence::null(),
@@ -144,6 +158,7 @@ impl Queue {
         Ok(())
     }
 
+    /// Get the properties of this queue, such as whether it is dedicated or not.
     pub fn info(&self) -> &QueueInfo {
         &self.info
     }

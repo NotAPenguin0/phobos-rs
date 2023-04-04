@@ -16,7 +16,8 @@ pub struct ExtensionProperties {
     pub spec_version: u32,
 }
 
-/// A physical device abstracts away an actual device, like a graphics card or integrated graphics card.
+/// A physical device abstracts away an actual device, like a graphics card or integrated graphics card. This struct stores
+/// its Vulkan handle, properties and requested queues.
 #[derive(Default, Debug)]
 pub struct PhysicalDevice {
     /// Handle to the [`VkPhysicalDevice`](vk::PhysicalDevice).
@@ -164,12 +165,25 @@ impl PhysicalDevice {
             .ok_or(anyhow::Error::from(Error::NoGPU))
     }
 
-    /// Get all queue families available on this device
+    /// Get all queue families available on this device. This is different from
+    /// [`Device::queue_families()`](crate::Device::queue_families) since this knows about properties of each family, while the
+    /// device function only knows about family indices.
     pub fn queue_families(&self) -> &[vk::QueueFamilyProperties] {
         self.queue_families.as_slice()
     }
 
-    /// Get all requested queues
+    /// Get information on all requested queues.
+    /// # Example
+    /// ```
+    /// # use phobos::*;
+    /// fn list_queues(device: PhysicalDevice) {
+    ///     device.queues()
+    ///           .iter()
+    ///           .for_each(|info| {
+    ///                 println!("Queue #{} supports {:#?} (dedicated = {}, can_present = {})", info.family_index, info.flags, info.dedicated, info.can_present);
+    ///           })
+    /// }
+    /// ```
     pub fn queues(&self) -> &[QueueInfo] {
         self.queues.as_slice()
     }
@@ -182,10 +196,23 @@ impl PhysicalDevice {
         self.handle
     }
 
+    /// This is the same function as [`Device::properties()`](crate::Device::properties)
     pub fn properties(&self) -> &vk::PhysicalDeviceProperties {
         &self.properties
     }
 
+    /// Get the memory properties of this physical device, such as the different memory heaps available.
+    /// # Example
+    /// ```
+    /// # use phobos::*;
+    /// fn list_memory_heaps(device: PhysicalDevice) {
+    ///     let properties = device.memory_properties();
+    ///     for i in 0..properties.memory_heap_count {
+    ///         let heap = properties.memory_heaps[i as usize];
+    ///         println!("Heap #{i} has flags {:#?} and a size of {} bytes", heap.flags, heap.size);
+    ///     }
+    /// }
+    /// ```
     pub fn memory_properties(&self) -> &vk::PhysicalDeviceMemoryProperties {
         &self.memory_properties
     }

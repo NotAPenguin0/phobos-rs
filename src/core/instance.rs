@@ -10,7 +10,8 @@ use crate::{AppSettings, WindowInterface};
 use crate::util::string::unwrap_to_raw_strings;
 
 /// Represents the loaded vulkan instance.
-/// You need to create this to initialize the Vulkan API.
+/// You need to create this to initialize the Vulkan API. This is used
+/// to create the device from.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct VkInstance {
@@ -22,6 +23,10 @@ pub struct VkInstance {
 
 impl VkInstance {
     /// Initializes the Vulkan API.
+    /// # Errors
+    /// * Can fail if the Vulkan loader was not found. Check for valid Vulkan drivers.
+    /// * Can fail if an instance extension or layer was requested that is not supported. This can happen when
+    ///   validation is enabled through [`AppSettings`], but the Vulkan SDK is not installed.
     pub fn new<Window: WindowInterface>(settings: &AppSettings<Window>) -> Result<Self> {
         let entry = unsafe { ash::Entry::load()? };
         let instance = create_vk_instance(&entry, settings)?;

@@ -44,7 +44,7 @@ impl WindowSize for winit::window::Window {
     }
 }
 
-/// Parent trait combining all requirements for a window interface. To be a window interface, a type T must implement the following traits:
+/// Blanket trait combining all requirements for a window interface. To be a window interface, a type T must implement the following traits:
 /// - [`HasRawWindowHandle`](raw_window_handle::HasRawWindowHandle)
 /// - [`HasRawDisplayHandle`](raw_window_handle::HasRawDisplayHandle)
 /// - [`WindowSize`]
