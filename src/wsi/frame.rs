@@ -25,8 +25,8 @@
 //!
 //!
 //!         // Advance caches to next frame to ensure resources are freed up where possible.
-//!         pipeline_cache.lock().unwrap().next_frame();
-//!         descriptor_cache.lock().unwrap().next_frame();
+//!         pipeline_cache.next_frame();
+//!         descriptor_cache.next_frame();
 //!
 //!         // Note that we want to handle events after processing our current frame, so that
 //!         // requesting an exit doesn't attempt to render another frame, which causes
@@ -69,10 +69,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{
-    Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore,
-    Surface, Swapchain, WindowInterface,
-};
+use crate::{Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore, Surface, Swapchain, VkInstance, WindowInterface};
 use crate::command_buffer::CommandBuffer;
 use crate::domain::ExecutionDomain;
 use crate::util::deferred_delete::DeletionQueue;
@@ -205,6 +202,12 @@ impl<A: Allocator> FrameManager<A> {
             swapchain,
             swapchain_delete: DeletionQueue::<Swapchain>::new((FRAMES_IN_FLIGHT + 2) as u32),
         })
+    }
+
+    /// Initialize frame manager and create a swapchain.
+    pub fn new_with_swapchain<Window: WindowInterface>(instance: &VkInstance, device: Device, allocator: A, settings: &AppSettings<Window>, surface: &Surface) -> Result<Self> {
+        let swapchain = Swapchain::new(instance, device.clone(), settings, surface)?;
+        FrameManager::new(device, allocator, settings, swapchain)
     }
 
     fn acquire_image(&self) -> Result<(u32 /*index*/, bool /*resize required*/)> {

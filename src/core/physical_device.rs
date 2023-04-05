@@ -165,6 +165,14 @@ impl PhysicalDevice {
             .ok_or(anyhow::Error::from(Error::NoGPU))
     }
 
+    /// Selects the best available physical device and creates a surface on it.
+    pub fn select_with_surface<Window: WindowInterface>(instance: &VkInstance, settings: &AppSettings<Window>) -> Result<(Surface, Self)> {
+        let mut surface = Surface::new(&instance, &settings)?;
+        let physical_device = PhysicalDevice::select(&instance, Some(&surface), &settings)?;
+        surface.query_details(&physical_device)?;
+        Ok((surface, physical_device))
+    }
+
     /// Get all queue families available on this device. This is different from
     /// [`Device::queue_families()`](crate::Device::queue_families) since this knows about properties of each family, while the
     /// device function only knows about family indices.

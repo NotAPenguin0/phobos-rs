@@ -47,7 +47,7 @@ pub(crate) mod command_pool;
 pub(crate) mod state;
 
 /// This struct represents a finished command buffer. This command buffer can't be recorded to anymore.
-/// It can only be obtained by calling [`IncompleteCommandBuffer::finish()`].
+/// It can only be obtained by calling [`IncompleteCommandBuffer::finish()`](crate::IncompleteCommandBuffer::finish).
 /// # Example
 /// ```
 /// # use phobos::*;

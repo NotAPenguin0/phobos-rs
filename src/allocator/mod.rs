@@ -1,6 +1,4 @@
 //! The allocator module exposes a couple interesting parts of the API
-//! <br>
-//! <br>
 //! # Allocator traits
 //! These are defined in [`traits`], and can be implemented to supply a custom allocator type to all phobos functions.
 //! # Default allocator

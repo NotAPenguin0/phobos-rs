@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 use futures::executor::block_on;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
@@ -66,12 +66,12 @@ pub trait ExampleApp {
 
     // Implement this for a windowed application
     fn frame(&mut self, _ctx: Context, _ifc: InFlightContext) -> Result<CommandBuffer<domain::All>> {
-        Err(anyhow!("frame() not implemented for non-headless example app"))
+        bail!("frame() not implemented for non-headless example app");
     }
 
     // Implement this for a headless application
     fn run(&mut self, _ctx: Context, _thread: ThreadContext) -> Result<()> {
-        Err(anyhow!("run() not implemented for headless example app"))
+        bail!("run() not implemented for headless example app");
     }
 }
 
@@ -120,33 +120,9 @@ impl ExampleRunner {
         };
         let settings = settings.build();
 
-        let instance = VkInstance::new(&settings)?;
-        let debug_messenger = DebugMessenger::new(&instance)?;
-        let (surface, physical_device) = {
-            match window {
-                None => {
-                    let physical_device = PhysicalDevice::select(&instance, None, &settings)?;
-                    (None, physical_device)
-                }
-                Some(_) => {
-                    let mut surface = Surface::new(&instance, &settings)?;
-                    let physical_device = PhysicalDevice::select(&instance, Some(&surface), &settings)?;
-                    surface.query_details(&physical_device)?;
-                    (Some(surface), physical_device)
-                }
-            }
+        let (instance, physical_device, surface, device, allocator, exec, frame, Some(debug_messenger)) = initialize(&settings, window.is_some())? else {
+            panic!("Asked for debug messenger but didnt get one")
         };
-        let device = Device::new(&instance, &physical_device, &settings)?;
-        let allocator = DefaultAllocator::new(&instance, &device, &physical_device)?;
-        let exec = ExecutionManager::new(device.clone(), &physical_device)?;
-        let frame = match window {
-            None => None,
-            Some(_) => {
-                let swapchain = Swapchain::new(&instance, device.clone(), &settings, surface.as_ref().unwrap())?;
-                Some(FrameManager::new(device.clone(), allocator.clone(), &settings, swapchain)?)
-            }
-        };
-
         let vk = VulkanContext {
             frame,
             exec,

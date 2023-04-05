@@ -7,3 +7,4 @@ pub mod error;
 pub mod instance;
 pub mod physical_device;
 pub mod queue;
+pub mod init;

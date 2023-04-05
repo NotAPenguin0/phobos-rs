@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{BufferView, Device, ImageView, IncompleteCommandBuffer};
+use crate::{BufferView, Device, ImageView};
 use crate::util::cache::{Resource, ResourceKey};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
