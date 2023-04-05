@@ -72,15 +72,21 @@ impl Resource for Shader {
             p_code: key.code.as_ptr(),
         };
 
+        let handle = unsafe { device.create_shader_module(&info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkShaderModule {handle:p}");
+
         Ok(Self {
             device: device.clone(),
-            handle: unsafe { device.create_shader_module(&info, None)? },
+            handle,
         })
     }
 }
 
 impl Drop for Shader {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkShaderModule {:p}", self.handle);
         unsafe {
             self.device.destroy_shader_module(self.handle, None);
         }

@@ -436,6 +436,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     /// }
     /// ```
     pub fn push_constants<T: Copy + Sized>(self, stage: vk::ShaderStageFlags, offset: u32, data: &[T]) -> Self {
+
         // TODO: Validate push constant ranges with current pipeline layout to prevent crashes.
         unsafe {
             // SAFETY: every data structure can be aligned to a byte slice.

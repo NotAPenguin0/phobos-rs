@@ -138,6 +138,8 @@ impl<A: Allocator> Image<A> {
                 None,
             )?
         };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkImage {handle:p}");
 
         let requirements = unsafe { device.get_image_memory_requirements(handle) };
 
@@ -209,6 +211,8 @@ impl<A: Allocator> Image<A> {
         };
 
         let view_handle = unsafe { self.device.create_image_view(&info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkImageView {view_handle:p}");
         Ok(ImageView::new(ImgView {
             device: self.device.clone(),
             handle: view_handle,
@@ -280,6 +284,8 @@ impl<A: Allocator> Image<A> {
 
 impl<A: Allocator> Drop for Image<A> {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkImage {:p}", self.handle);
         if self.is_owned() {
             unsafe {
                 self.device.destroy_image(self.handle, None);
@@ -383,6 +389,8 @@ impl ImgView {
 
 impl Drop for ImgView {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkImageView {:p}", self.handle);
         unsafe {
             self.device.destroy_image_view(self.handle, None);
         }

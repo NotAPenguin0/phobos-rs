@@ -30,6 +30,8 @@ impl VkInstance {
     pub fn new<Window: WindowInterface>(settings: &AppSettings<Window>) -> Result<Self> {
         let entry = unsafe { ash::Entry::load()? };
         let instance = create_vk_instance(&entry, settings)?;
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkInstance {:p}", instance.handle());
         Ok(VkInstance {
             entry,
             instance,
@@ -46,6 +48,8 @@ impl VkInstance {
 
 impl Drop for VkInstance {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkInstance {:p}", self.instance.handle());
         unsafe {
             self.instance.destroy_instance(None);
         }

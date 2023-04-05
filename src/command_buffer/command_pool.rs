@@ -22,6 +22,8 @@ impl CommandPool {
             queue_family_index: family,
         };
         let handle = unsafe { device.create_command_pool(&info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkCommandPool {handle:p}");
 
         Ok(CommandPool {
             device,
@@ -39,6 +41,8 @@ impl CommandPool {
 
 impl Drop for CommandPool {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkCommandPool {:p}", self.handle);
         unsafe {
             self.device.destroy_command_pool(self.handle, None);
         }

@@ -162,6 +162,8 @@ impl Device {
         let info = info.build();
 
         let handle = unsafe { instance.create_device(physical_device.handle(), &info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkDevice {:p}", handle.handle());
 
         let dynamic_state3 = if dynamic_state3_supported {
             Some(ash::extensions::ext::ExtendedDynamicState3::new(instance, &handle))
@@ -300,6 +302,8 @@ impl Deref for Device {
 
 impl Drop for DeviceInner {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkDevice {:p}", self.handle.handle());
         unsafe {
             self.handle.destroy_device(None);
         }

@@ -116,15 +116,22 @@ impl Resource for Pipeline {
         pci.stage_count = shader_info.len() as u32;
         pci.p_stages = shader_info.as_ptr();
 
+        let handle = unsafe {
+            device
+                .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
+                .map_err(|(_, e)| Error::VkError(e))?
+                .first()
+                .cloned()
+                .unwrap()
+        };
+
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkPipeline (graphics) {handle:p}");
+
         unsafe {
             Ok(Self {
                 device: device.clone(),
-                handle: device
-                    .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
-                    .map_err(|(_, e)| Error::VkError(e))?
-                    .first()
-                    .cloned()
-                    .unwrap(),
+                handle,
                 layout: layout.handle(),
                 set_layouts: layout.set_layouts().to_vec(),
             })
@@ -134,6 +141,8 @@ impl Resource for Pipeline {
 
 impl Drop for Pipeline {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkPipeline (graphics) {:p}", self.handle);
         unsafe {
             self.device.destroy_pipeline(self.handle, None);
         }
@@ -176,15 +185,22 @@ impl Resource for ComputePipeline {
 
         pci.stage = shader;
 
+        let handle = unsafe {
+            device
+                .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
+                .map_err(|(_, e)| Error::VkError(e))?
+                .first()
+                .cloned()
+                .unwrap()
+        };
+
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkPipeline (compute) {handle:p}");
+
         unsafe {
             Ok(Self {
                 device: device.clone(),
-                handle: device
-                    .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
-                    .map_err(|(_, e)| Error::VkError(e))?
-                    .first()
-                    .cloned()
-                    .unwrap(),
+                handle,
                 layout: layout.handle(),
                 set_layouts: layout.set_layouts().to_vec(),
             })
@@ -195,6 +211,8 @@ impl Resource for ComputePipeline {
 impl Drop for ComputePipeline {
     fn drop(&mut self) {
         unsafe {
+            #[cfg(feature = "log-objects")]
+            trace!("Destroying VkPipeline (compute) {:p}", self.handle);
             self.device.destroy_pipeline(self.handle, None);
         }
     }

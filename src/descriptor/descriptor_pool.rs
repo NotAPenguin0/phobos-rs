@@ -61,8 +61,12 @@ impl DescriptorPool {
             p_pool_sizes: pool_sizes.as_ptr(),
         };
 
+        let handle = unsafe { device.create_descriptor_pool(&info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkDescriptorPool {handle:p}");
+
         Ok(Self {
-            handle: unsafe { device.create_descriptor_pool(&info, None)? },
+            handle,
             device,
             size,
         })
@@ -79,6 +83,8 @@ impl DescriptorPool {
 
 impl Drop for DescriptorPool {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkDescriptorPool {:p}", self.handle);
         unsafe {
             self.device.destroy_descriptor_pool(self.handle, None);
         }

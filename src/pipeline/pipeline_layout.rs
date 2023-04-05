@@ -85,9 +85,15 @@ impl Resource for PipelineLayout {
             .push_constant_ranges(pc.as_slice())
             .set_layouts(set_layouts.as_slice())
             .build();
+
+        let handle = unsafe { device.create_pipeline_layout(&info, None)? };
+
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkPipelineLayout {handle:p}");
+
         Ok(Self {
             device: device.clone(),
-            handle: unsafe { device.create_pipeline_layout(&info, None)? },
+            handle,
             set_layouts,
         })
     }
@@ -95,6 +101,8 @@ impl Resource for PipelineLayout {
 
 impl Drop for PipelineLayout {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkPipelineLayout {:p}", self.handle);
         unsafe {
             self.device.destroy_pipeline_layout(self.handle, None);
         }

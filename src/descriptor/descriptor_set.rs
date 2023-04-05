@@ -112,6 +112,9 @@ impl Resource for DescriptorSet {
             p_set_layouts: &key.layout,
         };
         let set = unsafe { device.allocate_descriptor_sets(&info) }?.first().cloned().unwrap();
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkDescriptorSet {set:p}");
+
         let writes = key
             .bindings
             .iter()
@@ -186,6 +189,8 @@ impl Resource for DescriptorSet {
 
 impl Drop for DescriptorSet {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkDescriptorSet {:p}", self.handle);
         unsafe {
             self.device
                 .free_descriptor_sets(self.pool, std::slice::from_ref(&self.handle))

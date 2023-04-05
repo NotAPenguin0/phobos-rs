@@ -36,6 +36,8 @@ impl Surface {
                     None,
                 )?
             };
+            #[cfg(feature = "log-objects")]
+            trace!("Created new VkSurfaceKHR {handle:p}");
             Ok(Surface {
                 handle,
                 functions,
@@ -93,6 +95,8 @@ impl Deref for Surface {
 
 impl Drop for Surface {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkSurfaceKHR {:p}", self.handle);
         unsafe {
             self.functions.destroy_surface(self.handle, None);
         }

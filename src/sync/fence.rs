@@ -165,8 +165,14 @@ impl<T> Fence<T> {
                 vk::FenceCreateFlags::empty()
             },
         };
+
+        let handle = unsafe { device.create_fence(&info, None)? };
+
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkFence {handle:p}");
+
         Ok(Fence {
-            handle: unsafe { device.create_fence(&info, None)? },
+            handle,
             device,
             poll_rate,
             first_cleanup_fn: None,
@@ -289,6 +295,8 @@ impl<T> std::future::Future for Fence<T> {
 
 impl<T> Drop for Fence<T> {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkFence {:p}", self.handle);
         unsafe {
             self.device.destroy_fence(self.handle, None);
         }

@@ -38,6 +38,8 @@ impl DebugMessenger {
         };
         // SAFETY: Both p_user_data and p_next are allowed to be NULL, sType is correct and there are no other pointers passed in.
         let handle = unsafe { functions.create_debug_utils_messenger(&info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkDebugUtilsMessengerEXT {handle:p}");
         Ok(DebugMessenger {
             handle,
             functions,
@@ -47,6 +49,8 @@ impl DebugMessenger {
 
 impl Drop for DebugMessenger {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkDebugUtilsMessengerEXT {:p}", self.handle);
         unsafe {
             // SAFETY: self is valid, so self.functions and self.handle are valid, non-null objects.
             self.functions.destroy_debug_utils_messenger(self.handle, None);

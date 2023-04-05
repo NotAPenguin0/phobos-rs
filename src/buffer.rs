@@ -103,6 +103,8 @@ impl<A: Allocator> Buffer<A> {
                 None,
             )?
         };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkBuffer {handle:p} (size = {size} bytes)");
 
         let requirements = unsafe { device.get_buffer_memory_requirements(handle) };
         let memory = allocator.allocate("buffer", &requirements, location)?;
@@ -176,6 +178,8 @@ impl<A: Allocator> Buffer<A> {
 
 impl<A: Allocator> Drop for Buffer<A> {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkBuffer {:p}", self.handle);
         unsafe {
             self.device.destroy_buffer(self.handle, None);
         }

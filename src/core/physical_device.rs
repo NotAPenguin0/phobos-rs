@@ -160,6 +160,8 @@ impl PhysicalDevice {
                     total_video_memory(&physical_device),
                     total_device_memory(&physical_device)
                 );
+                #[cfg(feature = "log-objects")]
+                trace!("Created new VkPhysicalDevice {:p}", physical_device.handle);
                 Some(physical_device)
             })
             .ok_or(anyhow::Error::from(Error::NoGPU))
