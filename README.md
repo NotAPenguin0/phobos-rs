@@ -64,34 +64,32 @@ fn main() {
           ],
           ..Default::default()
         })
-        .build();
-  
-    // Initialize Vulkan. This is generally always going to be the same for every project, but it is 
-    // not abstracted away to allow keeping each created object separately.
-    let instance = VkInstance::new(&settings)?;
-    let debug_messenger = DebugMessenger::new(&instance)?;
-    let (surface, physical_device) = {
-      let mut surface = Surface::new(&instance, &settings)?;
-      let physical_device = PhysicalDevice::select(&instance, Some(&surface), &settings)?;
-      surface.query_details(&physical_device)?;
-      (surface, physical_device)
-    };
-    let device = Device::new(&instance, &physical_device, &settings)?;
-    let mut alloc = DefaultAllocator::new(&instance, &device, &physical_device)?;
-    let exec = ExecutionManager::new(device.clone(), &physical_device)?;
-    let mut frame = {
-      let swapchain = Swapchain::new(&instance, device.clone(), &settings, &surface)?;
-      FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
-    };
+            .build();
 
-    // Create a new pass graph for rendering. Note how we only do this once, as 
-    // we are using virtual resources that do not depend on the frame.
-    let swapchain = VirtualResource::image("swapchain");
-    let clear_pass = PassBuilder::render("clear")
-            .color_attachment(&swapchain, 
-                              vk::AttachmentLoadOp::CLEAR,
-                              // Clear the swapchain to red.
-                              Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
+  // Initialize Vulkan. There are other ways to initialize, for example
+  // with a custom allocator, or without a window context. See the core::init module for this 
+  // funcionality.
+  use phobos::prelude::*;
+  let (
+    instance,
+    physical_device,
+    surface,
+    allocator,
+    exec,
+    frame,
+    Some(debug_messenger)
+  ) = WindowedContext::init(&settings)? else {
+    panic!("Asked for debug messenger but didn't get one.")
+  };
+
+  // Create a new pass graph for rendering. Note how we only do this once, as 
+  // we are using virtual resources that do not depend on the frame.
+  let swapchain = VirtualResource::image("swapchain");
+  let clear_pass = PassBuilder::render("clear")
+          .color_attachment(&swapchain,
+                            vk::AttachmentLoadOp::CLEAR,
+                            // Clear the swapchain to red.
+                            Some(vk::ClearColorValue { float32: [1.0, 0.0, 0.0, 1.0] }))?
             .build();
     let present_pass = PassBuilder::present("present", clear_pass.output(&swapchain).unwrap());
     let graph = PassGraph::new()
