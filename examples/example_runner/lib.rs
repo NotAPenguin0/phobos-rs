@@ -120,7 +120,7 @@ impl ExampleRunner {
         };
         let settings = settings.build();
 
-        let (instance, physical_device, surface, device, allocator, exec, frame, Some(debug_messenger)) = initialize(&settings, window.is_some())? else {
+        let (instance, physical_device, surface, device, allocator, exec, frame, Some(debug_messenger)) = initialize(&settings, window.is_none())? else {
             panic!("Asked for debug messenger but didnt get one")
         };
         let vk = VulkanContext {

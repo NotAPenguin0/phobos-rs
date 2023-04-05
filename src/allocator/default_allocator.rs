@@ -88,8 +88,12 @@ impl DefaultAllocator {
 impl DefaultAllocator {
     fn free_impl(&mut self, allocation: &mut <Self as Allocator>::Allocation) -> Result<()> {
         let mut alloc = self.alloc.lock().map_err(|_| Error::PoisonError)?;
-        let memory = allocation.allocation.take().unwrap();
-        alloc.free(memory)?;
+        match allocation.allocation.take() {
+            None => {}
+            Some(allocation) => {
+                alloc.free(allocation)?;
+            }
+        }
         Ok(())
     }
 }

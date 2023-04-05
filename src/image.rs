@@ -28,8 +28,6 @@ pub struct Image<A: Allocator = DefaultAllocator> {
     /// Reference to the [`VkDevice`](vk::Device).
     #[derivative(Debug = "ignore")]
     device: Device,
-    #[derivative(Debug = "ignore")]
-    allocator: Option<A>,
     /// [`VkImage`](vk::Image) handle.
     handle: vk::Image,
     /// GPU memory allocation. If this is None, then the image is not owned by our system (for example a swapchain image) and should not be
@@ -151,7 +149,6 @@ impl<A: Allocator> Image<A> {
 
         Ok(Self {
             device,
-            allocator: Some(alloc.clone()),
             handle,
             format,
             size: vk::Extent3D {
@@ -177,7 +174,6 @@ impl<A: Allocator> Image<A> {
     ) -> Self {
         Self {
             device,
-            allocator: None,
             handle,
             memory: None,
             format,
@@ -287,12 +283,6 @@ impl<A: Allocator> Drop for Image<A> {
         if self.is_owned() {
             unsafe {
                 self.device.destroy_image(self.handle, None);
-            }
-            if let Some(memory) = &mut self.memory {
-                let memory = std::mem::take(memory);
-                if let Some(allocator) = &mut self.allocator {
-                    allocator.free(memory).unwrap();
-                }
             }
         }
     }

@@ -6,6 +6,10 @@ layout(set = 0, binding = 0) buffer writeonly Output {
     float data[];
 } outbuf;
 
+layout(push_constant) uniform PC {
+    float multiplier;
+} pc;
+
 void main() {
-    outbuf.data[gl_GlobalInvocationID.x] = float(gl_GlobalInvocationID.x);
+    outbuf.data[gl_GlobalInvocationID.x] = float(gl_GlobalInvocationID.x) * pc.multiplier;
 }

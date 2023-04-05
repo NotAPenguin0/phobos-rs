@@ -47,10 +47,13 @@ impl ExampleApp for Compute {
             .exec
             .on_domain::<domain::Compute>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
 
+        let multiplier: f32 = 2.0;
+
         // Record some commands, then obtain a finished command buffer to submit
         let cmd = cmd
             .bind_compute_pipeline("compute")?
             .bind_storage_buffer(0, 0, &self.buffer.view_full())?
+            .push_constant(vk::ShaderStageFlags::COMPUTE, 0, &multiplier)
             .dispatch(4, 1, 1)?
             .finish()?;
 

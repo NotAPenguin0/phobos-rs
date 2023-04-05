@@ -43,8 +43,7 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
     #[derivative(Debug = "ignore")]
     device: Device,
     #[derivative(Debug = "ignore")]
-    allocator: A,
-    #[derivative(Debug = "ignore")]
+    #[allow(dead_code)]
     memory: A::Allocation,
     pointer: Option<NonNull<c_void>>,
     handle: vk::Buffer,
@@ -112,7 +111,6 @@ impl<A: Allocator> Buffer<A> {
 
         Ok(Self {
             device,
-            allocator: allocator.clone(),
             pointer: memory.mapped_ptr(),
             memory,
             handle,
@@ -178,8 +176,6 @@ impl<A: Allocator> Buffer<A> {
 
 impl<A: Allocator> Drop for Buffer<A> {
     fn drop(&mut self) {
-        let memory = std::mem::take(&mut self.memory);
-        self.allocator.free(memory).unwrap();
         unsafe {
             self.device.destroy_buffer(self.handle, None);
         }

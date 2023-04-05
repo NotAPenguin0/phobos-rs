@@ -408,6 +408,21 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self
     }
 
+    /// Upload a single value of push constants. These are small packets of data stored inside the command buffer, so their state is tracked while executing.
+    /// Direct translation of [`vkCmdPushConstants`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPushConstants.html).
+    /// # Example
+    /// ```
+    /// # use phobos::*;
+    /// # use phobos::domain::ExecutionDomain;
+    /// fn use_push_constant<D: ExecutionDomain>(cmd: IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> {
+    ///     // Assumes a pipeline is bound, and that this pipeline has a vertex shader with the specified push constant range.
+    ///     let data: f32 = 1.0;
+    ///     cmd.push_constant(vk::ShaderStageFlags::VERTEX, 0, &data)
+    /// }
+    pub fn push_constant<T: Copy + Sized>(self, stage: vk::ShaderStageFlags, offset: u32, data: &T) -> Self {
+        self.push_constants(stage, offset, std::slice::from_ref(data))
+    }
+
     /// Upload push constants. These are small packets of data stored inside the command buffer, so their state is tracked while executing.
     /// Direct translation of [`vkCmdPushConstants`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPushConstants.html).
     /// # Example
@@ -420,7 +435,7 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     ///     cmd.push_constants(vk::ShaderStageFlags::VERTEX, 0, &data)
     /// }
     /// ```
-    pub fn push_constants<T: Copy>(self, stage: vk::ShaderStageFlags, offset: u32, data: &[T]) -> Self {
+    pub fn push_constants<T: Copy + Sized>(self, stage: vk::ShaderStageFlags, offset: u32, data: &[T]) -> Self {
         // TODO: Validate push constant ranges with current pipeline layout to prevent crashes.
         unsafe {
             // SAFETY: every data structure can be aligned to a byte slice.
