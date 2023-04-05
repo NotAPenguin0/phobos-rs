@@ -68,7 +68,7 @@ fn main() {
 
   // Initialize Vulkan. There are other ways to initialize, for example
   // with a custom allocator, or without a window context. See the core::init module for this 
-  // funcionality.
+  // functionality.
   use phobos::prelude::*;
   let (
     instance,
