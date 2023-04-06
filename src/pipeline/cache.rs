@@ -56,6 +56,14 @@ pub struct PipelineCache {
     inner: Arc<RwLock<PipelineCacheInner>>,
 }
 
+// SAFETY: Inner state is wrapped in an Arc<RwLock<T>>, and all pointers inside point to
+// internal data
+unsafe impl Send for PipelineCache {}
+
+// SAFETY: Inner state is wrapped in an Arc<RwLock<T>>, and all pointers inside point to
+// internal data
+unsafe impl Sync for PipelineCache {}
+
 macro_rules! require_extension {
     ($pci:ident, $device:ident, $state:expr, $ext:expr) => {
         if $pci.dynamic_states.contains(&$state) && !$device.is_extension_enabled($ext) {
