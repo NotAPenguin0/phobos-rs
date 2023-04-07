@@ -133,7 +133,7 @@ pub struct InFlightContext<'f, A: Allocator = DefaultAllocator> {
 /// The number of frames in flight. A frame in-flight is a frame that is rendering on the GPU or scheduled to do so.
 /// With two frames in flight, we can prepare a frame on the CPU while one frame is rendering on the GPU.
 /// This gives a good amount of parallelization while avoiding input lag.
-const FRAMES_IN_FLIGHT: usize = 2;
+pub const FRAMES_IN_FLIGHT: usize = 2;
 
 /// Responsible for presentation, frame-frame synchronization and per-frame resources.
 #[derive(Derivative)]
