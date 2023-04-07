@@ -261,6 +261,14 @@ impl<Q: Query> QueryPool<Q> {
         }
     }
 
+    pub fn current(&self) -> u32 {
+        if self.current == 0 {
+            0
+        } else {
+            self.current - 1
+        }
+    }
+
     pub fn wait_for_results(&mut self, first: u32, count: u32) -> Result<Vec<Q::Output>> {
         ensure!(first < self.count, "Query range out of range of query pool");
         ensure!(first + count <= self.count, "Query range out of range of query pool");
