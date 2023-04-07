@@ -77,7 +77,12 @@ impl ExecutionManager {
                     // Use this for our queue
                     device_queue
                 };
-                Ok(Mutex::new(Queue::new(device.clone(), device_queue, *queue)?))
+                Ok(Mutex::new(Queue::new(
+                    device.clone(),
+                    device_queue,
+                    *queue,
+                    *physical_device.queue_families().get(queue.family_index as usize).unwrap(),
+                )?))
             })
             .collect::<Result<Vec<Mutex<Queue>>>>()?;
 
@@ -99,22 +104,14 @@ impl ExecutionManager {
 
     /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn try_on_domain<'q, D: ExecutionDomain>(
-        &'q self,
-        pipelines: Option<PipelineCache>,
-        descriptors: Option<DescriptorCache>,
-    ) -> Result<D::CmdBuf<'q>> {
+    pub fn try_on_domain<'q, D: ExecutionDomain>(&'q self, pipelines: Option<PipelineCache>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn on_domain<'q, D: ExecutionDomain>(
-        &'q self,
-        pipelines: Option<PipelineCache>,
-        descriptors: Option<DescriptorCache>,
-    ) -> Result<D::CmdBuf<'q>> {
+    pub fn on_domain<'q, D: ExecutionDomain>(&'q self, pipelines: Option<PipelineCache>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }

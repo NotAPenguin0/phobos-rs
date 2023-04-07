@@ -139,6 +139,7 @@ impl Device {
         let mut features_1_1 = settings.gpu_requirements.features_1_1;
         let mut features_1_2 = settings.gpu_requirements.features_1_2;
         let mut features_1_3 = settings.gpu_requirements.features_1_3;
+        features_1_2.host_query_reset = vk::TRUE;
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
         features_1_3.maintenance4 = vk::TRUE;

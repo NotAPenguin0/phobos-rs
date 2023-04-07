@@ -3,6 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use phobos::prelude::*;
+use phobos::query_pool::{QueryPool, TimestampQuery};
 
 use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file};
 
@@ -24,7 +25,7 @@ impl ExampleApp for Compute {
         let buffer = Buffer::new(
             ctx.device,
             &mut ctx.allocator,
-            (16 * std::mem::size_of::<f32>()) as u64,
+            (1024 * 4 * std::mem::size_of::<f32>()) as u64,
             vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
             MemoryType::CpuToGpu,
         )?;
@@ -47,14 +48,19 @@ impl ExampleApp for Compute {
             .exec
             .on_domain::<domain::Compute>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
 
+        // Create a query pool to record timestamps
+        let mut timestamps = QueryPool::<TimestampQuery>::new(ctx.device, 2)?;
+
         let multiplier: f32 = 2.0;
 
         // Record some commands, then obtain a finished command buffer to submit
         let cmd = cmd
+            .write_timestamp(&mut timestamps, PipelineStage::TOP_OF_PIPE)?
             .bind_compute_pipeline("compute")?
             .bind_storage_buffer(0, 0, &self.buffer.view_full())?
             .push_constant(vk::ShaderStageFlags::COMPUTE, 0, &multiplier)
-            .dispatch(4, 1, 1)?
+            .dispatch(1024, 1, 1)?
+            .write_timestamp(&mut timestamps, PipelineStage::COMPUTE_SHADER)?
             .finish()?;
 
         // Submit our command buffer and wait for its completion.
@@ -64,6 +70,12 @@ impl ExampleApp for Compute {
         let mut view = self.buffer.view_full();
         let data = view.mapped_slice::<f32>()?;
         println!("Output data: {data:?}");
+
+        // Get our timestamp data
+        let times = timestamps.wait_for_all_results()?;
+        let start = *times.first().unwrap();
+        let end = *times.last().unwrap();
+        println!("Start: {}\tEnd: {}", start.raw_value(), end.raw_value());
 
         Ok(())
     }

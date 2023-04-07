@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, MutexGuard};
 
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 use ash::vk;
 
 use crate::{
@@ -15,6 +15,8 @@ use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
+use crate::pipeline::Pipeline;
+use crate::query_pool::{Query, QueryPool, TimestampQuery};
 
 impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer<'q, D> {
     type Domain = D;
@@ -45,6 +47,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
         Ok(IncompleteCommandBuffer {
             device,
             handle,
+            timestamp_valid_bits: queue_lock.family_properties().timestamp_valid_bits,
             queue_lock,
             current_pipeline_layout: vk::PipelineLayout::null(),
             current_set_layouts: vec![],
@@ -446,6 +449,15 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
                 .cmd_push_constants(self.handle, self.current_pipeline_layout, stage, offset, data);
         }
         self
+    }
+
+    /// Write a timestamp to the next entry in a query pool.
+    /// # Errors
+    /// * Fails if the query pool is out of entries.
+    pub fn write_timestamp(self, query_pool: &mut QueryPool<TimestampQuery>, stage: PipelineStage) -> Result<Self> {
+        let index = query_pool.next().ok_or(anyhow!("Query pool capacity exceeded"))?;
+        query_pool.write_timestamp(self.timestamp_valid_bits, self.handle, stage, index);
+        Ok(self)
     }
 
     /// Returns true if this command buffer was created with a pipeline cache.

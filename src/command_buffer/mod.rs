@@ -99,6 +99,7 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     device: Device,
     handle: vk::CommandBuffer,
     queue_lock: MutexGuard<'q, Queue>,
+    timestamp_valid_bits: u32,
     current_pipeline_layout: vk::PipelineLayout,
     current_set_layouts: Vec<vk::DescriptorSetLayout>,
     current_bindpoint: vk::PipelineBindPoint,

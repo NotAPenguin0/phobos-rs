@@ -60,10 +60,12 @@ pub struct Queue {
     pool: CommandPool,
     /// Information about this queue, such as supported operations, family index, etc. See also [`QueueInfo`]
     info: QueueInfo,
+    /// This queues queue family properties.
+    family_properties: vk::QueueFamilyProperties,
 }
 
 impl Queue {
-    pub(crate) fn new(device: Device, queue: Arc<Mutex<DeviceQueue>>, info: QueueInfo) -> Result<Self> {
+    pub(crate) fn new(device: Device, queue: Arc<Mutex<DeviceQueue>>, info: QueueInfo, family_properties: vk::QueueFamilyProperties) -> Result<Self> {
         // We create a transient command pool because command buffers will be allocated and deallocated
         // frequently.
         let pool = CommandPool::new(device.clone(), info.family_index, vk::CommandPoolCreateFlags::TRANSIENT)?;
@@ -72,6 +74,7 @@ impl Queue {
             queue,
             pool,
             info,
+            family_properties,
         })
     }
 
@@ -161,5 +164,10 @@ impl Queue {
     /// Get the properties of this queue, such as whether it is dedicated or not.
     pub fn info(&self) -> &QueueInfo {
         &self.info
+    }
+
+    /// Get the properties of this queue's family.
+    pub fn family_properties(&self) -> &vk::QueueFamilyProperties {
+        &self.family_properties
     }
 }
