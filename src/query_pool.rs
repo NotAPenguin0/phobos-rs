@@ -301,6 +301,10 @@ impl<Q: Query> QueryPool<Q> {
         Ok(data)
     }
 
+    pub fn reset(&self) {
+        unsafe { self.device.reset_query_pool(self.handle, 0, self.count) };
+    }
+
     pub unsafe fn handle(&self) -> vk::QueryPool {
         self.handle
     }
