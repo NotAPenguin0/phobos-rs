@@ -27,6 +27,7 @@ pub struct WindowContext {
 }
 
 impl WindowContext {
+    #[allow(dead_code)]
     pub fn new(title: impl Into<String>) -> Result<Self> {
         let event_loop = EventLoopBuilder::new().build();
         let window = WindowBuilder::new()

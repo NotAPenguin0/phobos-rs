@@ -36,7 +36,6 @@ use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, Exe
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
-use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
 
 pub mod compute;
 pub mod graphics;

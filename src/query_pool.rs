@@ -174,7 +174,7 @@ impl Query for PipelineStatisticsQuery {
         num_queries(self.flags)
     }
 
-    fn parse_query(&self, device: &Device, data: &[u64]) -> Self::Output {
+    fn parse_query(&self, _device: &Device, data: &[u64]) -> Self::Output {
         const BITS: [vk::QueryPipelineStatisticFlags; 13] = [
             vk::QueryPipelineStatisticFlags::INPUT_ASSEMBLY_VERTICES,
             vk::QueryPipelineStatisticFlags::INPUT_ASSEMBLY_PRIMITIVES,

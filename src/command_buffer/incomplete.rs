@@ -15,8 +15,7 @@ use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
-use crate::pipeline::Pipeline;
-use crate::query_pool::{Query, QueryPool, ScopedQuery, TimestampQuery};
+use crate::query_pool::{QueryPool, ScopedQuery, TimestampQuery};
 
 impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer<'q, D> {
     type Domain = D;
