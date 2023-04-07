@@ -1,3 +1,6 @@
+use std::ops::Sub;
+use std::time::Duration;
+
 use anyhow::{ensure, Result};
 use ash::vk;
 
@@ -13,14 +16,31 @@ pub trait Query: Default + Clone + Sized {
 }
 
 #[derive(Default, Copy, Clone, Debug)]
-#[repr(C, packed)]
 pub struct Timestamp {
     value: u64,
+    // The number of nanoseconds it takes for the timestamp to be incremented
+    period: f32,
 }
 
 impl Timestamp {
     pub fn raw_value(&self) -> u64 {
         self.value
+    }
+
+    pub fn nanoseconds(&self) -> u64 {
+        (self.value as f64 * self.period as f64) as u64
+    }
+
+    pub fn duration_since_epoch(&self) -> Duration {
+        Duration::from_nanos(self.nanoseconds())
+    }
+}
+
+impl Sub<Timestamp> for Timestamp {
+    type Output = Duration;
+
+    fn sub(self, rhs: Timestamp) -> Self::Output {
+        Duration::from_nanos(self.nanoseconds() - rhs.nanoseconds())
     }
 }
 
@@ -50,6 +70,7 @@ impl Query for TimestampQuery {
         let value = value & mask;
         Timestamp {
             value,
+            period: device.properties().limits.timestamp_period
         }
     }
 }

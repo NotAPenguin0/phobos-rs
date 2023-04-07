@@ -75,7 +75,9 @@ impl ExampleApp for Compute {
         let times = timestamps.wait_for_all_results()?;
         let start = *times.first().unwrap();
         let end = *times.last().unwrap();
-        println!("Start: {}\tEnd: {}", start.raw_value(), end.raw_value());
+        println!("{:?}", start);
+        println!("{:?}", end);
+        println!("Entire command buffer took {} nanoseconds", (end - start).as_nanos());
 
         Ok(())
     }
