@@ -86,37 +86,36 @@ use crate::pipeline::PipelineStage;
 pub type PassFnResult<'q, D> = Result<IncompleteCommandBuffer<'q, D>>;
 
 /// Blanket trait for the pass callback function.
-pub trait PassFn<'q, D: ExecutionDomain, A: Allocator>:
-FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> PassFnResult<'q, D> {}
+pub trait PassFn<'q, D: ExecutionDomain, U, A: Allocator>:
+FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &U) -> PassFnResult<'q, D> {}
 
-impl<'q, D, A, F> PassFn<'q, D, A> for F
+impl<'q, D, U, A, F> PassFn<'q, D, U, A> for F
     where
         D: ExecutionDomain,
         A: Allocator,
-        F: FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings) -> PassFnResult<'q, D>,
+        F: FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &U) -> PassFnResult<'q, D>,
 {}
 
-pub(crate) type BoxedPassFn<'q, 'exec, D, A> =
-Box<dyn PassFn<'q, D, A, Output=PassFnResult<'q, D>> + 'exec>;
+pub(crate) type BoxedPassFn<'q, 'exec, D, U, A> = Box<dyn PassFn<'q, D, U, A, Output=PassFnResult<'q, D>> + 'exec>;
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
-pub struct Pass<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
+pub struct Pass<'exec, 'q, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
     pub(crate) name: String,
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<PassResource>,
     pub(crate) outputs: Vec<PassResource>,
-    pub(crate) execute: BoxedPassFn<'q, 'exec, D, A>,
+    pub(crate) execute: BoxedPassFn<'q, 'exec, D, U, A>,
     pub(crate) is_renderpass: bool,
 }
 
 /// Used to create [`Pass`] objects correctly.
 /// # Example
 /// See the [`pass`](crate::graph::pass) module level documentation.
-pub struct PassBuilder<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
-    inner: Pass<'exec, 'q, D, A>,
+pub struct PassBuilder<'exec, 'q, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
+    inner: Pass<'exec, 'q, D, U, A>,
 }
 
-impl<'exec, 'q, D: ExecutionDomain, A: Allocator> Pass<'exec, 'q, D, A> {
+impl<'exec, 'q, D: ExecutionDomain, U, A: Allocator> Pass<'exec, 'q, D, U, A> {
     /// Returns the output virtual resource associated with the input resource.
     pub fn output(&self, resource: &VirtualResource) -> Option<&VirtualResource> {
         self.outputs
@@ -136,14 +135,14 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> Pass<'exec, 'q, D, A> {
     }
 }
 
-impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
+impl<'exec, 'q, D: ExecutionDomain, U, A: Allocator> PassBuilder<'exec, 'q, D, U, A> {
     /// Create a new pass for generic commands. Does not support commands that are located inside a renderpass.
     pub fn new(name: impl Into<String>) -> Self {
         PassBuilder {
             inner: Pass {
                 name: name.into(),
                 color: None,
-                execute: Box::new(|c, _, _| Ok(c)),
+                execute: Box::new(|c, _, _, _| Ok(c)),
                 inputs: vec![],
                 outputs: vec![],
                 is_renderpass: false,
@@ -157,7 +156,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
             inner: Pass {
                 name: name.into(),
                 color: None,
-                execute: Box::new(|c, _, _| Ok(c)),
+                execute: Box::new(|c, _, _, _| Ok(c)),
                 inputs: vec![],
                 outputs: vec![],
                 is_renderpass: true,
@@ -168,7 +167,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     /// Create a pass for presenting to the swapchain.
     /// Note that this doesn't actually do the presentation, it just adds the proper synchronization for it.
     /// If you are presenting to an output of the graph, this is required.
-    pub fn present(name: impl Into<String>, swapchain: &VirtualResource) -> Pass<'exec, 'q, D, A> {
+    pub fn present(name: impl Into<String>, swapchain: &VirtualResource) -> Pass<'exec, 'q, D, U, A> {
         Pass {
             name: name.into(),
             color: None,
@@ -181,7 +180,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
                 load_op: None,
             }],
             outputs: vec![],
-            execute: Box::new(|c, _, _| Ok(c)),
+            execute: Box::new(|c, _, _, _| Ok(c)),
             is_renderpass: false,
         }
     }
@@ -310,16 +309,13 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassBuilder<'exec, 'q, D, A> {
     }
 
     /// Set the function to be called when recording this pass.
-    pub fn execute(
-        mut self,
-        exec: impl PassFn<'q, D, A> + 'exec,
-    ) -> Self {
+    pub fn execute(mut self, exec: impl PassFn<'q, D, U, A> + 'exec) -> Self {
         self.inner.execute = Box::new(exec);
         self
     }
 
     /// Obtain a built [`Pass`] object.
-    pub fn build(self) -> Pass<'exec, 'q, D, A> {
+    pub fn build(self) -> Pass<'exec, 'q, D, U, A> {
         self.inner
     }
 }
