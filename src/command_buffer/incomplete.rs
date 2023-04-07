@@ -16,7 +16,7 @@ use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::Pipeline;
-use crate::query_pool::{Query, QueryPool, TimestampQuery};
+use crate::query_pool::{Query, QueryPool, ScopedQuery, TimestampQuery};
 
 impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer<'q, D> {
     type Domain = D;
@@ -439,7 +439,6 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     /// }
     /// ```
     pub fn push_constants<T: Copy + Sized>(self, stage: vk::ShaderStageFlags, offset: u32, data: &[T]) -> Self {
-
         // TODO: Validate push constant ranges with current pipeline layout to prevent crashes.
         unsafe {
             // SAFETY: every data structure can be aligned to a byte slice.
@@ -447,6 +446,20 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
             // SAFETY: self is valid, everything else is up to validation layers.
             self.device
                 .cmd_push_constants(self.handle, self.current_pipeline_layout, stage, offset, data);
+        }
+        self
+    }
+
+    pub fn begin_query<Q: ScopedQuery>(self, query_pool: &QueryPool<Q>, index: u32) -> Self {
+        unsafe {
+            self.device.cmd_begin_query(self.handle, query_pool.handle(), index, vk::QueryControlFlags::default());
+        }
+        self
+    }
+
+    pub fn end_query<Q: ScopedQuery>(self, query_pool: &QueryPool<Q>, index: u32) -> Self {
+        unsafe {
+            self.device.cmd_end_query(self.handle, query_pool.handle(), index);
         }
         self
     }

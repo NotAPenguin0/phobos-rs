@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use phobos::prelude::*;
-use phobos::query_pool::{QueryPool, TimestampQuery};
+use phobos::query_pool::{PipelineStatisticsQuery, QueryPool, QueryPoolCreateInfo, TimestampQuery};
 
 use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file};
 
@@ -49,17 +49,29 @@ impl ExampleApp for Compute {
             .on_domain::<domain::Compute>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
 
         // Create a query pool to record timestamps
-        let mut timestamps = QueryPool::<TimestampQuery>::new(ctx.device, 2)?;
+        let mut timestamps = QueryPool::<TimestampQuery>::new(ctx.device.clone(), QueryPoolCreateInfo {
+            count: 2,
+            statistic_flags: None,
+        })?;
+
+        // Create a query pool to record pipeline statistics
+        let mut stats = QueryPool::<PipelineStatisticsQuery>::new(ctx.device, QueryPoolCreateInfo {
+            count: 1,
+            statistic_flags: Some(vk::QueryPipelineStatisticFlags::COMPUTE_SHADER_INVOCATIONS),
+        })?;
 
         let multiplier: f32 = 2.0;
+        let query = stats.next().unwrap();
 
         // Record some commands, then obtain a finished command buffer to submit
         let cmd = cmd
             .write_timestamp(&mut timestamps, PipelineStage::TOP_OF_PIPE)?
+            .begin_query(&stats, query)
             .bind_compute_pipeline("compute")?
             .bind_storage_buffer(0, 0, &self.buffer.view_full())?
             .push_constant(vk::ShaderStageFlags::COMPUTE, 0, &multiplier)
             .dispatch(1024, 1, 1)?
+            .end_query(&stats, query)
             .write_timestamp(&mut timestamps, PipelineStage::COMPUTE_SHADER)?
             .finish()?;
 
@@ -75,9 +87,9 @@ impl ExampleApp for Compute {
         let times = timestamps.wait_for_all_results()?;
         let start = *times.first().unwrap();
         let end = *times.last().unwrap();
-        println!("{:?}", start);
-        println!("{:?}", end);
         println!("Entire command buffer took {} nanoseconds", (end - start).as_nanos());
+        let stats = stats.wait_for_single_result(query)?;
+        println!("Number of compute shader invocations: {}", stats.compute_shader_invocations.unwrap());
 
         Ok(())
     }

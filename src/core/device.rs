@@ -136,9 +136,11 @@ impl Device {
             info!("{:?}", ext);
         }
 
+        let mut features = settings.gpu_requirements.features;
         let mut features_1_1 = settings.gpu_requirements.features_1_1;
         let mut features_1_2 = settings.gpu_requirements.features_1_2;
         let mut features_1_3 = settings.gpu_requirements.features_1_3;
+        features.pipeline_statistics_query = vk::TRUE;
         features_1_2.host_query_reset = vk::TRUE;
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
@@ -148,7 +150,7 @@ impl Device {
         let mut info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(queue_create_infos.as_slice())
             .enabled_extension_names(extension_names_raw.as_slice())
-            .enabled_features(&settings.gpu_requirements.features)
+            .enabled_features(&features)
             .push_next(&mut features_1_1)
             .push_next(&mut features_1_2)
             .push_next(&mut features_1_3);

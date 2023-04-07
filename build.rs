@@ -1,8 +1,11 @@
 #[cfg(feature = "shaderc")]
 extern crate shaderc;
 
+#[allow(unused_imports)]
 use std::fs::File;
+#[allow(unused_imports)]
 use std::io::{Read, Write};
+#[allow(unused_imports)]
 use std::path::Path;
 
 #[cfg(feature = "shaderc")]
