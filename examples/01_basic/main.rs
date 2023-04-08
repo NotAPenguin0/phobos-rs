@@ -168,7 +168,7 @@ impl ExampleApp for Basic {
         // create a command buffer capable of executing graphics commands
         let cmd = ctx
             .exec
-            .on_domain::<domain::All>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))
+            .on_domain::<All>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))
             .unwrap();
         // record render graph to this command buffer
         let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?.finish();
