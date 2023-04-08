@@ -58,7 +58,7 @@
 //!                       Some(vk::ClearColorValue{ float32: [0.0, 0.0, 0.0, 1.0] }))?
 //!     // We sample the input resource in the fragment shader.
 //!     .sample_image(&input_resource, PipelineStage::FRAGMENT_SHADER)
-//!     .execute(|mut cmd, ifc, bindings| {
+//!     .executor(|mut cmd, ifc, bindings| {
 //!         // Draw a fullscreen quad using our sample pipeline and a descriptor set pointing to the input resource.
 //!         // This assumes we created a pipeline before and a sampler before, and that we bind the proper resources
 //!         // before recording the graph.
@@ -85,37 +85,77 @@ use crate::pipeline::PipelineStage;
 /// The returned value from a pass callback function.
 pub type PassFnResult<'q, D> = Result<IncompleteCommandBuffer<'q, D>>;
 
-/// Blanket trait for the pass callback function.
-pub trait PassFn<'q, D: ExecutionDomain, U, A: Allocator>:
-FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D> {}
+pub trait PassExecutor<D: ExecutionDomain, U, A: Allocator> {
+    fn execute<'q>(
+        &mut self,
+        cmd: IncompleteCommandBuffer<'q, D>,
+        ifc: &mut InFlightContext<A>,
+        bindings: &PhysicalResourceBindings,
+        user_data: &mut U,
+    ) -> PassFnResult<'q, D>;
+}
 
-impl<'q, D, U, A, F> PassFn<'q, D, U, A> for F
+impl<D, U, A, F> PassExecutor<D, U, A> for F
     where
         D: ExecutionDomain,
         A: Allocator,
-        F: FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D>,
-{}
+        F: for<'q> FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D>,
+{
+    fn execute<'q>(
+        &mut self,
+        cmd: IncompleteCommandBuffer<'q, D>,
+        ifc: &mut InFlightContext<A>,
+        bindings: &PhysicalResourceBindings,
+        user_data: &mut U,
+    ) -> PassFnResult<'q, D> {
+        self.call_mut((cmd, ifc, bindings, user_data))
+    }
+}
 
-pub(crate) type BoxedPassFn<'q, 'exec, D, U, A> = Box<dyn PassFn<'q, D, U, A, Output=PassFnResult<'q, D>> + 'exec>;
+pub(crate) type BoxedPassFn<'cb, D, U, A> = Box<dyn PassExecutor<D, U, A> + 'cb>;
+
+pub struct EmptyPassExecutor;
+
+impl EmptyPassExecutor {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn new_boxed() -> Box<Self> {
+        Box::new(Self::new())
+    }
+}
+
+impl<D: ExecutionDomain, U, A: Allocator> PassExecutor<D, U, A> for EmptyPassExecutor {
+    fn execute<'q>(
+        &mut self,
+        cmd: IncompleteCommandBuffer<'q, D>,
+        _ifc: &mut InFlightContext<A>,
+        _bindings: &PhysicalResourceBindings,
+        _user_data: &mut U,
+    ) -> PassFnResult<'q, D> {
+        Ok(cmd)
+    }
+}
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
-pub struct Pass<'exec, 'q, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
+pub struct Pass<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
     pub(crate) name: String,
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<PassResource>,
     pub(crate) outputs: Vec<PassResource>,
-    pub(crate) execute: BoxedPassFn<'q, 'exec, D, U, A>,
+    pub(crate) execute: BoxedPassFn<'cb, D, U, A>,
     pub(crate) is_renderpass: bool,
 }
 
 /// Used to create [`Pass`] objects correctly.
 /// # Example
 /// See the [`pass`](crate::graph::pass) module level documentation.
-pub struct PassBuilder<'exec, 'q, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
-    inner: Pass<'exec, 'q, D, U, A>,
+pub struct PassBuilder<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
+    inner: Pass<'cb, D, U, A>,
 }
 
-impl<'exec, 'q, D: ExecutionDomain, U, A: Allocator> Pass<'exec, 'q, D, U, A> {
+impl<'cb, D: ExecutionDomain, U, A: Allocator> Pass<'cb, D, U, A> {
     /// Returns the output virtual resource associated with the input resource.
     pub fn output(&self, resource: &VirtualResource) -> Option<&VirtualResource> {
         self.outputs
@@ -135,14 +175,14 @@ impl<'exec, 'q, D: ExecutionDomain, U, A: Allocator> Pass<'exec, 'q, D, U, A> {
     }
 }
 
-impl<'exec, 'q, D: ExecutionDomain, U, A: Allocator> PassBuilder<'exec, 'q, D, U, A> {
+impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     /// Create a new pass for generic commands. Does not support commands that are located inside a renderpass.
     pub fn new(name: impl Into<String>) -> Self {
         PassBuilder {
             inner: Pass {
                 name: name.into(),
                 color: None,
-                execute: Box::new(|c, _, _, _| Ok(c)),
+                execute: EmptyPassExecutor::new_boxed(),
                 inputs: vec![],
                 outputs: vec![],
                 is_renderpass: false,
@@ -156,7 +196,7 @@ impl<'exec, 'q, D: ExecutionDomain, U, A: Allocator> PassBuilder<'exec, 'q, D, U
             inner: Pass {
                 name: name.into(),
                 color: None,
-                execute: Box::new(|c, _, _, _| Ok(c)),
+                execute: EmptyPassExecutor::new_boxed(),
                 inputs: vec![],
                 outputs: vec![],
                 is_renderpass: true,
@@ -167,7 +207,7 @@ impl<'exec, 'q, D: ExecutionDomain, U, A: Allocator> PassBuilder<'exec, 'q, D, U
     /// Create a pass for presenting to the swapchain.
     /// Note that this doesn't actually do the presentation, it just adds the proper synchronization for it.
     /// If you are presenting to an output of the graph, this is required.
-    pub fn present(name: impl Into<String>, swapchain: &VirtualResource) -> Pass<'exec, 'q, D, U, A> {
+    pub fn present(name: impl Into<String>, swapchain: &VirtualResource) -> Pass<'cb, D, U, A> {
         Pass {
             name: name.into(),
             color: None,
@@ -180,7 +220,7 @@ impl<'exec, 'q, D: ExecutionDomain, U, A: Allocator> PassBuilder<'exec, 'q, D, U
                 load_op: None,
             }],
             outputs: vec![],
-            execute: Box::new(|c, _, _, _| Ok(c)),
+            execute: EmptyPassExecutor::new_boxed(),
             is_renderpass: false,
         }
     }
@@ -308,14 +348,21 @@ impl<'exec, 'q, D: ExecutionDomain, U, A: Allocator> PassBuilder<'exec, 'q, D, U
         self
     }
 
-    /// Set the function to be called when recording this pass.
-    pub fn execute(mut self, exec: impl PassFn<'q, D, U, A> + 'exec) -> Self {
+    /// Set the executor to be called when recording this pass.
+    pub fn executor(mut self, exec: impl PassExecutor<D, U, A> + 'cb) -> Self {
+        self.inner.execute = Box::new(exec);
+        self
+    }
+
+    pub fn execute_fn<F>(mut self, exec: F) -> Self
+        where
+            F: for<'q> FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D> + 'cb, {
         self.inner.execute = Box::new(exec);
         self
     }
 
     /// Obtain a built [`Pass`] object.
-    pub fn build(self) -> Pass<'exec, 'q, D, U, A> {
+    pub fn build(self) -> Pass<'cb, D, U, A> {
         self.inner
     }
 }

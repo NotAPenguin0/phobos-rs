@@ -117,7 +117,7 @@ impl ExampleApp for Basic {
                     float32: [1.0, 0.0, 0.0, 1.0],
                 }),
             )?
-            .execute(|mut cmd, ifc, _bindings, _| {
+            .execute_fn(|mut cmd, ifc, _bindings, _| {
                 // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
                 let mut buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
                 let slice = buffer.mapped_slice::<f32>()?;
@@ -142,7 +142,7 @@ impl ExampleApp for Basic {
                 }),
             )?
             .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
-            .execute(|cmd, _ifc, bindings, _| {
+            .execute_fn(|cmd, _ifc, bindings, _| {
                 cmd.full_viewport_scissor()
                     .bind_graphics_pipeline("sample")?
                     .resolve_and_bind_sampled_image(0, 0, &offscreen, &self.resources.sampler, bindings)?

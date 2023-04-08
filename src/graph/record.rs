@@ -17,12 +17,12 @@ use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::task_graph::{Node, Resource};
 
-pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, U, A: Allocator> {
+pub trait RecordGraphToCommandBuffer<D: ExecutionDomain, U, A: Allocator> {
     /// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names
     /// to actual resources.
     /// # Errors
     /// - This function can error if a virtual resource used in the graph is lacking an physical binding.
-    fn record(
+    fn record<'q>(
         &mut self,
         cmd: IncompleteCommandBuffer<'q, D>,
         bindings: &PhysicalResourceBindings,
@@ -30,8 +30,8 @@ pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, U, A: Allocator> {
         debug: Option<Arc<DebugMessenger>>,
         user_data: &mut U,
     ) -> Result<IncompleteCommandBuffer<'q, D>>
-    where
-        Self: Sized;
+        where
+            Self: Sized;
 }
 
 // Traversal
@@ -73,7 +73,7 @@ macro_rules! parents {
 
 fn insert_in_active_set<D: ExecutionDomain, U, A: Allocator>(
     node: NodeIndex,
-    graph: &PassGraph<'_, '_, D, U, A>,
+    graph: &PassGraph<'_, D, U, A>,
     active: &mut HashSet<NodeIndex>,
     children: &mut HashSet<NodeIndex>,
 ) {
@@ -212,7 +212,7 @@ fn annotate_pass<D: ExecutionDomain>(_: &PassNode<PassResource, D>, _: &Arc<Debu
 }
 
 fn record_pass<'q, D: ExecutionDomain, U, A: Allocator>(
-    pass: &mut PassNode<'_, 'q, PassResource, D, U, A>,
+    pass: &mut PassNode<'_, PassResource, D, U, A>,
     bindings: &PhysicalResourceBindings,
     ifc: &mut InFlightContext<A>,
     mut cmd: IncompleteCommandBuffer<'q, D>,
@@ -236,7 +236,7 @@ fn record_pass<'q, D: ExecutionDomain, U, A: Allocator>(
         cmd = cmd.begin_rendering(&info);
     }
 
-    cmd = pass.execute.call_mut((cmd, ifc, bindings, user_data))?;
+    cmd = pass.execute.execute(cmd, ifc, bindings, user_data)?;
 
     if pass.is_renderpass {
         cmd = cmd.end_rendering()
@@ -337,7 +337,7 @@ fn record_barrier<'q, D: ExecutionDomain>(
 }
 
 fn record_node<'q, D: ExecutionDomain, U, A: Allocator>(
-    graph: &mut BuiltPassGraph<'_, 'q, D, U, A>,
+    graph: &mut BuiltPassGraph<'_, D, U, A>,
     node: NodeIndex,
     bindings: &PhysicalResourceBindings,
     ifc: &mut InFlightContext<A>,
@@ -360,8 +360,8 @@ fn record_node<'q, D: ExecutionDomain, U, A: Allocator>(
     }
 }
 
-impl<'q, 'exec, D: ExecutionDomain, U, A: Allocator> RecordGraphToCommandBuffer<'q, D, U, A> for BuiltPassGraph<'exec, 'q, D, U, A> {
-    fn record(
+impl<'cb, D: ExecutionDomain, U, A: Allocator> RecordGraphToCommandBuffer<D, U, A> for BuiltPassGraph<'cb, D, U, A> {
+    fn record<'q>(
         &mut self,
         mut cmd: IncompleteCommandBuffer<'q, D>,
         bindings: &PhysicalResourceBindings,
