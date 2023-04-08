@@ -28,7 +28,7 @@ pub trait RecordGraphToCommandBuffer<'q, D: ExecutionDomain, U, A: Allocator> {
         bindings: &PhysicalResourceBindings,
         ifc: &mut InFlightContext<A>,
         debug: Option<Arc<DebugMessenger>>,
-        user_data: &U,
+        user_data: &mut U,
     ) -> Result<IncompleteCommandBuffer<'q, D>>
     where
         Self: Sized;
@@ -217,7 +217,7 @@ fn record_pass<'q, D: ExecutionDomain, U, A: Allocator>(
     ifc: &mut InFlightContext<A>,
     mut cmd: IncompleteCommandBuffer<'q, D>,
     debug: Option<Arc<DebugMessenger>>,
-    user_data: &U,
+    user_data: &mut U,
 ) -> Result<IncompleteCommandBuffer<'q, D>> {
     if let Some(debug) = debug.clone() {
         cmd = annotate_pass(pass, &debug, cmd)?;
@@ -343,7 +343,7 @@ fn record_node<'q, D: ExecutionDomain, U, A: Allocator>(
     ifc: &mut InFlightContext<A>,
     cmd: IncompleteCommandBuffer<'q, D>,
     debug: Option<Arc<DebugMessenger>>,
-    user_data: &U,
+    user_data: &mut U,
 ) -> Result<IncompleteCommandBuffer<'q, D>> {
     let graph = &mut graph.graph.graph;
     let dst_resource_res = PassGraph::barrier_dst_resource(graph, node).cloned();
@@ -367,7 +367,7 @@ impl<'q, 'exec, D: ExecutionDomain, U, A: Allocator> RecordGraphToCommandBuffer<
         bindings: &PhysicalResourceBindings,
         ifc: &mut InFlightContext<A>,
         debug: Option<Arc<DebugMessenger>>,
-        user_data: &U,
+        user_data: &mut U,
     ) -> Result<IncompleteCommandBuffer<'q, D>>
         where
             Self: Sized, {

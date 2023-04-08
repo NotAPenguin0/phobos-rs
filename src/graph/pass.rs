@@ -87,13 +87,13 @@ pub type PassFnResult<'q, D> = Result<IncompleteCommandBuffer<'q, D>>;
 
 /// Blanket trait for the pass callback function.
 pub trait PassFn<'q, D: ExecutionDomain, U, A: Allocator>:
-FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &U) -> PassFnResult<'q, D> {}
+FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D> {}
 
 impl<'q, D, U, A, F> PassFn<'q, D, U, A> for F
     where
         D: ExecutionDomain,
         A: Allocator,
-        F: FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &U) -> PassFnResult<'q, D>,
+        F: FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D>,
 {}
 
 pub(crate) type BoxedPassFn<'q, 'exec, D, U, A> = Box<dyn PassFn<'q, D, U, A, Output=PassFnResult<'q, D>> + 'exec>;

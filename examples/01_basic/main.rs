@@ -171,7 +171,7 @@ impl ExampleApp for Basic {
             .on_domain::<domain::All>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))
             .unwrap();
         // record render graph to this command buffer
-        let cmd = graph.record(cmd, &bindings, &mut ifc, None, &())?.finish();
+        let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?.finish();
         cmd
     }
 }
