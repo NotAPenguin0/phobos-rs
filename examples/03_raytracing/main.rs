@@ -1,6 +1,8 @@
 use anyhow::Result;
+use ash::vk;
 
-use phobos::{CommandBuffer, IncompleteCmdBuffer, InFlightContext};
+use phobos::{Buffer, CommandBuffer, IncompleteCmdBuffer, InFlightContext};
+use phobos::acceleration_structure::{AccelerationStructure, AccelerationStructureType};
 use phobos::domain::All;
 
 use crate::example_runner::{Context, ExampleApp, ExampleRunner, WindowContext};
@@ -11,9 +13,12 @@ mod example_runner;
 struct RaytracingSample {}
 
 impl ExampleApp for RaytracingSample {
-    fn new(ctx: Context) -> Result<Self>
+    fn new(mut ctx: Context) -> Result<Self>
         where
             Self: Sized, {
+        let buffer = Buffer::new_device_local(ctx.device.clone(), &mut ctx.allocator, 128u64, vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR)?;
+        let view = buffer.view_full();
+        let accel = AccelerationStructure::new(ctx.device, AccelerationStructureType::TopLevel, view, Default::default())?;
         Ok(Self {})
     }
 

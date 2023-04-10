@@ -4,3 +4,4 @@ pub mod upload;
 
 pub(crate) mod cache;
 pub(crate) mod string;
+pub mod to_vk;
