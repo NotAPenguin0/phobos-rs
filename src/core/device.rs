@@ -40,6 +40,7 @@ struct DeviceInner {
     handle: ash::Device,
     queue_families: Vec<u32>,
     properties: vk::PhysicalDeviceProperties,
+    accel_structure_properties: Option<vk::PhysicalDeviceAccelerationStructurePropertiesKHR>,
     extensions: HashSet<ExtensionID>,
     #[derivative(Debug = "ignore")]
     dynamic_state3: Option<ash::extensions::ext::ExtendedDynamicState3>,
@@ -213,10 +214,28 @@ impl Device {
             None
         };
 
+        let mut properties2 = vk::PhysicalDeviceProperties2::builder();
+
+        let mut accel_properties = if accel_supported {
+            Some(vk::PhysicalDeviceAccelerationStructurePropertiesKHR::default())
+        } else {
+            None
+        };
+
+        match &mut accel_properties {
+            None => {}
+            Some(properties) => {
+                properties2.push_next(properties);
+            }
+        };
+
+        unsafe { instance.get_physical_device_properties2(physical_device.handle(), &mut properties2) };
+
         let inner = DeviceInner {
             handle,
             queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
             properties: *physical_device.properties(),
+            accel_structure_properties: accel_properties,
             extensions: enabled_extensions,
             dynamic_state3,
             acceleration_structure,
@@ -287,6 +306,11 @@ impl Device {
     /// ```
     pub fn properties(&self) -> &vk::PhysicalDeviceProperties {
         &self.inner.properties
+    }
+
+    pub fn acceleration_structure_properties(&self) -> Result<&vk::PhysicalDeviceAccelerationStructurePropertiesKHR> {
+        self.require_extension(ExtensionID::AccelerationStructure)?;
+        Ok(self.inner.accel_structure_properties.as_ref().unwrap())
     }
 
     /// Check if a device extension is enabled.
