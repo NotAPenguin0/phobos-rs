@@ -4,6 +4,7 @@ use ash::vk;
 use crate::{BufferView, Device};
 use crate::core::device::ExtensionID;
 use crate::util::address::{DeviceOrHostAddress, DeviceOrHostAddressConst};
+use crate::util::align::align;
 use crate::util::to_vk::{AsVulkanType, IntoVulkanType};
 
 pub struct AccelerationStructure {
@@ -128,10 +129,16 @@ impl AccelerationStructure {
         }
 
         let sizes = unsafe { fns.get_acceleration_structure_build_sizes(ty.into_vulkan(), &info.as_vulkan(), primitive_counts) };
+        // From the spec: 'offset is an offset in bytes from the base address of the buffer at which the acceleration structure will be stored, and must be a multiple of 256'
+        // (https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkAccelerationStructureCreateInfoKHR.html)
+        const AS_ALIGNMENT: vk::DeviceSize = 256;
+        let scratch_align = device
+            .acceleration_structure_properties()?
+            .min_acceleration_structure_scratch_offset_alignment as vk::DeviceSize;
         Ok(AccelerationStructureBuildSize {
-            size: sizes.acceleration_structure_size,
-            update_scratch_size: sizes.update_scratch_size,
-            build_scratch_size: sizes.build_scratch_size,
+            size: align(sizes.acceleration_structure_size, AS_ALIGNMENT),
+            update_scratch_size: align(sizes.update_scratch_size, scratch_align),
+            build_scratch_size: align(sizes.update_scratch_size, scratch_align),
         })
     }
 }
