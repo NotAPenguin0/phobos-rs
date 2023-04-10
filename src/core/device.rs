@@ -7,13 +7,14 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{AppSettings, PhysicalDevice, VkInstance, WindowInterface};
+use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 use crate::util::string::unwrap_to_raw_strings;
 
 /// Device extensions that phobos requests but might not be available.
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum ExtensionID {
     ExtendedDynamicState3,
+    AccelerationStructure,
 }
 
 impl std::fmt::Display for ExtensionID {
@@ -32,6 +33,8 @@ struct DeviceInner {
     extensions: HashSet<ExtensionID>,
     #[derivative(Debug = "ignore")]
     dynamic_state3: Option<ash::extensions::ext::ExtendedDynamicState3>,
+    #[derivative(Debug = "ignore")]
+    acceleration_structure: Option<ash::extensions::khr::AccelerationStructure>,
 }
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
@@ -115,9 +118,25 @@ impl Device {
             available_extensions.as_slice(),
         );
 
+        let accel_supported = if settings.raytracing {
+            add_if_supported(
+                ExtensionID::AccelerationStructure,
+                ash::extensions::khr::AccelerationStructure::name(),
+                &mut enabled_extensions,
+                &mut extension_names,
+                available_extensions.as_slice(),
+            )
+        } else {
+            false
+        };
+
         // Add required extensions
         if settings.window.is_some() {
             extension_names.push(CString::from(ash::extensions::khr::Swapchain::name()));
+        }
+
+        if settings.raytracing {
+            extension_names.push(CString::from(ash::extensions::khr::DeferredHostOperations::name()));
         }
 
         info!("Enabled device extensions:");
@@ -148,6 +167,20 @@ impl Device {
         if dynamic_state3_supported {
             info = info.push_next(&mut features_dynamic_state3);
         }
+
+        let mut features_acceleration_structure = vk::PhysicalDeviceAccelerationStructureFeaturesKHR {
+            s_type: vk::StructureType::PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+            p_next: std::ptr::null_mut(),
+            acceleration_structure: vk::TRUE,
+            acceleration_structure_capture_replay: vk::FALSE,
+            acceleration_structure_indirect_build: vk::FALSE,
+            acceleration_structure_host_commands: vk::FALSE,
+            descriptor_binding_acceleration_structure_update_after_bind: vk::FALSE,
+        };
+        if accel_supported {
+            info = info.push_next(&mut features_acceleration_structure);
+        }
+
         let info = info.build();
 
         let handle = unsafe { instance.create_device(physical_device.handle(), &info, None)? };
@@ -158,12 +191,19 @@ impl Device {
             None
         };
 
+        let acceleration_structure = if accel_supported {
+            Some(ash::extensions::khr::AccelerationStructure::new(instance, &handle))
+        } else {
+            None
+        };
+
         let inner = DeviceInner {
             handle,
             queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
             properties: *physical_device.properties(),
             extensions: enabled_extensions,
             dynamic_state3,
+            acceleration_structure,
         };
 
         Ok(Device {
@@ -200,9 +240,22 @@ impl Device {
         self.inner.extensions.contains(&ext)
     }
 
-    /// Access to the function pointers for VK_EXT_dynamic_state_3
+    pub fn require_extension(&self, ext: ExtensionID) -> Result<()> {
+        if self.is_extension_enabled(ext) {
+            Ok(())
+        } else {
+            Err(Error::ExtensionNotSupported(ext).into())
+        }
+    }
+
+    /// Access to the function pointers for `VK_EXT_dynamic_state_3`
     pub fn dynamic_state3(&self) -> Option<&ash::extensions::ext::ExtendedDynamicState3> {
         self.inner.dynamic_state3.as_ref()
+    }
+
+    /// Access to the function pointers for `VK_KHR_acceleration_structure`
+    pub fn acceleration_structure(&self) -> Option<&ash::extensions::khr::AccelerationStructure> {
+        self.inner.acceleration_structure.as_ref()
     }
 
     /// True we only have a single queue, and thus the sharing mode for resources is always EXCLUSIVE.

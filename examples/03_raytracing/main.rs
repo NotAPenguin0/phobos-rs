@@ -11,7 +11,9 @@ mod example_runner;
 struct RaytracingSample {}
 
 impl ExampleApp for RaytracingSample {
-    fn new(ctx: Context) -> Result<Self> where Self: Sized {
+    fn new(ctx: Context) -> Result<Self>
+        where
+            Self: Sized, {
         Ok(Self {})
     }
 
@@ -23,5 +25,5 @@ impl ExampleApp for RaytracingSample {
 
 fn main() -> Result<()> {
     let window = WindowContext::new("01_basic")?;
-    ExampleRunner::new("03_raytracing", Some(&window))?.run::<RaytracingSample>(Some(window));
+    ExampleRunner::new("03_raytracing", Some(&window), |settings| settings.raytracing(true).build())?.run::<RaytracingSample>(Some(window));
 }

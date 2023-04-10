@@ -82,7 +82,7 @@ pub struct ExampleRunner {
 }
 
 impl ExampleRunner {
-    pub fn new(name: impl Into<String>, window: Option<&WindowContext>) -> Result<Self> {
+    pub fn new(name: impl Into<String>, window: Option<&WindowContext>, make_settings: impl Fn(AppBuilder<Window>) -> AppSettings<Window>) -> Result<Self> {
         std::env::set_var("RUST_LOG", "trace");
         pretty_env_logger::init();
         let mut settings = AppBuilder::new()
@@ -118,7 +118,7 @@ impl ExampleRunner {
                 settings = settings.window(&window.window);
             }
         };
-        let settings = settings.build();
+        let settings = make_settings(settings);
 
         let instance = VkInstance::new(&settings)?;
         let debug_messenger = DebugMessenger::new(&instance)?;

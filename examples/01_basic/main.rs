@@ -178,5 +178,5 @@ impl ExampleApp for Basic {
 
 fn main() -> Result<()> {
     let window = WindowContext::new("01_basic")?;
-    ExampleRunner::new("01_basic", Some(&window))?.run::<Basic>(Some(window));
+    ExampleRunner::new("01_basic", Some(&window), |s| s.build())?.run::<Basic>(Some(window));
 }

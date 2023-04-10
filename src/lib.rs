@@ -122,3 +122,4 @@ pub mod sampler;
 pub mod sync;
 pub mod util;
 pub mod wsi;
+pub mod acceleration_structure;
