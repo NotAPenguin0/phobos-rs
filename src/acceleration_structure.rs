@@ -3,7 +3,7 @@ use ash::vk;
 
 use crate::{BufferView, Device};
 use crate::core::device::ExtensionID;
-use crate::util::address::{DeviceOrHostAddress, DeviceOrHostAddressConst};
+use crate::util::address::DeviceOrHostAddress;
 use crate::util::align::align;
 use crate::util::to_vk::{AsVulkanType, IntoVulkanType};
 
@@ -82,6 +82,17 @@ impl<'a> AsVulkanType for AccelerationStructureBuildGeometryInfo<'a> {
             pp_geometries: std::ptr::null(),
             scratch_data: self.scratch_data.as_vulkan(),
         }
+    }
+}
+
+pub struct AccelerationStructureBuildInfo<'a> {
+    geometry: AccelerationStructureBuildGeometryInfo<'a>,
+    build_range_infos: Vec<vk::AccelerationStructureBuildRangeInfoKHR>,
+}
+
+impl<'a> AccelerationStructureBuildInfo<'a> {
+    pub fn as_vulkan(&'a self) -> (vk::AccelerationStructureBuildGeometryInfoKHR, &'a [vk::AccelerationStructureBuildRangeInfoKHR]) {
+        (self.geometry.as_vulkan(), self.build_range_infos.as_slice())
     }
 }
 

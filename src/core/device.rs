@@ -225,7 +225,7 @@ impl Device {
         match &mut accel_properties {
             None => {}
             Some(properties) => {
-                properties2.push_next(properties);
+                properties2 = properties2.push_next(properties);
             }
         };
 

@@ -2,8 +2,11 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{ComputeCmdBuffer, ComputeSupport, Error};
+use crate::acceleration_structure::AccelerationStructureBuildInfo;
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::core::device::ExtensionID;
 use crate::domain::ExecutionDomain;
+use crate::util::to_vk::AsVulkanType;
 
 impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D> {
     /// Sets the current compute pipeline by looking up the given name in the pipeline cache.
@@ -27,7 +30,12 @@ impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommand
         let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
         {
             cache.with_compute_pipeline(name, |pipeline| {
-                self.bind_pipeline_impl(pipeline.handle, pipeline.layout, pipeline.set_layouts.clone(), vk::PipelineBindPoint::COMPUTE)
+                self.bind_pipeline_impl(
+                    pipeline.handle,
+                    pipeline.layout,
+                    pipeline.set_layouts.clone(),
+                    vk::PipelineBindPoint::COMPUTE,
+                )
             })?;
         }
         Ok(self)
@@ -65,5 +73,30 @@ impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommand
         }
         Ok(self)
     }
-    // Methods for compute commands
+
+    fn build_acceleration_structure(self, info: &AccelerationStructureBuildInfo) -> Result<Self>
+        where
+            Self: Sized, {
+        self.build_acceleration_structures(std::slice::from_ref(info))
+    }
+
+    fn build_acceleration_structures(self, info: &[AccelerationStructureBuildInfo]) -> Result<Self>
+        where
+            Self: Sized, {
+        self.device.require_extension(ExtensionID::AccelerationStructure)?;
+        let as_vk = info.iter().map(|info| info.as_vulkan()).collect::<Vec<_>>();
+        let geometries = as_vk
+            .iter()
+            .map(|(geometry, _)| *geometry)
+            .collect::<Vec<_>>();
+        let infos = as_vk
+            .iter()
+            .map(|(_, ranges)| *ranges)
+            .collect::<Vec<_>>();
+        unsafe {
+            self.device.acceleration_structure().unwrap().cmd_build_acceleration_structures(self.handle, geometries.as_slice(), infos.as_slice());
+        }
+
+        Ok(self)
+    }
 }

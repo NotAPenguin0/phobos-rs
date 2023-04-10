@@ -4,6 +4,7 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{BufferView, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache};
+use crate::acceleration_structure::AccelerationStructureBuildInfo;
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
@@ -69,13 +70,17 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
     /// # Errors
     /// This function can report an error in case the pipeline name is not registered in the cache.
     fn bind_compute_pipeline(self, name: &str) -> Result<Self>
-    where
-        Self: Sized;
+        where
+            Self: Sized;
 
     /// Dispatch a compute invocation. See `vkCmdDispatch`
     fn dispatch(self, x: u32, y: u32, z: u32) -> Result<Self>
-    where
-        Self: Sized;
+        where
+            Self: Sized;
+
+    fn build_acceleration_structure(self, info: &AccelerationStructureBuildInfo) -> Result<Self> where Self: Sized;
+
+    fn build_acceleration_structures(self, info: &[AccelerationStructureBuildInfo]) -> Result<Self> where Self: Sized;
 }
 
 /// Completed command buffer
