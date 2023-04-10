@@ -32,7 +32,7 @@ use crate::sync::submit_batch::SubmitBatch;
 /// // Obtain a command buffer on the Transfer domain
 /// let cmd = exec.on_domain::<domain::Transfer>(None, None)?
 ///               .copy_image(/*command parameters*/)
-///               .finish();
+///               .finish()?;
 /// // Submit the command buffer, either to this frame's command list,
 /// // or to the execution manager for submitting commands outside of a
 /// // frame context (such as on another thread).
@@ -77,7 +77,12 @@ impl ExecutionManager {
                     // Use this for our queue
                     device_queue
                 };
-                Ok(Mutex::new(Queue::new(device.clone(), device_queue, *queue)?))
+                Ok(Mutex::new(Queue::new(
+                    device.clone(),
+                    device_queue,
+                    *queue,
+                    *physical_device.queue_families().get(queue.family_index as usize).unwrap(),
+                )?))
             })
             .collect::<Result<Vec<Mutex<Queue>>>>()?;
 
@@ -99,22 +104,14 @@ impl ExecutionManager {
 
     /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn try_on_domain<'q, D: ExecutionDomain>(
-        &'q self,
-        pipelines: Option<PipelineCache>,
-        descriptors: Option<DescriptorCache>,
-    ) -> Result<D::CmdBuf<'q>> {
+    pub fn try_on_domain<'q, D: ExecutionDomain>(&'q self, pipelines: Option<PipelineCache>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn on_domain<'q, D: ExecutionDomain>(
-        &'q self,
-        pipelines: Option<PipelineCache>,
-        descriptors: Option<DescriptorCache>,
-    ) -> Result<D::CmdBuf<'q>> {
+    pub fn on_domain<'q, D: ExecutionDomain>(&'q self, pipelines: Option<PipelineCache>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
     }
@@ -124,22 +121,20 @@ impl ExecutionManager {
     /// ```
     /// use phobos::prelude::*;
     /// let exec = ExecutionManager::new(device.clone(), &physical_device)?;
-    /// async {
-    ///     let cmd1 = exec.on_domain::<domain::All>(None, None)?.finish()?;
-    ///     let cmd2 = exec.on_domain::<domain::All>(None, None)?.finish()?;
-    ///     let mut batch = exec.start_submit_batch()?;
-    ///     // Submit the first command buffer first
-    ///     batch.submit(cmd1)?
-    ///          // The second command buffer waits at COLOR_ATTACHMENT_OUTPUT on the first command buffer's completion.
-    ///          .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
-    ///     batch.finish()?.await;
-    /// }
+    /// let cmd1 = exec.on_domain::<domain::All>(None, None)?.finish()?;
+    /// let cmd2 = exec.on_domain::<domain::All>(None, None)?.finish()?;
+    /// let mut batch = exec.start_submit_batch()?;
+    /// // Submit the first command buffer first
+    /// batch.submit(cmd1)?
+    ///      // The second command buffer waits at COLOR_ATTACHMENT_OUTPUT on the first command buffer's completion.
+    ///      .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
+    /// batch.finish()?.wait()?;
     /// ```
     pub fn start_submit_batch<D: ExecutionDomain + 'static>(&self) -> Result<SubmitBatch<D>> {
         SubmitBatch::new(self.device.clone(), self.clone())
     }
 
-    /// Submit a command buffer to its queue. TODO: Add semaphores
+    /// Submit a command buffer to its queue.
     pub fn submit<D: ExecutionDomain + 'static>(&self, mut cmd: CommandBuffer<D>) -> Result<Fence> {
         let fence = Fence::new(self.device.clone(), false)?;
 
@@ -164,6 +159,7 @@ impl ExecutionManager {
         }))
     }
 
+    /// Submit multiple SubmitInfo2 structures.
     pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
         queue.submit2(submits, Some(fence))?;

@@ -28,11 +28,15 @@ impl DescriptorSetLayout {
 /// information necessary.
 #[derive(Debug, Clone, Default)]
 pub struct DescriptorSetLayoutCreateInfo {
+    /// Descriptor set bindings for this set layout
     pub bindings: Vec<vk::DescriptorSetLayoutBinding>,
+    /// Whether this descriptor set layout is persistent. Should only be true if the pipeline layout
+    /// this belongs to is also persistent.
     pub persistent: bool,
 }
 
 impl ResourceKey for DescriptorSetLayoutCreateInfo {
+    /// Whether this descriptor set layout is persistent.
     fn persistent(&self) -> bool {
         self.persistent
     }
@@ -47,15 +51,20 @@ impl Resource for DescriptorSetLayout {
         let info = vk::DescriptorSetLayoutCreateInfo::builder()
             .bindings(key.bindings.as_slice())
             .build();
+        let handle = unsafe { device.create_descriptor_set_layout(&info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkDescriptorSetLayout {handle:p}");
         Ok(Self {
             device: device.clone(),
-            handle: unsafe { device.create_descriptor_set_layout(&info, None)? },
+            handle,
         })
     }
 }
 
 impl Drop for DescriptorSetLayout {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkDescriptorSetLayout {:p}", self.handle);
         unsafe {
             self.device.destroy_descriptor_set_layout(self.handle, None);
         }

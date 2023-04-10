@@ -17,8 +17,13 @@ impl Semaphore {
             p_next: std::ptr::null(),
             flags: Default::default(),
         };
+
+        let handle = unsafe { device.create_semaphore(&info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkSemaphore {handle:p}");
+
         Ok(Semaphore {
-            handle: unsafe { device.create_semaphore(&info, None)? },
+            handle,
             device,
         })
     }
@@ -33,6 +38,8 @@ impl Semaphore {
 
 impl Drop for Semaphore {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkSemaphore {:p}", self.handle);
         unsafe {
             self.device.destroy_semaphore(self.handle, None);
         }

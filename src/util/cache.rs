@@ -5,7 +5,11 @@ use anyhow::Result;
 
 use crate::Device;
 
+/// Trait representing a resource key in a cache. This key must be hashable and cloneable.
 pub trait ResourceKey: Hash + Eq + Clone {
+    /// Whether this resource is persistent. This means it will
+    /// never be cleaned up by the cache, even if its lifetime expires.
+    /// Use with caution.
     fn persistent(&self) -> bool;
 }
 
@@ -13,7 +17,7 @@ pub trait ResourceKey: Hash + Eq + Clone {
 pub trait Resource {
     /// Key type used for looking up and possibly creating new resources. Must be hashable and cloneable.
     type Key: ResourceKey;
-    /// Additional parameter passed through from [`Cache::get_or_create`] to [`create`].
+    /// Additional parameter passed through from [`Cache::get_or_create`] to [`Resource::create`].
     type ExtraParams<'a>;
     /// Amount of calls to [`Cache::next_frame`] have to happen without accessing this resource for it to be deallocated.
     const MAX_TIME_TO_LIVE: u32;

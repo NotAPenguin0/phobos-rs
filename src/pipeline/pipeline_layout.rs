@@ -20,17 +20,29 @@ pub struct PipelineLayout {
 /// use shader reflection for whatever reason.
 #[derive(Debug, Clone, Default, Copy, PartialEq, Eq, Hash)]
 pub struct PushConstantRange {
+    /// Shader stages where this push constant range is used
     pub stage_flags: vk::ShaderStageFlags,
+    /// Offset into the global push constant block of this range
     pub offset: u32,
+    /// Size of this push constant range
     pub size: u32,
 }
 
 /// Define a pipeline layout, this includes all descriptor bindings and push constant ranges used by the pipeline.
+/// # Shader reflection
+/// Using the `shader-reflection` feature allows you to completely omit constructing this manually. In this case,
+/// shader reflection will be used to derive them automatically.
 #[derive(Debug, Clone, Default)]
 pub struct PipelineLayoutCreateInfo {
+    /// Pipeline layout flags
     pub flags: vk::PipelineLayoutCreateFlags,
+    /// Descriptor set layouts for this pipeline layout.
     pub set_layouts: Vec<DescriptorSetLayoutCreateInfo>,
+    /// Push constant ranges used in this pipeline
     pub push_constants: Vec<PushConstantRange>,
+    /// Whether this pipeline layout is persistent, e.g. whether it should be kept alive forever
+    /// by the cache. Use this with caution, as it can cause large memory spikes for frequently changing
+    /// pipeline layouts.
     pub persistent: bool,
 }
 
@@ -42,12 +54,14 @@ impl PipelineLayout {
         self.handle
     }
 
+    /// Get the descriptor set layouts of this pipeline layout.
     pub fn set_layouts(&self) -> &[vk::DescriptorSetLayout] {
         self.set_layouts.as_slice()
     }
 }
 
 impl ResourceKey for PipelineLayoutCreateInfo {
+    /// Whether this pipeline layout is persistent or not.
     fn persistent(&self) -> bool {
         self.persistent
     }
@@ -71,9 +85,15 @@ impl Resource for PipelineLayout {
             .push_constant_ranges(pc.as_slice())
             .set_layouts(set_layouts.as_slice())
             .build();
+
+        let handle = unsafe { device.create_pipeline_layout(&info, None)? };
+
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkPipelineLayout {handle:p}");
+
         Ok(Self {
             device: device.clone(),
-            handle: unsafe { device.create_pipeline_layout(&info, None)? },
+            handle,
             set_layouts,
         })
     }
@@ -81,6 +101,8 @@ impl Resource for PipelineLayout {
 
 impl Drop for PipelineLayout {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkPipelineLayout {:p}", self.handle);
         unsafe {
             self.device.destroy_pipeline_layout(self.handle, None);
         }

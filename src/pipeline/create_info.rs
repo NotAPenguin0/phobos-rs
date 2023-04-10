@@ -35,9 +35,11 @@ pub(crate) struct PipelineRenderingInfo {
     pub stencil_format: Option<vk::Format>,
 }
 
+/// Newtype wrapper for a Vulkan viewport. Implements `Hash` and `Eq`.
 #[derive(Debug, Copy, Clone)]
 pub struct Viewport(pub(super) vk::Viewport);
 
+/// Newtype wrapper for a Vulkan Rect2D. Implements `Hash` and `Eq`.
 #[derive(Debug, Copy, Clone)]
 pub struct Rect2D(pub(super) vk::Rect2D);
 
@@ -45,6 +47,7 @@ pub struct Rect2D(pub(super) vk::Rect2D);
 #[derive(Debug, Clone, Derivative)]
 #[derivative(PartialEq, Eq, Hash)]
 pub struct PipelineCreateInfo {
+    /// The shaders used in this pipeline
     pub shaders: Vec<ShaderCreateInfo>,
     pub(crate) name: String,
     pub(crate) layout: PipelineLayoutCreateInfo,
@@ -107,6 +110,8 @@ impl PipelineCreateInfo {
             .build();
     }
 
+    /// Build the inner state of the pipeline. This must be called at least once before actually creating the pipeline.
+    /// When normally registering to the cache, this all happens automatically.
     pub fn build_inner(&mut self) {
         self.vk_attributes = self.vertex_attributes.iter().map(|v| v.0).collect();
         self.vk_vertex_inputs = self.vertex_input_bindings.iter().map(|v| v.0).collect();

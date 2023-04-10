@@ -8,27 +8,36 @@ use crate::Error;
 
 /// Represents a resource in a task graph.
 pub trait Resource {
+    /// Return true if this resource is a dependency of lhs
     fn is_dependency_of(&self, lhs: &Self) -> bool;
+    /// Get the uid of this resource
     fn uid(&self) -> &String;
 }
 
 /// Task in a task dependency graph. This is parametrized on a resource type.
 pub trait Task<R: Resource> {
+    /// Get the inputs of this task
     fn inputs(&self) -> &Vec<R>;
+    /// Get the outputs of this task
     fn outputs(&self) -> &Vec<R>;
 }
 
 /// Represents a barrier in the task graph.
 pub trait Barrier<R: Resource> {
+    /// Create a new barrier over the specified resource
     fn new(resource: R) -> Self;
+    /// Get the resource of this barrier.
     fn resource(&self) -> &R;
 }
 
 /// Represents a node in a task graph.
 #[derive(Debug)]
 pub enum Node<R: Resource, B: Barrier<R>, T: Task<R>> {
+    /// A task node
     Task(T),
+    /// A barrier node
     Barrier(B),
+    /// Dummy variant to allow adding `R` as a generic parameter
     _Unreachable((!, PhantomData<R>)),
 }
 
@@ -38,6 +47,7 @@ pub struct TaskGraph<R: Resource, B: Barrier<R> + Clone, T: Task<R>> {
 }
 
 impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> Default for TaskGraph<R, B, T> {
+    /// Create a default task graph
     fn default() -> Self {
         Self {
             graph: Default::default(),
@@ -46,6 +56,7 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> Default f
 }
 
 impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph<R, B, T> {
+    /// Create a default task graph.
     pub fn new() -> Self {
         Self::default()
     }

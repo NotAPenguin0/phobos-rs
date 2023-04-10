@@ -30,6 +30,7 @@ pub(crate) struct DescriptorBinding {
 }
 
 /// Specifies a set of bindings in a descriptor set. Can be created by a [`DescriptorSetBuilder`](crate::DescriptorSetBuilder).
+/// Public usage of this has been deprecated in favor of using the descriptor set methods in [`IncompleteCommandBuffer`](crate::IncompleteCommandBuffer)
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct DescriptorSetBinding {
     pub(crate) pool: vk::DescriptorPool,
@@ -38,7 +39,7 @@ pub struct DescriptorSetBinding {
 }
 
 /// Wrapper over a Vulkan `VkDescriptorSet`. You don't explicitly need to use this, as the command buffer and descriptor cache can manage these
-/// fully for you.
+/// fully for you. See for example [`IncompleteCommandBuffer::bind_sampled_image()`](crate::IncompleteCommandBuffer::bind_sampled_image)
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq, Eq)]
 pub struct DescriptorSet {
@@ -111,6 +112,9 @@ impl Resource for DescriptorSet {
             p_set_layouts: &key.layout,
         };
         let set = unsafe { device.allocate_descriptor_sets(&info) }?.first().cloned().unwrap();
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkDescriptorSet {set:p}");
+
         let writes = key
             .bindings
             .iter()
@@ -185,6 +189,8 @@ impl Resource for DescriptorSet {
 
 impl Drop for DescriptorSet {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkDescriptorSet {:p}", self.handle);
         unsafe {
             self.device
                 .free_descriptor_sets(self.pool, std::slice::from_ref(&self.handle))

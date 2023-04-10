@@ -57,32 +57,22 @@
 //! Now we are ready to initialize the Phobos library.
 //! ```
 //! use phobos::prelude::*;
+//! let (
+//!     instance,
+//!     physical_device,
+//!     surface,
+//!     allocator,
+//!     exec,
+//!     frame,
+//!     Some(debug_messenger)
+//! ) = WindowedContext::init(&settings)? else {
+//!     panic!("Asked for debug messenger but didn't get one.")
+//! };
 //!
-//! // Create Vulkan instance. This step is required.
-//! let instance = VkInstance::new(&settings)?;
-//! // Create a debug messenger object. This is not required, and only useful
-//! // validation layers are enabled.
-//! let debug_messenger = DebugMessenger::new(&instance)?;
-//! let (surface, physical_device) = {
-//!     // Create surface to render to. Not required for a compute-only context.
-//!     let mut surface = Surface::new(&instance, &settings)?;
-//!     // Select a physical device based on gpu requirements we passed earlier.
-//!     let physical_device = PhysicalDevice::select(&settings, Some(&surface), &settings)?;
-//!     surface.query_details(&physical_device)?;
-//!     (surface, physical_device)
-//! };
-//! // Create Vulkan device. This is our main interface with the Vulkan API.
-//! let device = Device::new(&instance, &physical_device, &settings)?;
-//! // Create the GPU allocator
-//! let mut alloc = DefaultAllocator::new(&instance, &device, &physical_device)?;
-//! // Create execution manager, needed to execute commands.
-//! let exec = ExecutionManager::new(device.clone(), &physical_device)?;
-//! // Create swapchain and frame manager.
-//! let mut frame = {
-//!     let swapchain = Swapchain::new(&instance, device.clone(), &settings, &surface)?;
-//!     FrameManager::new(device.clone(), alloc.clone(), &settings, swapchain)?
-//! };
 //! ```
+//! For more initialization options, see [`initialize()`], [`initialize_with_allocator()`] and
+//! [`WindowedContext::init_with_allocator()`](crate::core::init::WindowedContext::init_with_allocator).
+//!
 //! For further example code, check out the following modules
 //! - [`pipeline`] for pipeline creation and management.
 //! - [`wsi`] for managing your main loop and frame rendering logic.
@@ -122,4 +112,5 @@ pub mod sampler;
 pub mod sync;
 pub mod util;
 pub mod wsi;
+pub mod query_pool;
 pub mod acceleration_structure;

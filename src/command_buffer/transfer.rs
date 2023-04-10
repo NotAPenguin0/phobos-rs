@@ -1,14 +1,23 @@
 use anyhow::Result;
 use ash::vk;
 
+use crate::{BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::domain::ExecutionDomain;
-use crate::{BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
 
 impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteCommandBuffer<'_, D> {
     /// Copy one buffer to the other.
     /// # Errors
-    /// Fails if the buffer views do not have the same size.
+    /// * Fails if the buffer views do not have the same size.
+    /// # Example
+    /// ```
+    /// # use anyhow::Result;
+    /// # use phobos::*;
+    /// # use phobos::domain::*;
+    /// fn copy_buffer<C: TransferCmdBuffer>(cmd: C, src: &BufferView, dst: &BufferView) -> Result<C> {
+    ///     cmd.copy_buffer(src, dst)
+    /// }
+    /// ```
     fn copy_buffer(self, src: &BufferView, dst: &BufferView) -> Result<Self> {
         if src.size() != dst.size() {
             return Err(Error::InvalidBufferCopy.into());
@@ -29,6 +38,15 @@ impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteComma
     }
 
     /// Copy a buffer to the base mip level of the specified image.
+    /// # Example
+    /// ```
+    /// # use anyhow::Result;
+    /// # use phobos::*;
+    /// # use phobos::domain::*;
+    /// fn copy_buffer_to_image<C: TransferCmdBuffer>(cmd: C, src: &BufferView, dst: &ImageView) -> Result<C> {
+    ///     cmd.copy_buffer_to_image(src, dst)
+    /// }
+    /// ```
     fn copy_buffer_to_image(self, src: &BufferView, dst: &ImageView) -> Result<Self>
     where
         Self: Sized, {

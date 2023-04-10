@@ -10,15 +10,18 @@ use crate::graph::physical_resource::PhysicalResource;
 #[cfg(feature = "shader-reflection")]
 use crate::pipeline::shader_reflection::ReflectionInfo;
 
-/// This structure is used to build up `DescriptorSetBinding` objects for requesting descriptor sets.
+/// This structure is used to build up [`DescriptorSetBinding`](crate::descriptor::descriptor_set::DescriptorSetBinding) objects for requesting descriptor sets.
+/// Public usage of this API is deprecated, use the provided methods inside [`IncompleteCommandBuffer`](crate::IncompleteCommandBuffer).
 /// # Example usage
 /// ```
-/// use phobos::DescriptorSetBuilder;
-/// // Create a descriptor set with a single binding, and bind `my_image_view` together with
-/// // `my_sampler` as a combined image sampler.
-/// let set = DescriptorSetBuilder::new()
-///             .bind_sampled_image(0, &my_image_view, &my_sampler)
-///             .build();
+/// # use phobos::*;
+/// # use phobos::descriptor::descriptor_set::DescriptorSetBinding;
+/// fn make_descriptor_set(image: &ImageView, sampler: &Sampler) -> DescriptorSetBinding {
+///     DescriptorSetBuilder::new()
+///         .bind_sampled_image(0, image, sampler)
+///         .build()
+/// }
+///
 /// ```
 #[cfg(feature = "shader-reflection")]
 #[derive(Debug)]
@@ -27,23 +30,27 @@ pub struct DescriptorSetBuilder<'a> {
     reflection: Option<&'a ReflectionInfo>,
 }
 
-/// This structure is used to build up `DescriptorSetBinding` objects for requesting descriptor sets.
+/// This structure is used to build up [`DescriptorSetBinding`](crate::descriptor::descriptor_set::DescriptorSetBinding) objects for requesting descriptor sets.
+/// Public usage of this API is deprecated, use the provided methods inside [`IncompleteCommandBuffer`](crate::IncompleteCommandBuffer).
 /// # Example usage
 /// ```
-/// use phobos::DescriptorSetBuilder;
-/// // Create a descriptor set with a single binding, and bind `my_image_view` together with
-/// // `my_sampler` as a combined image sampler.
-/// let set = DescriptorSetBuilder::new()
-///             .bind_sampled_image(0, my_image_view.clone(), &my_sampler)
-///             .build();
+/// # use phobos::*;
+/// # use phobos::descriptor::descriptor_set::DescriptorSetBinding;
+/// fn make_descriptor_set(image: &ImageView, sampler: &Sampler) -> DescriptorSetBinding {
+///     DescriptorSetBuilder::new()
+///         .bind_sampled_image(0, image, sampler)
+///         .build()
+/// }
+///
 /// ```
 #[cfg(not(feature = "shader-reflection"))]
 pub struct DescriptorSetBuilder<'a> {
     inner: DescriptorSetBinding,
-    _phantom: PhantomData<&'a i32>,
+    _phantom: PhantomData<&'a ()>,
 }
 
 impl<'r> Default for DescriptorSetBuilder<'r> {
+    /// Create a default descriptor set builder with no bindings.
     fn default() -> Self {
         Self {
             inner: DescriptorSetBinding {

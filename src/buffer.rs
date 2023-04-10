@@ -43,8 +43,7 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
     #[derivative(Debug = "ignore")]
     device: Device,
     #[derivative(Debug = "ignore")]
-    allocator: A,
-    #[derivative(Debug = "ignore")]
+    #[allow(dead_code)]
     memory: A::Allocation,
     pointer: Option<NonNull<c_void>>,
     handle: vk::Buffer,
@@ -104,6 +103,8 @@ impl<A: Allocator> Buffer<A> {
                 None,
             )?
         };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkBuffer {handle:p} (size = {size} bytes)");
 
         let requirements = unsafe { device.get_buffer_memory_requirements(handle) };
         let memory = allocator.allocate("buffer", &requirements, location)?;
@@ -112,7 +113,6 @@ impl<A: Allocator> Buffer<A> {
 
         Ok(Self {
             device,
-            allocator: allocator.clone(),
             pointer: memory.mapped_ptr(),
             memory,
             handle,
@@ -170,6 +170,7 @@ impl<A: Allocator> Buffer<A> {
         self.handle
     }
 
+    /// Get the size of this buffer
     pub fn size(&self) -> vk::DeviceSize {
         self.size
     }
@@ -177,8 +178,8 @@ impl<A: Allocator> Buffer<A> {
 
 impl<A: Allocator> Drop for Buffer<A> {
     fn drop(&mut self) {
-        let memory = std::mem::take(&mut self.memory);
-        self.allocator.free(memory).unwrap();
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkBuffer {:p}", self.handle);
         unsafe {
             self.device.destroy_buffer(self.handle, None);
         }
@@ -205,10 +206,12 @@ impl BufferView {
         self.handle
     }
 
+    /// Get the offset of this buffer view into the owning buffer
     pub fn offset(&self) -> vk::DeviceSize {
         self.offset
     }
 
+    /// Get the size of this buffer view.
     pub fn size(&self) -> vk::DeviceSize {
         self.size
     }

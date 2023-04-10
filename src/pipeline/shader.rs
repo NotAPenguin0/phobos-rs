@@ -35,20 +35,24 @@ pub struct ShaderCreateInfo {
 }
 
 impl ShaderCreateInfo {
+    /// Get the shader stage of this shader
     pub fn stage(&self) -> vk::ShaderStageFlags {
         self.stage
     }
 
+    /// Get the SPIR-V bytecode of this shader
     pub fn code(&self) -> &[u32] {
         self.code.as_slice()
     }
 
+    /// Get the hash of this shader's SPIR-V bytecode.
     pub fn code_hash(&self) -> u64 {
         self.code_hash
     }
 }
 
 impl ResourceKey for ShaderCreateInfo {
+    /// Whether this shader is persistent.
     fn persistent(&self) -> bool {
         self.persistent
     }
@@ -68,15 +72,21 @@ impl Resource for Shader {
             p_code: key.code.as_ptr(),
         };
 
+        let handle = unsafe { device.create_shader_module(&info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkShaderModule {handle:p}");
+
         Ok(Self {
             device: device.clone(),
-            handle: unsafe { device.create_shader_module(&info, None)? },
+            handle,
         })
     }
 }
 
 impl Drop for Shader {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkShaderModule {:p}", self.handle);
         unsafe {
             self.device.destroy_shader_module(self.handle, None);
         }

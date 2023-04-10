@@ -26,6 +26,8 @@ pub(crate) struct BindingInfo {
     pub ty: vk::DescriptorType,
 }
 
+/// Stores reflection information about a pipeline. Can be used to derive a pipeline layout
+/// automatically, or access names of descriptor bindings.
 #[cfg(feature = "shader-reflection")]
 #[derive(Debug)]
 pub struct ReflectionInfo {

@@ -7,6 +7,7 @@ use crate::ShaderCreateInfo;
 /// struct to construct this.
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct ComputePipelineCreateInfo {
+    /// The shader used in this compute pipeline.
     pub shader: Option<ShaderCreateInfo>,
     pub(crate) name: String,
     pub(crate) layout: PipelineLayoutCreateInfo,
@@ -28,8 +29,8 @@ impl ComputePipelineCreateInfo {
     }
 }
 
-/// Builder struct similar to [`PipelineBuilder`](crate::PipelineBuilder), but for compute pipelines. Since these are much simpler,
-/// it is also much easier to construct these.
+/// Builder struct similar to [`PipelineBuilder`](crate::PipelineBuilder), but for compute pipelines. Since compute pipelines are much simpler,
+/// there is much less work to do when building one.
 #[derive(Debug)]
 pub struct ComputePipelineBuilder {
     inner: ComputePipelineCreateInfo,
@@ -70,7 +71,7 @@ impl ComputePipelineBuilder {
     }
 
     /// Obtain the pipeline name.
-    pub fn get_name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.inner.name
     }
 }

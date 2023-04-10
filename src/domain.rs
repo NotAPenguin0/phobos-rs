@@ -1,7 +1,7 @@
 use ash::vk;
 
-use crate::command_buffer::traits::IncompleteCmdBuffer;
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::command_buffer::traits::IncompleteCmdBuffer;
 use crate::core::queue::Queue;
 use crate::QueueType;
 
@@ -32,30 +32,41 @@ pub struct Transfer;
 pub struct Compute;
 
 impl ExecutionDomain for Graphics {
+    /// Returns true if the selected queue can be used to submit commands from this entire domain
+    /// to.
     fn queue_is_compatible(queue: &Queue) -> bool {
         queue.info().queue_type == QueueType::Graphics
     }
 
+    /// Type of the command buffer that will be submitted to this domain.
     type CmdBuf<'q> = IncompleteCommandBuffer<'q, Graphics>;
 }
 
 impl ExecutionDomain for Transfer {
+    /// Returns true if the selected queue can be used to submit commands from this entire domain
+    /// to.
     fn queue_is_compatible(queue: &Queue) -> bool {
         queue.info().queue_type == QueueType::Transfer
     }
 
+    /// Type of the command buffer that will be submitted to this domain.
     type CmdBuf<'q> = IncompleteCommandBuffer<'q, Transfer>;
 }
 
 impl ExecutionDomain for Compute {
+    /// Returns true if the selected queue can be used to submit commands from this entire domain
+    /// to.
     fn queue_is_compatible(queue: &Queue) -> bool {
         queue.info().queue_type == QueueType::Compute
     }
 
+    /// Type of the command buffer that will be submitted to this domain.
     type CmdBuf<'q> = IncompleteCommandBuffer<'q, Compute>;
 }
 
 impl ExecutionDomain for All {
+    /// Returns true if the selected queue can be used to submit commands from this entire domain
+    /// to.
     fn queue_is_compatible(queue: &Queue) -> bool {
         queue
             .info()
@@ -63,5 +74,6 @@ impl ExecutionDomain for All {
             .contains(vk::QueueFlags::COMPUTE | vk::QueueFlags::GRAPHICS | vk::QueueFlags::TRANSFER)
     }
 
+    /// Type of the command buffer that will be submitted to this domain.
     type CmdBuf<'q> = IncompleteCommandBuffer<'q, All>;
 }

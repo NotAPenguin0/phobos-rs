@@ -4,7 +4,9 @@ use winit;
 
 /// Trait for windows that exposes the content width and height of a window.
 pub trait WindowSize {
+    /// Get the width of the window
     fn width(&self) -> u32;
+    /// Get the height of the window
     fn height(&self) -> u32;
 }
 
@@ -44,7 +46,7 @@ impl WindowSize for winit::window::Window {
     }
 }
 
-/// Parent trait combining all requirements for a window interface. To be a window interface, a type T must implement the following traits:
+/// Blanket trait combining all requirements for a window interface. To be a window interface, a type T must implement the following traits:
 /// - [`HasRawWindowHandle`](raw_window_handle::HasRawWindowHandle)
 /// - [`HasRawDisplayHandle`](raw_window_handle::HasRawDisplayHandle)
 /// - [`WindowSize`]

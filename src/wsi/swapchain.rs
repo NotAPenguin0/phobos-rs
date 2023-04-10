@@ -67,6 +67,9 @@ impl Swapchain {
         let functions = ash::extensions::khr::Swapchain::new(instance, unsafe { &device.handle() });
         let swapchain = unsafe { functions.create_swapchain(&info, None)? };
 
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkSwapchainKHR {swapchain:p}");
+
         let images: Vec<SwapchainImage> = unsafe { functions.get_swapchain_images(swapchain)? }
             .iter()
             .map(move |image| -> Result<SwapchainImage> {
@@ -113,14 +116,17 @@ impl Swapchain {
         self.images.as_slice()
     }
 
+    /// Get the available present modes of this swapchain
     pub fn present_mode(&self) -> vk::PresentModeKHR {
         self.present_mode
     }
 
+    /// Get the current size of this swapchain
     pub fn extent(&self) -> &vk::Extent2D {
         &self.extent
     }
 
+    /// Get the surface format of this swapchain
     pub fn format(&self) -> vk::SurfaceFormatKHR {
         self.format
     }
@@ -136,6 +142,8 @@ impl Deref for Swapchain {
 
 impl Drop for Swapchain {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkSwapchainKHR {:p}", self.handle);
         // We need to manually clear this list of images *before* deleting the swapchain,
         // otherwise, the imageview handles become invalid.
         self.images.clear();

@@ -56,6 +56,14 @@ pub struct PipelineCache {
     inner: Arc<RwLock<PipelineCacheInner>>,
 }
 
+// SAFETY: Inner state is wrapped in an Arc<RwLock<T>>, and all pointers inside point to
+// internal data
+unsafe impl Send for PipelineCache {}
+
+// SAFETY: Inner state is wrapped in an Arc<RwLock<T>>, and all pointers inside point to
+// internal data
+unsafe impl Sync for PipelineCache {}
+
 macro_rules! require_extension {
     ($pci:ident, $device:ident, $state:expr, $ext:expr) => {
         if $pci.dynamic_states.contains(&$state) && !$device.is_extension_enabled($ext) {
@@ -78,6 +86,7 @@ fn verify_valid_dynamic_states(device: &Device, pci: &PipelineCreateInfo) {
 }
 
 impl ResourceKey for PipelineCreateInfo {
+    /// Whether this resource is persistent.
     fn persistent(&self) -> bool {
         false
     }
@@ -115,15 +124,22 @@ impl Resource for Pipeline {
         pci.stage_count = shader_info.len() as u32;
         pci.p_stages = shader_info.as_ptr();
 
+        let handle = unsafe {
+            device
+                .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
+                .map_err(|(_, e)| Error::VkError(e))?
+                .first()
+                .cloned()
+                .unwrap()
+        };
+
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkPipeline (graphics) {handle:p}");
+
         unsafe {
             Ok(Self {
                 device: device.clone(),
-                handle: device
-                    .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
-                    .map_err(|(_, e)| Error::VkError(e))?
-                    .first()
-                    .cloned()
-                    .unwrap(),
+                handle,
                 layout: layout.handle(),
                 set_layouts: layout.set_layouts().to_vec(),
             })
@@ -133,6 +149,8 @@ impl Resource for Pipeline {
 
 impl Drop for Pipeline {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkPipeline (graphics) {:p}", self.handle);
         unsafe {
             self.device.destroy_pipeline(self.handle, None);
         }
@@ -140,6 +158,7 @@ impl Drop for Pipeline {
 }
 
 impl ResourceKey for ComputePipelineCreateInfo {
+    /// Whether this pipeline is persistent.
     fn persistent(&self) -> bool {
         self.persistent
     }
@@ -174,15 +193,22 @@ impl Resource for ComputePipeline {
 
         pci.stage = shader;
 
+        let handle = unsafe {
+            device
+                .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
+                .map_err(|(_, e)| Error::VkError(e))?
+                .first()
+                .cloned()
+                .unwrap()
+        };
+
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkPipeline (compute) {handle:p}");
+
         unsafe {
             Ok(Self {
                 device: device.clone(),
-                handle: device
-                    .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
-                    .map_err(|(_, e)| Error::VkError(e))?
-                    .first()
-                    .cloned()
-                    .unwrap(),
+                handle,
                 layout: layout.handle(),
                 set_layouts: layout.set_layouts().to_vec(),
             })
@@ -193,16 +219,18 @@ impl Resource for ComputePipeline {
 impl Drop for ComputePipeline {
     fn drop(&mut self) {
         unsafe {
+            #[cfg(feature = "log-objects")]
+            trace!("Destroying VkPipeline (compute) {:p}", self.handle);
             self.device.destroy_pipeline(self.handle, None);
         }
     }
 }
 
 impl PipelineCacheInner {
-    pub(crate) fn get_pipeline(&mut self, name: &str, rendering_info: &PipelineRenderingInfo) -> Result<&Pipeline> {
+    pub(crate) fn get_pipeline(&mut self, name: &str, rendering_info: PipelineRenderingInfo) -> Result<&Pipeline> {
         let entry = self.pipeline_infos.get_mut(name);
         let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
-        entry.info.rendering_info = rendering_info.clone();
+        entry.info.rendering_info = rendering_info;
         entry.info.build_rendering_state();
         // Also put in queries for descriptor set layouts and pipeline layout to make sure they are not destroyed.
         for layout in &entry.info.layout.set_layouts {
@@ -268,6 +296,7 @@ impl PipelineCache {
         Ok(())
     }
 
+    /// Create and register a new pipeline into the cache
     #[cfg(not(feature = "shader-reflection"))]
     pub fn create_named_pipeline(&mut self, mut info: PipelineCreateInfo) -> Result<()> {
         info.build_inner();
@@ -317,6 +346,7 @@ impl PipelineCache {
         Ok(())
     }
 
+    /// Create and register a new compute pipeline into the cache
     #[cfg(not(feature = "shader-reflection"))]
     pub fn create_named_compute_pipeline(&mut self, mut info: ComputePipelineCreateInfo) -> Result<()> {
         let name = info.name.clone();
@@ -371,7 +401,7 @@ impl PipelineCache {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn with_pipeline<F: FnOnce(&Pipeline) -> Result<()>>(&mut self, name: &str, rendering_info: &PipelineRenderingInfo, f: F) -> Result<()> {
+    pub(crate) fn with_pipeline<F: FnOnce(&Pipeline) -> Result<()>>(&mut self, name: &str, rendering_info: PipelineRenderingInfo, f: F) -> Result<()> {
         let mut inner = self.inner.write().unwrap();
         let pipeline = inner.get_pipeline(name, rendering_info)?;
         f(pipeline)

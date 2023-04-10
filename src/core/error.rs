@@ -7,15 +7,16 @@ use thiserror::Error;
 
 use crate::core::device::ExtensionID;
 
+/// Error type that phobos can return.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// Failed to load the Vulkan library
+    /// Failed to load the Vulkan library.
     #[error("Failed to load Vulkan.")]
     LoadFailed(ash::LoadingError),
     /// Could not convert rust string to C-String because it has null bytes
     #[error("Invalid C string")]
     InvalidString(NulError),
-    /// Generic Vulkan error type
+    /// Generic Vulkan error type.
     #[error("Vulkan error: `{0}`")]
     VkError(ash::vk::Result),
     /// No window context specified where one was expected.
@@ -70,27 +71,40 @@ pub enum Error {
     /// Buffer view out of range of original buffer
     #[error("Buffer view is not a valid range in the parent buffer.")]
     BufferViewOutOfRange,
+    /// Buffer copy between views of different sizes is not allowed.
     #[error("Buffer copy has invalid buffer views as range.")]
     InvalidBufferCopy,
     /// Mappable buffer expected
     #[error("Requested mappable buffer, but buffer does not have a memory map")]
     UnmappableBuffer,
+    /// Shader needs an entry point named `main`.
     #[error("Shader does not have an entry point.")]
     NoEntryPoint,
+    /// Shader uses descriptor sets with the same binding but different types. This is legal, but currently unsupported.
     #[error("Shader uses aliased descriptor `{0}`, which is currently not supported.")]
     AliasedDescriptor(String),
+    /// Call requires reflection information, but was not given.
     #[error("Missing shader reflection information in call that requires it.")]
     NoReflectionInformation,
+    /// Tried to look up descriptor binding in reflection info, but does not exist.
     #[error("Descriptor `{0}` does not exist.")]
     NoBinding(String),
+    /// Returned from [`ExecutionManager::try_on_domain()`](crate::ExecutionManager::try_on_domain) to indicate the queue is currently locked.
     #[error("Returned as a result from ExecutionManager::try_on_domain to indicate the queue is currently locked.")]
     QueueLocked,
+    /// Tried to bind descriptors to command buffer with no descriptor cache. Give the descriptor cache in
+    /// [`ExecutionManager::on_domain()`](crate::ExecutionManager::on_domain)
     #[error("Tried to bind descriptors to command buffer with no descriptor cache")]
     NoDescriptorCache,
+    /// Tried to bind a pipeline to command buffer with no pipeline cache. Give the pipeline cache in
+    /// [`ExecutionManager::on_domain()`](crate::ExecutionManager::on_domain)
     #[error("Tried to bind pipeline to command buffer with no pipeline cache")]
     NoPipelineCache,
+    /// Cannot bind a graphics pipeline outside for a renderpass. Make sure the current pass was created using
+    /// [`PassBuilder::render()`](crate::PassBuilder::render)
     #[error("Tried to obtain a graphics pipeline outside of a render pass.")]
     NoRenderpass,
+    /// Function call requires extension to be enabled, but this extension was not requested or not available.
     #[error("Extension {0} required for this feature, but not enabled.")]
     ExtensionNotSupported(ExtensionID),
     /// Uncategorized error.

@@ -12,7 +12,7 @@ use petgraph::prelude::EdgeRef;
 
 use crate::{Allocator, DefaultAllocator, Error};
 use crate::domain::ExecutionDomain;
-use crate::graph::pass::{BoxedPassFn, Pass};
+use crate::graph::pass::{BoxedPassFn, EmptyPassExecutor, Pass};
 use crate::graph::resource::ResourceUsage;
 use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
 use crate::graph::virtual_resource::VirtualResource;
@@ -42,20 +42,20 @@ pub struct PassResourceBarrier {
 }
 
 /// A task in a pass graph. Either a render pass, or a compute pass, etc.
-pub struct PassNode<'exec, 'q, R: Resource, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
+pub struct PassNode<'cb, R: Resource, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
     pub(crate) identifier: String,
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<R>,
     pub(crate) outputs: Vec<R>,
-    pub(crate) execute: BoxedPassFn<'q, 'exec, D, A>,
+    pub(crate) execute: BoxedPassFn<'cb, D, U, A>,
     pub(crate) is_renderpass: bool,
 }
 
-pub(crate) type PassGraphInner<'exec, 'q, D, A> = Graph<Node<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>>, String>;
+pub(crate) type PassGraphInner<'cb, D, U, A> = Graph<Node<PassResource, PassResourceBarrier, PassNode<'cb, PassResource, D, U, A>>, String>;
 
 /// Pass graph, used for synchronizing resources over a single queue.
-pub struct PassGraph<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
-    pub(crate) graph: TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>>,
+pub struct PassGraph<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
+    pub(crate) graph: TaskGraph<PassResource, PassResourceBarrier, PassNode<'cb, PassResource, D, U, A>>,
     // Note that this is guaranteed to be stable.
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
     // index is invalidated. Since the source is always the first node, this is never invalidated.
@@ -64,31 +64,37 @@ pub struct PassGraph<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAlloca
     last_usages: HashMap<String, (usize, PipelineStage)>,
 }
 
-pub struct BuiltPassGraph<'exec, 'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
-    graph: PassGraph<'exec, 'q, D, A>,
+/// A completely built pass graph, ready for recording.
+pub struct BuiltPassGraph<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
+    graph: PassGraph<'cb, D, U, A>,
 }
 
-impl<'exec, 'q, D: ExecutionDomain, A: Allocator> Deref for BuiltPassGraph<'exec, 'q, D, A> {
-    type Target = PassGraph<'exec, 'q, D, A>;
+impl<'cb, D: ExecutionDomain, U, A: Allocator> Deref for BuiltPassGraph<'cb, D, U, A> {
+    /// The stored pass graph type.
+    type Target = PassGraph<'cb, D, U, A>;
 
+    /// Get the stored pass graph.
     fn deref(&self) -> &Self::Target {
         &self.graph
     }
 }
 
-impl<'exec, 'q, D: ExecutionDomain, A: Allocator> DerefMut for BuiltPassGraph<'exec, 'q, D, A> {
+impl<'cb, D: ExecutionDomain, U, A: Allocator> DerefMut for BuiltPassGraph<'cb, D, U, A> {
+    /// Get the stored pass graph.
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.graph
     }
 }
 
 impl PassResource {
+    /// Get the virtual resource associated with this pass resource.
     pub fn virtual_resource(&self) -> &VirtualResource {
         &self.resource
     }
 }
 
 impl Barrier<PassResource> for PassResourceBarrier {
+    /// Create a new barrier node.
     fn new(resource: PassResource) -> Self {
         Self {
             src_access: resource.usage.access(),
@@ -99,25 +105,28 @@ impl Barrier<PassResource> for PassResourceBarrier {
         }
     }
 
+    /// Get the resource this barrier operates on.
     fn resource(&self) -> &PassResource {
         &self.resource
     }
 }
 
 impl Resource for PassResource {
+    /// Returns true if `self` is a dependency of `lhs`
     fn is_dependency_of(&self, lhs: &Self) -> bool {
         self.virtual_resource().uid() == lhs.virtual_resource().uid()
     }
 
+    /// Return the uid of this virtual resource.
     fn uid(&self) -> &String {
         self.virtual_resource().uid()
     }
 }
 
-impl<R, D, A: Allocator> Task<R> for PassNode<'_, '_, R, D, A>
-where
-    R: Resource,
-    D: ExecutionDomain,
+impl<R, D, U, A: Allocator> Task<R> for PassNode<'_, R, D, U, A>
+    where
+        R: Resource,
+        D: ExecutionDomain,
 {
     fn inputs(&self) -> &Vec<R> {
         &self.inputs
@@ -142,9 +151,10 @@ macro_rules! barriers {
     };
 }
 
-impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
+impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
     /// Create a new task graph. If rendering to a swapchain, also give it the virtual resource you are planning to use for this.
-    /// This is necessary for proper sync
+    /// This is necessary for proper synchronization.
+    /// There is a tracking issue for improving this part of the API, see <https://github.com/NotAPenguin0/phobos-rs/issues/16>
     pub fn new(swapchain: Option<&VirtualResource>) -> Self {
         let mut graph = PassGraph {
             graph: TaskGraph::new(),
@@ -161,7 +171,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
                 color: None,
                 inputs: vec![],
                 outputs: vec![],
-                execute: Box::new(|c, _, _| Ok(c)),
+                execute: EmptyPassExecutor::new_boxed(),
                 is_renderpass: false,
             })
             .unwrap();
@@ -169,10 +179,10 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
         graph
     }
 
-    /// Add a pass to a task graph.
+    /// Add a pass to a task graph. To obtain a pass, use the [`PassBuilder`](crate::graph::pass::PassBuilder)
     /// # Errors
-    /// - This function can fail if adding the pass results in a cyclic dependency in the graph.
-    pub fn add_pass(mut self, pass: Pass<'exec, 'q, D, A>) -> Result<Self> {
+    /// - Fails if adding the pass results in a cyclic dependency in the graph.
+    pub fn add_pass(mut self, pass: Pass<'cb, D, U, A>) -> Result<Self> {
         {
             // Before adding this pass, we need to add every initial input (one with no '+' signs in its uid) to the output of the source node.
             // Note that we dont actually fill the pipeline stages yet, we do that later
@@ -212,7 +222,10 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
     }
 
     /// Builds the task graph so it can be recorded into a command buffer.
-    pub fn build(mut self) -> Result<BuiltPassGraph<'exec, 'q, D, A>> {
+    /// # Errors
+    /// * Fails if there are multiple usages of the same resource, which makes it impossible to
+    ///   construct an unambiguous graph.
+    pub fn build(mut self) -> Result<BuiltPassGraph<'cb, D, U, A>> {
         self.set_source_stages()?;
         self.graph.create_barrier_nodes();
         self.merge_identical_barriers()?;
@@ -222,16 +235,18 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
         })
     }
 
-    /// Returns the task graph built by the GPU task graph system, useful for outputting dotfiles.
-    pub fn task_graph(&self) -> &TaskGraph<PassResource, PassResourceBarrier, PassNode<'exec, 'q, PassResource, D, A>> {
+    /// Returns the internal task graph structure, useful for creating debug visualizations.
+    pub fn task_graph(&self) -> &TaskGraph<PassResource, PassResourceBarrier, PassNode<'cb, PassResource, D, U, A>> {
         &self.graph
     }
 
-    /// Returns the total amount of nodes in the graph.
+    /// Returns the total amount of nodes in the graph. This can be used as a metric of how
+    /// complex the graph is.
     pub fn num_nodes(&self) -> usize {
         self.graph.graph.node_count()
     }
 
+    /// Get the source node of the graph.
     #[allow(dead_code)]
     pub(crate) fn source(&self) -> NodeIndex {
         self.source
@@ -255,7 +270,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
 
     #[allow(dead_code)]
     fn barrier_src_resource<'a>(
-        graph: &'a PassGraphInner<D, A>,
+        graph: &'a PassGraphInner<D, U, A>,
         node: NodeIndex,
     ) -> Result<&'a PassResource> {
         let Node::Barrier(barrier) = graph.node_weight(node).unwrap() else { return Err(Error::NodeNotFound.into()) };
@@ -268,7 +283,7 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
     }
 
     pub(crate) fn barrier_dst_resource<'a>(
-        graph: &'a PassGraphInner<D, A>,
+        graph: &'a PassGraphInner<D, U, A>,
         node: NodeIndex,
     ) -> Result<&'a PassResource> {
         // We know that:
@@ -356,20 +371,22 @@ impl<'exec, 'q, D: ExecutionDomain, A: Allocator> PassGraph<'exec, 'q, D, A> {
     }
 }
 
+/// Trait that is implemented for the task graph to help with debugging and visualizing the graph.
 pub trait GraphViz {
+    /// Get the string representation of this graph in `dot` format.
     fn dot(&self) -> Result<String>;
 }
 
-impl<D: ExecutionDomain, A: Allocator> GraphViz for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> {
+impl<D: ExecutionDomain, U, A: Allocator> GraphViz for TaskGraph<PassResource, PassResourceBarrier, PassNode<'_, PassResource, D, U, A>> {
     fn dot(&self) -> Result<String> {
         Ok(format!(
             "{}",
-            Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes,)
+            Dot::with_attr_getters(&self.graph, &[], &Self::get_edge_attributes, &Self::get_node_attributes)
         ))
     }
 }
 
-impl<D: ExecutionDomain, A: Allocator> Display for Node<PassResource, PassResourceBarrier, PassNode<'_, '_, PassResource, D, A>> {
+impl<D: ExecutionDomain, U, A: Allocator> Display for Node<PassResource, PassResourceBarrier, PassNode<'_, PassResource, D, U, A>> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),

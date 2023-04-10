@@ -2,10 +2,13 @@ use ash::vk;
 
 use crate::graph::virtual_resource::VirtualResource;
 
+/// Type of a resource in the pass graph.
 #[derive(Debug, Default, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum ResourceType {
+    /// Image resource
     #[default]
     Image,
+    /// Buffer resource
     Buffer,
 }
 
@@ -30,6 +33,7 @@ pub(crate) enum ResourceUsage {
 }
 
 impl ResourceUsage {
+    /// Get the access flags for this resource usage.
     pub fn access(&self) -> vk::AccessFlags2 {
         match self {
             ResourceUsage::Nothing => vk::AccessFlags2::NONE,
@@ -42,6 +46,7 @@ impl ResourceUsage {
         }
     }
 
+    /// Whether this usage is a read operation
     pub fn is_read(&self) -> bool {
         match self {
             ResourceUsage::Nothing => true,

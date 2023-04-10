@@ -28,8 +28,6 @@ pub struct Image<A: Allocator = DefaultAllocator> {
     /// Reference to the [`VkDevice`](vk::Device).
     #[derivative(Debug = "ignore")]
     device: Device,
-    #[derivative(Debug = "ignore")]
-    allocator: Option<A>,
     /// [`VkImage`](vk::Image) handle.
     handle: vk::Image,
     /// GPU memory allocation. If this is None, then the image is not owned by our system (for example a swapchain image) and should not be
@@ -140,6 +138,8 @@ impl<A: Allocator> Image<A> {
                 None,
             )?
         };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkImage {handle:p}");
 
         let requirements = unsafe { device.get_image_memory_requirements(handle) };
 
@@ -151,7 +151,6 @@ impl<A: Allocator> Image<A> {
 
         Ok(Self {
             device,
-            allocator: Some(alloc.clone()),
             handle,
             format,
             size: vk::Extent3D {
@@ -177,7 +176,6 @@ impl<A: Allocator> Image<A> {
     ) -> Self {
         Self {
             device,
-            allocator: None,
             handle,
             memory: None,
             format,
@@ -213,6 +211,8 @@ impl<A: Allocator> Image<A> {
         };
 
         let view_handle = unsafe { self.device.create_image_view(&info, None)? };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkImageView {view_handle:p}");
         Ok(ImageView::new(ImgView {
             device: self.device.clone(),
             handle: view_handle,
@@ -241,34 +241,42 @@ impl<A: Allocator> Image<A> {
         self.handle
     }
 
+    /// Get the image format
     pub fn format(&self) -> vk::Format {
         self.format
     }
 
+    /// Get the image size
     pub fn size(&self) -> vk::Extent3D {
         self.size
     }
 
+    /// Get the image width
     pub fn width(&self) -> u32 {
         self.size().width
     }
 
+    /// Get the image height
     pub fn height(&self) -> u32 {
         self.size().height
     }
 
+    /// Get the image depth (for 2D images, this is 1)
     pub fn depth(&self) -> u32 {
         self.size().depth
     }
 
+    /// Get the number of layers in the image
     pub fn layers(&self) -> u32 {
         self.layers
     }
 
+    /// Get the number of mip levels in the image
     pub fn mip_levels(&self) -> u32 {
         self.mip_levels
     }
 
+    /// Get the number of MSAA samples for this image.
     pub fn samples(&self) -> vk::SampleCountFlags {
         self.samples
     }
@@ -276,15 +284,11 @@ impl<A: Allocator> Image<A> {
 
 impl<A: Allocator> Drop for Image<A> {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkImage {:p}", self.handle);
         if self.is_owned() {
             unsafe {
                 self.device.destroy_image(self.handle, None);
-            }
-            if let Some(memory) = &mut self.memory {
-                let memory = std::mem::take(memory);
-                if let Some(allocator) = &mut self.allocator {
-                    allocator.free(memory).unwrap();
-                }
             }
         }
     }
@@ -321,50 +325,63 @@ impl ImgView {
         self.image
     }
 
+    /// Get the image format
     pub fn format(&self) -> vk::Format {
         self.format
     }
 
+    /// Get the number of MSAA samples for this image.
     pub fn samples(&self) -> vk::SampleCountFlags {
         self.samples
     }
 
+    /// Get the image aspect that this view was built from
     pub fn aspect(&self) -> vk::ImageAspectFlags {
         self.aspect
     }
 
+    /// Get the image size
     pub fn size(&self) -> vk::Extent3D {
         self.size
     }
 
+    /// Get the image width
     pub fn width(&self) -> u32 {
         self.size().width
     }
 
+    /// Get the image height
     pub fn height(&self) -> u32 {
         self.size().height
     }
 
+    /// Get the image depth. For 2D images, this is 1
     pub fn depth(&self) -> u32 {
         self.size().depth
     }
 
+    /// Get the first layer this view was made from
     pub fn base_layer(&self) -> u32 {
         self.base_layer
     }
 
+    /// Get the number of layers this view was made from
     pub fn layer_count(&self) -> u32 {
         self.layer_count
     }
 
+    /// Get the first mip level this view was made from
     pub fn base_level(&self) -> u32 {
         self.base_level
     }
 
+    /// Get the number of mip levels this view was made from
     pub fn level_count(&self) -> u32 {
         self.level_count
     }
 
+    /// Get the unique ID of this image view. Every unique image view
+    /// is guaranteed to have its own unique id.
     pub fn id(&self) -> u64 {
         self.id
     }
@@ -372,6 +389,8 @@ impl ImgView {
 
 impl Drop for ImgView {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkImageView {:p}", self.handle);
         unsafe {
             self.device.destroy_image_view(self.handle, None);
         }
