@@ -1,9 +1,10 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use ash::vk;
 
 use crate::{BufferView, Device};
 use crate::core::device::ExtensionID;
-use crate::util::to_vk::IntoVulkanType;
+use crate::util::address::{DeviceOrHostAddress, DeviceOrHostAddressConst};
+use crate::util::to_vk::{AsVulkanType, IntoVulkanType};
 
 pub struct AccelerationStructure {
     device: Device,
@@ -17,20 +18,68 @@ pub enum AccelerationStructureType {
     Generic,
 }
 
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+pub enum AccelerationStructureBuildType {
+    Host,
+    Device,
+}
+
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+pub struct AccelerationStructureBuildSize {
+    pub size: vk::DeviceSize,
+    pub update_scratch_size: vk::DeviceSize,
+    pub build_scratch_size: vk::DeviceSize,
+}
+
+pub struct AccelerationStructureBuildGeometryInfo<'a> {
+    pub ty: AccelerationStructureType,
+    pub flags: vk::BuildAccelerationStructureFlagsKHR,
+    pub mode: vk::BuildAccelerationStructureModeKHR,
+    pub src: Option<&'a AccelerationStructure>,
+    pub dst: Option<&'a AccelerationStructure>,
+    pub geometries: &'a [vk::AccelerationStructureGeometryKHR],
+    pub scratch_data: DeviceOrHostAddress,
+}
+
 impl IntoVulkanType for AccelerationStructureType {
     type Output = vk::AccelerationStructureTypeKHR;
 
     fn into_vulkan(self) -> Self::Output {
         match self {
-            AccelerationStructureType::TopLevel => {
-                vk::AccelerationStructureTypeKHR::TOP_LEVEL
-            }
-            AccelerationStructureType::BottomLevel => {
-                vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL
-            }
-            AccelerationStructureType::Generic => {
-                vk::AccelerationStructureTypeKHR::GENERIC
-            }
+            AccelerationStructureType::TopLevel => vk::AccelerationStructureTypeKHR::TOP_LEVEL,
+            AccelerationStructureType::BottomLevel => vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
+            AccelerationStructureType::Generic => vk::AccelerationStructureTypeKHR::GENERIC,
+        }
+    }
+}
+
+impl IntoVulkanType for AccelerationStructureBuildType {
+    type Output = vk::AccelerationStructureBuildTypeKHR;
+
+    fn into_vulkan(self) -> Self::Output {
+        match self {
+            AccelerationStructureBuildType::Host => vk::AccelerationStructureBuildTypeKHR::HOST,
+            AccelerationStructureBuildType::Device => vk::AccelerationStructureBuildTypeKHR::DEVICE,
+        }
+    }
+}
+
+impl<'a> AsVulkanType for AccelerationStructureBuildGeometryInfo<'a> {
+    type Output = vk::AccelerationStructureBuildGeometryInfoKHR;
+
+    fn as_vulkan(&self) -> Self::Output {
+        vk::AccelerationStructureBuildGeometryInfoKHR {
+            s_type: vk::StructureType::ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+            p_next: std::ptr::null(),
+            ty: self.ty.into_vulkan(),
+            flags: self.flags,
+            mode: self.mode,
+            src_acceleration_structure: self.src.map(|a| a.handle).unwrap_or_default(),
+            dst_acceleration_structure: self.dst.map(|a| a.handle).unwrap_or_default(),
+            geometry_count: self.geometries.len() as u32,
+            p_geometries: self.geometries.as_ptr(),
+            pp_geometries: std::ptr::null(),
+            scratch_data: self.scratch_data.as_vulkan(),
         }
     }
 }
@@ -58,6 +107,31 @@ impl AccelerationStructure {
         Ok(Self {
             device,
             handle,
+        })
+    }
+
+    pub fn build_sizes(
+        device: &Device,
+        ty: AccelerationStructureBuildType,
+        info: &AccelerationStructureBuildGeometryInfo,
+        primitive_counts: &[u32],
+    ) -> Result<AccelerationStructureBuildSize> {
+        device.require_extension(ExtensionID::AccelerationStructure)?;
+        let fns = device.acceleration_structure().unwrap();
+
+        if primitive_counts.len() != info.geometries.len() {
+            bail!(
+                "max primitive count length should match the number of geometries (expected: {}, actual: {})",
+                info.geometries.len(),
+                primitive_counts.len()
+            );
+        }
+
+        let sizes = unsafe { fns.get_acceleration_structure_build_sizes(ty.into_vulkan(), &info.as_vulkan(), primitive_counts) };
+        Ok(AccelerationStructureBuildSize {
+            size: sizes.acceleration_structure_size,
+            update_scratch_size: sizes.update_scratch_size,
+            build_scratch_size: sizes.build_scratch_size,
         })
     }
 }
