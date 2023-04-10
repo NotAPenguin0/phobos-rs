@@ -76,9 +76,9 @@ pub trait ExampleApp {
 }
 
 pub struct ExampleRunner {
-    vk: VulkanContext,
     pipelines: PipelineCache,
     descriptors: DescriptorCache,
+    vk: VulkanContext,
 }
 
 impl ExampleRunner {
@@ -204,6 +204,7 @@ impl ExampleRunner {
             // Do not render a frame if Exit control flow is specified, to avoid
             // sync issues.
             if let ControlFlow::ExitWithCode(_) = *control_flow {
+                self.vk.device.wait_idle().unwrap();
                 return;
             }
             *control_flow = ControlFlow::Poll;
