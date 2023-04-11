@@ -1,7 +1,10 @@
 use anyhow::Result;
 use ash::vk;
 
-use phobos::{Buffer, CommandBuffer, ComputeCmdBuffer, IncompleteCmdBuffer, InFlightContext, MemoryType, PassBuilder, PassGraph, PhysicalResourceBindings, RecordGraphToCommandBuffer, VirtualResource};
+use phobos::{
+    Buffer, CommandBuffer, ComputeCmdBuffer, IncompleteCmdBuffer, InFlightContext, MemoryType, PassBuilder, PassGraph, PhysicalResourceBindings,
+    RecordGraphToCommandBuffer, VirtualResource,
+};
 use phobos::acceleration_structure::{
     AccelerationStructure, AccelerationStructureBuildInfo, AccelerationStructureBuildType, AccelerationStructureGeometryTrianglesData,
     AccelerationStructureType,
@@ -41,16 +44,12 @@ impl ExampleApp for RaytracingSample {
             .flags(vk::BuildAccelerationStructureFlagsKHR::ALLOW_COMPACTION | vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
             .set_type(AccelerationStructureType::BottomLevel)
             .push_triangles(
-                AccelerationStructureGeometryTrianglesData {
-                    format: vk::Format::R32G32_SFLOAT,
-                    vertex_data: vtx_buffer.address().into(),
-                    stride: 2 * std::mem::size_of::<f32>() as vk::DeviceSize,
-                    max_vertex: 2,
-                    index_type: vk::IndexType::NONE_KHR,
-                    index_data: DeviceOrHostAddressConst::null_host(),
-                    transform_data: DeviceOrHostAddressConst::null_host(),
-                },
-                vk::GeometryFlagsKHR::OPAQUE,
+                AccelerationStructureGeometryTrianglesData::default()
+                    .format(vk::Format::R32G32_SFLOAT)
+                    .vertex_data(vtx_buffer.address())
+                    .stride((2 * std::mem::size_of::<f32>()) as u64)
+                    .max_vertex(2)
+                    .flags(vk::GeometryFlagsKHR::OPAQUE)
             )
             .push_range(1, 0, 0, 0);
         // Query acceleration structure and scratch buffer size.
@@ -82,7 +81,9 @@ impl ExampleApp for RaytracingSample {
             .scratch_data(scratch_buffer.address().into());
 
         // Create a command buffer. Building acceleration structures is done on a compute command buffer.
-        let cmd = ctx.exec.on_domain::<Compute>(None, None)?
+        let cmd = ctx
+            .exec
+            .on_domain::<Compute>(None, None)?
             // Building an acceleration structure is just a single command
             .build_acceleration_structure(&build_info)?
             .finish()?;
@@ -99,9 +100,7 @@ impl ExampleApp for RaytracingSample {
     fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<CommandBuffer<All>> {
         let swap = VirtualResource::image("swapchain");
         let pass = PassBuilder::present("present", &swap);
-        let mut graph = PassGraph::new(Some(&swap))
-            .add_pass(pass)?
-            .build()?;
+        let mut graph = PassGraph::new(Some(&swap)).add_pass(pass)?.build()?;
         let mut bindings = PhysicalResourceBindings::new();
         bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
         let cmd = ctx.exec.on_domain::<All>(None, None)?;

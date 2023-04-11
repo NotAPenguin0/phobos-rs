@@ -41,6 +41,7 @@ pub struct AccelerationStructureGeometryTrianglesData {
     pub index_type: vk::IndexType,
     pub index_data: DeviceOrHostAddressConst,
     pub transform_data: DeviceOrHostAddressConst,
+    pub flags: vk::GeometryFlagsKHR,
 }
 
 pub struct AccelerationStructureBuildGeometryInfo<'a> {
@@ -51,6 +52,57 @@ pub struct AccelerationStructureBuildGeometryInfo<'a> {
     pub dst: Option<&'a AccelerationStructure>,
     pub geometries: Vec<vk::AccelerationStructureGeometryKHR>,
     pub scratch_data: DeviceOrHostAddress,
+}
+
+impl AccelerationStructureGeometryTrianglesData {
+    pub fn default() -> Self {
+        Self {
+            format: vk::Format::default(),
+            vertex_data: DeviceOrHostAddressConst::null_host(),
+            stride: 0,
+            max_vertex: 0,
+            index_type: vk::IndexType::NONE_KHR,
+            index_data: DeviceOrHostAddressConst::null_host(),
+            transform_data: DeviceOrHostAddressConst::null_host(),
+            flags: Default::default(),
+        }
+    }
+
+    pub fn format(mut self, format: impl Into<vk::Format>) -> Self {
+        self.format = format.into();
+        self
+    }
+
+    pub fn vertex_data(mut self, data: impl Into<DeviceOrHostAddressConst>) -> Self {
+        self.vertex_data = data.into();
+        self
+    }
+
+    pub fn stride(mut self, stride: impl Into<vk::DeviceSize>) -> Self {
+        self.stride = stride.into();
+        self
+    }
+
+    pub fn max_vertex(mut self, max_vertex: u32) -> Self {
+        self.max_vertex = max_vertex;
+        self
+    }
+
+    pub fn index_data(mut self, ty: vk::IndexType, data: impl Into<DeviceOrHostAddressConst>) -> Self {
+        self.index_type = ty;
+        self.index_data = data.into();
+        self
+    }
+
+    pub fn transform_data(mut self, data: impl Into<DeviceOrHostAddressConst>) -> Self {
+        self.transform_data = data.into();
+        self
+    }
+
+    pub fn flags(mut self, flags: vk::GeometryFlagsKHR) -> Self {
+        self.flags = flags;
+        self
+    }
 }
 
 impl IntoVulkanType for AccelerationStructureType {
@@ -172,15 +224,15 @@ impl<'a> AccelerationStructureBuildInfo<'a> {
         self
     }
 
-    pub fn push_triangles(mut self, triangles: AccelerationStructureGeometryTrianglesData, flags: vk::GeometryFlagsKHR) -> Self {
+    pub fn push_triangles(mut self, triangles: AccelerationStructureGeometryTrianglesData) -> Self {
         self = self.push_geometry(vk::AccelerationStructureGeometryKHR {
             s_type: vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_KHR,
             p_next: std::ptr::null(),
+            flags: triangles.flags,
             geometry_type: vk::GeometryTypeKHR::TRIANGLES,
             geometry: vk::AccelerationStructureGeometryDataKHR {
                 triangles: triangles.into_vulkan(),
             },
-            flags,
         });
         self
     }
@@ -297,14 +349,6 @@ impl AccelerationStructure {
             update_scratch_size: align(sizes.update_scratch_size, scratch_align),
             build_scratch_size: align(sizes.update_scratch_size, scratch_align),
         })
-    }
-
-    pub fn build_info(&self) -> AccelerationStructureBuildInfo {
-        AccelerationStructureBuildInfo::default()
-            .src(self)
-            .dst(self)
-            .mode(vk::BuildAccelerationStructureModeKHR::BUILD)
-            .set_type(self.ty)
     }
 
     pub unsafe fn handle(&self) -> vk::AccelerationStructureKHR {
