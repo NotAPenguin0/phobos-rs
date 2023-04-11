@@ -2,11 +2,10 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{ComputeCmdBuffer, ComputeSupport, Error};
-use crate::acceleration_structure::AccelerationStructureBuildInfo;
+use crate::acceleration_structure::{AccelerationStructure, AccelerationStructureBuildInfo};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::domain::ExecutionDomain;
-use crate::util::to_vk::AsVulkanType;
 
 impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D> {
     /// Sets the current compute pipeline by looking up the given name in the pipeline cache.
@@ -97,6 +96,22 @@ impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommand
             self.device.acceleration_structure().unwrap().cmd_build_acceleration_structures(self.handle, geometries.as_slice(), infos.as_slice());
         }
 
+        Ok(self)
+    }
+
+    fn compact_acceleration_structure(self, src: &AccelerationStructure, dst: &AccelerationStructure) -> Result<Self> {
+        self.device.require_extension(ExtensionID::AccelerationStructure)?;
+        let fns = self.device.acceleration_structure().unwrap();
+        let info = vk::CopyAccelerationStructureInfoKHR {
+            s_type: vk::StructureType::COPY_ACCELERATION_STRUCTURE_INFO_KHR,
+            p_next: std::ptr::null(),
+            src: unsafe { src.handle() },
+            dst: unsafe { dst.handle() },
+            mode: vk::CopyAccelerationStructureModeKHR::COMPACT,
+        };
+        unsafe {
+            fns.cmd_copy_acceleration_structure(self.handle, &info);
+        };
         Ok(self)
     }
 }

@@ -4,7 +4,7 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{BufferView, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache};
-use crate::acceleration_structure::AccelerationStructureBuildInfo;
+use crate::acceleration_structure::{AccelerationStructure, AccelerationStructureBuildInfo};
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
@@ -81,6 +81,8 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
     fn build_acceleration_structure(self, info: &AccelerationStructureBuildInfo) -> Result<Self> where Self: Sized;
 
     fn build_acceleration_structures(self, info: &[AccelerationStructureBuildInfo]) -> Result<Self> where Self: Sized;
+
+    fn compact_acceleration_structure(self, src: &AccelerationStructure, dst: &AccelerationStructure) -> Result<Self> where Self: Sized;
 }
 
 /// Completed command buffer

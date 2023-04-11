@@ -152,6 +152,10 @@ impl AccelerationStructure {
             build_scratch_size: align(sizes.update_scratch_size, scratch_align),
         })
     }
+
+    pub unsafe fn handle(&self) -> vk::AccelerationStructureKHR {
+        self.handle
+    }
 }
 
 impl Drop for AccelerationStructure {
