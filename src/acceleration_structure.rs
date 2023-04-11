@@ -313,6 +313,10 @@ impl AccelerationStructure {
         };
 
         let handle = unsafe { fns.create_acceleration_structure(&info, None)? };
+
+        #[cfg(feature = "log-objects")]
+        trace!("Created VkAccelerationStructureKHR {:p}", handle);
+
         Ok(Self {
             device,
             handle,
@@ -358,6 +362,8 @@ impl AccelerationStructure {
 
 impl Drop for AccelerationStructure {
     fn drop(&mut self) {
+        #[cfg(feature = "log-objects")]
+        trace!("Destroying VkAccelerationStructureKHR {:p}", self.handle);
         unsafe {
             self.device
                 .acceleration_structure()
