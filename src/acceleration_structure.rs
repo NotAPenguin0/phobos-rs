@@ -1,11 +1,13 @@
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use ash::vk;
+use ash::vk::Handle;
 
 use crate::{BufferView, Device};
 use crate::core::device::ExtensionID;
 use crate::util::address::{DeviceOrHostAddress, DeviceOrHostAddressConst};
 use crate::util::align::align;
 use crate::util::to_vk::{AsVulkanType, IntoVulkanType};
+use crate::util::transform::TransformMatrix;
 
 pub struct AccelerationStructure {
     device: Device,
@@ -44,6 +46,50 @@ pub struct AccelerationStructureGeometryTrianglesData {
     pub flags: vk::GeometryFlagsKHR,
 }
 
+#[derive(Default, Copy, Clone, Debug)]
+#[allow(non_camel_case_types)]
+#[repr(transparent)]
+pub struct u24([u8; 3]);
+
+impl From<u24> for u32 {
+    fn from(value: u24) -> Self {
+        let u24([a, b, c]) = value;
+        #[cfg(target_endian = "little")]
+        return u32::from_le_bytes([a, b, c, 0]);
+        #[cfg(target_endian = "big")]
+        return u32::from_be_bytes([0, a, b, c]);
+    }
+}
+
+impl TryFrom<u32> for u24 {
+    type Error = anyhow::Error;
+
+    fn try_from(value: u32) -> Result<Self> {
+        let [a, b, c, d] = value.to_ne_bytes();
+        #[cfg(target_endian = "little")]
+        return if d == 0 { Ok(u24([a, b, c])) } else { Err(anyhow!("u32 did not fit in u24")) };
+        #[cfg(target_endian = "big")]
+        return if a == 0 { Ok(u24([b, c, d])) } else { Err(anyhow!("u32 did not fit in u24")) };
+    }
+}
+
+pub struct AccelerationStructureGeometryInstancesData {
+    pub data: DeviceOrHostAddressConst,
+    pub flags: vk::GeometryFlagsKHR,
+}
+
+
+#[derive(Default, Copy, Clone)]
+#[repr(C, packed)]
+pub struct AccelerationStructureInstance {
+    pub transform: TransformMatrix,
+    pub custom_index: u24,
+    pub mask: u8,
+    pub shader_binding_table_record_offset: u24,
+    pub flags: u8,
+    pub acceleration_structure: u64,
+}
+
 pub struct AccelerationStructureBuildGeometryInfo<'a> {
     pub ty: AccelerationStructureType,
     pub flags: vk::BuildAccelerationStructureFlagsKHR,
@@ -52,6 +98,11 @@ pub struct AccelerationStructureBuildGeometryInfo<'a> {
     pub dst: Option<&'a AccelerationStructure>,
     pub geometries: Vec<vk::AccelerationStructureGeometryKHR>,
     pub scratch_data: DeviceOrHostAddress,
+}
+
+pub struct AccelerationStructureBuildInfo<'a> {
+    geometry: AccelerationStructureBuildGeometryInfo<'a>,
+    build_range_infos: Vec<vk::AccelerationStructureBuildRangeInfoKHR>,
 }
 
 impl AccelerationStructureGeometryTrianglesData {
@@ -166,9 +217,17 @@ impl IntoVulkanType for AccelerationStructureGeometryTrianglesData {
     }
 }
 
-pub struct AccelerationStructureBuildInfo<'a> {
-    geometry: AccelerationStructureBuildGeometryInfo<'a>,
-    build_range_infos: Vec<vk::AccelerationStructureBuildRangeInfoKHR>,
+impl IntoVulkanType for AccelerationStructureGeometryInstancesData {
+    type Output = vk::AccelerationStructureGeometryInstancesDataKHR;
+
+    fn into_vulkan(self) -> Self::Output {
+        vk::AccelerationStructureGeometryInstancesDataKHR {
+            s_type: vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+            p_next: std::ptr::null(),
+            array_of_pointers: vk::FALSE,
+            data: self.data.as_vulkan(),
+        }
+    }
 }
 
 impl<'a> Default for AccelerationStructureBuildInfo<'a> {
@@ -250,15 +309,15 @@ impl<'a> AccelerationStructureBuildInfo<'a> {
         self
     }
 
-    pub fn push_instances(mut self, instances: vk::AccelerationStructureGeometryInstancesDataKHR, flags: vk::GeometryFlagsKHR) -> Self {
+    pub fn push_instances(mut self, instances: AccelerationStructureGeometryInstancesData) -> Self {
         self = self.push_geometry(vk::AccelerationStructureGeometryKHR {
             s_type: vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_KHR,
             p_next: std::ptr::null(),
             geometry_type: vk::GeometryTypeKHR::INSTANCES,
+            flags: instances.flags,
             geometry: vk::AccelerationStructureGeometryDataKHR {
-                instances,
+                instances: instances.into_vulkan(),
             },
-            flags,
         });
         self
     }
@@ -290,6 +349,45 @@ impl<'a> AccelerationStructureBuildInfo<'a> {
         &'a [vk::AccelerationStructureBuildRangeInfoKHR],
     ) {
         (self.geometry.as_vulkan(), self.build_range_infos.as_slice())
+    }
+}
+
+impl AccelerationStructureInstance {
+    pub fn custom_index(mut self, idx: u32) -> Result<Self> {
+        self.custom_index = u24::try_from(idx)?;
+        Ok(self)
+    }
+
+    pub fn mask(mut self, mask: u8) -> Self {
+        self.mask = mask;
+        self
+    }
+
+    pub fn sbt_record_offset(mut self, offset: u32) -> Result<Self> {
+        self.shader_binding_table_record_offset = u24::try_from(offset)?;
+        Ok(self)
+    }
+
+    pub fn flags(mut self, flags: vk::GeometryInstanceFlagsKHR) -> Self {
+        self.flags = flags.as_raw() as u8;
+        self
+    }
+
+    pub fn acceleration_structure(mut self, accel: &AccelerationStructure, mode: AccelerationStructureBuildType) -> Result<Self> {
+        match mode {
+            AccelerationStructureBuildType::Host => {
+                self.acceleration_structure = accel.handle.as_raw();
+            }
+            AccelerationStructureBuildType::Device => {
+                self.acceleration_structure = accel.address()?
+            }
+        };
+        Ok(self)
+    }
+
+    pub fn transform(mut self, transform: TransformMatrix) -> Self {
+        self.transform = transform;
+        self
     }
 }
 
@@ -360,6 +458,18 @@ impl AccelerationStructure {
 
     pub unsafe fn handle(&self) -> vk::AccelerationStructureKHR {
         self.handle
+    }
+
+    pub fn address(&self) -> Result<vk::DeviceAddress> {
+        self.device.require_extension(ExtensionID::AccelerationStructure)?;
+        let fns = self.device.acceleration_structure().unwrap();
+        unsafe {
+            Ok(fns.get_acceleration_structure_device_address(&vk::AccelerationStructureDeviceAddressInfoKHR {
+                s_type: vk::StructureType::ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
+                p_next: std::ptr::null(),
+                acceleration_structure: self.handle(),
+            }))
+        }
     }
 }
 

@@ -7,13 +7,14 @@ use phobos::{
     RecordGraphToCommandBuffer, VirtualResource,
 };
 use phobos::acceleration_structure::{
-    AccelerationStructure, AccelerationStructureBuildInfo, AccelerationStructureBuildType, AccelerationStructureGeometryTrianglesData,
-    AccelerationStructureType,
+    AccelerationStructure, AccelerationStructureBuildInfo, AccelerationStructureBuildType, AccelerationStructureGeometryInstancesData,
+    AccelerationStructureGeometryTrianglesData, AccelerationStructureInstance, AccelerationStructureType,
 };
 use phobos::domain::{All, Compute};
 use phobos::query_pool::{AccelerationStructureCompactedSizeQuery, QueryPool, QueryPoolCreateInfo};
 use phobos::util::address::{DeviceOrHostAddress, DeviceOrHostAddressConst};
 use phobos::util::align::align;
+use phobos::util::transform::TransformMatrix;
 
 use crate::example_runner::{Context, ExampleApp, ExampleRunner, WindowContext};
 
@@ -23,6 +24,8 @@ mod example_runner;
 struct RaytracingSample {
     acceleration_structure: AccelerationStructure,
     buffer: Buffer,
+    instance_as: AccelerationStructure,
+    instance_buffer: Buffer,
 }
 
 impl ExampleApp for RaytracingSample {
@@ -124,10 +127,69 @@ impl ExampleApp for RaytracingSample {
             vk::AccelerationStructureCreateFlagsKHR::default(),
         )?;
 
-        // Submit compacting command
+        // Lets also create a TLAS. This is quite similar to the BLAS, except we wont do compaction here
+        let instances: [AccelerationStructureInstance; 1] = [AccelerationStructureInstance::default()
+            .mask(0xFF)
+            .flags(vk::GeometryInstanceFlagsKHR::TRIANGLE_FRONT_COUNTERCLOCKWISE)
+            .sbt_record_offset(0)?
+            .custom_index(0)?
+            .transform(TransformMatrix::identity())
+            // This instance points at the compacted BLAS.
+            .acceleration_structure(&compact_as, AccelerationStructureBuildType::Device)?];
+        let instance_buffer = Buffer::new(
+            ctx.device.clone(),
+            &mut ctx.allocator,
+            (instances.len() * std::mem::size_of::<AccelerationStructureInstance>()) as u64,
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST,
+            MemoryType::CpuToGpu,
+        )?;
+        instance_buffer
+            .view_full()
+            .mapped_slice::<AccelerationStructureInstance>()?
+            .copy_from_slice(&instances);
+
+        let build_info = AccelerationStructureBuildInfo::new_build()
+            .flags(vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
+            .set_type(AccelerationStructureType::TopLevel)
+            .push_instances(AccelerationStructureGeometryInstancesData {
+                data: instance_buffer.address().into(),
+                flags: vk::GeometryFlagsKHR::OPAQUE | vk::GeometryFlagsKHR::NO_DUPLICATE_ANY_HIT_INVOCATION,
+            })
+            .push_range(1, 0, 0, 0);
+
+        let instance_build_sizes = AccelerationStructure::build_sizes(&ctx.device, AccelerationStructureBuildType::Device, &build_info, &[1])?;
+        let instance_scratch_data = Buffer::new_device_local(
+            ctx.device.clone(),
+            &mut ctx.allocator,
+            instance_build_sizes.build_scratch_size,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+        )?;
+
+        let instance_as_buffer = Buffer::new_device_local(
+            ctx.device.clone(),
+            &mut ctx.allocator,
+            instance_build_sizes.size,
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR,
+        )?;
+        let instance_as = AccelerationStructure::new(
+            ctx.device.clone(),
+            AccelerationStructureType::TopLevel,
+            instance_as_buffer.view_full(),
+            Default::default(),
+        )?;
+        // Set scratch buffer and src/dst acceleration structures
+        let build_info = build_info
+            .src(&instance_as)
+            .dst(&instance_as)
+            .scratch_data(instance_scratch_data.address().into());
+
+        // Submit compacting and TLAS build command
         let cmd = ctx
             .exec
             .on_domain::<Compute>(None, None)?
+            // Build instance TLAS
+            .build_acceleration_structure(&build_info)?
+            // Compact triangle BLAS
             .compact_acceleration_structure(&acceleration_structure, &compact_as)?
             .finish()?;
         ctx.exec.submit(cmd)?.wait()?;
@@ -136,6 +198,8 @@ impl ExampleApp for RaytracingSample {
         Ok(Self {
             acceleration_structure: compact_as,
             buffer: compact_buffer,
+            instance_as,
+            instance_buffer: instance_as_buffer,
         })
     }
 
