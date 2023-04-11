@@ -1,5 +1,6 @@
 use anyhow::Result;
 use ash::vk;
+use log::info;
 
 use phobos::{
     Buffer, CommandBuffer, ComputeCmdBuffer, IncompleteCmdBuffer, InFlightContext, MemoryType, PassBuilder, PassGraph, PhysicalResourceBindings,
@@ -10,7 +11,9 @@ use phobos::acceleration_structure::{
     AccelerationStructureType,
 };
 use phobos::domain::{All, Compute};
+use phobos::query_pool::{AccelerationStructureCompactedSizeQuery, QueryPool, QueryPoolCreateInfo};
 use phobos::util::address::{DeviceOrHostAddress, DeviceOrHostAddressConst};
+use phobos::util::align::align;
 
 use crate::example_runner::{Context, ExampleApp, ExampleRunner, WindowContext};
 
@@ -49,7 +52,7 @@ impl ExampleApp for RaytracingSample {
                     .vertex_data(vtx_buffer.address())
                     .stride((2 * std::mem::size_of::<f32>()) as u64)
                     .max_vertex(2)
-                    .flags(vk::GeometryFlagsKHR::OPAQUE)
+                    .flags(vk::GeometryFlagsKHR::OPAQUE),
             )
             .push_range(1, 0, 0, 0);
         // Query acceleration structure and scratch buffer size.
@@ -80,20 +83,59 @@ impl ExampleApp for RaytracingSample {
             .dst(&acceleration_structure)
             .scratch_data(scratch_buffer.address().into());
 
+        // Create a query pool to query the compacted size.
+        let mut qp = QueryPool::<AccelerationStructureCompactedSizeQuery>::new(
+            ctx.device.clone(),
+            QueryPoolCreateInfo {
+                count: 1,
+                statistic_flags: None,
+            },
+        )?;
+
+        info!("Acceleration structure size before compacting: {} bytes", sizes.size);
+
         // Create a command buffer. Building acceleration structures is done on a compute command buffer.
         let cmd = ctx
             .exec
             .on_domain::<Compute>(None, None)?
             // Building an acceleration structure is just a single command
             .build_acceleration_structure(&build_info)?
+            // Query the compacted size properties. Note that the query type is inferred from the query pool type.
+            .write_acceleration_structure_properties(&acceleration_structure, &mut qp)?
             .finish()?;
         // Submit the command buffer and wait for its completion.
         ctx.exec.submit(cmd)?.wait()?;
 
+        // Use our compacted size query to compact this acceleration structure
+        let compacted_size = align(qp.wait_for_single_result(0)?, AccelerationStructure::alignment());
+        info!("Acceleration structure size after compacting: {} bytes", compacted_size);
+
+        // Create final compacted acceleration structures
+        let compact_buffer = Buffer::new_device_local(
+            ctx.device.clone(),
+            &mut ctx.allocator,
+            compacted_size,
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR,
+        )?;
+        let compact_as = AccelerationStructure::new(
+            ctx.device.clone(),
+            AccelerationStructureType::BottomLevel,
+            compact_buffer.view_full(),
+            vk::AccelerationStructureCreateFlagsKHR::default(),
+        )?;
+
+        // Submit compacting command
+        let cmd = ctx
+            .exec
+            .on_domain::<Compute>(None, None)?
+            .compact_acceleration_structure(&acceleration_structure, &compact_as)?
+            .finish()?;
+        ctx.exec.submit(cmd)?.wait()?;
+
         // Store resources so they do not get dropped
         Ok(Self {
-            acceleration_structure,
-            buffer,
+            acceleration_structure: compact_as,
+            buffer: compact_buffer,
         })
     }
 

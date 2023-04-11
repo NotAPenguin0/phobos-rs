@@ -20,6 +20,8 @@ pub trait Query: Clone + Sized {
 
 pub trait ScopedQuery: Query {}
 
+pub trait AccelerationStructurePropertyQuery: Query {}
+
 #[derive(Default, Copy, Clone, Debug)]
 pub struct Timestamp {
     value: u64,
@@ -208,7 +210,9 @@ impl Query for PipelineStatisticsQuery {
 impl ScopedQuery for PipelineStatisticsQuery {}
 
 #[derive(Default, Clone, Copy)]
-pub struct AccelerationStructureCompactedSizeQuery {}
+pub struct AccelerationStructureCompactedSizeQuery;
+
+impl AccelerationStructurePropertyQuery for AccelerationStructureCompactedSizeQuery {}
 
 impl Query for AccelerationStructureCompactedSizeQuery {
     const QUERY_TYPE: vk::QueryType = vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
@@ -281,6 +285,7 @@ impl<Q: Query> QueryPool<Q> {
         }
     }
 
+    /// Returns the current query pool index. This returns the same value as next() would, except it does not advance the query pool.
     pub fn current(&self) -> u32 {
         if self.current == 0 {
             0

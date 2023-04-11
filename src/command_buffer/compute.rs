@@ -6,6 +6,7 @@ use crate::acceleration_structure::{AccelerationStructure, AccelerationStructure
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::domain::ExecutionDomain;
+use crate::query_pool::{AccelerationStructureCompactedSizeQuery, AccelerationStructurePropertyQuery, QueryPool};
 
 impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D> {
     /// Sets the current compute pipeline by looking up the given name in the pipeline cache.
@@ -84,16 +85,13 @@ impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommand
             Self: Sized, {
         self.device.require_extension(ExtensionID::AccelerationStructure)?;
         let as_vk = info.iter().map(|info| info.as_vulkan()).collect::<Vec<_>>();
-        let geometries = as_vk
-            .iter()
-            .map(|(geometry, _)| *geometry)
-            .collect::<Vec<_>>();
-        let infos = as_vk
-            .iter()
-            .map(|(_, ranges)| *ranges)
-            .collect::<Vec<_>>();
+        let geometries = as_vk.iter().map(|(geometry, _)| *geometry).collect::<Vec<_>>();
+        let infos = as_vk.iter().map(|(_, ranges)| *ranges).collect::<Vec<_>>();
         unsafe {
-            self.device.acceleration_structure().unwrap().cmd_build_acceleration_structures(self.handle, geometries.as_slice(), infos.as_slice());
+            self.device
+                .acceleration_structure()
+                .unwrap()
+                .cmd_build_acceleration_structures(self.handle, geometries.as_slice(), infos.as_slice());
         }
 
         Ok(self)
@@ -113,5 +111,39 @@ impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommand
             fns.cmd_copy_acceleration_structure(self.handle, &info);
         };
         Ok(self)
+    }
+
+    fn write_acceleration_structures_properties<Q: AccelerationStructurePropertyQuery>(
+        self,
+        src: &[AccelerationStructure],
+        query_pool: &mut QueryPool<Q>,
+    ) -> Result<Self> {
+        self.device.require_extension(ExtensionID::AccelerationStructure)?;
+        let fns = self.device.acceleration_structure().unwrap();
+
+        let handles = src.iter().map(|a| unsafe { a.handle() }).collect::<Vec<_>>();
+        let first = query_pool.current();
+        unsafe {
+            fns.cmd_write_acceleration_structures_properties(
+                self.handle,
+                handles.as_slice(),
+                Q::QUERY_TYPE,
+                query_pool.handle(),
+                first,
+            );
+        }
+        handles.iter().for_each(|_| {
+            query_pool.next();
+        });
+        // Call next()
+        Ok(self)
+    }
+
+    fn write_acceleration_structure_properties<Q: AccelerationStructurePropertyQuery>(
+        self,
+        src: &AccelerationStructure,
+        query_pool: &mut QueryPool<Q>,
+    ) -> Result<Self> {
+        self.write_acceleration_structures_properties(std::slice::from_ref(src), query_pool)
     }
 }

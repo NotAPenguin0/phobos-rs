@@ -8,6 +8,7 @@ use crate::acceleration_structure::{AccelerationStructure, AccelerationStructure
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
+use crate::query_pool::{AccelerationStructureCompactedSizeQuery, AccelerationStructurePropertyQuery, QueryPool};
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {
@@ -78,11 +79,33 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
         where
             Self: Sized;
 
-    fn build_acceleration_structure(self, info: &AccelerationStructureBuildInfo) -> Result<Self> where Self: Sized;
+    fn build_acceleration_structure(self, info: &AccelerationStructureBuildInfo) -> Result<Self>
+        where
+            Self: Sized;
 
-    fn build_acceleration_structures(self, info: &[AccelerationStructureBuildInfo]) -> Result<Self> where Self: Sized;
+    fn build_acceleration_structures(self, info: &[AccelerationStructureBuildInfo]) -> Result<Self>
+        where
+            Self: Sized;
 
-    fn compact_acceleration_structure(self, src: &AccelerationStructure, dst: &AccelerationStructure) -> Result<Self> where Self: Sized;
+    fn compact_acceleration_structure(self, src: &AccelerationStructure, dst: &AccelerationStructure) -> Result<Self>
+        where
+            Self: Sized;
+
+    fn write_acceleration_structures_properties<Q: AccelerationStructurePropertyQuery>(
+        self,
+        src: &[AccelerationStructure],
+        query_pool: &mut QueryPool<Q>,
+    ) -> Result<Self>
+        where
+            Self: Sized;
+
+    fn write_acceleration_structure_properties<Q: AccelerationStructurePropertyQuery>(
+        self,
+        src: &AccelerationStructure,
+        query_pool: &mut QueryPool<Q>,
+    ) -> Result<Self>
+        where
+            Self: Sized;
 }
 
 /// Completed command buffer
