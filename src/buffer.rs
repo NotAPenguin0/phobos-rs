@@ -45,6 +45,7 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
     #[derivative(Debug = "ignore")]
     #[allow(dead_code)]
     memory: A::Allocation,
+    address: vk::DeviceAddress,
     pointer: Option<NonNull<c_void>>,
     handle: vk::Buffer,
     size: vk::DeviceSize,
@@ -79,7 +80,6 @@ impl<A: Allocator> Buffer<A> {
         } else {
             vk::SharingMode::CONCURRENT
         };
-
         let handle = unsafe {
             device.create_buffer(
                 &vk::BufferCreateInfo {
@@ -87,7 +87,7 @@ impl<A: Allocator> Buffer<A> {
                     p_next: std::ptr::null(),
                     flags: vk::BufferCreateFlags::empty(),
                     size,
-                    usage,
+                    usage: usage | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
                     sharing_mode,
                     queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT {
                         device.queue_families().len() as u32
@@ -111,12 +111,21 @@ impl<A: Allocator> Buffer<A> {
 
         unsafe { device.bind_buffer_memory(handle, memory.memory(), memory.offset())? };
 
+        let address = unsafe {
+            device.get_buffer_device_address(&vk::BufferDeviceAddressInfo {
+                s_type: vk::StructureType::BUFFER_DEVICE_ADDRESS_INFO,
+                p_next: std::ptr::null(),
+                buffer: handle,
+            })
+        };
+
         Ok(Self {
             device,
             pointer: memory.mapped_ptr(),
             memory,
             handle,
             size,
+            address,
         })
     }
 
@@ -173,6 +182,10 @@ impl<A: Allocator> Buffer<A> {
     /// Get the size of this buffer
     pub fn size(&self) -> vk::DeviceSize {
         self.size
+    }
+
+    pub fn address(&self) -> vk::DeviceAddress {
+        self.address
     }
 }
 

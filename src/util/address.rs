@@ -18,6 +18,26 @@ pub enum DeviceOrHostAddressConst {
     Host(*const c_void),
 }
 
+impl DeviceOrHostAddress {
+    pub fn null_device() -> Self {
+        Self::Device(vk::DeviceAddress::default())
+    }
+
+    pub fn null_host() -> Self {
+        Self::Host(std::ptr::null_mut())
+    }
+}
+
+impl DeviceOrHostAddressConst {
+    pub fn null_device() -> Self {
+        Self::Device(vk::DeviceAddress::default())
+    }
+
+    pub fn null_host() -> Self {
+        Self::Host(std::ptr::null())
+    }
+}
+
 impl AsVulkanType for DeviceOrHostAddress {
     type Output = vk::DeviceOrHostAddressKHR;
 
@@ -53,5 +73,29 @@ impl AsVulkanType for DeviceOrHostAddressConst {
                 }
             }
         }
+    }
+}
+
+impl From<vk::DeviceAddress> for DeviceOrHostAddress {
+    fn from(value: vk::DeviceAddress) -> Self {
+        Self::Device(value)
+    }
+}
+
+impl From<*mut c_void> for DeviceOrHostAddress {
+    fn from(value: *mut c_void) -> Self {
+        Self::Host(value)
+    }
+}
+
+impl From<vk::DeviceAddress> for DeviceOrHostAddressConst {
+    fn from(value: vk::DeviceAddress) -> Self {
+        Self::Device(value)
+    }
+}
+
+impl From<*const c_void> for DeviceOrHostAddressConst {
+    fn from(value: *const c_void) -> Self {
+        Self::Host(value)
     }
 }

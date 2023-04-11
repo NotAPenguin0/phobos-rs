@@ -11,6 +11,7 @@ use winit::window::{Window, WindowBuilder};
 
 use phobos::prelude::*;
 
+#[allow(dead_code)]
 pub fn load_spirv_file(path: &Path) -> Vec<u32> {
     let mut f = File::open(&path).expect("no file found");
     let metadata = fs::metadata(&path).expect("unable to read metadata");

@@ -5,6 +5,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use anyhow::Result;
+use ash::extensions::{ext, khr};
 use ash::vk;
 
 use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
@@ -25,6 +26,7 @@ pub enum ExtensionID {
     /// `VK_EXT_extended_dynamic_state3` provides more dynamic states to pipeline objects.
     ExtendedDynamicState3,
     AccelerationStructure,
+    RayTracingPipeline,
 }
 
 impl std::fmt::Display for ExtensionID {
@@ -43,9 +45,11 @@ struct DeviceInner {
     accel_structure_properties: Option<vk::PhysicalDeviceAccelerationStructurePropertiesKHR>,
     extensions: HashSet<ExtensionID>,
     #[derivative(Debug = "ignore")]
-    dynamic_state3: Option<ash::extensions::ext::ExtendedDynamicState3>,
+    dynamic_state3: Option<ext::ExtendedDynamicState3>,
     #[derivative(Debug = "ignore")]
-    acceleration_structure: Option<ash::extensions::khr::AccelerationStructure>,
+    acceleration_structure: Option<khr::AccelerationStructure>,
+    #[derivative(Debug = "ignore")]
+    rt_pipeline: Option<khr::RayTracingPipeline>,
 }
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
@@ -124,7 +128,7 @@ impl Device {
         // Add the extensions we want, but that are not required.
         let dynamic_state3_supported = add_if_supported(
             ExtensionID::ExtendedDynamicState3,
-            ash::extensions::ext::ExtendedDynamicState3::name(),
+            ext::ExtendedDynamicState3::name(),
             &mut enabled_extensions,
             &mut extension_names,
             available_extensions.as_slice(),
@@ -133,7 +137,19 @@ impl Device {
         let accel_supported = if settings.raytracing {
             add_if_supported(
                 ExtensionID::AccelerationStructure,
-                ash::extensions::khr::AccelerationStructure::name(),
+                khr::AccelerationStructure::name(),
+                &mut enabled_extensions,
+                &mut extension_names,
+                available_extensions.as_slice(),
+            )
+        } else {
+            false
+        };
+
+        let rt_pipeline_supported = if settings.raytracing {
+            add_if_supported(
+                ExtensionID::RayTracingPipeline,
+                khr::RayTracingPipeline::name(),
                 &mut enabled_extensions,
                 &mut extension_names,
                 available_extensions.as_slice(),
@@ -144,11 +160,11 @@ impl Device {
 
         // Add required extensions
         if settings.window.is_some() {
-            extension_names.push(CString::from(ash::extensions::khr::Swapchain::name()));
+            extension_names.push(CString::from(khr::Swapchain::name()));
         }
 
         if settings.raytracing {
-            extension_names.push(CString::from(ash::extensions::khr::DeferredHostOperations::name()));
+            extension_names.push(CString::from(khr::DeferredHostOperations::name()));
         }
 
         info!("Enabled device extensions:");
@@ -161,6 +177,7 @@ impl Device {
         let mut features_1_2 = settings.gpu_requirements.features_1_2;
         let mut features_1_3 = settings.gpu_requirements.features_1_3;
         features.pipeline_statistics_query = vk::TRUE;
+        features_1_2.buffer_device_address = vk::TRUE;
         features_1_2.host_query_reset = vk::TRUE;
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
@@ -192,8 +209,28 @@ impl Device {
             acceleration_structure_host_commands: vk::FALSE,
             descriptor_binding_acceleration_structure_update_after_bind: vk::FALSE,
         };
+        let mut features_ray_query = vk::PhysicalDeviceRayQueryFeaturesKHR {
+            s_type: vk::StructureType::PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
+            p_next: std::ptr::null_mut(),
+            ray_query: vk::TRUE,
+        };
         if accel_supported {
             info = info.push_next(&mut features_acceleration_structure);
+            info = info.push_next(&mut features_ray_query);
+        }
+
+        let mut features_ray_tracing_pipeline = vk::PhysicalDeviceRayTracingPipelineFeaturesKHR {
+            s_type: vk::StructureType::PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR,
+            p_next: std::ptr::null_mut(),
+            ray_tracing_pipeline: vk::TRUE,
+            ray_tracing_pipeline_shader_group_handle_capture_replay: vk::FALSE,
+            ray_tracing_pipeline_shader_group_handle_capture_replay_mixed: vk::FALSE,
+            ray_tracing_pipeline_trace_rays_indirect: vk::FALSE,
+            ray_traversal_primitive_culling: vk::FALSE,
+        };
+
+        if rt_pipeline_supported {
+            info = info.push_next(&mut features_ray_tracing_pipeline);
         }
 
         let info = info.build();
@@ -203,13 +240,19 @@ impl Device {
         trace!("Created new VkDevice {:p}", handle.handle());
 
         let dynamic_state3 = if dynamic_state3_supported {
-            Some(ash::extensions::ext::ExtendedDynamicState3::new(instance, &handle))
+            Some(ext::ExtendedDynamicState3::new(instance, &handle))
         } else {
             None
         };
 
         let acceleration_structure = if accel_supported {
-            Some(ash::extensions::khr::AccelerationStructure::new(instance, &handle))
+            Some(khr::AccelerationStructure::new(instance, &handle))
+        } else {
+            None
+        };
+
+        let rt_pipeline = if rt_pipeline_supported {
+            Some(khr::RayTracingPipeline::new(instance, &handle))
         } else {
             None
         };
@@ -239,6 +282,7 @@ impl Device {
             extensions: enabled_extensions,
             dynamic_state3,
             acceleration_structure,
+            rt_pipeline,
         };
 
         Ok(Device {
@@ -356,12 +400,12 @@ impl Device {
     ///     }
     /// }
     /// ```
-    pub fn dynamic_state3(&self) -> Option<&ash::extensions::ext::ExtendedDynamicState3> {
+    pub fn dynamic_state3(&self) -> Option<&ext::ExtendedDynamicState3> {
         self.inner.dynamic_state3.as_ref()
     }
 
     /// Access to the function pointers for `VK_KHR_acceleration_structure`
-    pub fn acceleration_structure(&self) -> Option<&ash::extensions::khr::AccelerationStructure> {
+    pub fn acceleration_structure(&self) -> Option<&khr::AccelerationStructure> {
         self.inner.acceleration_structure.as_ref()
     }
 
