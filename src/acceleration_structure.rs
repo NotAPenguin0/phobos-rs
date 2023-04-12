@@ -90,6 +90,8 @@ pub struct AccelerationStructureInstance {
     pub acceleration_structure: u64,
 }
 
+const_assert_eq!(std::mem::size_of::<AccelerationStructureInstance>(), 64);
+
 pub struct AccelerationStructureBuildGeometryInfo<'a> {
     pub ty: AccelerationStructureType,
     pub flags: vk::BuildAccelerationStructureFlagsKHR,
@@ -327,8 +329,8 @@ impl<'a> AccelerationStructureBuildInfo<'a> {
         self
     }
 
-    pub fn scratch_data(mut self, data: DeviceOrHostAddress) -> Self {
-        self.geometry.scratch_data = data;
+    pub fn scratch_data(mut self, data: impl Into<DeviceOrHostAddress>) -> Self {
+        self.geometry.scratch_data = data.into();
         self
     }
 
@@ -452,7 +454,7 @@ impl AccelerationStructure {
         Ok(AccelerationStructureBuildSize {
             size: align(sizes.acceleration_structure_size, Self::alignment()),
             update_scratch_size: align(sizes.update_scratch_size, scratch_align),
-            build_scratch_size: align(sizes.update_scratch_size, scratch_align),
+            build_scratch_size: align(sizes.build_scratch_size, scratch_align),
         })
     }
 
