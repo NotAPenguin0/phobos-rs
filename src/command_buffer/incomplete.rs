@@ -10,6 +10,7 @@ use crate::{
     BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings,
     PipelineCache, PipelineStage, Sampler, VirtualResource,
 };
+use crate::acceleration_structure::AccelerationStructure;
 use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
@@ -326,6 +327,14 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
     pub fn bind_storage_image(mut self, set: u32, binding: u32, image: &ImageView) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_storage_image(binding, image);
+            Ok(())
+        })?;
+        Ok(self)
+    }
+
+    pub fn bind_acceleration_structure(mut self, set: u32, binding: u32, accel: &AccelerationStructure) -> Result<Self> {
+        self.modify_descriptor_set(set, |builder| {
+            builder.bind_acceleration_structure(binding, accel);
             Ok(())
         })?;
         Ok(self)

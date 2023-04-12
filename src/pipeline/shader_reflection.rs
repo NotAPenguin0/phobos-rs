@@ -141,6 +141,25 @@ fn find_storage_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &S
     Ok(())
 }
 
+#[cfg(feature = "shader-reflection")]
+fn find_acceleration_structures(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+    for image in &resources.acceleration_structures {
+        let binding = ast.get_decoration(image.id, Decoration::Binding)?;
+        let set = ast.get_decoration(image.id, Decoration::DescriptorSet)?;
+        info.bindings.insert(
+            ast.get_name(image.id)?,
+            BindingInfo {
+                set,
+                binding,
+                stage,
+                count: 1,
+                ty: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
+            },
+        );
+    }
+    Ok(())
+}
+
 
 #[cfg(feature = "shader-reflection")]
 fn find_push_constants(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
@@ -172,6 +191,7 @@ fn reflect_module(module: spv_cross::spirv::Module) -> Result<ReflectionInfo> {
     find_storage_buffers(&mut ast, stage, &resources, &mut info)?;
     find_push_constants(&mut ast, stage, &resources, &mut info)?;
     find_storage_images(&mut ast, stage, &resources, &mut info)?;
+    find_acceleration_structures(&mut ast, stage, &resources, &mut info)?;
     Ok(info)
 }
 

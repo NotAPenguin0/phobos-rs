@@ -30,6 +30,7 @@ shaderc = { version = "0.8.2", optional = true, features = ["build-from-source"]
 
 [dev-dependencies]
 pretty_env_logger = "0.4.0"
+glam = "0.23.0"
 
 [features]
 default = ["winit", "debug-markers", "shader-reflection"]

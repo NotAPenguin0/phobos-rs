@@ -1,10 +1,13 @@
+use std::path::Path;
+
 use anyhow::Result;
 use ash::vk;
+use glam::{Mat4, Vec3};
 use log::info;
 
 use phobos::{
-    Buffer, CommandBuffer, ComputeCmdBuffer, IncompleteCmdBuffer, InFlightContext, MemoryType, PassBuilder, PassGraph, PhysicalResourceBindings,
-    RecordGraphToCommandBuffer, VirtualResource,
+    Buffer, CommandBuffer, ComputeCmdBuffer, GraphicsCmdBuffer, IncompleteCmdBuffer, InFlightContext, MemoryType, PassBuilder, PassGraph,
+    PhysicalResourceBindings, PipelineBuilder, PipelineStage, RecordGraphToCommandBuffer, ShaderCreateInfo, VirtualResource,
 };
 use phobos::acceleration_structure::{
     AccelerationStructure, AccelerationStructureBuildInfo, AccelerationStructureBuildType, AccelerationStructureGeometryInstancesData,
@@ -12,28 +15,28 @@ use phobos::acceleration_structure::{
 };
 use phobos::domain::{All, Compute};
 use phobos::query_pool::{AccelerationStructureCompactedSizeQuery, QueryPool, QueryPoolCreateInfo};
-use phobos::util::address::{DeviceOrHostAddress, DeviceOrHostAddressConst};
+use phobos::util::address::DeviceOrHostAddressConst;
 use phobos::util::align::align;
 use phobos::util::transform::TransformMatrix;
 
-use crate::example_runner::{Context, ExampleApp, ExampleRunner, WindowContext};
+use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file, WindowContext};
 
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
 
 struct RaytracingSample {
-    acceleration_structure: AccelerationStructure,
-    buffer: Buffer,
-    instance_as: AccelerationStructure,
-    instance_buffer: Buffer,
+    vtx: Buffer,
+    inst: Buffer,
+    blas: AccelerationStructure,
+    blas_buffer: Buffer,
+    tlas: AccelerationStructure,
+    tlas_buffer: Buffer,
 }
 
 impl ExampleApp for RaytracingSample {
-    fn new(mut ctx: Context) -> Result<Self>
-        where
-            Self: Sized, {
+    fn new(mut ctx: Context) -> Result<Self> {
         // Create a vertex buffer and fill it with vertex data.
-        let vertices: [f32; 6] = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0];
+        let vertices: [f32; 18] = [-1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0];
         let vtx_buffer = Buffer::new(
             ctx.device.clone(),
             &mut ctx.allocator,
@@ -51,15 +54,15 @@ impl ExampleApp for RaytracingSample {
             .set_type(AccelerationStructureType::BottomLevel)
             .push_triangles(
                 AccelerationStructureGeometryTrianglesData::default()
-                    .format(vk::Format::R32G32_SFLOAT)
+                    .format(vk::Format::R32G32B32_SFLOAT)
                     .vertex_data(vtx_buffer.address())
-                    .stride((2 * std::mem::size_of::<f32>()) as u64)
-                    .max_vertex(2)
-                    .flags(vk::GeometryFlagsKHR::OPAQUE),
+                    .stride((3 * std::mem::size_of::<f32>()) as u64)
+                    .max_vertex(5)
+                    .flags(vk::GeometryFlagsKHR::OPAQUE | vk::GeometryFlagsKHR::NO_DUPLICATE_ANY_HIT_INVOCATION),
             )
-            .push_range(1, 0, 0, 0);
+            .push_range(2, 0, 0, 0);
         // Query acceleration structure and scratch buffer size.
-        let sizes = AccelerationStructure::build_sizes(&ctx.device, AccelerationStructureBuildType::Device, &build_info, &[1])?;
+        let sizes = AccelerationStructure::build_sizes(&ctx.device, AccelerationStructureBuildType::Device, &build_info, &[2])?;
         // Allocate backing buffer for acceleration structure
         let buffer = Buffer::new_device_local(
             ctx.device.clone(),
@@ -103,6 +106,13 @@ impl ExampleApp for RaytracingSample {
             .on_domain::<Compute>(None, None)?
             // Building an acceleration structure is just a single command
             .build_acceleration_structure(&build_info)?
+            // This barrier is required!
+            .memory_barrier(
+                PipelineStage::ACCELERATION_STRUCTURE_BUILD_KHR,
+                vk::AccessFlags2::ACCELERATION_STRUCTURE_WRITE_KHR,
+                PipelineStage::ALL_COMMANDS,
+                vk::AccessFlags2::ACCELERATION_STRUCTURE_READ_KHR,
+            )
             // Query the compacted size properties. Note that the query type is inferred from the query pool type.
             .write_acceleration_structure_properties(&acceleration_structure, &mut qp)?
             .finish()?;
@@ -130,7 +140,8 @@ impl ExampleApp for RaytracingSample {
         // Lets also create a TLAS. This is quite similar to the BLAS, except we wont do compaction here
         let instances: [AccelerationStructureInstance; 1] = [AccelerationStructureInstance::default()
             .mask(0xFF)
-            .flags(vk::GeometryInstanceFlagsKHR::TRIANGLE_FRONT_COUNTERCLOCKWISE)
+            // Nvidia best practices recommend disabling face culling!
+            .flags(vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE)
             .sbt_record_offset(0)?
             .custom_index(0)?
             .transform(TransformMatrix::identity())
@@ -148,7 +159,7 @@ impl ExampleApp for RaytracingSample {
             .mapped_slice::<AccelerationStructureInstance>()?
             .copy_from_slice(&instances);
 
-        let build_info = AccelerationStructureBuildInfo::new_build()
+        let tlas_build_info = AccelerationStructureBuildInfo::new_build()
             .flags(vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
             .set_type(AccelerationStructureType::TopLevel)
             .push_instances(AccelerationStructureGeometryInstancesData {
@@ -178,7 +189,7 @@ impl ExampleApp for RaytracingSample {
             Default::default(),
         )?;
         // Set scratch buffer and src/dst acceleration structures
-        let build_info = build_info
+        let tlas_build_info = tlas_build_info
             .src(&instance_as)
             .dst(&instance_as)
             .scratch_data(instance_scratch_data.address().into());
@@ -188,28 +199,77 @@ impl ExampleApp for RaytracingSample {
             .exec
             .on_domain::<Compute>(None, None)?
             // Build instance TLAS
-            .build_acceleration_structure(&build_info)?
+            .build_acceleration_structure(&tlas_build_info)?
             // Compact triangle BLAS
             .compact_acceleration_structure(&acceleration_structure, &compact_as)?
             .finish()?;
         ctx.exec.submit(cmd)?.wait()?;
 
+        // Create our sample pipeline
+        let vtx_code = load_spirv_file(Path::new("examples/data/vert.spv"));
+        let frag_code = load_spirv_file(Path::new("examples/data/trace.spv"));
+
+        let vertex = ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::VERTEX, vtx_code);
+        let fragment = ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
+        let pci = PipelineBuilder::new("rt")
+            .vertex_input(0, vk::VertexInputRate::VERTEX)
+            .vertex_attribute(0, 0, vk::Format::R32G32_SFLOAT)?
+            .vertex_attribute(0, 1, vk::Format::R32G32_SFLOAT)?
+            .attach_shader(vertex)
+            .attach_shader(fragment)
+            .cull_mask(vk::CullModeFlags::NONE)
+            .blend_attachment_none()
+            .depth(false, false, false, vk::CompareOp::ALWAYS)
+            .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
+            .build();
+        ctx.pipelines.create_named_pipeline(pci)?;
+
         // Store resources so they do not get dropped
         Ok(Self {
-            acceleration_structure: compact_as,
-            buffer: compact_buffer,
-            instance_as,
-            instance_buffer: instance_as_buffer,
+            vtx: vtx_buffer,
+            inst: instance_buffer,
+            blas: compact_as,
+            blas_buffer: compact_buffer,
+            tlas: instance_as,
+            tlas_buffer: instance_as_buffer,
         })
     }
 
     fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<CommandBuffer<All>> {
         let swap = VirtualResource::image("swapchain");
-        let pass = PassBuilder::present("present", &swap);
-        let mut graph = PassGraph::new(Some(&swap)).add_pass(pass)?.build()?;
+        let render_pass = PassBuilder::render("render")
+            .color_attachment(
+                &swap,
+                vk::AttachmentLoadOp::CLEAR,
+                Some(vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.0, 0.0],
+                }),
+            )?
+            .execute_fn(|cmd, ifc, bindings, _| {
+                let view = Mat4::look_at_rh(Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 1.0, 0.0));
+                let projection = Mat4::perspective_rh(90.0_f32.to_radians(), 800.0 / 600.0, 0.001, 100.0);
+                let vertices: [f32; 24] =
+                    [-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
+                let mut buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
+                buffer.mapped_slice::<f32>()?.copy_from_slice(vertices.as_slice());
+                cmd.bind_graphics_pipeline("rt")?
+                    .full_viewport_scissor()
+                    .bind_vertex_buffer(0, &buffer)
+                    .push_constant(vk::ShaderStageFlags::FRAGMENT, 0, &view)
+                    .push_constant(vk::ShaderStageFlags::FRAGMENT, std::mem::size_of::<Mat4>() as u32, &projection)
+                    .bind_acceleration_structure(0, 0, &self.tlas)?
+                    .draw(6, 1, 0, 0)
+            })
+            .build();
+
+        let pass = PassBuilder::present("present", render_pass.output(&swap).unwrap());
+        let mut graph = PassGraph::new(Some(&swap)).add_pass(render_pass)?.add_pass(pass)?.build()?;
+
         let mut bindings = PhysicalResourceBindings::new();
         bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
-        let cmd = ctx.exec.on_domain::<All>(None, None)?;
+        let cmd = ctx
+            .exec
+            .on_domain::<All>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
         let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?;
         cmd.finish()
     }

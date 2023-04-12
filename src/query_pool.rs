@@ -259,7 +259,7 @@ impl<Q: Query> QueryPool<Q> {
 
         let handle = unsafe { device.create_query_pool(&vk_info, None)? };
         #[cfg(feature = "log-objects")]
-        trace!("Created VkQueryPool {handle:p}");
+        trace!("Created new VkQueryPool {handle:p}");
 
         // Every query in the pool must be reset before usage
         unsafe { device.reset_query_pool(handle, 0, info.count) };

@@ -413,7 +413,7 @@ impl AccelerationStructure {
         let handle = unsafe { fns.create_acceleration_structure(&info, None)? };
 
         #[cfg(feature = "log-objects")]
-        trace!("Created VkAccelerationStructureKHR {:p}", handle);
+        trace!("Created new VkAccelerationStructureKHR {:p}", handle);
 
         Ok(Self {
             device,

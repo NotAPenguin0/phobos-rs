@@ -158,6 +158,15 @@ impl Device {
             false
         };
 
+        let ray_query_name = CStr::from_bytes_with_nul(b"VK_KHR_ray_query\0")?;
+        let ray_query_supported = settings.raytracing
+            && available_extensions
+            .iter()
+            .any(|ext| ray_query_name == unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) });
+        if ray_query_supported {
+            extension_names.push(CString::from(ray_query_name));
+        }
+
         // Add required extensions
         if settings.window.is_some() {
             extension_names.push(CString::from(khr::Swapchain::name()));
@@ -209,13 +218,18 @@ impl Device {
             acceleration_structure_host_commands: vk::FALSE,
             descriptor_binding_acceleration_structure_update_after_bind: vk::FALSE,
         };
+
         let mut features_ray_query = vk::PhysicalDeviceRayQueryFeaturesKHR {
             s_type: vk::StructureType::PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
             p_next: std::ptr::null_mut(),
             ray_query: vk::TRUE,
         };
+
         if accel_supported {
             info = info.push_next(&mut features_acceleration_structure);
+        }
+
+        if ray_query_supported {
             info = info.push_next(&mut features_ray_query);
         }
 

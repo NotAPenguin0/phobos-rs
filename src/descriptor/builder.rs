@@ -5,6 +5,7 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
+use crate::acceleration_structure::AccelerationStructure;
 use crate::descriptor::descriptor_set::{DescriptorBinding, DescriptorBufferInfo, DescriptorContents, DescriptorImageInfo, DescriptorSetBinding};
 use crate::graph::physical_resource::PhysicalResource;
 #[cfg(feature = "shader-reflection")]
@@ -175,6 +176,16 @@ impl<'r> DescriptorSetBuilder<'r> {
                 view: image.clone(),
                 layout: vk::ImageLayout::GENERAL,
             })],
+        })
+    }
+
+    pub fn bind_acceleration_structure(&mut self, binding: u32, accel: &AccelerationStructure) {
+        self.inner.bindings.push(DescriptorBinding {
+            binding,
+            ty: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
+            descriptors: vec![
+                DescriptorContents::AccelerationStructure(unsafe { accel.handle() })
+            ],
         })
     }
 
