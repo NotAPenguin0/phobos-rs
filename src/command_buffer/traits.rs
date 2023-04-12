@@ -8,7 +8,7 @@ use crate::acceleration_structure::{AccelerationStructure, AccelerationStructure
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
-use crate::query_pool::{AccelerationStructureCompactedSizeQuery, AccelerationStructurePropertyQuery, QueryPool};
+use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {

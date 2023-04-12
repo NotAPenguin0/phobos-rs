@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 use ash::vk;
 use glam::{Mat4, Vec3};
-use log::info;
+use log::{info, trace};
 
 use phobos::{
     Buffer, CommandBuffer, ComputeCmdBuffer, GraphicsCmdBuffer, IncompleteCmdBuffer, InFlightContext, MemoryType, PassBuilder, PassGraph,
@@ -46,6 +46,16 @@ impl ExampleApp for RaytracingSample {
         )?;
         vtx_buffer.view_full().mapped_slice::<f32>()?.copy_from_slice(&vertices);
 
+        let indices = (0..5).collect::<Vec<u32>>();
+        let idx_buffer = Buffer::new(
+            ctx.device.clone(),
+            &mut ctx.allocator,
+            (indices.len() * std::mem::size_of::<u32>()) as u64,
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST,
+            MemoryType::CpuToGpu,
+        )?;
+        idx_buffer.view_full().mapped_slice::<u32>()?.copy_from_slice(indices.as_slice());
+
         // Create our initial acceleration structure build info to query the size of scratch buffers and the acceleration structure.
         // We only need to set the build mode, flags and all geometry.
         // src and dst acceleration structures can be left empty
@@ -58,6 +68,7 @@ impl ExampleApp for RaytracingSample {
                     .vertex_data(vtx_buffer.address())
                     .stride((3 * std::mem::size_of::<f32>()) as u64)
                     .max_vertex(5)
+                    .index_data(vk::IndexType::UINT32, idx_buffer.address())
                     .flags(vk::GeometryFlagsKHR::OPAQUE | vk::GeometryFlagsKHR::NO_DUPLICATE_ANY_HIT_INVOCATION),
             )
             .push_range(2, 0, 0, 0);
@@ -87,7 +98,7 @@ impl ExampleApp for RaytracingSample {
         let build_info = build_info
             .src(&acceleration_structure)
             .dst(&acceleration_structure)
-            .scratch_data(scratch_buffer.address().into());
+            .scratch_data(scratch_buffer.address());
 
         // Create a query pool to query the compacted size.
         let mut qp = QueryPool::<AccelerationStructureCompactedSizeQuery>::new(
@@ -192,7 +203,7 @@ impl ExampleApp for RaytracingSample {
         let tlas_build_info = tlas_build_info
             .src(&instance_as)
             .dst(&instance_as)
-            .scratch_data(instance_scratch_data.address().into());
+            .scratch_data(instance_scratch_data.address());
 
         // Submit compacting and TLAS build command
         let cmd = ctx

@@ -1,7 +1,3 @@
-use std::any::Any;
-use std::ffi::c_void;
-use std::ops::Deref;
-
 use anyhow::Result;
 use ash::vk;
 
