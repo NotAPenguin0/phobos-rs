@@ -89,6 +89,7 @@
 #![feature(fn_traits)]
 #![feature(stmt_expr_attributes)]
 #![feature(min_specialization)]
+#![feature(assert_matches)]
 
 #[macro_use]
 extern crate derivative;

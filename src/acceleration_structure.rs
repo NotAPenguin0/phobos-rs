@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use ash::vk;
-use ash::vk::Handle;
+use ash::vk::{Handle, Packed24_8};
 
 use crate::{BufferView, Device};
 use crate::core::device::ExtensionID;
@@ -51,6 +51,19 @@ pub struct AccelerationStructureGeometryTrianglesData {
 #[repr(transparent)]
 pub struct u24([u8; 3]);
 
+impl u24 {
+    const MIN: Self = Self::from_ne_bytes([0, 0, 0]);
+    const MAX: Self = Self::from_ne_bytes([255, 255, 255]);
+
+    pub const fn from_ne_bytes(bytes: [u8; 3]) -> Self {
+        Self(bytes)
+    }
+
+    pub fn into_bytes(self) -> [u8; 3] {
+        self.0
+    }
+}
+
 impl From<u24> for u32 {
     fn from(value: u24) -> Self {
         let u24([a, b, c]) = value;
@@ -73,22 +86,33 @@ impl TryFrom<u32> for u24 {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use std::assert_matches::assert_matches;
+
+    use crate::acceleration_structure::u24;
+
+    #[test]
+    fn u24_convert() {
+        assert_eq!(u32::from(u24::try_from(100).unwrap()), 100u32);
+        assert_eq!(u32::from(u24::MAX), 16777215);
+    }
+
+    #[test]
+    fn u24_fail_convert() {
+        assert_matches!(u24::try_from(u32::MAX), Err(_));
+    }
+}
+
 pub struct AccelerationStructureGeometryInstancesData {
     pub data: DeviceOrHostAddressConst,
     pub flags: vk::GeometryFlagsKHR,
 }
 
 
-#[derive(Default, Copy, Clone)]
-#[repr(C, packed)]
-pub struct AccelerationStructureInstance {
-    pub transform: TransformMatrix,
-    pub custom_index: u24,
-    pub mask: u8,
-    pub shader_binding_table_record_offset: u24,
-    pub flags: u8,
-    pub acceleration_structure: u64,
-}
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+pub struct AccelerationStructureInstance(vk::AccelerationStructureInstanceKHR);
 
 const_assert_eq!(std::mem::size_of::<AccelerationStructureInstance>(), 64);
 
@@ -354,41 +378,58 @@ impl<'a> AccelerationStructureBuildInfo<'a> {
     }
 }
 
+impl Default for AccelerationStructureInstance {
+    fn default() -> Self {
+        Self(vk::AccelerationStructureInstanceKHR {
+            transform: TransformMatrix::default().into_vulkan(),
+            instance_custom_index_and_mask: Packed24_8::new(0, 0),
+            instance_shader_binding_table_record_offset_and_flags: Packed24_8::new(0, 0),
+            acceleration_structure_reference: vk::AccelerationStructureReferenceKHR {
+                host_handle: vk::AccelerationStructureKHR::null()
+            },
+        })
+    }
+}
+
 impl AccelerationStructureInstance {
     pub fn custom_index(mut self, idx: u32) -> Result<Self> {
-        self.custom_index = u24::try_from(idx)?;
+        self.0.instance_custom_index_and_mask = Packed24_8::new(idx, self.0.instance_custom_index_and_mask.high_8());
         Ok(self)
     }
 
     pub fn mask(mut self, mask: u8) -> Self {
-        self.mask = mask;
+        self.0.instance_custom_index_and_mask = Packed24_8::new(self.0.instance_custom_index_and_mask.low_24(), mask);
         self
     }
 
     pub fn sbt_record_offset(mut self, offset: u32) -> Result<Self> {
-        self.shader_binding_table_record_offset = u24::try_from(offset)?;
+        self.0.instance_shader_binding_table_record_offset_and_flags = Packed24_8::new(offset, self.0.instance_shader_binding_table_record_offset_and_flags.high_8());
         Ok(self)
     }
 
     pub fn flags(mut self, flags: vk::GeometryInstanceFlagsKHR) -> Self {
-        self.flags = flags.as_raw() as u8;
+        self.0.instance_shader_binding_table_record_offset_and_flags = Packed24_8::new(self.0.instance_shader_binding_table_record_offset_and_flags.low_24(), flags.as_raw() as u8);
         self
     }
 
     pub fn acceleration_structure(mut self, accel: &AccelerationStructure, mode: AccelerationStructureBuildType) -> Result<Self> {
         match mode {
             AccelerationStructureBuildType::Host => {
-                self.acceleration_structure = accel.handle.as_raw();
+                self.0.acceleration_structure_reference = vk::AccelerationStructureReferenceKHR {
+                    host_handle: accel.handle
+                };
             }
             AccelerationStructureBuildType::Device => {
-                self.acceleration_structure = accel.address()?
+                self.0.acceleration_structure_reference = vk::AccelerationStructureReferenceKHR {
+                    device_handle: accel.address()?
+                };
             }
         };
         Ok(self)
     }
 
     pub fn transform(mut self, transform: TransformMatrix) -> Self {
-        self.transform = transform;
+        self.0.transform = transform.into_vulkan();
         self
     }
 }

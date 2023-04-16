@@ -25,6 +25,7 @@ use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file,
 mod example_runner;
 
 struct RaytracingSample {
+    idx: Buffer,
     vtx: Buffer,
     inst: Buffer,
     blas: AccelerationStructure,
@@ -41,7 +42,7 @@ impl ExampleApp for RaytracingSample {
             ctx.device.clone(),
             &mut ctx.allocator,
             (vertices.len() * std::mem::size_of::<f32>()) as u64,
-            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST,
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
             MemoryType::CpuToGpu,
         )?;
         vtx_buffer.view_full().mapped_slice::<f32>()?.copy_from_slice(&vertices);
@@ -51,15 +52,18 @@ impl ExampleApp for RaytracingSample {
             ctx.device.clone(),
             &mut ctx.allocator,
             (indices.len() * std::mem::size_of::<u32>()) as u64,
-            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST,
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
             MemoryType::CpuToGpu,
         )?;
-        idx_buffer.view_full().mapped_slice::<u32>()?.copy_from_slice(indices.as_slice());
+        idx_buffer
+            .view_full()
+            .mapped_slice::<u32>()?
+            .copy_from_slice(indices.as_slice());
 
         // Create our initial acceleration structure build info to query the size of scratch buffers and the acceleration structure.
         // We only need to set the build mode, flags and all geometry.
         // src and dst acceleration structures can be left empty
-        let build_info = AccelerationStructureBuildInfo::new_build()
+        let mut build_info = AccelerationStructureBuildInfo::new_build()
             .flags(vk::BuildAccelerationStructureFlagsKHR::ALLOW_COMPACTION | vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
             .set_type(AccelerationStructureType::BottomLevel)
             .push_triangles(
@@ -95,10 +99,7 @@ impl ExampleApp for RaytracingSample {
             vk::AccelerationStructureCreateFlagsKHR::default(),
         )?;
         // We can now fill the rest of the build info (source and destination acceleration structures, and the scratch data).
-        let build_info = build_info
-            .src(&acceleration_structure)
-            .dst(&acceleration_structure)
-            .scratch_data(scratch_buffer.address());
+        build_info = build_info.dst(&acceleration_structure).scratch_data(scratch_buffer.address());
 
         // Create a query pool to query the compacted size.
         let mut qp = QueryPool::<AccelerationStructureCompactedSizeQuery>::new(
@@ -149,7 +150,7 @@ impl ExampleApp for RaytracingSample {
         )?;
 
         // Lets also create a TLAS. This is quite similar to the BLAS, except we wont do compaction here
-        let instances: [AccelerationStructureInstance; 1] = [AccelerationStructureInstance::default()
+        let instance = AccelerationStructureInstance::default()
             .mask(0xFF)
             // Nvidia best practices recommend disabling face culling!
             .flags(vk::GeometryInstanceFlagsKHR::TRIANGLE_FACING_CULL_DISABLE)
@@ -157,20 +158,21 @@ impl ExampleApp for RaytracingSample {
             .custom_index(0)?
             .transform(TransformMatrix::identity())
             // This instance points at the compacted BLAS.
-            .acceleration_structure(&compact_as, AccelerationStructureBuildType::Device)?];
+            .acceleration_structure(&compact_as, AccelerationStructureBuildType::Device)?;
         let instance_buffer = Buffer::new(
             ctx.device.clone(),
             &mut ctx.allocator,
-            (instances.len() * std::mem::size_of::<AccelerationStructureInstance>()) as u64,
+            std::mem::size_of::<AccelerationStructureInstance>() as u64,
             vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST,
             MemoryType::CpuToGpu,
         )?;
-        instance_buffer
+        *instance_buffer
             .view_full()
             .mapped_slice::<AccelerationStructureInstance>()?
-            .copy_from_slice(&instances);
+            .first_mut()
+            .unwrap() = instance;
 
-        let tlas_build_info = AccelerationStructureBuildInfo::new_build()
+        let mut tlas_build_info = AccelerationStructureBuildInfo::new_build()
             .flags(vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
             .set_type(AccelerationStructureType::TopLevel)
             .push_instances(AccelerationStructureGeometryInstancesData {
@@ -179,7 +181,7 @@ impl ExampleApp for RaytracingSample {
             })
             .push_range(1, 0, 0, 0);
 
-        let instance_build_sizes = AccelerationStructure::build_sizes(&ctx.device, AccelerationStructureBuildType::Device, &build_info, &[1])?;
+        let instance_build_sizes = AccelerationStructure::build_sizes(&ctx.device, AccelerationStructureBuildType::Device, &tlas_build_info, &[1])?;
         let instance_scratch_data = Buffer::new_device_local(
             ctx.device.clone(),
             &mut ctx.allocator,
@@ -200,19 +202,22 @@ impl ExampleApp for RaytracingSample {
             Default::default(),
         )?;
         // Set scratch buffer and src/dst acceleration structures
-        let tlas_build_info = tlas_build_info
-            .src(&instance_as)
-            .dst(&instance_as)
-            .scratch_data(instance_scratch_data.address());
+        tlas_build_info = tlas_build_info.dst(&instance_as).scratch_data(instance_scratch_data.address());
 
         // Submit compacting and TLAS build command
         let cmd = ctx
             .exec
             .on_domain::<Compute>(None, None)?
             // Build instance TLAS
-            .build_acceleration_structure(&tlas_build_info)?
             // Compact triangle BLAS
             .compact_acceleration_structure(&acceleration_structure, &compact_as)?
+            .memory_barrier(
+                PipelineStage::ALL_COMMANDS,
+                vk::AccessFlags2::MEMORY_WRITE | vk::AccessFlags2::MEMORY_READ,
+                PipelineStage::ALL_COMMANDS,
+                vk::AccessFlags2::MEMORY_READ,
+            )
+            .build_acceleration_structure(&tlas_build_info)?
             .finish()?;
         ctx.exec.submit(cmd)?.wait()?;
 
@@ -237,6 +242,7 @@ impl ExampleApp for RaytracingSample {
 
         // Store resources so they do not get dropped
         Ok(Self {
+            idx: idx_buffer,
             vtx: vtx_buffer,
             inst: instance_buffer,
             blas: compact_as,
@@ -257,6 +263,7 @@ impl ExampleApp for RaytracingSample {
                 }),
             )?
             .execute_fn(|cmd, ifc, bindings, _| {
+                trace!("Frame");
                 let view = Mat4::look_at_rh(Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 1.0, 0.0));
                 let projection = Mat4::perspective_rh(90.0_f32.to_radians(), 800.0 / 600.0, 0.001, 100.0);
                 let vertices: [f32; 24] =
@@ -273,8 +280,8 @@ impl ExampleApp for RaytracingSample {
             })
             .build();
 
-        let pass = PassBuilder::present("present", render_pass.output(&swap).unwrap());
-        let mut graph = PassGraph::new(Some(&swap)).add_pass(render_pass)?.add_pass(pass)?.build()?;
+        let present = PassBuilder::present("present", render_pass.output(&swap).unwrap());
+        let mut graph = PassGraph::new(Some(&swap)).add_pass(render_pass)?.add_pass(present)?.build()?;
 
         let mut bindings = PhysicalResourceBindings::new();
         bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
