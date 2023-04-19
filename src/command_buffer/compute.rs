@@ -6,7 +6,7 @@ use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::domain::ExecutionDomain;
 use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
-use crate::raytracing::acceleration_structure::{AccelerationStructure, AccelerationStructureBuildInfo};
+use crate::raytracing::*;
 
 impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D> {
     /// Sets the current compute pipeline by looking up the given name in the pipeline cache.

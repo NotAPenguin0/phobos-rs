@@ -5,16 +5,9 @@ use ash::vk;
 use glam::{Mat4, Vec3};
 use log::{info, trace};
 
-use phobos::{
-    Buffer, CommandBuffer, ComputeCmdBuffer, GraphicsCmdBuffer, IncompleteCmdBuffer, InFlightContext, MemoryType, PassBuilder, PassGraph,
-    PhysicalResourceBindings, PipelineBuilder, PipelineStage, RecordGraphToCommandBuffer, ShaderCreateInfo, VirtualResource,
-};
 use phobos::domain::{All, Compute};
-use phobos::query_pool::{AccelerationStructureCompactedSizeQuery, QueryPool, QueryPoolCreateInfo};
-use phobos::raytracing::acceleration_structure::{AccelerationStructure, AccelerationStructureBuildInfo, AccelerationStructureBuildType, AccelerationStructureGeometryInstancesData, AccelerationStructureGeometryTrianglesData, AccelerationStructureInstance, AccelerationStructureType};
-use phobos::util::address::DeviceOrHostAddressConst;
+use phobos::prelude::*;
 use phobos::util::align::align;
-use phobos::util::transform::TransformMatrix;
 
 use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file, WindowContext};
 
@@ -74,7 +67,7 @@ impl ExampleApp for RaytracingSample {
             )
             .push_range(2, 0, 0, 0);
         // Query acceleration structure and scratch buffer size.
-        let sizes = AccelerationStructure::build_sizes(&ctx.device, AccelerationStructureBuildType::Device, &build_info, &[2])?;
+        let sizes = query_build_size(&ctx.device, AccelerationStructureBuildType::Device, &build_info, &[2])?;
         // Allocate backing buffer for acceleration structure
         let buffer = Buffer::new_device_local(
             ctx.device.clone(),
@@ -181,7 +174,7 @@ impl ExampleApp for RaytracingSample {
             })
             .push_range(1, 0, 0, 0);
 
-        let instance_build_sizes = AccelerationStructure::build_sizes(&ctx.device, AccelerationStructureBuildType::Device, &tlas_build_info, &[1])?;
+        let instance_build_sizes = query_build_size(&ctx.device, AccelerationStructureBuildType::Device, &tlas_build_info, &[1])?;
         let instance_scratch_data = Buffer::new_device_local(
             ctx.device.clone(),
             &mut ctx.allocator,
