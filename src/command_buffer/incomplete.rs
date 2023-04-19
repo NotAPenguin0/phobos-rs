@@ -6,10 +6,7 @@ use std::sync::{Arc, MutexGuard};
 use anyhow::{anyhow, ensure, Result};
 use ash::vk;
 
-use crate::{
-    BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings,
-    PipelineCache, PipelineStage, Sampler, VirtualResource,
-};
+use crate::{Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, PipelineStage, Sampler, VirtualResource};
 use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
@@ -18,7 +15,7 @@ use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::query_pool::{QueryPool, ScopedQuery, TimestampQuery};
 use crate::raytracing::acceleration_structure::AccelerationStructure;
 
-impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer<'q, D> {
+impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A> for IncompleteCommandBuffer<'q, D, A> {
     type Domain = D;
 
     /// Create a new command buffer ready for recording.
@@ -28,7 +25,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
         queue_lock: MutexGuard<'q, Queue>,
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,
-        pipelines: Option<PipelineCache>,
+        pipelines: Option<PipelineCache<A>>,
         descriptors: Option<DescriptorCache>,
     ) -> Result<Self> {
         unsafe {
@@ -56,6 +53,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
             current_render_area: Default::default(),
             current_descriptor_sets: None,
             descriptor_state_needs_update: false,
+            current_sbt_regions: None,
             descriptor_cache: descriptors,
             pipeline_cache: pipelines,
             _domain: PhantomData,
@@ -89,7 +87,7 @@ impl<'q, D: ExecutionDomain> IncompleteCmdBuffer<'q> for IncompleteCommandBuffer
     }
 }
 
-impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
+impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// Bind a descriptor set to the command buffer.
     /// # Errors
     /// - Fails if no pipeline was bound.
@@ -328,6 +326,19 @@ impl<D: ExecutionDomain> IncompleteCommandBuffer<'_, D> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_storage_image(binding, image);
             Ok(())
+        })?;
+        Ok(self)
+    }
+
+    pub fn resolve_and_bind_storage_image(
+        mut self,
+        set: u32,
+        binding: u32,
+        resource: &VirtualResource,
+        bindings: &PhysicalResourceBindings,
+    ) -> Result<Self> {
+        self.modify_descriptor_set(set, |builder| {
+            builder.resolve_and_bind_storage_image(binding, resource, bindings)
         })?;
         Ok(self)
     }

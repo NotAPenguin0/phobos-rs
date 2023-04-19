@@ -1,12 +1,12 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use ash::vk;
 
-use crate::{BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
+use crate::{Allocator, BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::domain::ExecutionDomain;
 
-impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D> {
+impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D, A> {
     /// Sets the viewport and scissor regions to the entire render area. Can only be called inside a renderpass.
     /// # Example
     /// ```
@@ -135,6 +135,28 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         Ok(self)
     }
 
+    fn trace_rays(mut self, width: u32, height: u32, depth: u32) -> Result<Self>
+        where
+            Self: Sized, {
+        self.device.require_extension(ExtensionID::RayTracingPipeline)?;
+        self = self.ensure_descriptor_state()?;
+        let fns = self.device.raytracing_pipeline().unwrap();
+        let Some(regions) = self.current_sbt_regions else { bail!("called trace_rays() without a valid raytracing pipeline build"); };
+        unsafe {
+            fns.cmd_trace_rays(
+                self.handle,
+                regions.get(0).unwrap(),
+                regions.get(1).unwrap(),
+                regions.get(2).unwrap(),
+                regions.get(3).unwrap(),
+                width,
+                height,
+                depth,
+            )
+        };
+        Ok(self)
+    }
+
     /// Bind a graphics pipeline by name.
     /// # Errors
     /// * Fails if the pipeline was not previously registered in the pipeline cache.
@@ -154,9 +176,14 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
         {
             let Some(rendering_state) = self.current_rendering_state.clone() else { return Err(Error::NoRenderpass.into()) };
-            cache.with_pipeline(name, rendering_state, |pipeline|
-                self.bind_pipeline_impl(pipeline.handle, pipeline.layout, pipeline.set_layouts.clone(), vk::PipelineBindPoint::GRAPHICS),
-            )?;
+            cache.with_pipeline(name, rendering_state, |pipeline| {
+                self.bind_pipeline_impl(
+                    pipeline.handle,
+                    pipeline.layout,
+                    pipeline.set_layouts.clone(),
+                    vk::PipelineBindPoint::GRAPHICS,
+                )
+            })?;
         }
         Ok(self)
     }
@@ -268,6 +295,28 @@ impl<D: GfxSupport + ExecutionDomain> GraphicsCmdBuffer for IncompleteCommandBuf
         // SAFETY: Vulkan API call. This function pointer is not null because we just verified its availability.
         unsafe {
             funcs.cmd_set_polygon_mode(self.handle, mode);
+        }
+        Ok(self)
+    }
+
+    /// Bind a ray tracing pipeline by name.
+    /// # Errors
+    /// * Fails if the pipeline was not previously registered in the pipeline cache.
+    /// * Fails if this command buffer has no pipeline cache.
+    fn bind_ray_tracing_pipeline(mut self, name: &str) -> Result<Self>
+        where
+            Self: Sized, {
+        let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
+        {
+            cache.with_raytracing_pipeline(name, |pipeline| {
+                self.current_sbt_regions = Some(pipeline.shader_binding_table.regions);
+                self.bind_pipeline_impl(
+                    pipeline.handle,
+                    pipeline.layout,
+                    pipeline.set_layouts.clone(),
+                    vk::PipelineBindPoint::RAY_TRACING_KHR,
+                )
+            })?;
         }
         Ok(self)
     }

@@ -6,10 +6,11 @@ use glam::{Mat4, Vec3};
 use log::{info, trace};
 
 use phobos::domain::{All, Compute};
+use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
 use phobos::prelude::*;
 use phobos::util::align::align;
 
-use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file, WindowContext};
+use crate::example_runner::{Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, WindowContext};
 
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
@@ -27,6 +28,9 @@ struct RaytracingSample {
     instances: Buffer,
     blas: BackedAccelerationStructure,
     tlas: BackedAccelerationStructure,
+    attachment: Image,
+    attachment_view: ImageView,
+    sampler: Sampler,
 }
 
 fn make_input_buffer<T: Copy>(ctx: &mut Context, data: &[T], usage: vk::BufferUsageFlags, alignment: Option<u64>) -> Result<Buffer> {
@@ -175,7 +179,7 @@ impl ExampleApp for RaytracingSample {
         // Create a command buffer. Building acceleration structures is done on a compute command buffer.
         let cmd = ctx
             .exec
-            .on_domain::<Compute>(None, None)?
+            .on_domain::<Compute, DefaultAllocator>(None, None)?
             // Building an acceleration structure is just a single command
             .build_acceleration_structure(&blas_build_info)?
             // This barrier is required!
@@ -204,7 +208,7 @@ impl ExampleApp for RaytracingSample {
         // Submit compacting and TLAS build command
         let cmd = ctx
             .exec
-            .on_domain::<Compute>(None, None)?
+            .on_domain::<Compute, DefaultAllocator>(None, None)?
             // Build instance TLAS
             // Compact triangle BLAS
             .compact_acceleration_structure(&blas.accel, &compact_as)?
@@ -218,26 +222,48 @@ impl ExampleApp for RaytracingSample {
             .finish()?;
         ctx.exec.submit(cmd)?.wait()?;
 
-        // Create our sample pipeline
-        let vtx_code = load_spirv_file(Path::new("examples/data/vert.spv"));
-        let frag_code = load_spirv_file(Path::new("examples/data/trace.spv"));
+        let rgen = create_shader("examples/data/raygen.spv", vk::ShaderStageFlags::RAYGEN_KHR);
+        let rchit = create_shader("examples/data/rayhit.spv", vk::ShaderStageFlags::CLOSEST_HIT_KHR);
+        let rmiss = create_shader("examples/data/raymiss.spv", vk::ShaderStageFlags::MISS_KHR);
 
-        let vertex = ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::VERTEX, vtx_code);
-        let fragment = ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
-        let pci = PipelineBuilder::new("rt")
+        // Create the raytracing pipeline
+        let pci = RayTracingPipelineBuilder::new("rt")
+            .max_recursion_depth(1)
+            .add_ray_gen_group(rgen)
+            .add_ray_hit_group(Some(rchit), None)
+            .add_ray_miss_group(rmiss)
+            .build();
+        ctx.pipelines.create_named_raytracing_pipeline(pci)?;
+
+        // Create the pipeline for drawing the raytraced result to the screen
+        let vertex = create_shader("examples/data/vert.spv", vk::ShaderStageFlags::VERTEX);
+        let fragment = create_shader("examples/data/frag.spv", vk::ShaderStageFlags::FRAGMENT);
+
+        let pci = PipelineBuilder::new("sample")
             .vertex_input(0, vk::VertexInputRate::VERTEX)
             .vertex_attribute(0, 0, vk::Format::R32G32_SFLOAT)?
             .vertex_attribute(0, 1, vk::Format::R32G32_SFLOAT)?
-            .attach_shader(vertex)
-            .attach_shader(fragment)
-            .cull_mask(vk::CullModeFlags::NONE)
-            .blend_attachment_none()
-            .depth(false, false, false, vk::CompareOp::ALWAYS)
             .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
+            .blend_attachment_none()
+            .cull_mask(vk::CullModeFlags::NONE)
+            .attach_shader(vertex.clone())
+            .attach_shader(fragment)
             .build();
         ctx.pipelines.create_named_pipeline(pci)?;
 
-        // Store resources so they do not get dropped
+        let attachment = Image::new(
+            ctx.device.clone(),
+            &mut ctx.allocator,
+            800,
+            600,
+            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::STORAGE,
+            vk::Format::R32G32B32A32_SFLOAT,
+            vk::SampleCountFlags::TYPE_1,
+        )?;
+        let view = attachment.view(vk::ImageAspectFlags::COLOR)?;
+
+        let sampler = Sampler::default(ctx.device.clone())?;
+
         Ok(Self {
             idx: idx_buffer,
             vtx: vtx_buffer,
@@ -250,12 +276,30 @@ impl ExampleApp for RaytracingSample {
                 sizes: blas.sizes,
             },
             tlas,
+            attachment,
+            attachment_view: view,
+            sampler,
         })
     }
 
     fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<CommandBuffer<All>> {
         let swap = VirtualResource::image("swapchain");
-        let render_pass = PassBuilder::render("render")
+        let rt_image = VirtualResource::image("rt_out");
+        let rt_pass = PassBuilder::new("raytrace")
+            .write_storage_image(&rt_image, PipelineStage::RAY_TRACING_SHADER_KHR)
+            .execute_fn(|cmd, ifc, bindings, _| {
+                let view = Mat4::look_at_rh(Vec3::new(0.0, 0.0, -1.0), Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 1.0, 0.0));
+                let projection = Mat4::perspective_rh(90.0_f32.to_radians(), 800.0 / 600.0, 0.001, 100.0);
+                cmd.bind_ray_tracing_pipeline("rt")?
+                    .push_constant(vk::ShaderStageFlags::RAYGEN_KHR, 0, &view)
+                    .push_constant(vk::ShaderStageFlags::RAYGEN_KHR, 64, &projection)
+                    .bind_acceleration_structure(0, 0, &self.tlas.accel)?
+                    .resolve_and_bind_storage_image(0, 1, &rt_image, bindings)?
+                    .trace_rays(800, 600, 1)
+            })
+            .build();
+
+        let render_pass = PassBuilder::render("copy")
             .color_attachment(
                 &swap,
                 vk::AttachmentLoadOp::CLEAR,
@@ -263,31 +307,34 @@ impl ExampleApp for RaytracingSample {
                     float32: [0.0, 0.0, 0.0, 0.0],
                 }),
             )?
+            .sample_image(rt_pass.output(&rt_image).unwrap(), PipelineStage::RAY_TRACING_SHADER_KHR)
             .execute_fn(|cmd, ifc, bindings, _| {
-                let view = Mat4::look_at_rh(Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 1.0, 0.0));
-                let projection = Mat4::perspective_rh(90.0_f32.to_radians(), 800.0 / 600.0, 0.001, 100.0);
-                let vertices: [f32; 24] =
-                    [-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
-                let mut buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
-                buffer.mapped_slice::<f32>()?.copy_from_slice(vertices.as_slice());
-                cmd.bind_graphics_pipeline("rt")?
-                    .full_viewport_scissor()
-                    .bind_vertex_buffer(0, &buffer)
-                    .push_constant(vk::ShaderStageFlags::FRAGMENT, 0, &view)
-                    .push_constant(vk::ShaderStageFlags::FRAGMENT, std::mem::size_of::<Mat4>() as u32, &projection)
-                    .bind_acceleration_structure(0, 0, &self.tlas.accel)?
+                let vertices: Vec<f32> =
+                    vec![-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
+                let mut vtx_buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
+                let slice = vtx_buffer.mapped_slice::<f32>()?;
+                slice.copy_from_slice(vertices.as_slice());
+                cmd.full_viewport_scissor()
+                    .bind_graphics_pipeline("sample")?
+                    .bind_vertex_buffer(0, &vtx_buffer)
+                    .resolve_and_bind_sampled_image(0, 0, &rt_image, &self.sampler, bindings)?
                     .draw(6, 1, 0, 0)
             })
             .build();
 
         let present = PassBuilder::present("present", render_pass.output(&swap).unwrap());
-        let mut graph = PassGraph::new(Some(&swap)).add_pass(render_pass)?.add_pass(present)?.build()?;
+        let mut graph = PassGraph::new(Some(&swap))
+            .add_pass(rt_pass)?
+            .add_pass(render_pass)?
+            .add_pass(present)?
+            .build()?;
 
         let mut bindings = PhysicalResourceBindings::new();
         bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
+        bindings.bind_image("rt_out", &self.attachment_view);
         let cmd = ctx
             .exec
-            .on_domain::<All>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
+            .on_domain::<All, _>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
         let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?;
         cmd.finish()
     }

@@ -1,9 +1,9 @@
 use ash::vk;
 
+use crate::{Allocator, QueueType};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::command_buffer::traits::IncompleteCmdBuffer;
 use crate::core::queue::Queue;
-use crate::QueueType;
 
 /// This trait defines an execution domain. An execution domain must specify a command buffer type,
 /// and expose a function that checks whether a queue is compatible with it or not.
@@ -13,7 +13,7 @@ pub trait ExecutionDomain {
     fn queue_is_compatible(queue: &Queue) -> bool;
     /// Type of the command buffer that will be submitted to this domain.
     /// This type must implement the [`IncompleteCmdBuffer`] trait.
-    type CmdBuf<'q>: IncompleteCmdBuffer<'q>;
+    type CmdBuf<'q, A: Allocator>: IncompleteCmdBuffer<'q, A>;
 }
 
 /// Supports all operations (graphics, transfer and compute).
@@ -39,7 +39,7 @@ impl ExecutionDomain for Graphics {
     }
 
     /// Type of the command buffer that will be submitted to this domain.
-    type CmdBuf<'q> = IncompleteCommandBuffer<'q, Graphics>;
+    type CmdBuf<'q, A: Allocator> = IncompleteCommandBuffer<'q, Graphics, A>;
 }
 
 impl ExecutionDomain for Transfer {
@@ -50,7 +50,7 @@ impl ExecutionDomain for Transfer {
     }
 
     /// Type of the command buffer that will be submitted to this domain.
-    type CmdBuf<'q> = IncompleteCommandBuffer<'q, Transfer>;
+    type CmdBuf<'q, A: Allocator> = IncompleteCommandBuffer<'q, Transfer, A>;
 }
 
 impl ExecutionDomain for Compute {
@@ -61,7 +61,7 @@ impl ExecutionDomain for Compute {
     }
 
     /// Type of the command buffer that will be submitted to this domain.
-    type CmdBuf<'q> = IncompleteCommandBuffer<'q, Compute>;
+    type CmdBuf<'q, A: Allocator> = IncompleteCommandBuffer<'q, Compute, A>;
 }
 
 impl ExecutionDomain for All {
@@ -75,5 +75,5 @@ impl ExecutionDomain for All {
     }
 
     /// Type of the command buffer that will be submitted to this domain.
-    type CmdBuf<'q> = IncompleteCommandBuffer<'q, All>;
+    type CmdBuf<'q, A: Allocator> = IncompleteCommandBuffer<'q, All, A>;
 }

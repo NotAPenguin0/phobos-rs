@@ -21,6 +21,11 @@ pub fn load_spirv_file(path: &Path) -> Vec<u32> {
     Vec::from(binary)
 }
 
+pub fn create_shader(path: &str, stage: vk::ShaderStageFlags) -> ShaderCreateInfo {
+    let code = load_spirv_file(Path::new(path));
+    ShaderCreateInfo::from_spirv(stage, code)
+}
+
 #[derive(Debug)]
 pub struct WindowContext {
     pub event_loop: EventLoop<()>,
@@ -125,6 +130,10 @@ impl ExampleRunner {
         let (instance, physical_device, surface, device, allocator, exec, frame, Some(debug_messenger)) = initialize(&settings, window.is_none())? else {
             panic!("Asked for debug messenger but didnt get one")
         };
+
+        let pipelines = PipelineCache::new(device.clone(), allocator.clone())?;
+        let descriptors = DescriptorCache::new(device.clone())?;
+
         let vk = VulkanContext {
             frame,
             exec,
@@ -135,9 +144,6 @@ impl ExampleRunner {
             debug_messenger,
             instance,
         };
-
-        let pipelines = PipelineCache::new(vk.device.clone())?;
-        let descriptors = DescriptorCache::new(vk.device.clone())?;
 
         Ok(Self {
             vk,

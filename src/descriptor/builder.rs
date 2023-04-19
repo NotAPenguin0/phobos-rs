@@ -179,6 +179,20 @@ impl<'r> DescriptorSetBuilder<'r> {
         })
     }
 
+    pub fn resolve_and_bind_storage_image(
+        &mut self,
+        binding: u32,
+        resource: &VirtualResource,
+        bindings: &PhysicalResourceBindings,
+    ) -> Result<()> {
+        if let Some(PhysicalResource::Image(image)) = bindings.resolve(resource) {
+            self.bind_storage_image(binding, image);
+            Ok(())
+        } else {
+            Err(Error::NoResourceBound(resource.uid().clone()).into())
+        }
+    }
+
     pub fn bind_acceleration_structure(&mut self, binding: u32, accel: &AccelerationStructure) {
         self.inner.bindings.push(DescriptorBinding {
             binding,

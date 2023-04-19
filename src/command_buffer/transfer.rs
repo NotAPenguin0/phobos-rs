@@ -1,11 +1,11 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
+use crate::{Allocator, BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::domain::ExecutionDomain;
 
-impl<D: TransferSupport + ExecutionDomain> TransferCmdBuffer for IncompleteCommandBuffer<'_, D> {
+impl<D: TransferSupport + ExecutionDomain, A: Allocator> TransferCmdBuffer for IncompleteCommandBuffer<'_, D, A> {
     /// Copy one buffer to the other.
     /// # Errors
     /// * Fails if the buffer views do not have the same size.

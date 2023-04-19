@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffer, PipelineCache};
+use crate::{Allocator, CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffer, PipelineCache};
 use crate::command_buffer::command_pool::CommandPool;
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
@@ -126,10 +126,10 @@ impl Queue {
         queue.handle
     }
 
-    pub(crate) fn allocate_command_buffer<'q, CmdBuf: IncompleteCmdBuffer<'q>>(
+    pub(crate) fn allocate_command_buffer<'q, A: Allocator, CmdBuf: IncompleteCmdBuffer<'q, A>>(
         device: Device,
         queue_lock: MutexGuard<'q, Queue>,
-        pipelines: Option<PipelineCache>,
+        pipelines: Option<PipelineCache<A>>,
         descriptors: Option<DescriptorCache>,
     ) -> Result<CmdBuf> {
         let info = vk::CommandBufferAllocateInfo {

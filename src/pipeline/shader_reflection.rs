@@ -45,6 +45,11 @@ fn get_shader_stage(ast: &Ast) -> Result<vk::ShaderStageFlags> {
         ExecutionModel::Geometry => vk::ShaderStageFlags::GEOMETRY, // EVIL
         ExecutionModel::Fragment => vk::ShaderStageFlags::FRAGMENT,
         ExecutionModel::GlCompute => vk::ShaderStageFlags::COMPUTE,
+        ExecutionModel::RayGenerationKHR => vk::ShaderStageFlags::RAYGEN_KHR,
+        ExecutionModel::IntersectionKHR => vk::ShaderStageFlags::INTERSECTION_KHR,
+        ExecutionModel::AnyHitKHR => vk::ShaderStageFlags::ANY_HIT_KHR,
+        ExecutionModel::ClosestHitKHR => vk::ShaderStageFlags::CLOSEST_HIT_KHR,
+        ExecutionModel::MissKHR => vk::ShaderStageFlags::MISS_KHR,
         ExecutionModel::Kernel => {
             unimplemented!()
         }
@@ -159,7 +164,6 @@ fn find_acceleration_structures(ast: &mut Ast, stage: vk::ShaderStageFlags, reso
     }
     Ok(())
 }
-
 
 #[cfg(feature = "shader-reflection")]
 fn find_push_constants(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {

@@ -348,6 +348,38 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         self
     }
 
+    pub fn write_storage_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
+        self.inner.inputs.push(PassResource {
+            usage: ResourceUsage::ShaderWrite,
+            resource: resource.clone(),
+            stage,
+            layout: vk::ImageLayout::GENERAL,
+            clear_value: None,
+            load_op: None,
+        });
+        self.inner.outputs.push(PassResource {
+            usage: ResourceUsage::ShaderWrite,
+            resource: resource.upgrade(),
+            stage,
+            layout: vk::ImageLayout::GENERAL,
+            clear_value: None,
+            load_op: None,
+        });
+        self
+    }
+
+    pub fn read_storage_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
+        self.inner.inputs.push(PassResource {
+            usage: ResourceUsage::ShaderRead,
+            resource: resource.clone(),
+            stage,
+            layout: vk::ImageLayout::GENERAL,
+            clear_value: None,
+            load_op: None,
+        });
+        self
+    }
+
     /// Set the executor to be called when recording this pass.
     pub fn executor(mut self, exec: impl PassExecutor<D, U, A> + 'cb) -> Self {
         self.inner.execute = Box::new(exec);

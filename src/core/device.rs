@@ -43,6 +43,7 @@ struct DeviceInner {
     queue_families: Vec<u32>,
     properties: vk::PhysicalDeviceProperties,
     accel_structure_properties: Option<vk::PhysicalDeviceAccelerationStructurePropertiesKHR>,
+    rt_properties: Option<vk::PhysicalDeviceRayTracingPipelinePropertiesKHR>,
     extensions: HashSet<ExtensionID>,
     #[derivative(Debug = "ignore")]
     dynamic_state3: Option<ext::ExtendedDynamicState3>,
@@ -279,7 +280,20 @@ impl Device {
             None
         };
 
+        let mut rt_properties = if rt_pipeline_supported {
+            Some(vk::PhysicalDeviceRayTracingPipelinePropertiesKHR::default())
+        } else {
+            None
+        };
+
         match &mut accel_properties {
+            None => {}
+            Some(properties) => {
+                properties2 = properties2.push_next(properties);
+            }
+        };
+
+        match &mut rt_properties {
             None => {}
             Some(properties) => {
                 properties2 = properties2.push_next(properties);
@@ -293,6 +307,7 @@ impl Device {
             queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
             properties: *physical_device.properties(),
             accel_structure_properties: accel_properties,
+            rt_properties,
             extensions: enabled_extensions,
             dynamic_state3,
             acceleration_structure,
@@ -371,6 +386,11 @@ impl Device {
         Ok(self.inner.accel_structure_properties.as_ref().unwrap())
     }
 
+    pub fn ray_tracing_properties(&self) -> Result<&vk::PhysicalDeviceRayTracingPipelinePropertiesKHR> {
+        self.require_extension(ExtensionID::RayTracingPipeline)?;
+        Ok(self.inner.rt_properties.as_ref().unwrap())
+    }
+
     /// Check if a device extension is enabled.
     /// # Example
     /// ```
@@ -421,6 +441,11 @@ impl Device {
     /// Access to the function pointers for `VK_KHR_acceleration_structure`
     pub fn acceleration_structure(&self) -> Option<&khr::AccelerationStructure> {
         self.inner.acceleration_structure.as_ref()
+    }
+
+    /// Access to the function pointers for `VK_KHR_ray_tracing_pipeline`
+    pub fn raytracing_pipeline(&self) -> Option<&khr::RayTracingPipeline> {
+        self.inner.rt_pipeline.as_ref()
     }
 
     /// True we only have a single queue, and thus the sharing mode for resources is always EXCLUSIVE.

@@ -1,14 +1,14 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{ComputeCmdBuffer, ComputeSupport, Error};
+use crate::{Allocator, ComputeCmdBuffer, ComputeSupport, Error};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::domain::ExecutionDomain;
 use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
 use crate::raytracing::*;
 
-impl<D: ComputeSupport + ExecutionDomain> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D> {
+impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D, A> {
     /// Sets the current compute pipeline by looking up the given name in the pipeline cache.
     /// # Errors
     /// - Fails with [`Error::NoPipelineCache`] if this command buffer was created without a pipeline cache.
