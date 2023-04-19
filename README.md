@@ -32,7 +32,9 @@ If you are simply looking for a safe, low-level wrapper around Vulkan, Vulkano i
 - A linear allocator for per-frame allocations like uniform buffers.
 - Typed command buffers per queue type.
 - Automatically thread safe command buffer recording.
-- Easily batch together submits into one `vkQueueSubmit` call and synchronize them with semaphores using the `SubmitBatch` utility.
+- Easily batch together submits into one `vkQueueSubmit` call and synchronize them with semaphores using
+  the `SubmitBatch` utility.
+- Automatically create a shader binding table for your ray tracing pipeline.
 
 ## What does Phobos not do?
 
@@ -118,5 +120,4 @@ Visit the [docs.rs](https://docs.rs/phobos/latest) page, or open an issue.
 
 ## Planned features
 
-- Raytracing support
 - Expose more Vulkan API features.
