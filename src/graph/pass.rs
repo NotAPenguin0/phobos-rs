@@ -83,31 +83,31 @@ use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
 
 /// The returned value from a pass callback function.
-pub type PassFnResult<'q, D> = Result<IncompleteCommandBuffer<'q, D>>;
+pub type PassFnResult<'q, D, A> = Result<IncompleteCommandBuffer<'q, D, A>>;
 
 pub trait PassExecutor<D: ExecutionDomain, U, A: Allocator> {
     fn execute<'q>(
         &mut self,
-        cmd: IncompleteCommandBuffer<'q, D>,
+        cmd: IncompleteCommandBuffer<'q, D, A>,
         ifc: &mut InFlightContext<A>,
         bindings: &PhysicalResourceBindings,
         user_data: &mut U,
-    ) -> PassFnResult<'q, D>;
+    ) -> PassFnResult<'q, D, A>;
 }
 
 impl<D, U, A, F> PassExecutor<D, U, A> for F
     where
         D: ExecutionDomain,
         A: Allocator,
-        F: for<'q> FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D>,
+        F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A>,
 {
     fn execute<'q>(
         &mut self,
-        cmd: IncompleteCommandBuffer<'q, D>,
+        cmd: IncompleteCommandBuffer<'q, D, A>,
         ifc: &mut InFlightContext<A>,
         bindings: &PhysicalResourceBindings,
         user_data: &mut U,
-    ) -> PassFnResult<'q, D> {
+    ) -> PassFnResult<'q, D, A> {
         self.call_mut((cmd, ifc, bindings, user_data))
     }
 }
@@ -129,11 +129,11 @@ impl EmptyPassExecutor {
 impl<D: ExecutionDomain, U, A: Allocator> PassExecutor<D, U, A> for EmptyPassExecutor {
     fn execute<'q>(
         &mut self,
-        cmd: IncompleteCommandBuffer<'q, D>,
+        cmd: IncompleteCommandBuffer<'q, D, A>,
         _ifc: &mut InFlightContext<A>,
         _bindings: &PhysicalResourceBindings,
         _user_data: &mut U,
-    ) -> PassFnResult<'q, D> {
+    ) -> PassFnResult<'q, D, A> {
         Ok(cmd)
     }
 }
@@ -388,7 +388,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
 
     pub fn execute_fn<F>(mut self, exec: F) -> Self
         where
-            F: for<'q> FnMut(IncompleteCommandBuffer<'q, D>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D> + 'cb, {
+            F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A> + 'cb, {
         self.inner.execute = Box::new(exec);
         self
     }

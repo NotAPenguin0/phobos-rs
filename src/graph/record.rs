@@ -24,12 +24,12 @@ pub trait RecordGraphToCommandBuffer<D: ExecutionDomain, U, A: Allocator> {
     /// - This function can error if a virtual resource used in the graph is lacking an physical binding.
     fn record<'q>(
         &mut self,
-        cmd: IncompleteCommandBuffer<'q, D>,
+        cmd: IncompleteCommandBuffer<'q, D, A>,
         bindings: &PhysicalResourceBindings,
         ifc: &mut InFlightContext<A>,
         debug: Option<Arc<DebugMessenger>>,
         user_data: &mut U,
-    ) -> Result<IncompleteCommandBuffer<'q, D>>
+    ) -> Result<IncompleteCommandBuffer<'q, D, A>>
         where
             Self: Sized;
 }
@@ -194,8 +194,8 @@ fn render_area<D: ExecutionDomain, U, A: Allocator>(pass: &PassNode<PassResource
 fn annotate_pass<'q, D: ExecutionDomain, U, A: Allocator>(
     pass: &PassNode<PassResource, D, U, A>,
     debug: &Arc<DebugMessenger>,
-    cmd: IncompleteCommandBuffer<'q, D>,
-) -> Result<IncompleteCommandBuffer<'q, D>> {
+    cmd: IncompleteCommandBuffer<'q, D, A>,
+) -> Result<IncompleteCommandBuffer<'q, D, A>> {
     let name = CString::new(pass.identifier.clone())?;
     let label = vk::DebugUtilsLabelEXT {
         s_type: vk::StructureType::DEBUG_UTILS_LABEL_EXT,
@@ -207,7 +207,7 @@ fn annotate_pass<'q, D: ExecutionDomain, U, A: Allocator>(
 }
 
 #[cfg(not(feature = "debug-markers"))]
-fn annotate_pass<D: ExecutionDomain>(_: &PassNode<PassResource, D>, _: &Arc<DebugMessenger>, cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
+fn annotate_pass<D: ExecutionDomain, A: Allocator>(_: &PassNode<PassResource, D>, _: &Arc<DebugMessenger>, cmd: IncompleteCommandBuffer<D, A>) -> Result<IncompleteCommandBuffer<D, A>> {
     Ok(cmd)
 }
 
@@ -215,10 +215,10 @@ fn record_pass<'q, D: ExecutionDomain, U, A: Allocator>(
     pass: &mut PassNode<'_, PassResource, D, U, A>,
     bindings: &PhysicalResourceBindings,
     ifc: &mut InFlightContext<A>,
-    mut cmd: IncompleteCommandBuffer<'q, D>,
+    mut cmd: IncompleteCommandBuffer<'q, D, A>,
     debug: Option<Arc<DebugMessenger>>,
     user_data: &mut U,
-) -> Result<IncompleteCommandBuffer<'q, D>> {
+) -> Result<IncompleteCommandBuffer<'q, D, A>> {
     if let Some(debug) = debug.clone() {
         cmd = annotate_pass(pass, &debug, cmd)?;
     }
@@ -251,12 +251,12 @@ fn record_pass<'q, D: ExecutionDomain, U, A: Allocator>(
     Ok(cmd)
 }
 
-fn record_image_barrier<'q, D: ExecutionDomain>(
+fn record_image_barrier<'q, D: ExecutionDomain, A: Allocator>(
     barrier: &PassResourceBarrier,
     image: &ImageView,
     dst_resource: &PassResource,
-    cmd: IncompleteCommandBuffer<'q, D>,
-) -> Result<IncompleteCommandBuffer<'q, D>> {
+    cmd: IncompleteCommandBuffer<'q, D, A>,
+) -> Result<IncompleteCommandBuffer<'q, D, A>> {
     // Image layouts:
     // barrier.resource has information on srcLayout
     // dst_resource(barrier) has information on dstLayout
@@ -291,12 +291,12 @@ fn record_image_barrier<'q, D: ExecutionDomain>(
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
-fn record_buffer_barrier<'q, D: ExecutionDomain>(
+fn record_buffer_barrier<'q, D: ExecutionDomain, A: Allocator>(
     barrier: &PassResourceBarrier,
     _buffer: &BufferView,
     _dst_resource: &PassResource,
-    cmd: IncompleteCommandBuffer<'q, D>,
-) -> Result<IncompleteCommandBuffer<'q, D>> {
+    cmd: IncompleteCommandBuffer<'q, D, A>,
+) -> Result<IncompleteCommandBuffer<'q, D, A>> {
     // Since every driver implements buffer barriers as global memory barriers, we will do the same.
     let vk_barrier = vk::MemoryBarrier2 {
         s_type: vk::StructureType::MEMORY_BARRIER_2,
@@ -322,12 +322,12 @@ fn record_buffer_barrier<'q, D: ExecutionDomain>(
     Ok(cmd.pipeline_barrier_2(&dependency))
 }
 
-fn record_barrier<'q, D: ExecutionDomain>(
+fn record_barrier<'q, D: ExecutionDomain, A: Allocator>(
     barrier: &PassResourceBarrier,
     dst_resource: &PassResource,
     bindings: &PhysicalResourceBindings,
-    cmd: IncompleteCommandBuffer<'q, D>,
-) -> Result<IncompleteCommandBuffer<'q, D>> {
+    cmd: IncompleteCommandBuffer<'q, D, A>,
+) -> Result<IncompleteCommandBuffer<'q, D, A>> {
     let physical_resource = bindings.resolve(&barrier.resource.resource);
     let Some(resource) = physical_resource else { return Err(anyhow::Error::from(Error::NoResourceBound(barrier.resource.uid().clone()))) };
     match resource {
@@ -341,10 +341,10 @@ fn record_node<'q, D: ExecutionDomain, U, A: Allocator>(
     node: NodeIndex,
     bindings: &PhysicalResourceBindings,
     ifc: &mut InFlightContext<A>,
-    cmd: IncompleteCommandBuffer<'q, D>,
+    cmd: IncompleteCommandBuffer<'q, D, A>,
     debug: Option<Arc<DebugMessenger>>,
     user_data: &mut U,
-) -> Result<IncompleteCommandBuffer<'q, D>> {
+) -> Result<IncompleteCommandBuffer<'q, D, A>> {
     let graph = &mut graph.graph.graph;
     let dst_resource_res = PassGraph::barrier_dst_resource(graph, node).cloned();
     let weight = graph.node_weight_mut(node).unwrap();
@@ -363,12 +363,12 @@ fn record_node<'q, D: ExecutionDomain, U, A: Allocator>(
 impl<'cb, D: ExecutionDomain, U, A: Allocator> RecordGraphToCommandBuffer<D, U, A> for BuiltPassGraph<'cb, D, U, A> {
     fn record<'q>(
         &mut self,
-        mut cmd: IncompleteCommandBuffer<'q, D>,
+        mut cmd: IncompleteCommandBuffer<'q, D, A>,
         bindings: &PhysicalResourceBindings,
         ifc: &mut InFlightContext<A>,
         debug: Option<Arc<DebugMessenger>>,
         user_data: &mut U,
-    ) -> Result<IncompleteCommandBuffer<'q, D>>
+    ) -> Result<IncompleteCommandBuffer<'q, D, A>>
         where
             Self: Sized, {
         let mut active = HashSet::new();

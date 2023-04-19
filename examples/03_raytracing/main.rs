@@ -10,7 +10,7 @@ use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
 use phobos::prelude::*;
 use phobos::util::align::align;
 
-use crate::example_runner::{Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, WindowContext};
+use crate::example_runner::{Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, save_dotfile, WindowContext};
 
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
@@ -307,7 +307,7 @@ impl ExampleApp for RaytracingSample {
                     float32: [0.0, 0.0, 0.0, 0.0],
                 }),
             )?
-            .sample_image(rt_pass.output(&rt_image).unwrap(), PipelineStage::RAY_TRACING_SHADER_KHR)
+            .sample_image(rt_pass.output(&rt_image).unwrap(), PipelineStage::FRAGMENT_SHADER)
             .execute_fn(|cmd, ifc, bindings, _| {
                 let vertices: Vec<f32> =
                     vec![-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
@@ -328,6 +328,8 @@ impl ExampleApp for RaytracingSample {
             .add_pass(render_pass)?
             .add_pass(present)?
             .build()?;
+
+        save_dotfile(graph.task_graph(), "graph.svg");
 
         let mut bindings = PhysicalResourceBindings::new();
         bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
