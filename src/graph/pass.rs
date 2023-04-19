@@ -139,11 +139,14 @@ impl<D: ExecutionDomain, U, A: Allocator> PassExecutor<D, U, A> for EmptyPassExe
 }
 
 /// Represents one pass in a GPU task graph. You can obtain one using a [`PassBuilder`].
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Pass<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
     pub(crate) name: String,
     pub(crate) color: Option<[f32; 4]>,
     pub(crate) inputs: Vec<PassResource>,
     pub(crate) outputs: Vec<PassResource>,
+    #[derivative(Debug = "ignore")]
     pub(crate) execute: BoxedPassFn<'cb, D, U, A>,
     pub(crate) is_renderpass: bool,
 }

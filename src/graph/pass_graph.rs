@@ -205,9 +205,9 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
             self.update_last_usage(&input.resource, input.stage)?;
         }
 
-        for output in &pass.outputs {
-            self.update_last_usage(&output.resource, output.stage)?;
-        }
+        //for output in &pass.outputs {
+        //    self.update_last_usage(&output.resource, output.stage)?;
+        //}
 
         self.graph.add_task(PassNode {
             identifier: pass.name,
@@ -257,7 +257,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
         match entry {
             Entry::Occupied(mut entry) => {
                 let version = resource.version();
-                if version > entry.get().0 {
+                if version >= entry.get().0 {
                     entry.insert((version, stage));
                 }
             }
