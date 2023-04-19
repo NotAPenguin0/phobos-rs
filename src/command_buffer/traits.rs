@@ -4,11 +4,11 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{BufferView, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache};
-use crate::acceleration_structure::{AccelerationStructure, AccelerationStructureBuildInfo};
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
+use crate::raytracing::acceleration_structure::{AccelerationStructure, AccelerationStructureBuildInfo};
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {

@@ -102,18 +102,14 @@ pub use crate::prelude::*;
 
 pub mod prelude;
 
-pub mod acceleration_structure;
 pub mod allocator;
-pub mod buffer;
 pub mod command_buffer;
 pub mod core;
 pub mod descriptor;
 pub mod domain;
 pub mod graph;
-pub mod image;
 pub mod pipeline;
-pub mod query_pool;
-pub mod sampler;
 pub mod sync;
 pub mod util;
 pub mod wsi;
+pub mod resource;

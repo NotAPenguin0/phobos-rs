@@ -9,12 +9,9 @@ use phobos::{
     Buffer, CommandBuffer, ComputeCmdBuffer, GraphicsCmdBuffer, IncompleteCmdBuffer, InFlightContext, MemoryType, PassBuilder, PassGraph,
     PhysicalResourceBindings, PipelineBuilder, PipelineStage, RecordGraphToCommandBuffer, ShaderCreateInfo, VirtualResource,
 };
-use phobos::acceleration_structure::{
-    AccelerationStructure, AccelerationStructureBuildInfo, AccelerationStructureBuildType, AccelerationStructureGeometryInstancesData,
-    AccelerationStructureGeometryTrianglesData, AccelerationStructureInstance, AccelerationStructureType,
-};
 use phobos::domain::{All, Compute};
 use phobos::query_pool::{AccelerationStructureCompactedSizeQuery, QueryPool, QueryPoolCreateInfo};
+use phobos::raytracing::acceleration_structure::{AccelerationStructure, AccelerationStructureBuildInfo, AccelerationStructureBuildType, AccelerationStructureGeometryInstancesData, AccelerationStructureGeometryTrianglesData, AccelerationStructureInstance, AccelerationStructureType};
 use phobos::util::address::DeviceOrHostAddressConst;
 use phobos::util::align::align;
 use phobos::util::transform::TransformMatrix;
@@ -159,10 +156,13 @@ impl ExampleApp for RaytracingSample {
             .transform(TransformMatrix::identity())
             // This instance points at the compacted BLAS.
             .acceleration_structure(&compact_as, AccelerationStructureBuildType::Device)?;
-        let instance_buffer = Buffer::new(
+        let instance_buffer = Buffer::new_aligned(
             ctx.device.clone(),
             &mut ctx.allocator,
             std::mem::size_of::<AccelerationStructureInstance>() as u64,
+            // The Vulkan spec states: For any element of pInfos[i].pGeometries or pInfos[i].ppGeometries with a geometryType of VK_GEOMETRY_TYPE_INSTANCES_KHR,
+            // if geometry.arrayOfPointers is VK_FALSE, geometry.instances.data.deviceAddress must be aligned to 16 bytes
+            16u64,
             vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST,
             MemoryType::CpuToGpu,
         )?;
@@ -263,7 +263,6 @@ impl ExampleApp for RaytracingSample {
                 }),
             )?
             .execute_fn(|cmd, ifc, bindings, _| {
-                trace!("Frame");
                 let view = Mat4::look_at_rh(Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 1.0, 0.0));
                 let projection = Mat4::perspective_rh(90.0_f32.to_radians(), 800.0 / 600.0, 0.001, 100.0);
                 let vertices: [f32; 24] =
