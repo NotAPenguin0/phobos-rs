@@ -14,7 +14,6 @@ pub struct AccelerationStructureGeometryTrianglesData {
     pub flags: vk::GeometryFlagsKHR,
 }
 
-
 impl AccelerationStructureGeometryTrianglesData {
     pub fn default() -> Self {
         Self {

@@ -121,6 +121,10 @@ impl<'a> AccelerationStructureBuildInfo<'a> {
         self
     }
 
+    pub fn ty(&self) -> AccelerationStructureType {
+        self.geometry.ty
+    }
+
     pub fn as_vulkan(
         &'a self,
     ) -> (

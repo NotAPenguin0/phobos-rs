@@ -56,12 +56,18 @@ impl AccelerationStructure {
         self.device.require_extension(ExtensionID::AccelerationStructure)?;
         let fns = self.device.acceleration_structure().unwrap();
         unsafe {
-            Ok(fns.get_acceleration_structure_device_address(&vk::AccelerationStructureDeviceAddressInfoKHR {
-                s_type: vk::StructureType::ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
-                p_next: std::ptr::null(),
-                acceleration_structure: self.handle(),
-            }))
+            Ok(
+                fns.get_acceleration_structure_device_address(&vk::AccelerationStructureDeviceAddressInfoKHR {
+                    s_type: vk::StructureType::ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
+                    p_next: std::ptr::null(),
+                    acceleration_structure: self.handle(),
+                }),
+            )
         }
+    }
+
+    pub fn ty(&self) -> AccelerationStructureType {
+        self.ty
     }
 }
 
@@ -72,6 +78,7 @@ impl Drop for AccelerationStructure {
         unsafe {
             self.device
                 .acceleration_structure()
+                // Since we created this object successfully surely the extension is supported
                 .unwrap()
                 .destroy_acceleration_structure(self.handle, None);
         }
