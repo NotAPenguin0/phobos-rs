@@ -118,6 +118,8 @@ pub struct AppSettings<'a, Window: WindowInterface> {
     /// Maximum per-frame size of scratch shader storage buffer objects. This is the size of each
     /// frame context's [`ScratchAllocator`](crate::ScratchAllocator)
     pub scratch_ssbo_size: vk::DeviceSize,
+    /// Whether to enable raytracing extensions.
+    pub raytracing: bool,
 }
 
 impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
@@ -137,6 +139,7 @@ impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
             scratch_ibo_size: 1,
             scratch_ubo_size: 1,
             scratch_ssbo_size: 1,
+            raytracing: false,
         }
     }
 }
@@ -228,6 +231,11 @@ impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
         self.inner.scratch_ubo_size = size;
         self.inner.scratch_ssbo_size = size;
 
+        self
+    }
+
+    pub fn raytracing(mut self, enabled: bool) -> Self {
+        self.inner.raytracing = enabled;
         self
     }
 

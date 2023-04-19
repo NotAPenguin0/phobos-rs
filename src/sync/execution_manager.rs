@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
+use crate::{Allocator, CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 use crate::command_buffer::*;
 use crate::core::queue::{DeviceQueue, Queue};
 use crate::domain::ExecutionDomain;
@@ -104,16 +104,16 @@ impl ExecutionManager {
 
     /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn try_on_domain<'q, D: ExecutionDomain>(&'q self, pipelines: Option<PipelineCache>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q>> {
+    pub fn try_on_domain<'q, D: ExecutionDomain, A: Allocator>(&'q self, pipelines: Option<PipelineCache<A>>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q, A>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
+        Queue::allocate_command_buffer::<'q, A, D::CmdBuf<'q, A>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn on_domain<'q, D: ExecutionDomain>(&'q self, pipelines: Option<PipelineCache>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q>> {
+    pub fn on_domain<'q, D: ExecutionDomain, A: Allocator>(&'q self, pipelines: Option<PipelineCache<A>>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q, A>> {
         let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
-        Queue::allocate_command_buffer::<'q, D::CmdBuf<'q>>(self.device.clone(), queue, pipelines, descriptors)
+        Queue::allocate_command_buffer::<'q, A, D::CmdBuf<'q, A>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
     /// Begin a submit batch. Note that all submits in a batch are over a single domain (currently).

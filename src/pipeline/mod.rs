@@ -50,10 +50,10 @@
 //! The pipeline cache internally frees up resources by destroying pipelines that have not been accessed in a long time.
 //! To ensure this happens periodically, call [`PipelineCache::next_frame()`](crate::PipelineCache::next_frame) at the end of each iteration of your render loop.
 
-
 use ash::vk;
 
-use crate::Device;
+use crate::{Allocator, Device};
+use crate::pipeline::raytracing::ShaderBindingTable;
 
 pub mod builder;
 pub mod cache;
@@ -61,6 +61,7 @@ pub mod compute;
 pub mod create_info;
 pub mod hash;
 pub mod pipeline_layout;
+pub mod raytracing;
 pub mod set_layout;
 pub mod shader;
 
@@ -93,6 +94,18 @@ pub struct ComputePipeline {
     pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,
 }
 
+/// A fully built Vulkan ray tracing pipeline. This is a managed resource, so it cannot be manually
+/// cloned or dropped.
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct RayTracingPipeline<A: Allocator> {
+    device: Device,
+    pub(crate) handle: vk::Pipeline,
+    pub(crate) layout: vk::PipelineLayout,
+    pub(crate) set_layouts: Vec<vk::DescriptorSetLayout>,
+    pub(crate) shader_binding_table: ShaderBindingTable<A>,
+}
+
 /// Pipeline type.
 #[derive(Debug)]
 pub enum PipelineType {
@@ -100,4 +113,6 @@ pub enum PipelineType {
     Graphics,
     /// Compute pipeline
     Compute,
+    /// Raytracing pipeline
+    RayTracing,
 }

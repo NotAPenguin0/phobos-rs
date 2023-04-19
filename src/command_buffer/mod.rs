@@ -32,7 +32,7 @@ use std::sync::MutexGuard;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{CmdBuffer, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
+use crate::{Allocator, CmdBuffer, DefaultAllocator, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
 use crate::core::queue::Queue;
 use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
@@ -93,7 +93,7 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 /// that could change in the future, see <https://github.com/NotAPenguin0/phobos-rs/issues/23>)
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
+pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain, A: Allocator = DefaultAllocator> {
     #[derivative(Debug = "ignore")]
     device: Device,
     handle: vk::CommandBuffer,
@@ -107,9 +107,10 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain> {
     current_render_area: vk::Rect2D,
     current_descriptor_sets: Option<HashMap<u32, DescriptorSetBuilder<'static>>>,
     descriptor_state_needs_update: bool,
+    current_sbt_regions: Option<[vk::StridedDeviceAddressRegionKHR; 4]>,
     // TODO: Only update disturbed descriptor sets
     descriptor_cache: Option<DescriptorCache>,
-    pipeline_cache: Option<PipelineCache>,
+    pipeline_cache: Option<PipelineCache<A>>,
     _domain: PhantomData<D>,
 }
 

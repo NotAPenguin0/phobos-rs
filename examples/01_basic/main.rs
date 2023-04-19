@@ -168,7 +168,7 @@ impl ExampleApp for Basic {
         // create a command buffer capable of executing graphics commands
         let cmd = ctx
             .exec
-            .on_domain::<All>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))
+            .on_domain::<All, _>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))
             .unwrap();
         // record render graph to this command buffer
         let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?.finish();
@@ -178,5 +178,5 @@ impl ExampleApp for Basic {
 
 fn main() -> Result<()> {
     let window = WindowContext::new("01_basic")?;
-    ExampleRunner::new("01_basic", Some(&window))?.run::<Basic>(Some(window));
+    ExampleRunner::new("01_basic", Some(&window), |s| s.build())?.run::<Basic>(Some(window));
 }

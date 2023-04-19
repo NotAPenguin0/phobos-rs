@@ -3,6 +3,7 @@ use ash::vk;
 
 use crate::{BufferView, Device, ImageView};
 use crate::util::cache::{Resource, ResourceKey};
+use crate::util::pnext::PNext;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct DescriptorImageInfo {
@@ -20,6 +21,7 @@ pub(crate) struct DescriptorBufferInfo {
 pub(crate) enum DescriptorContents {
     Image(DescriptorImageInfo),
     Buffer(DescriptorBufferInfo),
+    AccelerationStructure(vk::AccelerationStructureKHR),
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -80,6 +82,17 @@ fn binding_buffer_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorBufferI
         .collect()
 }
 
+fn binding_accel_structure_info(binding: &DescriptorBinding) -> Vec<vk::AccelerationStructureKHR> {
+    binding
+        .descriptors
+        .iter()
+        .map(|descriptor| {
+            let DescriptorContents::AccelerationStructure(handle) = descriptor else { panic!("Missing descriptor type case?") };
+            *handle
+        })
+        .collect()
+}
+
 struct WriteDescriptorSet {
     pub set: vk::DescriptorSet,
     pub binding: u32,
@@ -88,6 +101,7 @@ struct WriteDescriptorSet {
     pub ty: vk::DescriptorType,
     pub image_info: Option<Vec<vk::DescriptorImageInfo>>,
     pub buffer_info: Option<Vec<vk::DescriptorBufferInfo>>,
+    pub acceleration_structure_info: Option<Vec<vk::AccelerationStructureKHR>>,
 }
 
 impl ResourceKey for DescriptorSetBinding {
@@ -127,6 +141,7 @@ impl Resource for DescriptorSet {
                     ty: binding.ty,
                     image_info: None,
                     buffer_info: None,
+                    acceleration_structure_info: None,
                 };
 
                 match binding.ty {
@@ -145,6 +160,9 @@ impl Resource for DescriptorSet {
                     vk::DescriptorType::STORAGE_BUFFER => {
                         write.buffer_info = Some(binding_buffer_info(binding));
                     }
+                    vk::DescriptorType::ACCELERATION_STRUCTURE_KHR => {
+                        write.acceleration_structure_info = Some(binding_accel_structure_info(binding));
+                    }
                     _ => {
                         todo!();
                     }
@@ -153,11 +171,30 @@ impl Resource for DescriptorSet {
             })
             .collect::<Vec<WriteDescriptorSet>>();
 
+        let pnext = writes
+            .iter()
+            .map(|write| {
+                if let Some(info) = &write.acceleration_structure_info {
+                    Some(PNext::WriteDescriptorSetAccelerationStructure(
+                        vk::WriteDescriptorSetAccelerationStructureKHR {
+                            s_type: vk::StructureType::WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+                            p_next: std::ptr::null(),
+                            acceleration_structure_count: info.len() as u32,
+                            p_acceleration_structures: info.as_ptr(),
+                        },
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<Option<PNext>>>();
+
         let vk_writes = writes
             .iter()
-            .map(|write| vk::WriteDescriptorSet {
+            .zip(&pnext)
+            .map(|(write, p_next)| vk::WriteDescriptorSet {
                 s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                p_next: std::ptr::null(),
+                p_next: p_next.as_ref().map(|p_next| p_next.as_ptr()).unwrap_or(std::ptr::null()),
                 dst_set: write.set,
                 dst_binding: write.binding,
                 dst_array_element: write.array_element,

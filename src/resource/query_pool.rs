@@ -20,6 +20,8 @@ pub trait Query: Clone + Sized {
 
 pub trait ScopedQuery: Query {}
 
+pub trait AccelerationStructurePropertyQuery: Query {}
+
 #[derive(Default, Copy, Clone, Debug)]
 pub struct Timestamp {
     value: u64,
@@ -207,6 +209,28 @@ impl Query for PipelineStatisticsQuery {
 
 impl ScopedQuery for PipelineStatisticsQuery {}
 
+#[derive(Default, Clone, Copy)]
+pub struct AccelerationStructureCompactedSizeQuery;
+
+impl AccelerationStructurePropertyQuery for AccelerationStructureCompactedSizeQuery {}
+
+impl Query for AccelerationStructureCompactedSizeQuery {
+    const QUERY_TYPE: vk::QueryType = vk::QueryType::ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+    type Output = u64;
+
+    fn new(_pool: &QueryPoolCreateInfo) -> Self {
+        Self::default()
+    }
+
+    fn size(&self) -> usize {
+        1
+    }
+
+    fn parse_query(&self, _device: &Device, data: &[u64]) -> Self::Output {
+        *data.first().unwrap()
+    }
+}
+
 #[derive(Default, Debug, Copy, Clone)]
 pub struct QueryPoolCreateInfo {
     pub count: u32,
@@ -235,7 +259,7 @@ impl<Q: Query> QueryPool<Q> {
 
         let handle = unsafe { device.create_query_pool(&vk_info, None)? };
         #[cfg(feature = "log-objects")]
-        trace!("Created VkQueryPool {handle:p}");
+        trace!("Created new VkQueryPool {handle:p}");
 
         // Every query in the pool must be reset before usage
         unsafe { device.reset_query_pool(handle, 0, info.count) };
@@ -261,6 +285,7 @@ impl<Q: Query> QueryPool<Q> {
         }
     }
 
+    /// Returns the current query pool index. This returns the same value as next() would, except it does not advance the query pool.
     pub fn current(&self) -> u32 {
         if self.current == 0 {
             0

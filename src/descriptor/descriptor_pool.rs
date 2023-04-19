@@ -33,6 +33,7 @@ impl DescriptorPoolSize {
         sizes.insert(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::STORAGE_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::INPUT_ATTACHMENT, min_capacity);
+        sizes.insert(vk::DescriptorType::ACCELERATION_STRUCTURE_KHR, min_capacity);
         Self(sizes)
     }
 }

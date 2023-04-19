@@ -5,11 +5,12 @@ use std::sync::{Arc, RwLock};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{ComputePipelineCreateInfo, Device, Error, PipelineCreateInfo};
+use crate::{Allocator, ComputePipelineCreateInfo, DefaultAllocator, Device, Error, PipelineCreateInfo};
 use crate::core::device::ExtensionID;
-use crate::pipeline::{ComputePipeline, Pipeline, PipelineType};
+use crate::pipeline::{ComputePipeline, Pipeline, PipelineType, RayTracingPipeline};
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::pipeline_layout::PipelineLayout;
+use crate::pipeline::raytracing::{RayTracingPipelineCreateInfo, ShaderBindingTable, ShaderGroup};
 use crate::pipeline::set_layout::DescriptorSetLayout;
 use crate::pipeline::shader::Shader;
 use crate::util::cache::{Cache, Resource, ResourceKey};
@@ -27,14 +28,17 @@ struct PipelineEntry<P>
 }
 
 #[derive(Debug)]
-struct PipelineCacheInner {
+struct PipelineCacheInner<A: Allocator> {
+    allocator: A,
     shaders: Cache<Shader>,
     set_layouts: Cache<DescriptorSetLayout>,
     pipeline_layouts: Cache<PipelineLayout>,
     pipelines: Cache<Pipeline>,
     compute_pipelines: Cache<ComputePipeline>,
+    raytracing_pipelines: Cache<RayTracingPipeline<A>>,
     pipeline_infos: HashMap<String, PipelineEntry<PipelineCreateInfo>>,
     compute_pipeline_infos: HashMap<String, PipelineEntry<ComputePipelineCreateInfo>>,
+    raytracing_pipeline_infos: HashMap<String, PipelineEntry<RayTracingPipelineCreateInfo>>,
 }
 
 /// The main pipeline cache struct. This stores all named pipelines and shaders.
@@ -45,24 +49,24 @@ struct PipelineCacheInner {
 /// # Example usage
 /// ```
 /// use phobos::prelude::*;
-/// let mut cache = PipelineCache::new(device.clone())?;
+/// let mut cache = PipelineCache::new(device.clone(), allocator.clone())?;
 /// let pci = PipelineBuilder::new("my_pipeline")
 ///     // ... options for pipeline creation
 ///     .build();
 /// cache.create_named_pipeline(pci)?;
 /// ```
 #[derive(Debug, Clone)]
-pub struct PipelineCache {
-    inner: Arc<RwLock<PipelineCacheInner>>,
+pub struct PipelineCache<A: Allocator = DefaultAllocator> {
+    inner: Arc<RwLock<PipelineCacheInner<A>>>,
 }
 
 // SAFETY: Inner state is wrapped in an Arc<RwLock<T>>, and all pointers inside point to
 // internal data
-unsafe impl Send for PipelineCache {}
+unsafe impl<A: Allocator> Send for PipelineCache<A> {}
 
 // SAFETY: Inner state is wrapped in an Arc<RwLock<T>>, and all pointers inside point to
 // internal data
-unsafe impl Sync for PipelineCache {}
+unsafe impl<A: Allocator> Sync for PipelineCache<A> {}
 
 macro_rules! require_extension {
     ($pci:ident, $device:ident, $state:expr, $ext:expr) => {
@@ -226,7 +230,146 @@ impl Drop for ComputePipeline {
     }
 }
 
-impl PipelineCacheInner {
+impl ResourceKey for RayTracingPipelineCreateInfo {
+    fn persistent(&self) -> bool {
+        false
+    }
+}
+
+impl<A: Allocator> Resource for RayTracingPipeline<A> {
+    type Key = RayTracingPipelineCreateInfo;
+    type ExtraParams<'a> = (
+        A,
+        &'a mut Cache<Shader>,
+        &'a mut Cache<PipelineLayout>,
+        &'a mut Cache<DescriptorSetLayout>,
+    );
+    const MAX_TIME_TO_LIVE: u32 = 8;
+
+    fn create(device: Device, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
+        where
+            Self: Sized, {
+        device.require_extension(ExtensionID::RayTracingPipeline)?;
+        let (alloc, shaders, pipeline_layouts, set_layouts) = params;
+        let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
+        let mut pci = info.to_vk(unsafe { layout.handle() });
+
+        let entry = CString::new("main")?;
+        let mut shader_indices = HashMap::new();
+        let shader_info: Vec<_> = info
+            .shaders
+            .iter()
+            .enumerate()
+            .map(|(idx, shader)| -> vk::PipelineShaderStageCreateInfo {
+                shader_indices.insert(shader.code_hash(), idx as u32);
+                vk::PipelineShaderStageCreateInfo::builder()
+                    .name(&entry)
+                    .stage(shader.stage())
+                    .module(unsafe { shaders.get_or_create(shader, ()).unwrap().handle() })
+                    .build()
+            })
+            .collect();
+        pci.stage_count = shader_info.len() as u32;
+        pci.p_stages = shader_info.as_ptr();
+
+        let groups = info
+            .shader_groups
+            .iter()
+            .map(|group| {
+                let (general, closest_hit, any_hit, intersection, ty) = match group {
+                    ShaderGroup::RayGeneration {
+                        shader,
+                    } => (
+                        shader.index,
+                        vk::SHADER_UNUSED_KHR,
+                        vk::SHADER_UNUSED_KHR,
+                        vk::SHADER_UNUSED_KHR,
+                        vk::RayTracingShaderGroupTypeKHR::GENERAL,
+                    ),
+                    ShaderGroup::RayMiss {
+                        shader,
+                    } => (
+                        shader.index,
+                        vk::SHADER_UNUSED_KHR,
+                        vk::SHADER_UNUSED_KHR,
+                        vk::SHADER_UNUSED_KHR,
+                        vk::RayTracingShaderGroupTypeKHR::GENERAL,
+                    ),
+                    ShaderGroup::RayHit {
+                        closest_hit,
+                        any_hit,
+                    } => (
+                        vk::SHADER_UNUSED_KHR,
+                        closest_hit.map(|sh| sh.index).unwrap_or(vk::SHADER_UNUSED_KHR),
+                        any_hit.map(|sh| sh.index).unwrap_or(vk::SHADER_UNUSED_KHR),
+                        vk::SHADER_UNUSED_KHR,
+                        vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
+                    ),
+                    ShaderGroup::Callable {
+                        shader,
+                    } => (
+                        shader.index,
+                        vk::SHADER_UNUSED_KHR,
+                        vk::SHADER_UNUSED_KHR,
+                        vk::SHADER_UNUSED_KHR,
+                        vk::RayTracingShaderGroupTypeKHR::GENERAL,
+                    ),
+                };
+
+                vk::RayTracingShaderGroupCreateInfoKHR {
+                    s_type: vk::StructureType::RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
+                    p_next: std::ptr::null(),
+                    ty,
+                    general_shader: general,
+                    closest_hit_shader: closest_hit,
+                    any_hit_shader: any_hit,
+                    intersection_shader: intersection,
+                    p_shader_group_capture_replay_handle: std::ptr::null(),
+                }
+            })
+            .collect::<Vec<_>>();
+        pci.group_count = groups.len() as u32;
+        pci.p_groups = groups.as_ptr();
+
+        let fns = device.raytracing_pipeline().unwrap();
+        let handle = unsafe {
+            fns.create_ray_tracing_pipelines(
+                vk::DeferredOperationKHR::null(),
+                vk::PipelineCache::null(),
+                std::slice::from_ref(&pci),
+                None,
+            )?
+                .first()
+                .cloned()
+                .unwrap()
+        };
+
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkPipeline (raytracing) {handle:p}");
+
+        let sbt = ShaderBindingTable::new(device.clone(), alloc, handle, info)?;
+
+        Ok(Self {
+            device,
+            handle,
+            layout: unsafe { layout.handle() },
+            set_layouts: layout.set_layouts().to_vec(),
+            shader_binding_table: sbt,
+        })
+    }
+}
+
+impl<A: Allocator> Drop for RayTracingPipeline<A> {
+    fn drop(&mut self) {
+        unsafe {
+            #[cfg(feature = "log-objects")]
+            trace!("Destroying VkPipeline (raytracing) {:p}", self.handle);
+            self.device.destroy_pipeline(self.handle, None);
+        }
+    }
+}
+
+impl<A: Allocator> PipelineCacheInner<A> {
     pub(crate) fn get_pipeline(&mut self, name: &str, rendering_info: PipelineRenderingInfo) -> Result<&Pipeline> {
         let entry = self.pipeline_infos.get_mut(name);
         let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
@@ -256,21 +399,43 @@ impl PipelineCacheInner {
             (&mut self.shaders, &mut self.pipeline_layouts, &mut self.set_layouts),
         )
     }
+
+    pub(crate) fn get_raytracing_pipeline(&mut self, name: &str) -> Result<&RayTracingPipeline<A>> {
+        let entry = self.raytracing_pipeline_infos.get_mut(name);
+        let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
+        // Also put in queries for descriptor set layouts and pipeline layout to make sure they are not destroyed.
+        for layout in &entry.info.layout.set_layouts {
+            self.set_layouts.get_or_create(layout, ())?;
+        }
+        self.pipeline_layouts.get_or_create(&entry.info.layout, &mut self.set_layouts)?;
+        self.raytracing_pipelines.get_or_create(
+            &entry.info,
+            (
+                self.allocator.clone(),
+                &mut self.shaders,
+                &mut self.pipeline_layouts,
+                &mut self.set_layouts,
+            ),
+        )
+    }
 }
 
 // TODO: Maybe incorporate the vulkan pipeline cache api to improve startup times?
 
-impl PipelineCache {
+impl<A: Allocator> PipelineCache<A> {
     /// Create a new empty pipeline cache.
-    pub fn new(device: Device) -> Result<Self> {
+    pub fn new(device: Device, allocator: A) -> Result<Self> {
         let inner = PipelineCacheInner {
+            allocator,
             shaders: Cache::new(device.clone()),
             set_layouts: Cache::new(device.clone()),
             pipeline_layouts: Cache::new(device.clone()),
             pipelines: Cache::new(device.clone()),
-            compute_pipelines: Cache::new(device),
+            compute_pipelines: Cache::new(device.clone()),
+            raytracing_pipelines: Cache::new(device),
             pipeline_infos: Default::default(),
             compute_pipeline_infos: Default::default(),
+            raytracing_pipeline_infos: Default::default(),
         };
         Ok(Self {
             inner: Arc::new(RwLock::new(inner)),
@@ -355,7 +520,39 @@ impl PipelineCache {
             name,
             PipelineEntry {
                 info,
+            },
+        );
+        Ok(())
+    }
+
+    /// Create and register a new raytracing pipeline into the cache
+    #[cfg(feature = "shader-reflection")]
+    pub fn create_named_raytracing_pipeline(&mut self, mut info: RayTracingPipelineCreateInfo) -> Result<()> {
+        let refl = reflect_shaders(info.shaders.as_slice())?;
+        // Using reflection, we can allow omitting the pipeline layout field.
+        info.layout = build_pipeline_layout(&refl);
+
+        let name = info.name.clone();
+        let mut inner = self.inner.write().unwrap();
+        inner.raytracing_pipeline_infos.insert(
+            name,
+            PipelineEntry {
+                info,
                 reflection: refl,
+            },
+        );
+        Ok(())
+    }
+
+    /// Create and register a new compute pipeline into the cache
+    #[cfg(not(feature = "shader-reflection"))]
+    pub fn create_named_raytracing_pipeline(&mut self, mut info: RayTracingPipelineCreateInfo) -> Result<()> {
+        let name = info.name.clone();
+        let mut inner = self.inner.write().unwrap();
+        inner.raytracing_pipeline_infos.insert(
+            name,
+            PipelineEntry {
+                info,
             },
         );
         Ok(())
@@ -385,6 +582,18 @@ impl PipelineCache {
             .map(|entry| entry.info.clone())
     }
 
+    /// Get the pipeline create info associated with a raytracing pipeline
+    /// # Errors
+    /// Returns None if the pipeline was not found in the cache.
+    pub fn raytracing_pipeline_info(&self, name: &str) -> Option<RayTracingPipelineCreateInfo> {
+        self.inner
+            .read()
+            .unwrap()
+            .raytracing_pipeline_infos
+            .get(name)
+            .map(|entry| entry.info.clone())
+    }
+
     /// Returns the pipeline type of a pipeline, or None if the pipeline does not exist.
     pub fn pipeline_type(&self, name: &str) -> Option<PipelineType> {
         let inner = self.inner.read().unwrap();
@@ -392,6 +601,8 @@ impl PipelineCache {
             Some(PipelineType::Graphics)
         } else if inner.compute_pipeline_infos.contains_key(name) {
             Some(PipelineType::Compute)
+        } else if inner.raytracing_pipeline_infos.contains_key(name) {
+            Some(PipelineType::RayTracing)
         } else {
             None
         }
@@ -417,10 +628,22 @@ impl PipelineCache {
         f(pipeline)
     }
 
+    /// Obtain a raytracing pipeline from the cache and do some work with it.
+    /// # Errors
+    /// - This function can fail if the requested pipeline does not exist in the cache
+    /// - This function can fail if allocating the pipeline fails.
+    pub(crate) fn with_raytracing_pipeline<F: FnOnce(&RayTracingPipeline<A>) -> Result<()>>(&mut self, name: &str, f: F) -> Result<()> {
+        let mut inner = self.inner.write().unwrap();
+        let pipeline = inner.get_raytracing_pipeline(name)?;
+        f(pipeline)
+    }
+
     /// Advance cache resource time to live so resources that have not been used in a while can be cleaned up
     pub fn next_frame(&mut self) {
         let mut inner = self.inner.write().unwrap();
         inner.pipelines.next_frame();
+        inner.compute_pipelines.next_frame();
+        inner.raytracing_pipelines.next_frame();
         inner.pipeline_layouts.next_frame();
         inner.shaders.next_frame();
         inner.set_layouts.next_frame();

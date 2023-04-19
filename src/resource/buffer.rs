@@ -35,6 +35,7 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
+use crate::util::align::align;
 
 /// Wrapper around a [`VkBuffer`](vk::Buffer).
 #[derive(Derivative)]
@@ -45,6 +46,7 @@ pub struct Buffer<A: Allocator = DefaultAllocator> {
     #[derivative(Debug = "ignore")]
     #[allow(dead_code)]
     memory: A::Allocation,
+    address: vk::DeviceAddress,
     pointer: Option<NonNull<c_void>>,
     handle: vk::Buffer,
     size: vk::DeviceSize,
@@ -79,7 +81,6 @@ impl<A: Allocator> Buffer<A> {
         } else {
             vk::SharingMode::CONCURRENT
         };
-
         let handle = unsafe {
             device.create_buffer(
                 &vk::BufferCreateInfo {
@@ -87,7 +88,7 @@ impl<A: Allocator> Buffer<A> {
                     p_next: std::ptr::null(),
                     flags: vk::BufferCreateFlags::empty(),
                     size,
-                    usage,
+                    usage: usage | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
                     sharing_mode,
                     queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT {
                         device.queue_families().len() as u32
@@ -111,14 +112,82 @@ impl<A: Allocator> Buffer<A> {
 
         unsafe { device.bind_buffer_memory(handle, memory.memory(), memory.offset())? };
 
+        let address = unsafe {
+            device.get_buffer_device_address(&vk::BufferDeviceAddressInfo {
+                s_type: vk::StructureType::BUFFER_DEVICE_ADDRESS_INFO,
+                p_next: std::ptr::null(),
+                buffer: handle,
+            })
+        };
+
         Ok(Self {
             device,
             pointer: memory.mapped_ptr(),
             memory,
             handle,
             size,
+            address,
         })
     }
+
+    pub fn new_aligned(device: Device, allocator: &mut A, size: impl Into<vk::DeviceSize>, alignment: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
+        let alignment = alignment.into();
+        let size = align(size.into(), alignment);
+        let sharing_mode = if device.is_single_queue() {
+            vk::SharingMode::EXCLUSIVE
+        } else {
+            vk::SharingMode::CONCURRENT
+        };
+        let handle = unsafe {
+            device.create_buffer(
+                &vk::BufferCreateInfo {
+                    s_type: vk::StructureType::BUFFER_CREATE_INFO,
+                    p_next: std::ptr::null(),
+                    flags: vk::BufferCreateFlags::empty(),
+                    size,
+                    usage: usage | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                    sharing_mode,
+                    queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT {
+                        device.queue_families().len() as u32
+                    } else {
+                        0
+                    },
+                    p_queue_family_indices: if sharing_mode == vk::SharingMode::CONCURRENT {
+                        device.queue_families().as_ptr()
+                    } else {
+                        std::ptr::null()
+                    },
+                },
+                None,
+            )?
+        };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkBuffer {handle:p} (size = {size} bytes)");
+
+        let mut requirements = unsafe { device.get_buffer_memory_requirements(handle) };
+        requirements.alignment = alignment;
+        let memory = allocator.allocate("buffer", &requirements, location)?;
+
+        unsafe { device.bind_buffer_memory(handle, memory.memory(), memory.offset())? };
+
+        let address = unsafe {
+            device.get_buffer_device_address(&vk::BufferDeviceAddressInfo {
+                s_type: vk::StructureType::BUFFER_DEVICE_ADDRESS_INFO,
+                p_next: std::ptr::null(),
+                buffer: handle,
+            })
+        };
+
+        Ok(Self {
+            device,
+            pointer: memory.mapped_ptr(),
+            memory,
+            handle,
+            size,
+            address,
+        })
+    }
+
 
     /// Allocate a new buffer with device local memory (VRAM). This is usually the correct memory location for most buffers.
     pub fn new_device_local(device: Device, allocator: &mut A, size: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags) -> Result<Self> {
@@ -173,6 +242,10 @@ impl<A: Allocator> Buffer<A> {
     /// Get the size of this buffer
     pub fn size(&self) -> vk::DeviceSize {
         self.size
+    }
+
+    pub fn address(&self) -> vk::DeviceAddress {
+        self.address
     }
 }
 

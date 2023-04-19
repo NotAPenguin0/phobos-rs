@@ -9,6 +9,7 @@ use crate::descriptor::descriptor_set::{DescriptorBinding, DescriptorBufferInfo,
 use crate::graph::physical_resource::PhysicalResource;
 #[cfg(feature = "shader-reflection")]
 use crate::pipeline::shader_reflection::ReflectionInfo;
+use crate::raytracing::acceleration_structure::AccelerationStructure;
 
 /// This structure is used to build up [`DescriptorSetBinding`](crate::descriptor::descriptor_set::DescriptorSetBinding) objects for requesting descriptor sets.
 /// Public usage of this API is deprecated, use the provided methods inside [`IncompleteCommandBuffer`](crate::IncompleteCommandBuffer).
@@ -175,6 +176,30 @@ impl<'r> DescriptorSetBuilder<'r> {
                 view: image.clone(),
                 layout: vk::ImageLayout::GENERAL,
             })],
+        })
+    }
+
+    pub fn resolve_and_bind_storage_image(
+        &mut self,
+        binding: u32,
+        resource: &VirtualResource,
+        bindings: &PhysicalResourceBindings,
+    ) -> Result<()> {
+        if let Some(PhysicalResource::Image(image)) = bindings.resolve(resource) {
+            self.bind_storage_image(binding, image);
+            Ok(())
+        } else {
+            Err(Error::NoResourceBound(resource.uid().clone()).into())
+        }
+    }
+
+    pub fn bind_acceleration_structure(&mut self, binding: u32, accel: &AccelerationStructure) {
+        self.inner.bindings.push(DescriptorBinding {
+            binding,
+            ty: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
+            descriptors: vec![
+                DescriptorContents::AccelerationStructure(unsafe { accel.handle() })
+            ],
         })
     }
 

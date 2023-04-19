@@ -11,6 +11,7 @@ use winit::window::{Window, WindowBuilder};
 
 use phobos::prelude::*;
 
+#[allow(dead_code)]
 pub fn load_spirv_file(path: &Path) -> Vec<u32> {
     let mut f = File::open(&path).expect("no file found");
     let metadata = fs::metadata(&path).expect("unable to read metadata");
@@ -18,6 +19,11 @@ pub fn load_spirv_file(path: &Path) -> Vec<u32> {
     f.read(&mut buffer).expect("buffer overflow");
     let (_, binary, _) = unsafe { buffer.align_to::<u32>() };
     Vec::from(binary)
+}
+
+pub fn create_shader(path: &str, stage: vk::ShaderStageFlags) -> ShaderCreateInfo {
+    let code = load_spirv_file(Path::new(path));
+    ShaderCreateInfo::from_spirv(stage, code)
 }
 
 #[derive(Debug)]
@@ -77,13 +83,13 @@ pub trait ExampleApp {
 }
 
 pub struct ExampleRunner {
-    vk: VulkanContext,
     pipelines: PipelineCache,
     descriptors: DescriptorCache,
+    vk: VulkanContext,
 }
 
 impl ExampleRunner {
-    pub fn new(name: impl Into<String>, window: Option<&WindowContext>) -> Result<Self> {
+    pub fn new(name: impl Into<String>, window: Option<&WindowContext>, make_settings: impl Fn(AppBuilder<Window>) -> AppSettings<Window>) -> Result<Self> {
         std::env::set_var("RUST_LOG", "trace");
         pretty_env_logger::init();
         let mut settings = AppBuilder::new()
@@ -119,11 +125,15 @@ impl ExampleRunner {
                 settings = settings.window(&window.window);
             }
         };
-        let settings = settings.build();
+        let settings = make_settings(settings);
 
         let (instance, physical_device, surface, device, allocator, exec, frame, Some(debug_messenger)) = initialize(&settings, window.is_none())? else {
             panic!("Asked for debug messenger but didnt get one")
         };
+
+        let pipelines = PipelineCache::new(device.clone(), allocator.clone())?;
+        let descriptors = DescriptorCache::new(device.clone())?;
+
         let vk = VulkanContext {
             frame,
             exec,
@@ -134,9 +144,6 @@ impl ExampleRunner {
             debug_messenger,
             instance,
         };
-
-        let pipelines = PipelineCache::new(vk.device.clone())?;
-        let descriptors = DescriptorCache::new(vk.device.clone())?;
 
         Ok(Self {
             vk,
@@ -181,6 +188,7 @@ impl ExampleRunner {
             // Do not render a frame if Exit control flow is specified, to avoid
             // sync issues.
             if let ControlFlow::ExitWithCode(_) = *control_flow {
+                self.vk.device.wait_idle().unwrap();
                 return;
             }
             *control_flow = ControlFlow::Poll;

@@ -35,6 +35,9 @@ fn compile_shaders() {
     println!("cargo:rerun-if-changed=examples/data/frag.glsl");
     println!("cargo:rerun-if-changed=examples/data/blue.glsl");
     println!("cargo:rerun-if-changed=examples/data/compute.glsl");
+    println!("cargo:rerun-if-changed=examples/data/raygen.rgen");
+    println!("cargo:rerun-if-changed=examples/data/rayhit.rchit");
+    println!("cargo:rerun-if-changed=examples/data/raymiss.rmiss");
 
     compile_shader(
         Path::new("examples/data/vert.glsl"),
@@ -55,6 +58,21 @@ fn compile_shaders() {
         Path::new("examples/data/compute.glsl"),
         shaderc::ShaderKind::Compute,
         Path::new("examples/data/compute.spv"),
+    );
+    compile_shader(
+        Path::new("examples/data/raygen.rgen"),
+        shaderc::ShaderKind::RayGeneration,
+        Path::new("examples/data/raygen.spv"),
+    );
+    compile_shader(
+        Path::new("examples/data/rayhit.rchit"),
+        shaderc::ShaderKind::ClosestHit,
+        Path::new("examples/data/rayhit.spv"),
+    );
+    compile_shader(
+        Path::new("examples/data/raymiss.rmiss"),
+        shaderc::ShaderKind::Miss,
+        Path::new("examples/data/raymiss.spv"),
     );
 }
 

@@ -30,7 +30,7 @@ pub fn staged_buffer_upload<T: Copy, A: Allocator + 'static>(
     let view = buffer.view_full();
 
     let cmd = exec
-        .on_domain::<domain::Transfer>(None, None)?
+        .on_domain::<domain::Transfer, A>(None, None)?
         .copy_buffer(&staging_view, &view)?
         .finish()?;
 

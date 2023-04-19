@@ -24,12 +24,14 @@ thiserror = "1.0.38"
 spv-cross = { version = "0.23.2", optional = true, features = ["glsl", "hlsl"] }
 log = "0.4.17"
 rayon = { version = "1.7.0", optional = true }
+static_assertions = "1.1.0"
 
 [build-dependencies]
 shaderc = { version = "0.8.2", optional = true, features = ["build-from-source"] }
 
 [dev-dependencies]
 pretty_env_logger = "0.4.0"
+glam = "0.23.0"
 
 [features]
 default = ["winit", "debug-markers", "shader-reflection"]

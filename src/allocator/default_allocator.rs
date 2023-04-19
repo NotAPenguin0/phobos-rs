@@ -79,7 +79,7 @@ impl DefaultAllocator {
                 // SAFETY: The user passed in a valid PhysicalDevice reference.
                 physical_device: unsafe { physical_device.handle() },
                 debug_settings: Default::default(),
-                buffer_device_address: false, // We might change this if the bufferDeviceAddress feature gets enabled.
+                buffer_device_address: true,
             })?)),
         })
     }

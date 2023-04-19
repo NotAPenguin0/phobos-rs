@@ -96,5 +96,5 @@ impl ExampleApp for Compute {
 }
 
 fn main() -> Result<()> {
-    ExampleRunner::new("02_headless_compute", None)?.run::<Compute>(None);
+    ExampleRunner::new("02_headless_compute", None, |s| s.build())?.run::<Compute>(None);
 }
