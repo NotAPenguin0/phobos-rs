@@ -1,3 +1,5 @@
+//! Exposes the virtual resource utility used to refer to resources in a graph.
+
 use crate::graph::resource::ResourceType;
 
 /// Represents a virtual resource in the system, uniquely identified by a string.
@@ -95,11 +97,13 @@ impl VirtualResource {
     }
 }
 
+/// Syntax sugar to easily construct image virtual resources
 #[macro_export]
 macro_rules! image {
     ($id:literal) => { ::phobos::prelude::VirtualResource::image($id) }
 }
 
+/// Syntax sugar to easily construct buffer virtual resources
 #[macro_export]
 macro_rules! buffer {
     ($id:literal) => { ::phobos::prelude::VirtualResource::buffer($id) }

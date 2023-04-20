@@ -1,3 +1,5 @@
+//! The internal graph structure in the task graph.
+
 use std::marker::PhantomData;
 
 use anyhow::Result;

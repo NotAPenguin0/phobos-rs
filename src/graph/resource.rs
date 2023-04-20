@@ -1,3 +1,5 @@
+//! Exposes the different resource types in a pass graph.
+
 use ash::vk;
 
 use crate::graph::virtual_resource::VirtualResource;

@@ -1,5 +1,7 @@
 //! The pass graph system is a powerful abstraction that allows you to automatically manage synchronization **within a single queue**,
-//! and automatically transition image layouts based on usage. Each pass needs to declare its inputs and outputs, and then the graph
+//! and automatically transition image layouts based on usage.
+//!
+//! Each pass needs to declare its inputs and outputs, and then the graph
 //! is built and barriers are inserted where needed. All resources are specified as [`VirtualResource`](crate::VirtualResource)s, referenced by a string ID.
 //! This means that it's possible to not have to rebuild the graph every frame.
 //!

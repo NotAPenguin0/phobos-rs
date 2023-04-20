@@ -1,3 +1,5 @@
+//! Provides utilities for binding physical resources to virtual resources
+
 use std::collections::HashMap;
 
 use anyhow::Result;

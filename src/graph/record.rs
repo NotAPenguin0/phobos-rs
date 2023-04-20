@@ -1,3 +1,5 @@
+//! Provides methods to record a pass graph to a command buffer
+
 use std::collections::HashSet;
 use std::ffi::CString;
 use std::sync::Arc;
@@ -17,6 +19,7 @@ use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::task_graph::{Node, Resource};
 use crate::sync::domain::ExecutionDomain;
 
+/// Implement this on a type to be able to record this type to a command buffer.
 pub trait RecordGraphToCommandBuffer<D: ExecutionDomain, U, A: Allocator> {
     /// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names
     /// to actual resources.
@@ -361,6 +364,7 @@ fn record_node<'q, D: ExecutionDomain, U, A: Allocator>(
 }
 
 impl<'cb, D: ExecutionDomain, U, A: Allocator> RecordGraphToCommandBuffer<D, U, A> for BuiltPassGraph<'cb, D, U, A> {
+    /// Record the rendergraph to the command buffer. This will pass `user_data` along to every pass executor in the graph.
     fn record<'q>(
         &mut self,
         mut cmd: IncompleteCommandBuffer<'q, D, A>,

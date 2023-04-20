@@ -1,3 +1,5 @@
+//! The pass graph module holds the render graph implementation.
+
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
@@ -128,10 +130,12 @@ impl<R, D, U, A: Allocator> Task<R> for PassNode<'_, R, D, U, A>
         R: Resource,
         D: ExecutionDomain,
 {
+    /// Get the inputs of this pass
     fn inputs(&self) -> &Vec<R> {
         &self.inputs
     }
 
+    /// Get the outputs of this pass
     fn outputs(&self) -> &Vec<R> {
         &self.outputs
     }

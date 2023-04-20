@@ -1,5 +1,7 @@
 //! This module mainly exposes the [`PassBuilder`] struct, used for correctly defining passes in a
-//! [`PassGraph`](crate::PassGraph). For documentation on how to use the pass graph, refer to the [`graph`](crate::graph) module level documentation.
+//! [`PassGraph`](crate::PassGraph).
+//!
+//! For documentation on how to use the pass graph, refer to the [`graph`](crate::graph) module level documentation.
 //! There are a few different types of passes. Each pass must declare its inputs and outputs, and can optionally
 //! specify a closure to be executed when the pass is recorded to a command buffer. Additionally, a color can be given to each pass
 //! which will show up in debuggers like [*RenderDoc*](https://renderdoc.org/) if the `debug-markers` feature is enabled.
@@ -53,12 +55,12 @@
 //!     // Let's color this pass green
 //!     .color([0.0, 1.0, 0.0, 1.0])
 //!     // Clear the swapchain to black.
-//!     .color_attachment(swapchain.clone(),
+//!     .color_attachment(&swapchain,
 //!                       vk::AttachmentLoadOp::CLEAR,
 //!                       Some(vk::ClearColorValue{ float32: [0.0, 0.0, 0.0, 1.0] }))?
 //!     // We sample the input resource in the fragment shader.
 //!     .sample_image(&input_resource, PipelineStage::FRAGMENT_SHADER)
-//!     .executor(|mut cmd, ifc, bindings| {
+//!     .execute_fn(|mut cmd, ifc, bindings, _| {
 //!         // Draw a fullscreen quad using our sample pipeline and a descriptor set pointing to the input resource.
 //!         // This assumes we created a pipeline before and a sampler before, and that we bind the proper resources
 //!         // before recording the graph.
@@ -85,7 +87,9 @@ use crate::sync::domain::ExecutionDomain;
 /// The returned value from a pass callback function.
 pub type PassFnResult<'q, D, A> = Result<IncompleteCommandBuffer<'q, D, A>>;
 
+/// Defines a pass executor that can be called when the pass is recorded.
 pub trait PassExecutor<D: ExecutionDomain, U, A: Allocator> {
+    /// Record this pass to a command buffer.
     fn execute<'q>(
         &mut self,
         cmd: IncompleteCommandBuffer<'q, D, A>,
@@ -101,6 +105,7 @@ impl<D, U, A, F> PassExecutor<D, U, A> for F
         A: Allocator,
         F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A>,
 {
+    /// Record this pass to a command buffer by calling the given function.
     fn execute<'q>(
         &mut self,
         cmd: IncompleteCommandBuffer<'q, D, A>,
@@ -114,19 +119,23 @@ impl<D, U, A, F> PassExecutor<D, U, A> for F
 
 pub(crate) type BoxedPassFn<'cb, D, U, A> = Box<dyn PassExecutor<D, U, A> + 'cb>;
 
+/// An empty pass executor that does nothing
 pub struct EmptyPassExecutor;
 
 impl EmptyPassExecutor {
+    /// Creates an empty pass executor
     pub fn new() -> Self {
         Self {}
     }
 
+    /// Create a new empty pass executor in a [`Box`]
     pub fn new_boxed() -> Box<Self> {
         Box::new(Self::new())
     }
 }
 
 impl<D: ExecutionDomain, U, A: Allocator> PassExecutor<D, U, A> for EmptyPassExecutor {
+    /// Execute the empty pass executor by just returning the command buffer.
     fn execute<'q>(
         &mut self,
         cmd: IncompleteCommandBuffer<'q, D, A>,
@@ -173,6 +182,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> Pass<'cb, D, U, A> {
             .next()
     }
 
+    /// Get the pass name
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -351,6 +361,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         self
     }
 
+    /// Declare that a resource will be used as a storage image that is written to in the given pipeline stages.
     pub fn write_storage_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::ShaderWrite,
@@ -371,6 +382,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         self
     }
 
+    /// Declare that a resource will be used as a storage image that will be read from in the given pipeline stages.
     pub fn read_storage_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::ShaderRead,
@@ -389,6 +401,8 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         self
     }
 
+    /// Set the executor to be called when recording this pass. This method can be used to deduce types
+    /// when a function is used as a pass executor.
     pub fn execute_fn<F>(mut self, exec: F) -> Self
         where
             F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A> + 'cb, {
