@@ -1,3 +1,5 @@
+//! Exposes Vulkan queue objects, though these are always abstracted through the ExecutionManager.
+
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::Result;

@@ -1,3 +1,5 @@
+//! Exposes the phobos error type
+
 use std::ffi::NulError;
 use std::sync::PoisonError;
 

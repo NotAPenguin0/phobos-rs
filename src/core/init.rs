@@ -1,3 +1,5 @@
+//! Exposes methods to make initialization of the library easier without losing flexibility.
+
 use std::marker::PhantomData;
 
 use anyhow::Result;
@@ -58,6 +60,7 @@ impl<W: WindowInterface> ContextInit<W> for HeadlessContext {
 }
 
 impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
+    /// All created vulkan objects
     type Output<A: Allocator> = (
         VkInstance,
         PhysicalDevice,

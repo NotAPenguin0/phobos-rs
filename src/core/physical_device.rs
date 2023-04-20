@@ -1,3 +1,5 @@
+//! Exposes the physical device, which is a handle to the actual GPU used.
+
 use std::ffi::CStr;
 
 use anyhow::Result;

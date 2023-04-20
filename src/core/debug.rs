@@ -1,3 +1,5 @@
+//! Contains the debug messenger used to log validation layer messages
+
 use std::ops::Deref;
 
 use anyhow::Result;

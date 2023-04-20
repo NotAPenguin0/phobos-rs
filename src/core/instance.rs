@@ -1,3 +1,5 @@
+//! Exposes the Vulkan instance, which represents the loaded Vulkan library
+
 use std::ffi::{CStr, CString};
 use std::ops::Deref;
 use std::str::FromStr;

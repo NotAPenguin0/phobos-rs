@@ -1,3 +1,5 @@
+//! Exposes all structs needed to store initialization parameters.
+
 use ash::vk;
 
 use crate::core::queue::QueueType;
@@ -234,6 +236,11 @@ impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
         self
     }
 
+    /// Enable as many raytracing extensions as possible.
+    /// Will try to enable the following extensions if they are available
+    /// - `VK_KHR_acceleration_structure`
+    /// - `VK_KHR_ray_query`
+    /// - `VK_KHR_ray_tracing_pipeline`
     pub fn raytracing(mut self, enabled: bool) -> Self {
         self.inner.raytracing = enabled;
         self

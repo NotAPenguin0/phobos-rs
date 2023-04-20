@@ -1,3 +1,5 @@
+//! Contains the Vulkan device, the main entrypoint to the Vulkan API.
+
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, NulError};
 use std::fmt::Formatter;
@@ -25,7 +27,9 @@ use crate::util::string::unwrap_to_raw_strings;
 pub enum ExtensionID {
     /// `VK_EXT_extended_dynamic_state3` provides more dynamic states to pipeline objects.
     ExtendedDynamicState3,
+    /// `VK_KHR_acceleration_structure` provides acceleration structures for raytracing
     AccelerationStructure,
+    /// `VK_KHR_ray_tracing_pipeline` provides raytracing pipelines and ray query objects in shaders.
     RayTracingPipeline,
 }
 
@@ -385,11 +389,20 @@ impl Device {
         &self.inner.properties
     }
 
+    /// Get the physical device properties related to acceleration structures.
+    ///
+    /// # Errors
+    ///
+    /// - Fails if [`ExtensionID::AccelerationStructure`] is not enabled.
     pub fn acceleration_structure_properties(&self) -> Result<&vk::PhysicalDeviceAccelerationStructurePropertiesKHR> {
         self.require_extension(ExtensionID::AccelerationStructure)?;
         Ok(self.inner.accel_structure_properties.as_ref().unwrap())
     }
 
+    /// Get the physical device properties related to raytracing pipelines
+    /// # Errors
+    ///
+    /// - Fails if [`ExtensionID::RayTracingPipeline`] is not enabled.
     pub fn ray_tracing_properties(&self) -> Result<&vk::PhysicalDeviceRayTracingPipelinePropertiesKHR> {
         self.require_extension(ExtensionID::RayTracingPipeline)?;
         Ok(self.inner.rt_properties.as_ref().unwrap())
@@ -408,6 +421,7 @@ impl Device {
         self.inner.extensions.contains(&ext)
     }
 
+    /// Returns `Ok` if the given extension is enabled, `Err` otherwise.
     pub fn require_extension(&self, ext: ExtensionID) -> Result<()> {
         if self.is_extension_enabled(ext) {
             Ok(())
@@ -443,11 +457,15 @@ impl Device {
     }
 
     /// Access to the function pointers for `VK_KHR_acceleration_structure`
+    ///
+    /// Returns `None` if the extension is not enabled
     pub fn acceleration_structure(&self) -> Option<&khr::AccelerationStructure> {
         self.inner.acceleration_structure.as_ref()
     }
 
     /// Access to the function pointers for `VK_KHR_ray_tracing_pipeline`
+    ///
+    /// Returns `None` if the extension is not enabled
     pub fn raytracing_pipeline(&self) -> Option<&khr::RayTracingPipeline> {
         self.inner.rt_pipeline.as_ref()
     }
