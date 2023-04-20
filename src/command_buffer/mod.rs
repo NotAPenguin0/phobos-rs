@@ -1,17 +1,4 @@
-//! Most functions in this module are a relatively thin wrapper over Vulkan commands.
-//!
-//! # Domains
-//!
-//! The most important feature is that of execution domains. Commands are divided into four domains:
-//! - [Transfer](crate::domain::Transfer): All transfer and copy related commands.
-//! - [Graphics](crate::domain::Graphics): All graphics and rendering related commands.
-//! - [Compute](crate::domain::Compute): GPU compute commands, most notably `vkCmdDispatch`
-//! - [All](crate::domain::All): All of the above.
-//!
-//! This concept abstracts over that of queue families. A command buffer over a domain is allocated from a queue that supports all operations
-//! on its domain, and as few other domains (to try to catch dedicated transfer/async compute queues). For this reason, always try to
-//! allocate from the most restrictive domain as you can.
-//!
+//! Exposes command buffer wrappers for recording GPU commands.
 //! # Incomplete command buffers
 //!
 //! Vulkan command buffers need to call `vkEndCommandBuffer` before they can be submitted. After this call, no more commands should be

@@ -1,3 +1,5 @@
+//! Contains implementations of the transfer domain for command buffers
+
 use anyhow::Result;
 use ash::vk;
 

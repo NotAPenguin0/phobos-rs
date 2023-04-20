@@ -1,3 +1,5 @@
+//! Contains implementations of the compute domain for command buffers
+
 use anyhow::Result;
 use ash::vk;
 
@@ -74,12 +76,17 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for Inc
         Ok(self)
     }
 
+    /// Build a single acceleration structure. This is a write operation to the acceleration structure, so
+    /// it must be synchronized.
     fn build_acceleration_structure(self, info: &AccelerationStructureBuildInfo) -> Result<Self>
         where
             Self: Sized, {
         self.build_acceleration_structures(std::slice::from_ref(info))
     }
 
+    /// Build multiple acceleration structures in a single Vulkan command.
+    /// This is a write operation to the acceleration structures, so it must be
+    /// synchronized
     fn build_acceleration_structures(self, info: &[AccelerationStructureBuildInfo]) -> Result<Self>
         where
             Self: Sized, {
@@ -97,6 +104,7 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for Inc
         Ok(self)
     }
 
+    /// Compact an acceleration structure. This is read operation on `src`, and a write operation on `dst`
     fn compact_acceleration_structure(self, src: &AccelerationStructure, dst: &AccelerationStructure) -> Result<Self> {
         self.device.require_extension(ExtensionID::AccelerationStructure)?;
         let fns = self.device.acceleration_structure().unwrap();
@@ -113,6 +121,9 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for Inc
         Ok(self)
     }
 
+    /// Write acceleration structure properties to the query pool. The property written depends on
+    /// the type of the query pool passed in and is automatically inferred to be
+    /// [`Q::QUERY_TYPE`].
     fn write_acceleration_structures_properties<Q: AccelerationStructurePropertyQuery>(
         self,
         src: &[AccelerationStructure],
@@ -139,6 +150,9 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for Inc
         Ok(self)
     }
 
+    /// Write acceleration structure properties to the query pool. The property written depends on
+    /// the type of the query pool passed in and is automatically inferred to be
+    /// [`Q::QUERY_TYPE`].
     fn write_acceleration_structure_properties<Q: AccelerationStructurePropertyQuery>(
         self,
         src: &AccelerationStructure,

@@ -1,3 +1,5 @@
+//! Abstraction over Vulkan command pools
+
 use anyhow::Result;
 use ash::vk;
 

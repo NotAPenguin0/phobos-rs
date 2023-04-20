@@ -1,3 +1,5 @@
+//! Extra utilities for command buffers not tied to a domain
+
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -330,6 +332,26 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
         Ok(self)
     }
 
+    /// Binds a new descriptor with descriptor type [`vk::DescriptorType::STORAGE_IMAGE`]. The image bound to this is
+    /// the image obtained by resolving the input resource from the given resource bindings. The sampler bound to this
+    /// is the one given. This binding is not actually flushed onto the gpu until the next draw or dispatch call.
+    ///
+    /// Expects the image to be in [`vk::ImageLayout::GENERAL`]
+    /// # Errors
+    /// * Fails if the virtual resource has no physical binding associated to it.
+    /// # Example
+    /// ```
+    /// # use anyhow::Result;
+    /// # use phobos::sync::domain::ExecutionDomain;
+    /// # use phobos::*;
+    /// fn use_resolve_and_bind<'q, D: ExecutionDomain>(cmd: IncompleteCommandBuffer<'q, D>, image: &ImageView) -> Result<IncompleteCommandBuffer<'q, D>> {
+    ///     let resource = VirtualResource::image("image");
+    ///     let mut bindings = PhysicalResourceBindings::new();
+    ///     bindings.bind_image("image", image);
+    ///
+    ///     cmd.resolve_and_bind_storage_image(0, 0, &resource, &bindings)
+    /// }
+    /// ```
     pub fn resolve_and_bind_storage_image(
         mut self,
         set: u32,
@@ -343,6 +365,19 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
         Ok(self)
     }
 
+    /// Binds a new descriptor with descriptor type [`vk::DescriptorType::ACCELERATION_STRUCTURE_KHR`]. The
+    /// `VK_KHR_acceleration_structure` extension must be enabled for this (use [`AppBuilder::raytracing()`](crate::AppBuilder::raytracing() to enable).
+    /// # Example
+    /// ```
+    /// # use anyhow::Result;
+    /// # use phobos::sync::domain::ExecutionDomain;
+    /// # use phobos::*;
+    /// fn use_bind_acceleration_structure<'q, D: ExecutionDomain + GfxSupport>(cmd: IncompleteCommandBuffer<'q, D>, accel: &AccelerationStructure) -> Result<IncompleteCommandBuffer<'q, D>> {
+    ///     cmd.use_bind_acceleration_structure(0, 0, accel)?
+    ///         // This call will flush the descriptor state and bind proper descriptor sets.
+    ///        .trace_rays(1920, 1080, 1)
+    /// }
+    /// ```
     pub fn bind_acceleration_structure(mut self, set: u32, binding: u32, accel: &AccelerationStructure) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_acceleration_structure(binding, accel);
@@ -469,6 +504,8 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
         self
     }
 
+    /// Begin a scoped query. Not all query types are scoped, so the query type must implement
+    /// [`ScopedQuery`]
     pub fn begin_query<Q: ScopedQuery>(self, query_pool: &QueryPool<Q>, index: u32) -> Self {
         unsafe {
             self.device.cmd_begin_query(self.handle, query_pool.handle(), index, vk::QueryControlFlags::default());
@@ -476,6 +513,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
         self
     }
 
+    /// End a scoped query. This query must be started with [`Self::begin_query()`] first.
     pub fn end_query<Q: ScopedQuery>(self, query_pool: &QueryPool<Q>, index: u32) -> Self {
         unsafe {
             self.device.cmd_end_query(self.handle, query_pool.handle(), index);

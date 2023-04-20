@@ -1,3 +1,5 @@
+//! Contains implementations of the compute domain for command buffers
+
 use anyhow::{bail, Result};
 use ash::vk;
 
@@ -135,6 +137,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
         Ok(self)
     }
 
+    /// Issue a `vkCmdTraceRaysKHR` command. Requires [`ExtensionID::RayTracingPipeline`] to be enabled.
     fn trace_rays(mut self, width: u32, height: u32, depth: u32) -> Result<Self>
         where
             Self: Sized, {
@@ -182,6 +185,28 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
                     pipeline.layout,
                     pipeline.set_layouts.clone(),
                     vk::PipelineBindPoint::GRAPHICS,
+                )
+            })?;
+        }
+        Ok(self)
+    }
+
+    /// Bind a ray tracing pipeline by name.
+    /// # Errors
+    /// * Fails if the pipeline was not previously registered in the pipeline cache.
+    /// * Fails if this command buffer has no pipeline cache.
+    fn bind_ray_tracing_pipeline(mut self, name: &str) -> Result<Self>
+        where
+            Self: Sized, {
+        let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
+        {
+            cache.with_raytracing_pipeline(name, |pipeline| {
+                self.current_sbt_regions = Some(pipeline.shader_binding_table.regions);
+                self.bind_pipeline_impl(
+                    pipeline.handle,
+                    pipeline.layout,
+                    pipeline.set_layouts.clone(),
+                    vk::PipelineBindPoint::RAY_TRACING_KHR,
                 )
             })?;
         }
@@ -295,28 +320,6 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
         // SAFETY: Vulkan API call. This function pointer is not null because we just verified its availability.
         unsafe {
             funcs.cmd_set_polygon_mode(self.handle, mode);
-        }
-        Ok(self)
-    }
-
-    /// Bind a ray tracing pipeline by name.
-    /// # Errors
-    /// * Fails if the pipeline was not previously registered in the pipeline cache.
-    /// * Fails if this command buffer has no pipeline cache.
-    fn bind_ray_tracing_pipeline(mut self, name: &str) -> Result<Self>
-        where
-            Self: Sized, {
-        let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
-        {
-            cache.with_raytracing_pipeline(name, |pipeline| {
-                self.current_sbt_regions = Some(pipeline.shader_binding_table.regions);
-                self.bind_pipeline_impl(
-                    pipeline.handle,
-                    pipeline.layout,
-                    pipeline.set_layouts.clone(),
-                    vk::PipelineBindPoint::RAY_TRACING_KHR,
-                )
-            })?;
         }
         Ok(self)
     }

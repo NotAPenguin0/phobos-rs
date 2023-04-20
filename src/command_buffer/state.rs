@@ -1,3 +1,5 @@
+//! Command buffer rendering state
+
 use ash::vk;
 
 use crate::ImageView;
