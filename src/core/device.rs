@@ -61,6 +61,10 @@ pub struct Device {
     inner: Arc<DeviceInner>,
 }
 
+unsafe impl Send for Device {}
+
+unsafe impl Sync for Device {}
+
 fn add_if_supported(
     ext: ExtensionID,
     name: &CStr,

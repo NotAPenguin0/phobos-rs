@@ -12,6 +12,7 @@
 //! [`ImgView`] also owns a full Vulkan resource. For this reason, we wrap it in a reference-counted `Arc` so we can safely treat it as if it were
 //! a `str` to a `String`. Most API functions will ask for an [`ImageView`].
 
+use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -87,7 +88,20 @@ pub struct ImgView {
 }
 
 /// Reference-counted version of [`ImgView`].
-pub type ImageView = Arc<ImgView>;
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct ImageView(pub Arc<ImgView>);
+
+impl Deref for ImageView {
+    type Target = Arc<ImgView>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+unsafe impl Send for ImageView {}
+
+unsafe impl Sync for ImageView {}
 
 impl<A: Allocator> Image<A> {
     // TODO: Allow specifying an initial layout for convenience
@@ -217,7 +231,7 @@ impl<A: Allocator> Image<A> {
         let view_handle = unsafe { self.device.create_image_view(&info, None)? };
         #[cfg(feature = "log-objects")]
         trace!("Created new VkImageView {view_handle:p}");
-        Ok(ImageView::new(ImgView {
+        Ok(ImageView(Arc::new(ImgView {
             device: self.device.clone(),
             handle: view_handle,
             image: self.handle,
@@ -230,7 +244,7 @@ impl<A: Allocator> Image<A> {
             base_layer: 0,
             layer_count: self.layers,
             id: ImgView::get_new_id(),
-        }))
+        })))
     }
 
     /// Whether this image resource is owned by the application or an external manager (such as the swapchain).
