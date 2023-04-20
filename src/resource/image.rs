@@ -47,6 +47,10 @@ pub struct Image<A: Allocator = DefaultAllocator> {
     samples: vk::SampleCountFlags,
 }
 
+unsafe impl<A: Allocator> Send for Image<A> {}
+
+unsafe impl<A: Allocator> Sync for Image<A> {}
+
 /// Abstraction over a [`VkImageView`](vk::ImageView). Most functions operating on images will expect these instead of raw owning [`Image`] structs.
 /// Image views can refer to one or more array layers or mip levels of an image. Given the right extension they can also interpret the image contents in a different
 /// format.
