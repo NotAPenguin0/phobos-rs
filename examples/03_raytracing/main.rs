@@ -329,8 +329,6 @@ impl ExampleApp for RaytracingSample {
             .add_pass(present)?
             .build()?;
 
-        save_dotfile(graph.task_graph(), "graph.svg");
-
         let mut bindings = PhysicalResourceBindings::new();
         bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
         bindings.bind_image("rt_out", &self.attachment_view);
