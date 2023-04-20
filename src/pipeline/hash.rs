@@ -1,3 +1,5 @@
+//! Implements `Hash`, `Eq` and `PartialEq` on pipeline create info to make it hashable for the cache.
+
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 

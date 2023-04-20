@@ -1,3 +1,5 @@
+//! Exposes wrappers for `VkDescriptorSetLayout` objects.
+
 use anyhow::Result;
 use ash::vk;
 

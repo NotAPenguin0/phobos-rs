@@ -1,3 +1,5 @@
+//! The pipeline builder is used to easily create graphics pipelines correctly.
+
 use std::collections::HashMap;
 
 use anyhow::Result;

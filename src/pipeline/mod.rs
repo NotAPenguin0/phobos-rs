@@ -1,5 +1,6 @@
-//! The pipeline module mainly exposes the [`PipelineCache`](crate::PipelineCache) struct. This is a helper that manages creating
-//! pipelines, obtaining reflection information from them (if the `shader-reflection` feature is enabled).
+//! Deals with wrappers for creating and managing Vulkan pipeline objects and their related objects.
+//!
+//! This is a helper that manages creating pipelines, obtaining reflection information from them (if the `shader-reflection` feature is enabled).
 //! You probably only want one of these in the entire application. Since it's used everywhere, to ensure safe access
 //! is possible, the inner state of a [`PipelineCache`](crate::PipelineCache) is wrapped in an `Arc<RwLock<PipelineCacheInner>>`,
 //! so this is `Send`, `Sync` and `Clone`.
@@ -11,7 +12,7 @@
 //! use std::path::Path;
 //! use phobos::prelude::*;
 //!
-//! let mut cache = PipelineCache::new(device.clone())?;
+//! let mut cache = PipelineCache::new(device.clone(), allocator.clone())?;
 //!
 //! // Load in some shader code for our pipelines.
 //! // Note that `load_spirv_binary()` does not ship with phobos.

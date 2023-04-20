@@ -1,3 +1,5 @@
+//! The pipeline cache stores pipelines and deletes them if appropriate.
+
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::sync::{Arc, RwLock};
@@ -544,7 +546,7 @@ impl<A: Allocator> PipelineCache<A> {
         Ok(())
     }
 
-    /// Create and register a new compute pipeline into the cache
+    /// Create and register a new raytracing pipeline into the cache
     #[cfg(not(feature = "shader-reflection"))]
     pub fn create_named_raytracing_pipeline(&mut self, mut info: RayTracingPipelineCreateInfo) -> Result<()> {
         let name = info.name.clone();

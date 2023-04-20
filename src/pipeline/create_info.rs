@@ -1,3 +1,5 @@
+//! Wrapper structs for pipeline create info objects.
+
 use ash::vk;
 
 use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;

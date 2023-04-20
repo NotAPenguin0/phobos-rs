@@ -1,3 +1,5 @@
+//! Wrapper structs around `VkPipelineLayout` objects.
+
 use anyhow::Result;
 use ash::vk;
 

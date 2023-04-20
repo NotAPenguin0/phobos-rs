@@ -1,3 +1,5 @@
+//! Wrapper types for compute pipelines
+
 use ash::vk;
 
 use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;

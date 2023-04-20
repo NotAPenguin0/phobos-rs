@@ -1,3 +1,5 @@
+//! Exposes wrappers for `VkShaderModule` objects.
+
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 

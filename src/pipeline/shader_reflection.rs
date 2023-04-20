@@ -1,3 +1,5 @@
+//! Implements shader reflection to generate pipeline layouts automatically
+
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 

@@ -1,3 +1,5 @@
+//! Wrappers around Vulkan ray tracing pipelines and related objects.
+
 use anyhow::Result;
 use ash::vk;
 
@@ -5,6 +7,7 @@ use crate::{Allocator, Buffer, Device, MemoryType, ShaderCreateInfo};
 use crate::core::device::ExtensionID;
 use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
 
+/// An index of a shader in a shader group into the shaders array.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct ShaderIndex {
     pub index: u32,
@@ -27,29 +30,43 @@ pub(crate) const fn shader_group_index(group: &ShaderGroup) -> u32 {
     }
 }
 
+/// A shader group for raytracing pipelines
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum ShaderGroup {
+    /// Specifies a ray generation shader, with a single shader object
     RayGeneration {
+        /// The ray generation shader to use
         shader: ShaderIndex,
     },
+    /// Specifies a ray miss shader, with a single shader object
     RayMiss {
+        /// The ray miss shader to be called when a ray misses
         shader: ShaderIndex,
     },
+    /// Specifies a ray hit group, with two optional shaders to be called
     RayHit {
+        /// Optionally a closest hit shader
         closest_hit: Option<ShaderIndex>,
+        /// Optionally an anyhit shader
         any_hit: Option<ShaderIndex>,
     },
+    /// Specifies a callable shader group,  with a single shader object
     Callable {
+        /// The shader to be called
         shader: ShaderIndex,
     },
 }
 
+/// A single entry in a Shader Binding Table
 #[derive(Debug)]
 pub struct SBTEntry {
+    /// Offset of this entry into the SBT
     pub offset: u32,
+    /// Amount of shader handles in this entry
     pub count: u32,
 }
 
+/// A ShaderBindingTable resource. This can be derived from the ray tracing pipeline.
 #[derive(Debug)]
 pub struct ShaderBindingTable<A: Allocator> {
     pub(crate) buffer: Buffer<A>,
@@ -160,12 +177,14 @@ impl<A: Allocator> ShaderBindingTable<A> {
     }
 }
 
+/// Ray tracing pipeline create info. Prefer using the buidler to construct this correctly
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub struct RayTracingPipelineCreateInfo {
     pub(crate) name: String,
     pub(crate) layout: PipelineLayoutCreateInfo,
     pub(crate) max_recursion_depth: u32,
     pub(crate) shader_groups: Vec<ShaderGroup>,
+    /// All shaders used. These must always be sorted by their type.
     pub shaders: Vec<ShaderCreateInfo>,
 }
 
@@ -191,11 +210,13 @@ impl RayTracingPipelineCreateInfo {
     }
 }
 
+/// Ray tracing pipeline builder to easily create raytracing pipelines.
 pub struct RayTracingPipelineBuilder {
     inner: RayTracingPipelineCreateInfo,
 }
 
 impl RayTracingPipelineBuilder {
+    /// Create a new raytracing pipeline with the given name
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             inner: RayTracingPipelineCreateInfo {
@@ -208,6 +229,7 @@ impl RayTracingPipelineBuilder {
         }
     }
 
+    /// Add a shader to the pipeline
     fn add_shader(&mut self, shader: ShaderCreateInfo) -> ShaderIndex {
         if let Some((idx, shader)) = self
             .inner
@@ -227,11 +249,13 @@ impl RayTracingPipelineBuilder {
         }
     }
 
+    /// Add a shader group
     pub fn add_shader_group(mut self, group: ShaderGroup) -> Self {
         self.inner.shader_groups.push(group);
         self
     }
 
+    /// Add a ray generation shader group
     pub fn add_ray_gen_group(mut self, shader: ShaderCreateInfo) -> Self {
         let shader = self.add_shader(shader);
         self.inner.shader_groups.push(ShaderGroup::RayGeneration {
@@ -240,6 +264,7 @@ impl RayTracingPipelineBuilder {
         self
     }
 
+    /// Add a ray miss shader group
     pub fn add_ray_miss_group(mut self, shader: ShaderCreateInfo) -> Self {
         let shader = self.add_shader(shader);
         self.inner.shader_groups.push(ShaderGroup::RayMiss {
@@ -248,6 +273,7 @@ impl RayTracingPipelineBuilder {
         self
     }
 
+    /// Add a ray hit group. Both shaders are optional
     pub fn add_ray_hit_group(mut self, closest_hit: Option<ShaderCreateInfo>, any_hit: Option<ShaderCreateInfo>) -> Self {
         let closest_hit = closest_hit.map(|sh| self.add_shader(sh));
         let any_hit = any_hit.map(|sh| self.add_shader(sh));
@@ -258,6 +284,7 @@ impl RayTracingPipelineBuilder {
         self
     }
 
+    /// Add a callable shader group
     pub fn add_callable_group(mut self, shader: ShaderCreateInfo) -> Self {
         let shader = self.add_shader(shader);
         self.inner.shader_groups.push(ShaderGroup::Callable {
@@ -266,15 +293,18 @@ impl RayTracingPipelineBuilder {
         self
     }
 
+    /// Set the max recursion depth for this pipeline
     pub fn max_recursion_depth(mut self, depth: u32) -> Self {
         self.inner.max_recursion_depth = depth;
         self
     }
 
+    /// Get the pipeline name
     pub fn name(&self) -> &str {
         &self.inner.name
     }
 
+    /// Build the pipeline create info
     pub fn build(mut self) -> RayTracingPipelineCreateInfo {
         // Sort shader groups by type
         self.inner.shader_groups.sort_by_key(|group| shader_group_index(group));
