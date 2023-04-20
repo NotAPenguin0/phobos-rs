@@ -1,3 +1,5 @@
+//! The descriptor cache module exposes utilities for creating descriptor sets.
+
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -35,6 +37,7 @@ fn grow_pool_size(mut old_size: DescriptorPoolSize, request: &DescriptorSetBindi
 }
 
 impl DescriptorCacheInner {
+    /// Get or create a descriptor set and return a reference to it.
     pub fn get_descriptor_set(&mut self, mut bindings: DescriptorSetBinding) -> Result<&DescriptorSet> {
         if bindings.bindings.is_empty() {
             return Err(Error::EmptyDescriptorBinding.into());

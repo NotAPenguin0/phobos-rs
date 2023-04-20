@@ -1,3 +1,5 @@
+//! A descriptor pool automatically grows to allocate descriptor sets from. It is completely managed for you so you dont need to create one manually.
+
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
@@ -10,6 +12,7 @@ use crate::Device;
 #[derive(Debug, Clone)]
 pub(super) struct DescriptorPoolSize(pub(super) HashMap<vk::DescriptorType, u32>);
 
+/// Memory pool for descriptor sets
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub(super) struct DescriptorPool {
@@ -20,6 +23,7 @@ pub(super) struct DescriptorPool {
 }
 
 impl DescriptorPoolSize {
+    /// Create a new descriptor pool size description
     pub fn new(min_capacity: u32) -> Self {
         let mut sizes = HashMap::new();
         sizes.insert(vk::DescriptorType::SAMPLER, min_capacity);
@@ -39,6 +43,7 @@ impl DescriptorPoolSize {
 }
 
 impl DescriptorPool {
+    /// Create a new descriptor pool
     pub(super) fn new(device: Device, size: DescriptorPoolSize) -> Result<Self> {
         // TODO: this max_sets value is overly pessimistic as it doesnt account for multiple
         // descriptors being held in the same descriptor set. Ideally this grows with the pool too.
@@ -73,10 +78,12 @@ impl DescriptorPool {
         })
     }
 
+    /// Get the raw Vulkan handle of this descriptor pool
     pub(super) unsafe fn handle(&self) -> vk::DescriptorPool {
         self.handle
     }
 
+    /// Get the current size of the descriptor pool.
     pub fn size(&self) -> &DescriptorPoolSize {
         &self.size
     }

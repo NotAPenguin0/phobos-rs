@@ -1,4 +1,5 @@
 //! This module handles everything related to descriptor sets.
+//!
 //! Similarly to the [`pipeline`](crate::pipeline) module, this module exposes a [`DescriptorCache`](crate::DescriptorCache) struct.
 //! This struct handles allocation of descriptor sets, writing to them and manages a descriptor pool.
 //!
@@ -11,10 +12,10 @@
 //! ```
 //! # use phobos::prelude::*;
 //! # use anyhow::Result;
-//! fn descriptor_sets_example(device: Device, exec: ExecutionManager, image: &ImageView, sampler: &Sampler) -> Result<()> {
+//! fn descriptor_sets_example<A: Allocator>(device: Device, alloc: A, exec: ExecutionManager, image: &ImageView, sampler: &Sampler) -> Result<()> {
 //!     let descriptors = DescriptorCache::new(device.clone())?;
-//!     let pipelines = PipelineCache::new(device.clone())?;
-//!     let cmd = exec.on_domain::<domain::All>(Some(pipelines), Some(cache))?
+//!     let pipelines = PipelineCache::new(device.clone(), alloc)?;
+//!     let cmd = exec.on_domain::<domain::All, A>(Some(pipelines), Some(cache))?
 //!         .bind_graphics_pipeline("my_pipeline")?
 //!         // In GLSL: layout(set = 0, binding = 0) uniform sampler2D tex;
 //!         .bind_sampled_image(0, 0, image, &sampler)?

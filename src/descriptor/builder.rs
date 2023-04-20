@@ -179,6 +179,7 @@ impl<'r> DescriptorSetBuilder<'r> {
         })
     }
 
+    /// Resolve and bind a storage image to a specified slot.
     pub fn resolve_and_bind_storage_image(
         &mut self,
         binding: u32,
@@ -193,6 +194,7 @@ impl<'r> DescriptorSetBuilder<'r> {
         }
     }
 
+    /// Bind an acceleration structure to the specified slot.
     pub fn bind_acceleration_structure(&mut self, binding: u32, accel: &AccelerationStructure) {
         self.inner.bindings.push(DescriptorBinding {
             binding,

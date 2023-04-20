@@ -1,3 +1,5 @@
+//! Wrappers for descriptor set binding info
+
 use anyhow::Result;
 use ash::vk;
 
