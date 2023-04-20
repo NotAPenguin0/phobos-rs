@@ -45,7 +45,6 @@ pub use crate::util::address::*;
 pub use crate::util::byte_size::ByteSize;
 pub use crate::util::deferred_delete::DeletionQueue;
 pub use crate::util::transform::TransformMatrix;
-pub use crate::util::upload::staged_buffer_upload;
 pub use crate::wsi::frame::{FrameManager, InFlightContext};
 pub use crate::wsi::surface::Surface;
 pub use crate::wsi::swapchain::Swapchain;
