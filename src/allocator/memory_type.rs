@@ -1,3 +1,5 @@
+//! Exposes different memory types that determine where memory allocations should live.
+
 /// The memory type of an allocation indicates where it should live.
 /// Give this to an [`Allocator`](crate::Allocator) to let it decide
 /// where your allocation should live.

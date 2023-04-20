@@ -1,3 +1,5 @@
+//! Allocator traits to implement for using your own custom allocator with phobos
+
 use std::ffi::c_void;
 use std::ptr::NonNull;
 

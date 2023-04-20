@@ -1,3 +1,5 @@
+//! Contains a default allocator type based on the [`gpu_allocator`] crate that is good for most needs.
+
 use std::ffi::c_void;
 use std::ptr::NonNull;
 use std::sync::{Arc, Mutex};
