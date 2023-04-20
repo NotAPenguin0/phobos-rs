@@ -37,7 +37,6 @@ pub use crate::resource::query_pool::*;
 pub use crate::resource::raytracing::*;
 pub use crate::sampler::Sampler;
 pub use crate::sync::domain;
-pub use crate::sync::domain;
 pub use crate::sync::execution_manager::ExecutionManager;
 pub use crate::sync::fence::*;
 pub use crate::sync::semaphore::*;
