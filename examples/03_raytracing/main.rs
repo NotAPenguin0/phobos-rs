@@ -5,6 +5,7 @@ use ash::vk;
 use glam::{Mat4, Vec3};
 use log::{info, trace};
 
+use phobos::image;
 use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
 use phobos::prelude::*;
 use phobos::sync::domain::{All, Compute};
@@ -283,8 +284,8 @@ impl ExampleApp for RaytracingSample {
     }
 
     fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<CommandBuffer<All>> {
-        let swap = VirtualResource::image("swapchain");
-        let rt_image = VirtualResource::image("rt_out");
+        let swap = image!("swapchain");
+        let rt_image = image!("rt_out");
         let rt_pass = PassBuilder::new("raytrace")
             .write_storage_image(&rt_image, PipelineStage::RAY_TRACING_SHADER_KHR)
             .execute_fn(|cmd, ifc, bindings, _| {

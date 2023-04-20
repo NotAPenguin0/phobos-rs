@@ -94,3 +94,13 @@ impl VirtualResource {
         &self.uid
     }
 }
+
+#[macro_export]
+macro_rules! image {
+    ($id:literal) => { ::phobos::prelude::VirtualResource::image($id) }
+}
+
+#[macro_export]
+macro_rules! buffer {
+    ($id:literal) => { ::phobos::prelude::VirtualResource::buffer($id) }
+}
