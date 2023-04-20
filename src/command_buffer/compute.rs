@@ -4,9 +4,9 @@ use ash::vk;
 use crate::{Allocator, ComputeCmdBuffer, ComputeSupport, Error};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
-use crate::domain::ExecutionDomain;
 use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
 use crate::raytracing::*;
+use crate::sync::domain::ExecutionDomain;
 
 impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D, A> {
     /// Sets the current compute pipeline by looking up the given name in the pipeline cache.
@@ -16,7 +16,7 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for Inc
     /// # Example
     /// ```
     /// # use phobos::*;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use anyhow::Result;
     /// // Assumes "my_pipeline" was previously added to the pipeline cache with `PipelineCache::create_named_compute_pipeline()`,
     /// // and that cmd was created with this cache.
@@ -56,7 +56,7 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for Inc
     /// # Example
     /// ```
     /// # use phobos::*;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use anyhow::Result;
     /// // Assumes "my_pipeline" was previously added to the pipeline cache with `PipelineCache::create_named_compute_pipeline()`,
     /// // and that cmd was created with this cache.

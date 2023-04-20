@@ -1,7 +1,8 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, Buffer, Device, domain, ExecutionManager, Fence, IncompleteCmdBuffer, MemoryType, TransferCmdBuffer};
+use crate::{Allocator, Buffer, Device, ExecutionManager, Fence, IncompleteCmdBuffer, MemoryType, TransferCmdBuffer};
+use crate::sync::domain;
 
 /// Perform a staged upload to a GPU buffer. Returns a fence that can be awaited to obtain the resulting buffer.
 pub fn staged_buffer_upload<T: Copy, A: Allocator + 'static>(

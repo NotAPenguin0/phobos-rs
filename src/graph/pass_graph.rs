@@ -11,12 +11,12 @@ use petgraph::graph::NodeIndex;
 use petgraph::prelude::EdgeRef;
 
 use crate::{Allocator, DefaultAllocator, Error};
-use crate::domain::ExecutionDomain;
 use crate::graph::pass::{BoxedPassFn, EmptyPassExecutor, Pass};
 use crate::graph::resource::ResourceUsage;
 use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
 use crate::graph::virtual_resource::VirtualResource;
 use crate::pipeline::PipelineStage;
+use crate::sync::domain::ExecutionDomain;
 
 /// Virtual GPU resource in a task graph.
 #[derive(Derivative, Default, Clone)]

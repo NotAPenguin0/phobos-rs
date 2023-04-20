@@ -16,3 +16,4 @@ pub mod fence;
 pub mod semaphore;
 pub mod submit_batch;
 pub mod thread_context;
+pub mod domain;

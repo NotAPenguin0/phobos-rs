@@ -5,7 +5,7 @@ use ash::vk;
 
 use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
 use crate::command_buffer::CommandBuffer;
-use crate::domain::ExecutionDomain;
+use crate::sync::domain::ExecutionDomain;
 
 #[derive(Debug)]
 struct SubmitInfo<D: ExecutionDomain> {

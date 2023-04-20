@@ -11,11 +11,11 @@ use petgraph::visit::EdgeRef;
 use crate::{Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph, PhysicalResourceBindings};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
-use crate::domain::ExecutionDomain;
 use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::task_graph::{Node, Resource};
+use crate::sync::domain::ExecutionDomain;
 
 pub trait RecordGraphToCommandBuffer<D: ExecutionDomain, U, A: Allocator> {
     /// Records a render graph to a command buffer. This also takes in a set of physical bindings to resolve virtual resource names

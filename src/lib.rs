@@ -106,7 +106,6 @@ pub mod allocator;
 pub mod command_buffer;
 pub mod core;
 pub mod descriptor;
-pub mod domain;
 pub mod graph;
 pub mod pipeline;
 pub mod sync;

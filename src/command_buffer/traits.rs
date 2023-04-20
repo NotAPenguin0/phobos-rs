@@ -3,12 +3,13 @@ use std::sync::MutexGuard;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, BufferView, DescriptorCache, Device, domain, ExecutionManager, ImageView, PipelineCache};
+use crate::{Allocator, BufferView, DescriptorCache, Device, ExecutionManager, ImageView, PipelineCache};
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
-use crate::domain::ExecutionDomain;
 use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
 use crate::raytracing::*;
+use crate::sync::domain;
+use crate::sync::domain::ExecutionDomain;
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {

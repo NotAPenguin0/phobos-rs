@@ -7,7 +7,7 @@ use ash::vk;
 use crate::{Allocator, CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 use crate::command_buffer::*;
 use crate::core::queue::{DeviceQueue, Queue};
-use crate::domain::ExecutionDomain;
+use crate::sync::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
 
 /// The execution manager is responsible for allocating command buffers on correct

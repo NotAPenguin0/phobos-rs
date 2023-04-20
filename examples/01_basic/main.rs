@@ -4,8 +4,8 @@ use anyhow::Result;
 use futures::executor::block_on;
 
 use phobos::command_buffer::traits::*;
-use phobos::domain::All;
 use phobos::prelude::*;
+use phobos::sync::domain::All;
 use phobos::vk;
 
 use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file, WindowContext};

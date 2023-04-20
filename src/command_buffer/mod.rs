@@ -34,8 +34,8 @@ use ash::vk;
 
 use crate::{Allocator, CmdBuffer, DefaultAllocator, DescriptorCache, DescriptorSetBuilder, Device, Error, ExecutionManager, PipelineCache};
 use crate::core::queue::Queue;
-use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
+use crate::sync::domain::ExecutionDomain;
 
 pub mod compute;
 pub mod graphics;
@@ -51,7 +51,7 @@ pub(crate) mod state;
 /// # Example
 /// ```
 /// # use phobos::*;
-/// # use phobos::domain::ExecutionDomain;
+/// # use phobos::sync::domain::ExecutionDomain;
 /// # use anyhow::Result;
 ///
 /// fn finish_and_wait<D: ExecutionDomain + 'static>(exec: ExecutionManager, cmd: IncompleteCommandBuffer<D>) -> Result<()> {
@@ -74,7 +74,7 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 /// # Example
 /// ```
 /// # use phobos::*;
-/// # use phobos::domain::{ExecutionDomain, Graphics};
+/// # use phobos::sync::domain::{ExecutionDomain, Graphics};
 /// # use anyhow::Result;
 /// fn submit_some_commands(exec: ExecutionManager) -> Result<()> {
 ///     let cmd: IncompleteCommandBuffer<Graphics> = exec.on_domain::<Graphics>(None, None)?;

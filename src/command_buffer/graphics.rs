@@ -4,7 +4,7 @@ use ash::vk;
 use crate::{Allocator, BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
-use crate::domain::ExecutionDomain;
+use crate::sync::domain::ExecutionDomain;
 
 impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D, A> {
     /// Sets the viewport and scissor regions to the entire render area. Can only be called inside a renderpass.
@@ -12,7 +12,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn set_viewport<C: GraphicsCmdBuffer>(cmd: C) -> C {
     ///     // Now the current viewport and scissor cover the current attachment's entire area
     ///     cmd.full_viewport_scissor()
@@ -36,7 +36,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn set_viewport<C: GraphicsCmdBuffer>(cmd: C) -> C {
     ///     cmd.viewport(vk::Viewport {
     ///         x: 0.0,
@@ -60,7 +60,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn set_scissor<C: GraphicsCmdBuffer>(cmd: C) -> C {
     ///     cmd.scissor(vk::Rect2D {
     ///         offset: Default::default(),
@@ -86,7 +86,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn draw<C: GraphicsCmdBuffer>(cmd: C, vertex_buffer: &BufferView) -> Result<C> {
     ///     cmd.full_viewport_scissor()
     ///        .bind_graphics_pipeline("my_pipeline")?
@@ -111,7 +111,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn draw_indexed<C: GraphicsCmdBuffer>(cmd: C, vertex_buffer: &BufferView, index_buffer: &BufferView) -> Result<C> {
     ///     cmd.full_viewport_scissor()
     ///        .bind_graphics_pipeline("my_pipeline")?
@@ -164,7 +164,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// # Example
     /// ```
     /// # use phobos::*;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use anyhow::Result;
     /// // Assumes "my_pipeline" was previously added to the pipeline cache with `PipelineCache::create_named_pipeline()`,
     /// // and that cmd was created with this cache.
@@ -194,7 +194,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn draw<C: GraphicsCmdBuffer>(cmd: C, vertex_buffer: &BufferView) -> Result<C> {
     ///     cmd.bind_vertex_buffer(0, vertex_buffer)
     ///        .draw(6, 1, 0, 0)
@@ -222,7 +222,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn draw_indexed<C: GraphicsCmdBuffer>(cmd: C, vertex_buffer: &BufferView, index_buffer: &BufferView) -> Result<C> {
     ///     cmd.bind_vertex_buffer(0, vertex_buffer)
     ///        .bind_index_buffer(index_buffer, vk::IndexType::UINT32)
@@ -281,7 +281,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn set_polygon_mode<C: GraphicsCmdBuffer>(cmd: C) -> Result<C> {
     ///     // Subsequent drawcalls will get a wireframe view.
     ///     cmd.set_polygon_mode(vk::PolygonMode::LINE)

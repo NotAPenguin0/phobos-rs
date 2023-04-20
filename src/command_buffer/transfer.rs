@@ -3,7 +3,7 @@ use ash::vk;
 
 use crate::{Allocator, BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
 use crate::command_buffer::IncompleteCommandBuffer;
-use crate::domain::ExecutionDomain;
+use crate::sync::domain::ExecutionDomain;
 
 impl<D: TransferSupport + ExecutionDomain, A: Allocator> TransferCmdBuffer for IncompleteCommandBuffer<'_, D, A> {
     /// Copy one buffer to the other.
@@ -13,7 +13,7 @@ impl<D: TransferSupport + ExecutionDomain, A: Allocator> TransferCmdBuffer for I
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn copy_buffer<C: TransferCmdBuffer>(cmd: C, src: &BufferView, dst: &BufferView) -> Result<C> {
     ///     cmd.copy_buffer(src, dst)
     /// }
@@ -42,7 +42,7 @@ impl<D: TransferSupport + ExecutionDomain, A: Allocator> TransferCmdBuffer for I
     /// ```
     /// # use anyhow::Result;
     /// # use phobos::*;
-    /// # use phobos::domain::*;
+    /// # use phobos::sync::domain::*;
     /// fn copy_buffer_to_image<C: TransferCmdBuffer>(cmd: C, src: &BufferView, dst: &ImageView) -> Result<C> {
     ///     cmd.copy_buffer_to_image(src, dst)
     /// }

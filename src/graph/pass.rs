@@ -77,10 +77,10 @@ use ash::vk;
 
 use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
 use crate::command_buffer::IncompleteCommandBuffer;
-use crate::domain::ExecutionDomain;
 use crate::graph::pass_graph::PassResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
+use crate::sync::domain::ExecutionDomain;
 
 /// The returned value from a pass callback function.
 pub type PassFnResult<'q, D, A> = Result<IncompleteCommandBuffer<'q, D, A>>;

@@ -10,10 +10,10 @@ use crate::{Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSe
 use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
-use crate::domain::ExecutionDomain;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::query_pool::{QueryPool, ScopedQuery, TimestampQuery};
 use crate::raytracing::acceleration_structure::AccelerationStructure;
+use crate::sync::domain::ExecutionDomain;
 
 impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A> for IncompleteCommandBuffer<'q, D, A> {
     type Domain = D;
@@ -67,7 +67,7 @@ impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A> for Incomp
     /// ```
     /// # use phobos::*;
     /// # use anyhow::Result;
-    /// # use phobos::domain::{ExecutionDomain, Graphics};
+    /// # use phobos::sync::domain::{ExecutionDomain, Graphics};
     /// fn finish_command_buffer<D: ExecutionDomain>(cmd: IncompleteCommandBuffer<D>) -> Result<CommandBuffer<D>> {
     ///     // Releases the lock on a queue associated with the domain `D`, allowing other command
     ///     // buffers to start recording on this domain.
@@ -183,7 +183,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// reflect this change. This function is not extremely useful at the moment.
     /// # Example
     /// ```
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use phobos::{BufferView, IncompleteCommandBuffer};
     /// # use anyhow::Result;
     /// fn use_descriptor_forget<'q, D: ExecutionDomain>(cmd: IncompleteCommandBuffer<'q, D>, buffer: &BufferView, other_buffer: &BufferView) -> Result<IncompleteCommandBuffer<'q, D>> {
@@ -210,7 +210,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # Example
     /// ```
     /// # use anyhow::Result;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use phobos::*;
     /// fn use_resolve_and_bind<'q, D: ExecutionDomain>(cmd: IncompleteCommandBuffer<'q, D>, image: &ImageView, sampler: &Sampler) -> Result<IncompleteCommandBuffer<'q, D>> {
     ///     let resource = VirtualResource::image("image");
@@ -243,7 +243,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # Example
     /// ```
     /// # use anyhow::Result;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use phobos::*;
     /// fn use_bind_sampled_image<'q, D: ExecutionDomain + GfxSupport>(cmd: IncompleteCommandBuffer<'q, D>, image: &ImageView, sampler: &Sampler) -> Result<IncompleteCommandBuffer<'q, D>> {
     ///     cmd.bind_sampled_image(0, 0, image, sampler)?
@@ -266,7 +266,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # Example
     /// ```
     /// # use anyhow::Result;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use phobos::*;
     /// fn use_bind_uniform_buffer<'q, D: ExecutionDomain + GfxSupport>(cmd: IncompleteCommandBuffer<'q, D>, buffer: &BufferView) -> Result<IncompleteCommandBuffer<'q, D>> {
     ///     cmd.bind_uniform_buffer(0, 0, buffer)?
@@ -289,7 +289,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # Example
     /// ```
     /// # use anyhow::Result;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use phobos::*;
     /// fn use_bind_storage_buffer<'q, D: ExecutionDomain + GfxSupport>(cmd: IncompleteCommandBuffer<'q, D>, buffer: &BufferView) -> Result<IncompleteCommandBuffer<'q, D>> {
     ///     cmd.bind_storage_buffer(0, 0, buffer)?
@@ -314,7 +314,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # Example
     /// ```
     /// # use anyhow::Result;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use phobos::*;
     /// fn use_bind_storage_image<'q, D: ExecutionDomain + GfxSupport>(cmd: IncompleteCommandBuffer<'q, D>, image: &ImageView) -> Result<IncompleteCommandBuffer<'q, D>> {
     ///     cmd.bind_storage_image(0, 0, image)?
@@ -435,7 +435,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # Example
     /// ```
     /// # use phobos::*;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// fn use_push_constant<D: ExecutionDomain>(cmd: IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> {
     ///     // Assumes a pipeline is bound, and that this pipeline has a vertex shader with the specified push constant range.
     ///     let data: f32 = 1.0;
@@ -450,7 +450,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # Example
     /// ```
     /// # use phobos::*;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// fn use_push_constants<D: ExecutionDomain>(cmd: IncompleteCommandBuffer<D>) -> IncompleteCommandBuffer<D> {
     ///     // Assumes a pipeline is bound, and that this pipeline has a vertex shader with the specified push constant range.
     ///     let data: [f32; 2] = [64.0, 32.0];
@@ -497,7 +497,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// ```
     /// # use log::warn;
     /// # use phobos::*;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use anyhow::Result;
     /// fn check_pipeline_cache<D: ExecutionDomain + GfxSupport>(cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
     ///     if cmd.has_pipeline_cache() {
@@ -517,7 +517,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// ```
     /// # use log::warn;
     /// # use phobos::*;
-    /// # use phobos::domain::ExecutionDomain;
+    /// # use phobos::sync::domain::ExecutionDomain;
     /// # use anyhow::Result;
     /// fn check_descriptor_cache<D: ExecutionDomain>(cmd: IncompleteCommandBuffer<D>, buffer: &BufferView) -> Result<IncompleteCommandBuffer<D>> {
     ///     if cmd.has_descriptor_cache() {

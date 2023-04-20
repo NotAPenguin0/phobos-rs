@@ -5,9 +5,9 @@ use ash::vk;
 use glam::{Mat4, Vec3};
 use log::{info, trace};
 
-use phobos::domain::{All, Compute};
 use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
 use phobos::prelude::*;
+use phobos::sync::domain::{All, Compute};
 use phobos::util::align::align;
 
 use crate::example_runner::{Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, save_dotfile, WindowContext};

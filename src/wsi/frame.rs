@@ -71,7 +71,7 @@ use ash::vk;
 
 use crate::{Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore, Surface, Swapchain, VkInstance, WindowInterface};
 use crate::command_buffer::CommandBuffer;
-use crate::domain::ExecutionDomain;
+use crate::sync::domain::ExecutionDomain;
 use crate::util::deferred_delete::DeletionQueue;
 use crate::wsi::swapchain::SwapchainImage;
 
