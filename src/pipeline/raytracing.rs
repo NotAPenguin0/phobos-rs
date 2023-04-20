@@ -166,7 +166,7 @@ pub struct RayTracingPipelineCreateInfo {
     pub(crate) layout: PipelineLayoutCreateInfo,
     pub(crate) max_recursion_depth: u32,
     pub(crate) shader_groups: Vec<ShaderGroup>,
-    pub(crate) shaders: Vec<ShaderCreateInfo>,
+    pub shaders: Vec<ShaderCreateInfo>,
 }
 
 impl RayTracingPipelineCreateInfo {
