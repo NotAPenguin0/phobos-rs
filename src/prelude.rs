@@ -29,6 +29,7 @@ pub use crate::pipeline::cache::PipelineCache;
 pub use crate::pipeline::compute::{ComputePipelineBuilder, ComputePipelineCreateInfo};
 pub use crate::pipeline::create_info::PipelineCreateInfo;
 pub use crate::pipeline::hash::*;
+pub use crate::pipeline::raytracing::RayTracingPipelineBuilder;
 pub use crate::pipeline::shader::ShaderCreateInfo;
 pub use crate::resource::*;
 pub use crate::resource::buffer::{Buffer, BufferView};
