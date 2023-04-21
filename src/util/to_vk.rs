@@ -2,6 +2,7 @@
 
 /// Convert an object into a vulkan type
 pub trait IntoVulkanType {
+    /// Output Vulkan type
     type Output;
 
     /// Consume self and return a vulkan type
@@ -10,6 +11,7 @@ pub trait IntoVulkanType {
 
 /// Get a reference to the object, as a vulkan type
 pub trait AsVulkanType {
+    /// Output Vulkan type
     type Output;
 
     /// Return a vulkan type that lives as long as self

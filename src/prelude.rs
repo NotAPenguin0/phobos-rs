@@ -1,3 +1,5 @@
+//! Re-exports most commonly used types in the library
+
 pub use ash::vk;
 
 pub use traits::*;
@@ -49,6 +51,7 @@ pub use crate::wsi::frame::{FrameManager, InFlightContext};
 pub use crate::wsi::surface::Surface;
 pub use crate::wsi::swapchain::Swapchain;
 
+/// Re-exports all important traits of the library
 pub mod traits {
     pub use crate::allocator::traits::*;
     pub use crate::command_buffer::traits::*;

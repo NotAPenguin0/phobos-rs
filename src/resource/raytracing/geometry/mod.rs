@@ -1,3 +1,5 @@
+//! Exposes different acceleration structure geometry types
+
 use ash::vk;
 
 pub use instances::*;
@@ -10,13 +12,21 @@ use crate::util::to_vk::{AsVulkanType, IntoVulkanType};
 pub mod triangles;
 pub mod instances;
 
+/// All information required to build the geometry of an acceleration structure
 pub struct AccelerationStructureBuildGeometryInfo<'a> {
+    /// The acceleration structure type
     pub ty: AccelerationStructureType,
+    /// Acceleration structure build flags
     pub flags: vk::BuildAccelerationStructureFlagsKHR,
+    /// The acceleration structure build mode
     pub mode: vk::BuildAccelerationStructureModeKHR,
+    /// Source acceleration structure
     pub src: Option<&'a AccelerationStructure>,
+    /// Destination acceleration structure
     pub dst: Option<&'a AccelerationStructure>,
+    /// Geometry data in this acceleration structure
     pub geometries: Vec<vk::AccelerationStructureGeometryKHR>,
+    /// Scratch data used for building
     pub scratch_data: DeviceOrHostAddress,
 }
 

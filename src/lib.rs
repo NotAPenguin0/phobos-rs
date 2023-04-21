@@ -91,6 +91,8 @@
 #![feature(min_specialization)]
 #![feature(assert_matches)]
 
+#![forbid(missing_docs)]
+
 #[macro_use]
 extern crate derivative;
 #[macro_use]

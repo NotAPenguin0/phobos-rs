@@ -112,6 +112,7 @@ impl Drop for PipelineLayout {
 }
 
 impl PushConstantRange {
+    /// Convert this into a Vulkan struct
     pub fn to_vk(&self) -> vk::PushConstantRange {
         vk::PushConstantRange {
             stage_flags: self.stage_flags,

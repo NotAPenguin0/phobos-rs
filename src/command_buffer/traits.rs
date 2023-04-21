@@ -1,3 +1,5 @@
+//! Defines the traits with command buffer operations
+
 use std::sync::MutexGuard;
 
 use anyhow::Result;
@@ -87,18 +89,22 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
         where
             Self: Sized;
 
+    /// Build an acceleration structure
     fn build_acceleration_structure(self, info: &AccelerationStructureBuildInfo) -> Result<Self>
         where
             Self: Sized;
 
+    /// Build multiple acceleration structures in a single command
     fn build_acceleration_structures(self, info: &[AccelerationStructureBuildInfo]) -> Result<Self>
         where
             Self: Sized;
 
+    /// Compact an acceleration structure
     fn compact_acceleration_structure(self, src: &AccelerationStructure, dst: &AccelerationStructure) -> Result<Self>
         where
             Self: Sized;
 
+    /// Write acceleration structure properties of multiple acceleration structures in a single command.
     fn write_acceleration_structures_properties<Q: AccelerationStructurePropertyQuery>(
         self,
         src: &[AccelerationStructure],
@@ -107,6 +113,7 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
         where
             Self: Sized;
 
+    /// Write acceleration structure properties
     fn write_acceleration_structure_properties<Q: AccelerationStructurePropertyQuery>(
         self,
         src: &AccelerationStructure,
@@ -127,8 +134,10 @@ pub trait CmdBuffer {
 
 /// Incomplete command buffer
 pub trait IncompleteCmdBuffer<'q, A: Allocator> {
+    /// The domain this command buffer operates on
     type Domain: ExecutionDomain;
 
+    /// Create a new command buffer
     fn new(
         device: Device,
         queue_lock: MutexGuard<'q, Queue>,
@@ -139,6 +148,8 @@ pub trait IncompleteCmdBuffer<'q, A: Allocator> {
     ) -> Result<Self>
     where
         Self: Sized;
+
+    /// Finish recording to this command buffer and consume it into a completed command buffer
     fn finish(self) -> Result<CommandBuffer<Self::Domain>>;
 }
 

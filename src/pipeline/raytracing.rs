@@ -10,6 +10,7 @@ use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
 /// An index of a shader in a shader group into the shaders array.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct ShaderIndex {
+    /// The index into the array
     pub index: u32,
 }
 

@@ -123,7 +123,9 @@ struct PerImage {
 /// Another way to acquire an instance of this struct is through a [`ThreadContext`](crate::ThreadContext).
 #[derive(Debug)]
 pub struct InFlightContext<'f, A: Allocator = DefaultAllocator> {
+    /// The current frame's swapchain image
     pub swapchain_image: Option<ImageView>,
+    /// The current frame's swapchain image index
     pub swapchain_image_index: Option<usize>,
     pub(crate) vertex_allocator: &'f mut ScratchAllocator<A>,
     pub(crate) index_allocator: &'f mut ScratchAllocator<A>,

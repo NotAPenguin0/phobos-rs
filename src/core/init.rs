@@ -8,8 +8,10 @@ use crate::{
     Allocator, AppSettings, DebugMessenger, DefaultAllocator, Device, ExecutionManager, FrameManager, PhysicalDevice, Surface, VkInstance, WindowInterface,
 };
 
+/// ZST implementing initialization without a window
 pub struct HeadlessContext;
 
+/// ZST implementing initialization with a window
 pub struct WindowedContext<W: WindowInterface> {
     _phantom: PhantomData<W>,
 }
