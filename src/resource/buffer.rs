@@ -1,3 +1,5 @@
+//! Wrappers for `VkBuffer` objects.
+//!
 //! Similarly to the [`image`](crate::image) module, this module exposes two types: [`Buffer`] and [`BufferView`]. The difference here is that a
 //! [`BufferView`] does not own a vulkan resource, so it cane be freely copied around as long as the owning [`Buffer`] lives.
 //!
@@ -130,6 +132,7 @@ impl<A: Allocator> Buffer<A> {
         })
     }
 
+    /// Allocate a new buffer with a specific alignment instead of the inferred alignment from the usage flags.
     pub fn new_aligned(device: Device, allocator: &mut A, size: impl Into<vk::DeviceSize>, alignment: impl Into<vk::DeviceSize>, usage: vk::BufferUsageFlags, location: MemoryType) -> Result<Self> {
         let alignment = alignment.into();
         let size = align(size.into(), alignment);
@@ -244,6 +247,7 @@ impl<A: Allocator> Buffer<A> {
         self.size
     }
 
+    /// Get the device address of this buffer
     pub fn address(&self) -> vk::DeviceAddress {
         self.address
     }

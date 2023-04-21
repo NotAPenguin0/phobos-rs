@@ -1,3 +1,5 @@
+//! Exposes common Vulkan resources such as buffers and images.
+
 pub mod raytracing;
 pub mod buffer;
 pub mod image;

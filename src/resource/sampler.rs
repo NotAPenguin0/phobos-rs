@@ -1,3 +1,5 @@
+//! Abstraction for Vulkan sampler objects
+
 use anyhow::Result;
 use ash::vk;
 

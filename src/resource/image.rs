@@ -1,4 +1,4 @@
-//! This module provides utilities to manage [`VkImage`](vk::Image) and [`VkImageView`](vk::ImageView) objects.
+//! Provides utilities to manage [`VkImage`](vk::Image) and [`VkImageView`](vk::ImageView) objects.
 //!
 //! # Images
 //!

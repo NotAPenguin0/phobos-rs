@@ -1,3 +1,5 @@
+//! Exposes all relevant abstractions for raytracing resources
+
 pub use acceleration_structure::*;
 pub use as_build_type::*;
 pub use as_type::*;

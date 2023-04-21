@@ -1,3 +1,5 @@
+//! Abstraction for `VkQueryPool` objects.
+
 use std::ops::Sub;
 use std::time::Duration;
 
@@ -6,22 +8,31 @@ use ash::vk;
 
 use crate::{Device, PipelineStage};
 
+/// Trait that must be implemented for each Vulkan query
 pub trait Query: Clone + Sized {
+    /// The Vulkan query type
     const QUERY_TYPE: vk::QueryType;
 
+    /// Output data from this query
     type Output;
 
+    /// Create a new query object
     fn new(pool: &QueryPoolCreateInfo) -> Self;
 
+    /// The amount of u64 elements in the query
     fn size(&self) -> usize;
 
+    /// Parse this query's data into its output
     fn parse_query(&self, device: &Device, data: &[u64]) -> Self::Output;
 }
 
+/// A scoped query is a query that must be queried with `vkCmdBeginQuery` and `vkCmdEndQuery`
 pub trait ScopedQuery: Query {}
 
+/// Indicates that this query is an acceleration structure property
 pub trait AccelerationStructurePropertyQuery: Query {}
 
+/// A timestamp obtained from a timestamp query
 #[derive(Default, Copy, Clone, Debug)]
 pub struct Timestamp {
     value: u64,
@@ -30,14 +41,17 @@ pub struct Timestamp {
 }
 
 impl Timestamp {
+    /// Get the raw value of this timestamp
     pub fn raw_value(&self) -> u64 {
         self.value
     }
 
+    /// Get the number of nanoseconds elapsed since the start of the driver timer
     pub fn nanoseconds(&self) -> u64 {
         (self.value as f64 * self.period as f64) as u64
     }
 
+    /// Get the duration since the start of the driver timer
     pub fn duration_since_epoch(&self) -> Duration {
         Duration::from_nanos(self.nanoseconds())
     }
@@ -46,11 +60,13 @@ impl Timestamp {
 impl Sub<Timestamp> for Timestamp {
     type Output = Duration;
 
+    /// Obtain the difference in duration between two timestamps
     fn sub(self, rhs: Timestamp) -> Self::Output {
         Duration::from_nanos(self.nanoseconds() - rhs.nanoseconds())
     }
 }
 
+/// A timestamp query
 #[derive(Default, Copy, Clone)]
 pub struct TimestampQuery {
     valid_bits: u32,
@@ -93,23 +109,40 @@ fn num_queries(flags: vk::QueryPipelineStatisticFlags) -> usize {
     flags.as_raw().count_ones() as usize
 }
 
+/// A pipeline statistics query, each field is optional and can be toggled
+/// by setting the relevant bit in the query pool create info
 #[derive(Debug, Default, Copy, Clone)]
 pub struct PipelineStatistics {
+    /// Number of vertices in the input assembly stage
     pub input_assembly_vertices: Option<u64>,
+    /// Number of primitives in the input assembly stage
     pub input_assembly_primitives: Option<u64>,
+    /// Number of vertex shader invocations
     pub vertex_shader_invocations: Option<u64>,
+    /// Number of geometry shader invocations
     pub geometry_shader_invocations: Option<u64>,
+    /// Number of vertex shader primitives
     pub geometry_shader_primitives: Option<u64>,
+    /// Number of clipping stage invocations
     pub clipping_invocations: Option<u64>,
+    /// Number of clipping stage primitives
     pub clipping_primitives: Option<u64>,
+    /// Number of fragment shader invocations
     pub fragment_shader_invocations: Option<u64>,
+    /// Number of patches in the tessellation control shader
     pub tessellation_control_shader_patches: Option<u64>,
+    /// Number of tessellation evaluation shader invocations
     pub tessellation_evaluation_shader_invocations: Option<u64>,
+    /// Number of compute shader invocations
     pub compute_shader_invocations: Option<u64>,
+    /// Number of task shader invocations
     pub task_shader_invocations: Option<u64>,
+    /// Number of mesh shader invocations
     pub mesh_shader_invocations: Option<u64>,
 }
 
+/// A pipeline statistics query. Each query bit that is requested
+/// needs to be individually enabled
 #[derive(Default, Copy, Clone)]
 pub struct PipelineStatisticsQuery {
     flags: vk::QueryPipelineStatisticFlags,
@@ -209,6 +242,7 @@ impl Query for PipelineStatisticsQuery {
 
 impl ScopedQuery for PipelineStatisticsQuery {}
 
+/// Query for the compacted size of an acceleration structure
 #[derive(Default, Clone, Copy)]
 pub struct AccelerationStructureCompactedSizeQuery;
 
@@ -231,12 +265,17 @@ impl Query for AccelerationStructureCompactedSizeQuery {
     }
 }
 
+/// Information required to create a query pool
 #[derive(Default, Debug, Copy, Clone)]
 pub struct QueryPoolCreateInfo {
+    /// The number of queries the query pool must reserve memory for
     pub count: u32,
+    /// If the query type is [``PipelineStatisticsQuery`], this holds the enabled query bits.
     pub statistic_flags: Option<vk::QueryPipelineStatisticFlags>,
 }
 
+/// A Vulkan query pool object. This is generic on any query type that implements the [`Query`] trait.
+/// This trait provides information needed to parse the results of the Vulkan query.
 pub struct QueryPool<Q: Query> {
     handle: vk::QueryPool,
     device: Device,
@@ -294,6 +333,7 @@ impl<Q: Query> QueryPool<Q> {
         }
     }
 
+    /// Wait for a range of results in the query pool
     pub fn wait_for_results(&mut self, first: u32, count: u32) -> Result<Vec<Q::Output>> {
         ensure!(first < self.count, "Query range out of range of query pool");
         ensure!(first + count <= self.count, "Query range out of range of query pool");
@@ -316,10 +356,12 @@ impl<Q: Query> QueryPool<Q> {
         Ok(data)
     }
 
+    /// Wait for results of all queries in the pool
     pub fn wait_for_all_results(&mut self) -> Result<Vec<Q::Output>> {
         self.wait_for_results(0, self.count)
     }
 
+    /// Wait for the result of a single query in the pool
     pub fn wait_for_single_result(&mut self, index: u32) -> Result<Q::Output> {
         ensure!(index < self.count, "Query range out of range of query pool");
         let flags = vk::QueryResultFlags::TYPE_64 | vk::QueryResultFlags::WAIT;
@@ -334,11 +376,15 @@ impl<Q: Query> QueryPool<Q> {
         Ok(data)
     }
 
+    /// Reset the query pool
     pub fn reset(&mut self) {
         unsafe { self.device.reset_query_pool(self.handle, 0, self.count) };
         self.current = 0;
     }
 
+    /// Get unsafe access to the underlying `VkQueryPool` handle
+    /// # Safety
+    /// Modifying this object may put the system in an undefined state
     pub unsafe fn handle(&self) -> vk::QueryPool {
         self.handle
     }
