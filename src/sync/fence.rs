@@ -1,3 +1,5 @@
+//! Abstraction for `VkFence` objects.
+
 use std::pin::Pin;
 use std::slice;
 use std::task::{Context, Poll};

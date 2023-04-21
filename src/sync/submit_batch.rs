@@ -1,3 +1,5 @@
+//! Provides the [`SubmitBatch`] struct to batch submits together and synchronize between them easily.
+
 use std::rc::Rc;
 
 use anyhow::Result;

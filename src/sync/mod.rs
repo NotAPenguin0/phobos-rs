@@ -1,4 +1,4 @@
-//! The sync module provides utilities dealing with Vulkan synchronization outside the scope of the
+//! Provides utilities dealing with Vulkan synchronization outside the scope of the
 //! pass graph.
 //!
 //! - The [`fence`] module provides a wrapper around `VkFence` objects, used for CPU-GPU sync,

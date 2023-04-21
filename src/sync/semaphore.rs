@@ -1,3 +1,5 @@
+//! Abstraction for `VkSemaphore` objects.
+
 use ash::vk;
 
 use crate::Device;

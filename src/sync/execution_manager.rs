@@ -1,3 +1,5 @@
+//! Exposes the [`ExecutionManager`], used to allocate and submit command buffers.
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 

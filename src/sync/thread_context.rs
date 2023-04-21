@@ -1,3 +1,5 @@
+//! Provides a thread context used to record render graphs without an active frame
+
 use anyhow::Result;
 use ash::vk;
 
