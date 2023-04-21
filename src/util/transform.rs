@@ -1,3 +1,5 @@
+//! Wrapper around `VkTransformMatrixKHR` for easy usage
+
 use ash::vk;
 
 use crate::util::to_vk::IntoVulkanType;
@@ -8,6 +10,7 @@ use crate::util::to_vk::IntoVulkanType;
 pub struct TransformMatrix(vk::TransformMatrixKHR);
 
 impl TransformMatrix {
+    /// Create an identity matrix
     pub fn identity() -> Self {
         Self(vk::TransformMatrixKHR {
             matrix: [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],

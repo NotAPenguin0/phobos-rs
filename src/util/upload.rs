@@ -1,3 +1,5 @@
+//! Utility to upload buffers easily. Note that this is currently WRONG.
+
 use anyhow::Result;
 use ash::vk;
 

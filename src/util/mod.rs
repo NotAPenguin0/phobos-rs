@@ -1,3 +1,5 @@
+//! Various utilities
+
 pub mod byte_size;
 pub mod deferred_delete;
 pub mod upload;

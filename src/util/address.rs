@@ -1,38 +1,50 @@
+//! Wrappers around device addresses
+
 use std::ffi::c_void;
 
 use ash::vk;
 
 use crate::util::to_vk::AsVulkanType;
 
+/// Either a `VkDeviceAddress` or a mutable host pointer
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub enum DeviceOrHostAddress {
+    /// Device pointer
     Device(vk::DeviceAddress),
+    /// Mutable host pointer
     Host(*mut c_void),
 }
 
+/// Either a `VkDeviceAddress` or an immutable host pointer
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub enum DeviceOrHostAddressConst {
+    /// Device pointer
     Device(vk::DeviceAddress),
+    /// Immutable host pointer
     Host(*const c_void),
 }
 
 impl DeviceOrHostAddress {
+    /// Create a null pointer on the device
     pub fn null_device() -> Self {
         Self::Device(vk::DeviceAddress::default())
     }
 
+    /// Create a null pointer on the host
     pub fn null_host() -> Self {
         Self::Host(std::ptr::null_mut())
     }
 }
 
 impl DeviceOrHostAddressConst {
+    /// Create a null pointer on the device
     pub fn null_device() -> Self {
         Self::Device(vk::DeviceAddress::default())
     }
 
+    /// Create a null pointer on the host
     pub fn null_host() -> Self {
         Self::Host(std::ptr::null())
     }

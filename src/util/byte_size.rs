@@ -1,3 +1,5 @@
+//! Utility to get the byte size of objects
+
 use std::mem::size_of;
 
 use ash::vk;

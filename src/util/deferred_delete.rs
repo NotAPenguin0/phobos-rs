@@ -1,3 +1,5 @@
+//! Deferred deletion queue
+
 #[derive(Debug)]
 struct Item<T> {
     _value: T,

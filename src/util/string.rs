@@ -1,3 +1,5 @@
+//! String utilities for dealing with FFI strings
+
 use std::ffi::{c_char, CStr, CString};
 
 /// Wraps a c string into a string, or an empty string if the provided c string was null.
