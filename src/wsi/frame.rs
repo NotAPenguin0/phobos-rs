@@ -1,5 +1,6 @@
-//! This module contains all the logic responsible for managing presentation and frame synchronization. Every frame should be contained
-//! in a call to [`FrameManager::new_frame`], which takes in a closure that is called when the frame is ready to be processed.
+//! Contains all the logic responsible for managing presentation and frame synchronization.
+//!
+//! Every frame should be contained in a call to [`FrameManager::new_frame`], which takes in a closure that is called when the frame is ready to be processed.
 //! This also gives you an [`InFlightContext`] object which contains useful data relevant to the current frame's execution context,
 //! such as per-frame allocators and a view to the current swapchain image.
 //!

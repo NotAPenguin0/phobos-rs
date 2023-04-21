@@ -1,3 +1,5 @@
+//! Utilities for generic window handling
+
 use raw_window_handle::{HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle};
 #[cfg(feature = "winit")]
 use winit;

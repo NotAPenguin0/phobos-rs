@@ -1,3 +1,5 @@
+//! Wrappers around a `VkSurfaceKHR`
+
 use std::ops::Deref;
 
 use anyhow::Result;

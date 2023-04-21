@@ -1,3 +1,5 @@
+//! Wrappers around a `VkSwapchainKHR`
+
 use std::ops::Deref;
 
 use anyhow::Result;
