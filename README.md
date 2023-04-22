@@ -108,7 +108,7 @@ fn main() {
             bindings.bind_image("swapchain", &ifc.swapchain_image.as_ref().unwrap());
             let cmd = exec.on_domain::<domain::Graphics, DefaultAllocator>(None, None)?;
             // Record render graph to our command buffer
-            graph.record(cmd, &bindings, &mut ifc, None).finish()
+            graph.record(cmd, &bindings, &mut ifc, None, &mut ()).finish()
       }))?;
     }
 }
