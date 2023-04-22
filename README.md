@@ -2,16 +2,12 @@
 
 ![build](https://github.com/NotAPenguin0/phobos-rs/actions/workflows/rust.yml/badge.svg)
 
-Phobos is a fast, powerful Vulkan abstraction library. It provides abstractions to automatically
+Phobos is a Vulkan abstraction library aiming to create Vulkan applications more easily. It provides abstractions to automatically
 manage common Vulkan problems like synchronization and resource management. At the same time, it aims to 
 expose the full Vulkan API without major limitations.
 
 At the moment, the project is highly WIP, and not all these goals have been fully achieved yet. It is developed
 together with a rendering engine using it, so features are currently added as needed.
-
-The abstraction level of Phobos sits a bit above [Vulkano](https://crates.io/crates/vulkano). While the full API 
-is exposed, Phobos provides many powerful quality-of-life features sitting on top of it (see below) that Vulkano does not implement.
-If you are simply looking for a safe, low-level wrapper around Vulkan, Vulkano is the better choice.
 
 ## What does Phobos do?
 
@@ -25,6 +21,7 @@ If you are simply looking for a safe, low-level wrapper around Vulkan, Vulkano i
   - Automatic memory barriers for buffers.
   - Virtual resources, meaning actual resources are only bound to a graph at record time. This allows general-purpose graphs to be re-used if desired.
 - Safe wrappers for Vulkan objects.
+- No `unsafe` in the public API, except when accessing raw Vulkan handles.
 - Descriptor sets are completely hidden. Simply bind resources directly to the command buffer.
 - Automatic pipeline management.
 - Shader reflection to automatically generate pipeline layouts.
@@ -38,8 +35,8 @@ If you are simply looking for a safe, low-level wrapper around Vulkan, Vulkano i
 
 ## What does Phobos not do?
 
-Phobos is not a renderer, it does not implement any visual features. It's intended as a library to help you 
-write a Vulkan renderer more easily and correctly, without hiding important API details.
+- Implement a renderer for you. It simply exposes the Vulkan API.
+- Support mobile GPUs. Phobos is optimized for desktop GPUs and makes no effort to support mobile GPUs.
 
 ## Example
 
