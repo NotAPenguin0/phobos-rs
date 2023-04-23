@@ -7,6 +7,7 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::Device;
+use crate::core::device::ExtensionID;
 
 /// Defines how many descriptors a descriptor pool should be able to hold.
 #[derive(Debug, Clone)]
@@ -24,7 +25,7 @@ pub(super) struct DescriptorPool {
 
 impl DescriptorPoolSize {
     /// Create a new descriptor pool size description
-    pub fn new(min_capacity: u32) -> Self {
+    pub fn new(device: &Device, min_capacity: u32) -> Self {
         let mut sizes = HashMap::new();
         sizes.insert(vk::DescriptorType::SAMPLER, min_capacity);
         sizes.insert(vk::DescriptorType::COMBINED_IMAGE_SAMPLER, min_capacity);
@@ -37,7 +38,9 @@ impl DescriptorPoolSize {
         sizes.insert(vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::STORAGE_BUFFER_DYNAMIC, min_capacity);
         sizes.insert(vk::DescriptorType::INPUT_ATTACHMENT, min_capacity);
-        sizes.insert(vk::DescriptorType::ACCELERATION_STRUCTURE_KHR, min_capacity);
+        if device.is_extension_enabled(ExtensionID::AccelerationStructure) {
+            sizes.insert(vk::DescriptorType::ACCELERATION_STRUCTURE_KHR, min_capacity);
+        }
         Self(sizes)
     }
 }

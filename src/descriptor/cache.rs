@@ -71,7 +71,7 @@ impl DescriptorCache {
         let inner = DescriptorCacheInner {
             device: device.clone(),
             cache: Cache::new(device.clone()),
-            pool: DescriptorPool::new(device, DescriptorPoolSize::new(1))?,
+            pool: DescriptorPool::new(device.clone(), DescriptorPoolSize::new(&device, 1))?,
             deferred_pool_delete: DeletionQueue::new(16),
         };
         Ok(Self {
