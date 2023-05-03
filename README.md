@@ -73,6 +73,7 @@ fn main() {
     instance,
     physical_device,
     surface,
+    device
     allocator,
     exec,
     frame,
