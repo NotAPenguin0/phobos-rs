@@ -113,7 +113,7 @@ impl<D, U, A, F> PassExecutor<D, U, A> for F
         bindings: &PhysicalResourceBindings,
         user_data: &mut U,
     ) -> PassFnResult<'q, D, A> {
-        self.call_mut((cmd, ifc, bindings, user_data))
+        self(cmd, ifc, bindings, user_data)
     }
 }
 

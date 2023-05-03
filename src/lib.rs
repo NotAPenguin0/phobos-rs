@@ -86,13 +86,9 @@
 //! - [`buffer`] for managing [`VkBuffer`](vk::Buffer) objects.
 //! - [`util`] for various utilities and common patterns like buffer uploads.
 
-#![feature(never_type)]
-#![feature(fn_traits)]
-#![feature(stmt_expr_attributes)]
 #![feature(min_specialization)]
-#![feature(assert_matches)]
 
-#![forbid(missing_docs)]
+#![warn(missing_docs)]
 
 #[macro_use]
 extern crate derivative;

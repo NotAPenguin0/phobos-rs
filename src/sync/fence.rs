@@ -116,6 +116,8 @@ pub struct Fence<T = ()> {
 // safely be sent between threads.
 unsafe impl<T> Send for Fence<T> {}
 
+impl<T> Unpin for Fence<T> {}
+
 /// Type alias that more expressively conveys the intent that this Fence is a Future.
 pub type GpuFuture<T> = Fence<T>;
 
@@ -147,8 +149,6 @@ impl Fence<()> {
         }
     }
 }
-
-impl<T> Unpin for Fence<T> {}
 
 impl<T> Fence<T> {
     /// Create a new fence, possibly in the singaled status.
@@ -186,7 +186,7 @@ impl<T> Fence<T> {
         let mut f = self.first_cleanup_fn.take();
         while f.is_some() {
             let func = f.take().unwrap();
-            func.f.call_once(());
+            (func.f)();
             f = func.next
         }
     }

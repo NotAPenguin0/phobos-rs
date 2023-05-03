@@ -40,7 +40,7 @@ pub enum Node<R: Resource, B: Barrier<R>, T: Task<R>> {
     /// A barrier node
     Barrier(B),
     /// Dummy variant to allow adding `R` as a generic parameter
-    _Unreachable((!, PhantomData<R>)),
+    _Unreachable(PhantomData<R>),
 }
 
 /// Task graph structure, used for automatic synchronization of resource accesses.
