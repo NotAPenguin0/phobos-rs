@@ -80,7 +80,7 @@ pub struct ShaderBindingTable<A: Allocator> {
 }
 
 impl<A: Allocator> ShaderBindingTable<A> {
-    pub(crate) fn new(mut device: Device, mut allocator: A, pipeline: vk::Pipeline, info: &RayTracingPipelineCreateInfo) -> Result<Self> {
+    pub(crate) fn new(device: Device, mut allocator: A, pipeline: vk::Pipeline, info: &RayTracingPipelineCreateInfo) -> Result<Self> {
         device.require_extension(ExtensionID::RayTracingPipeline)?;
         let group_count = info.shader_groups.len() as u32;
         let group_handle_size = device.ray_tracing_properties()?.shader_group_handle_size;
@@ -121,19 +121,19 @@ impl<A: Allocator> ShaderBindingTable<A> {
 
         let ray_gen_offset = 0;
         let ray_miss_offset = if ray_miss_count > 0 {
-            info.shader_groups.iter().enumerate().find(|(idx, sh)| matches!(sh, ShaderGroup::RayMiss { .. })).unwrap().0 as u32
+            info.shader_groups.iter().enumerate().find(|(_, sh)| matches!(sh, ShaderGroup::RayMiss { .. })).unwrap().0 as u32
         } else {
             0
         };
 
         let ray_hit_offset = if ray_hit_count > 0 {
-            info.shader_groups.iter().enumerate().find(|(idx, sh)| matches!(sh, ShaderGroup::RayHit { .. })).unwrap().0 as u32
+            info.shader_groups.iter().enumerate().find(|(_, sh)| matches!(sh, ShaderGroup::RayHit { .. })).unwrap().0 as u32
         } else {
             0
         };
 
         let callable_offset = if callable_count > 0 {
-            info.shader_groups.iter().enumerate().find(|(idx, sh)| matches!(sh, ShaderGroup::Callable { .. })).unwrap().0 as u32
+            info.shader_groups.iter().enumerate().find(|(_, sh)| matches!(sh, ShaderGroup::Callable { .. })).unwrap().0 as u32
         } else {
             0
         };
@@ -232,12 +232,12 @@ impl RayTracingPipelineBuilder {
 
     /// Add a shader to the pipeline
     fn add_shader(&mut self, shader: ShaderCreateInfo) -> ShaderIndex {
-        if let Some((idx, shader)) = self
+        if let Some((idx, _)) = self
             .inner
             .shaders
             .iter()
             .enumerate()
-            .find(|(idx, sh)| sh.code_hash() == shader.code_hash())
+            .find(|(_, sh)| sh.code_hash() == shader.code_hash())
         {
             ShaderIndex {
                 index: idx as u32,
