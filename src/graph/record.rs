@@ -155,6 +155,9 @@ fn depth_attachment<D: ExecutionDomain, U, A: Allocator>(
                 // TODO: handle or report this error better
                 panic!("No resource bound");
             };
+
+            let resolve = find_resolve_attachment(pass, bindings, resource);
+
             let info = RenderingAttachmentInfo {
                 image_view: image.clone(),
                 image_layout: resource.layout,
