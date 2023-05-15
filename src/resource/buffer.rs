@@ -201,11 +201,11 @@ impl<A: Allocator> Buffer<A> {
     /// # Lifetime
     /// This view is valid as long as the buffer is valid.
     /// # Errors
-    /// Fails if `offset + size >= self.size`.
+    /// Fails if `offset + size > self.size`.
     pub fn view(&self, offset: impl Into<vk::DeviceSize>, size: impl Into<vk::DeviceSize>) -> Result<BufferView> {
         let offset = offset.into();
         let size = size.into();
-        if offset + size >= self.size {
+        if offset + size > self.size {
             Err(anyhow::Error::from(Error::BufferViewOutOfRange))
         } else {
             Ok(BufferView {
