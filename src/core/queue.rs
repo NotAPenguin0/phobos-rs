@@ -144,7 +144,7 @@ impl Queue {
         let handle = unsafe { device.allocate_command_buffers(&info)? }
             .into_iter()
             .next()
-            .ok_or(Error::Uncategorized("Command buffer allocation failed."))?;
+            .ok_or_else(|| Error::Uncategorized("Command buffer allocation failed."))?;
 
         CmdBuf::new(
             device,

@@ -146,7 +146,7 @@ impl PipelineBuilder {
     /// Doing this will automatically calculate offsets and sizes, so make sure to add these in order of declaration in
     /// the shader.
     pub fn vertex_attribute(mut self, binding: u32, location: u32, format: vk::Format) -> Result<Self> {
-        let offset = self.vertex_binding_offsets.get_mut(&binding).ok_or(Error::NoVertexBinding)?;
+        let offset = self.vertex_binding_offsets.get_mut(&binding).ok_or_else(|| Error::NoVertexBinding)?;
         self.inner
             .vertex_attributes
             .push(VertexInputAttributeDescription(vk::VertexInputAttributeDescription {

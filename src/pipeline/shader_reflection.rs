@@ -39,7 +39,7 @@ pub struct ReflectionInfo {
 
 #[cfg(feature = "shader-reflection")]
 fn get_shader_stage(ast: &Ast) -> Result<vk::ShaderStageFlags> {
-    let entry = ast.get_entry_points()?.first().cloned().ok_or(Error::NoEntryPoint)?;
+    let entry = ast.get_entry_points()?.first().cloned().ok_or_else(|| Error::NoEntryPoint)?;
     Ok(match entry.execution_model {
         ExecutionModel::Vertex => vk::ShaderStageFlags::VERTEX,
         ExecutionModel::TessellationControl => vk::ShaderStageFlags::TESSELLATION_CONTROL,

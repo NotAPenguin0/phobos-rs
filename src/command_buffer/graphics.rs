@@ -316,7 +316,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
         let funcs = self
             .device
             .dynamic_state3()
-            .ok_or::<anyhow::Error>(Error::ExtensionNotSupported(ExtensionID::ExtendedDynamicState3).into())?;
+            .ok_or_else::<anyhow::Error, _>(|| Error::ExtensionNotSupported(ExtensionID::ExtendedDynamicState3).into())?;
         // SAFETY: Vulkan API call. This function pointer is not null because we just verified its availability.
         unsafe {
             funcs.cmd_set_polygon_mode(self.handle, mode);

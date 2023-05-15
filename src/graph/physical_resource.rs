@@ -27,7 +27,7 @@ pub enum PhysicalResource {
 /// // Bind the virtual resource to the image
 /// bindings.bind_image("image", &view);
 /// // ... Later, lookup the physical image handle from a virtual resource handle
-/// let view = bindings.resolve(&resource).ok_or(Error::NoResourceBound)?;
+/// let view = bindings.resolve(&resource).ok_or_else(|| Error::NoResourceBound)?;
 /// ```
 #[derive(Debug, Default)]
 pub struct PhysicalResourceBindings {
@@ -56,7 +56,7 @@ impl PhysicalResourceBindings {
             new_name.into(),
             self.bindings
                 .get(resource)
-                .ok_or(Error::NoResourceBound(resource.to_owned()))?
+                .ok_or_else(|| Error::NoResourceBound(resource.to_owned()))?
                 .clone(),
         );
         Ok(())

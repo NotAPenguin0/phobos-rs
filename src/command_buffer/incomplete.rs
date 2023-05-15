@@ -525,7 +525,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # Errors
     /// * Fails if the query pool is out of entries.
     pub fn write_timestamp(self, query_pool: &mut QueryPool<TimestampQuery>, stage: PipelineStage) -> Result<Self> {
-        let index = query_pool.next().ok_or(anyhow!("Query pool capacity exceeded"))?;
+        let index = query_pool.next().ok_or_else(|| anyhow!("Query pool capacity exceeded"))?;
         query_pool.write_timestamp(self.timestamp_valid_bits, self.handle, stage, index);
         Ok(self)
     }

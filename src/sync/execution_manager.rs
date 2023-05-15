@@ -114,7 +114,7 @@ impl ExecutionManager {
     /// Obtain a command buffer capable of operating on the specified domain.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
     pub fn on_domain<'q, D: ExecutionDomain, A: Allocator>(&'q self, pipelines: Option<PipelineCache<A>>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q, A>> {
-        let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
+        let queue = self.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
         Queue::allocate_command_buffer::<'q, A, D::CmdBuf<'q, A>>(self.device.clone(), queue, pipelines, descriptors)
     }
 
@@ -153,7 +153,7 @@ impl ExecutionManager {
             p_signal_semaphores: std::ptr::null(),
         };
 
-        let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
+        let queue = self.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
         queue.submit(std::slice::from_ref(&info), Some(&fence))?;
         let exec = self.clone();
         Ok(fence.with_cleanup(move || unsafe {
@@ -163,7 +163,7 @@ impl ExecutionManager {
 
     /// Submit multiple SubmitInfo2 structures.
     pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
-        let queue = self.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
+        let queue = self.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
         queue.submit2(submits, Some(fence))?;
         Ok(())
     }

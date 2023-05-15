@@ -166,7 +166,7 @@ impl PhysicalDevice {
                 trace!("Created new VkPhysicalDevice {:p}", physical_device.handle);
                 Some(physical_device)
             })
-            .ok_or(anyhow::Error::from(Error::NoGPU))
+            .ok_or_else(|| anyhow::Error::from(Error::NoGPU))
     }
 
     /// Selects the best available physical device and creates a surface on it.

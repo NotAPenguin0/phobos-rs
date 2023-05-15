@@ -64,8 +64,8 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
     }
 
     fn is_dependent(&self, graph: &Graph<Node<R, B, T>, String>, child: NodeIndex, parent: NodeIndex) -> Result<Option<R>> {
-        let child = graph.node_weight(child).ok_or(Error::NodeNotFound)?;
-        let parent = graph.node_weight(parent).ok_or(Error::NodeNotFound)?;
+        let child = graph.node_weight(child).ok_or_else(|| Error::NodeNotFound)?;
+        let parent = graph.node_weight(parent).ok_or_else(|| Error::NodeNotFound)?;
         if let Node::Task(child) = child {
             if let Node::Task(parent) = parent {
                 return Ok(child
@@ -80,7 +80,7 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
     }
 
     fn is_task_node(graph: &Graph<Node<R, B, T>, String>, node: NodeIndex) -> Result<bool> {
-        Ok(matches!(graph.node_weight(node).ok_or(Error::NodeNotFound)?, Node::Task(_)))
+        Ok(matches!(graph.node_weight(node).ok_or_else(|| Error::NodeNotFound)?, Node::Task(_)))
     }
 
     pub(crate) fn get_edge_attributes(_: &Graph<Node<R, B, T>, String>, _: EdgeReference<String>) -> String {

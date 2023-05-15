@@ -175,7 +175,7 @@ fn choose_surface_format<Window: WindowInterface>(settings: &AppSettings<Window>
         .formats()
         .first()
         .copied()
-        .ok_or(anyhow::Error::from(Error::NoSurfaceFormat))
+        .ok_or_else(|| anyhow::Error::from(Error::NoSurfaceFormat))
 }
 
 fn choose_present_mode<Window: WindowInterface>(settings: &AppSettings<Window>, surface: &Surface) -> vk::PresentModeKHR {

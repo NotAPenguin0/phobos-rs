@@ -464,7 +464,7 @@ impl<A: Allocator> FrameManager<A> {
         };
 
         // Use the command buffer's domain to determine the correct queue to use.
-        let queue = exec.get_queue::<D>().ok_or(Error::NoCapableQueue)?;
+        let queue = exec.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
         queue.submit(std::slice::from_ref(&submit), Some(&per_frame.fence))
     }
 

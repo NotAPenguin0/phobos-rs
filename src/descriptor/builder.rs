@@ -126,7 +126,7 @@ impl<'r> DescriptorSetBuilder<'r> {
     #[cfg(feature = "shader-reflection")]
     pub fn bind_named_sampled_image(&mut self, name: &str, image: &ImageView, sampler: &Sampler) -> Result<()> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
-        let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
+        let binding = info.bindings.get(name).ok_or_else(|| Error::NoBinding(name.to_string()))?;
         self.bind_sampled_image(binding.binding, image, sampler);
         Ok(())
     }
@@ -150,7 +150,7 @@ impl<'r> DescriptorSetBuilder<'r> {
     #[cfg(feature = "shader-reflection")]
     pub fn bind_named_uniform_buffer(&mut self, name: &str, buffer: &BufferView) -> Result<()> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
-        let binding = info.bindings.get(name).ok_or(Error::NoBinding(name.to_string()))?;
+        let binding = info.bindings.get(name).ok_or_else(|| Error::NoBinding(name.to_string()))?;
         self.bind_uniform_buffer(binding.binding, buffer);
         Ok(())
     }
