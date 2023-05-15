@@ -158,9 +158,9 @@ fn depth_attachment<D: ExecutionDomain, U, A: Allocator>(
             let info = RenderingAttachmentInfo {
                 image_view: image.clone(),
                 image_layout: resource.layout,
-                resolve_mode: None,
-                resolve_image_view: None,
-                resolve_image_layout: None,
+                resolve_mode: resolve.is_some().then_some(vk::ResolveModeFlags::AVERAGE),
+                resolve_image_layout: resolve.is_some().then_some(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL),
+                resolve_image_view: resolve,
                 load_op: resource.load_op.unwrap(),
                 store_op: vk::AttachmentStoreOp::STORE,
                 clear_value: resource.clear_value.unwrap_or(vk::ClearValue::default()),

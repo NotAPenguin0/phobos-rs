@@ -354,7 +354,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
             usage: ResourceUsage::Attachment(AttachmentType::Resolve(src.clone())),
             resource: dst.clone(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT, // RESOLVE is only for vkCmdResolve
-            layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            layout: vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
             clear_value: None,
             load_op: None,
         });
@@ -363,7 +363,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
             usage: ResourceUsage::Attachment(AttachmentType::Resolve(src.clone())),
             resource: dst.upgrade(),
             stage: PipelineStage::COLOR_ATTACHMENT_OUTPUT, // RESOLVE is only for vkCmdResolve
-            layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            layout: vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL,
             clear_value: None,
             load_op: Some(vk::AttachmentLoadOp::DONT_CARE),
         });
