@@ -50,7 +50,7 @@
 //!                     // This command buffer should at the very least transition the swapchain image to
 //!                     // `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`.
 //!                     // This can be done using the render graph API, or with a single command:
-//!                     let cmd = exec.on_domain::<ph::domain::Graphics>()?
+//!                     let cmd = exec.on_domain::<domain::Graphics>()?
 //!                                   .transition_image(&ifc.swapchain_image,
 //!                                         vk::PipelineStageFlags::TOP_OF_PIPE, vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
 //!                                         vk::ImageLayout::UNDEFINED, vk::ImageLayout::PRESENT_SRC_KHR,
