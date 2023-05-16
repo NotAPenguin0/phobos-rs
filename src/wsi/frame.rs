@@ -64,7 +64,6 @@
 //! });
 //! ```
 
-use std::future::Future;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -74,7 +73,6 @@ use crate::{
     Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore,
     Surface, Swapchain, VkInstance, WindowInterface,
 };
-use crate::command_buffer::CommandBuffer;
 use crate::sync::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
 use crate::util::deferred_delete::DeletionQueue;
@@ -86,10 +84,10 @@ use crate::wsi::swapchain::SwapchainImage;
 struct PerFrame<A: Allocator = DefaultAllocator> {
     pub fence: Fence,
     /// Signaled by the GPU when a swapchain image is ready.
-    pub image_ready: Semaphore,
+    pub image_ready: Arc<Semaphore>,
     /// Signaled by the GPU when all commands for a frame have been processed.
     /// We wait on this before presenting.
-    pub gpu_finished: Semaphore,
+    pub gpu_finished: Arc<Semaphore>,
     /// Command buffer that was submitted this frame.
     /// Can be deleted once this frame's data is used again.
     #[derivative(Debug = "ignore")]
@@ -128,6 +126,8 @@ pub struct InFlightContext<'f, A: Allocator = DefaultAllocator> {
     pub(crate) index_allocator: &'f mut ScratchAllocator<A>,
     pub(crate) uniform_allocator: &'f mut ScratchAllocator<A>,
     pub(crate) storage_allocator: &'f mut ScratchAllocator<A>,
+    pub(crate) wait_semaphore: Option<Arc<Semaphore>>,
+    pub(crate) signal_semaphore: Option<Arc<Semaphore>>,
 }
 
 /// The number of frames in flight. A frame in-flight is a frame that is rendering on the GPU or scheduled to do so.
@@ -154,11 +154,10 @@ struct AcquiredImage {
 }
 
 impl<A: Allocator> FrameManager<A> {
-    fn acquire_image(&self) -> Result<AcquiredImage> {
-        let frame = &self.per_frame[self.current_frame as usize];
-        unsafe {
-            frame.fence.wait_without_cleanup()?;
-        }
+    fn acquire_image(&mut self) -> Result<AcquiredImage> {
+        let frame = &mut self.per_frame[self.current_frame as usize];
+        // We do want to call cleanup functions now
+        frame.fence.wait()?;
         let result = unsafe {
             self.swapchain
                 .acquire_next_image(self.swapchain.handle(), u64::MAX, frame.image_ready.handle(), vk::Fence::null())
@@ -249,36 +248,11 @@ impl<A: Allocator> FrameManager<A> {
     /// should ever be submitted to a queue. Any other ways to submit commands for this frame should be synchronized properly to this
     /// submission. The reason for this is that [`FrameManager::present`] waits on a semaphore this function's submission
     /// will signal. Any commands for this frame submitted from somewhere else must be synchronized to this submission.
-    fn submit<D: ExecutionDomain + 'static>(&mut self, cmd: CommandBuffer<D>, exec: ExecutionManager) -> Result<()> {
-        // Reset frame fence
+    fn submit<D: ExecutionDomain + 'static>(&mut self, batch: SubmitBatch<D>) -> Result<()> {
+        // Finish the submit batch and submit it. We store the fence so we can wait on it later.
         let mut per_frame = &mut self.per_frame[self.current_frame as usize];
-        per_frame.fence.reset()?;
-
-        let semaphores: Vec<vk::Semaphore> = vec![&per_frame.image_ready].iter().map(|sem| unsafe { sem.handle() }).collect();
-        let stages = vec![vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-
-        // Grab a copy of the command buffer handle for submission.
-        // We do this because we're going to move the actual command buffer into our
-        // PerFrame structure to keep it around until we can safely delete it next frame.
-        let cmd_handle = unsafe { cmd.handle() };
-        per_frame.command_buffer = Some(Box::new(cmd));
-
-        let gpu_finished = unsafe { per_frame.gpu_finished.handle() };
-        let submit = vk::SubmitInfo {
-            s_type: vk::StructureType::SUBMIT_INFO,
-            p_next: std::ptr::null(),
-            wait_semaphore_count: semaphores.len() as u32,
-            p_wait_semaphores: semaphores.as_ptr(),
-            p_wait_dst_stage_mask: stages.as_ptr(),
-            command_buffer_count: 1,
-            p_command_buffers: &cmd_handle,
-            signal_semaphore_count: 1,
-            p_signal_semaphores: &gpu_finished,
-        };
-
-        // Use the command buffer's domain to determine the correct queue to use.
-        let queue = exec.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
-        queue.submit(std::slice::from_ref(&submit), Some(&per_frame.fence))
+        per_frame.fence = batch.finish()?;
+        Ok(())
     }
 
     /// Present a frame to the swapchain. This is the same as calling
@@ -336,8 +310,8 @@ impl<A: Allocator> FrameManager<A> {
                 .map(|_| -> Result<PerFrame<A>> {
                     Ok(PerFrame::<A> {
                         fence: Fence::new(device.clone(), true)?,
-                        image_ready: Semaphore::new(device.clone())?,
-                        gpu_finished: Semaphore::new(device.clone())?,
+                        image_ready: Arc::new(Semaphore::new(device.clone())?),
+                        gpu_finished: Arc::new(Semaphore::new(device.clone())?),
                         command_buffer: None,
                         vertex_allocator: ScratchAllocator::<A>::new(
                             device.clone(),
@@ -391,10 +365,10 @@ impl<A: Allocator> FrameManager<A> {
     /// This will call the provided callback function to obtain a [`SubmitBatch`](crate::sync::submit_batch::SubmitBatch)
     /// which contains the commands to be submitted for this frame.
     pub async fn new_frame<Window, D, F>(&mut self, exec: ExecutionManager, window: &Window, surface: &Surface, f: F) -> Result<()>
-    where
-        Window: WindowInterface,
-        D: ExecutionDomain + 'static,
-        F: FnOnce(InFlightContext<A>) -> Result<CommandBuffer<D>>, {
+        where
+            Window: WindowInterface,
+            D: ExecutionDomain + 'static,
+            F: FnOnce(InFlightContext<A>) -> Result<SubmitBatch<D>>, {
         // Advance deletion queue by one frame
         self.swapchain_delete.next_frame();
 
@@ -424,7 +398,7 @@ impl<A: Allocator> FrameManager<A> {
             self.current_image = index;
         }
 
-        let frame_commands = {
+        let submission = {
             let mut per_frame = &mut self.per_frame[self.current_frame as usize];
             // Delete the command buffer used the previous time this frame was allocated.
             if let Some(cmd) = &mut per_frame.command_buffer {
@@ -440,10 +414,12 @@ impl<A: Allocator> FrameManager<A> {
                 index_allocator: &mut per_frame.index_allocator,
                 uniform_allocator: &mut per_frame.uniform_allocator,
                 storage_allocator: &mut per_frame.storage_allocator,
+                wait_semaphore: Some(per_frame.image_ready.clone()),
+                signal_semaphore: Some(per_frame.gpu_finished.clone()),
             };
             f(ifc)?
         };
-        self.submit(frame_commands, exec.clone())?;
+        self.submit(submission)?;
         self.present(exec)
     }
 

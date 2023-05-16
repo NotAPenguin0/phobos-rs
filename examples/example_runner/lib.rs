@@ -13,6 +13,7 @@ use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use winit::window::{Window, WindowBuilder};
 
 use phobos::prelude::*;
+use phobos::sync::submit_batch::SubmitBatch;
 
 #[allow(dead_code)]
 pub fn load_spirv_file(path: &Path) -> Vec<u32> {
@@ -102,7 +103,7 @@ pub trait ExampleApp {
         Self: Sized;
 
     // Implement this for a windowed application
-    fn frame(&mut self, _ctx: Context, _ifc: InFlightContext) -> Result<CommandBuffer<domain::All>> {
+    fn frame(&mut self, _ctx: Context, _ifc: InFlightContext) -> Result<SubmitBatch<domain::All>> {
         bail!("frame() not implemented for non-headless example app");
     }
 

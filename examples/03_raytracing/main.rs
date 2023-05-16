@@ -9,6 +9,7 @@ use phobos::image;
 use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
 use phobos::prelude::*;
 use phobos::sync::domain::{All, Compute};
+use phobos::sync::submit_batch::SubmitBatch;
 use phobos::util::align::align;
 
 use crate::example_runner::{Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, save_dotfile, WindowContext};
@@ -283,7 +284,7 @@ impl ExampleApp for RaytracingSample {
         })
     }
 
-    fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<CommandBuffer<All>> {
+    fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<SubmitBatch<All>> {
         let swap = image!("swapchain");
         let rt_image = image!("rt_out");
         let rt_pass = PassBuilder::new("raytrace")
@@ -337,7 +338,10 @@ impl ExampleApp for RaytracingSample {
             .exec
             .on_domain::<All, _>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
         let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?;
-        cmd.finish()
+        let cmd = cmd.finish()?;
+        let mut batch = ctx.exec.start_submit_batch()?;
+        batch.submit_for_present(cmd, &ifc)?;
+        Ok(batch)
     }
 }
 

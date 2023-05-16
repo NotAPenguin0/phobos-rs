@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use ash::vk;
 
-use crate::{CmdBuffer, Device, ExecutionManager, Fence, PipelineStage, Semaphore};
+use crate::{Allocator, CmdBuffer, Device, ExecutionManager, Fence, InFlightContext, PipelineStage, Semaphore};
 use crate::command_buffer::CommandBuffer;
 use crate::sync::domain::ExecutionDomain;
 
@@ -67,6 +67,66 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
         Ok(SubmitHandle {
             index: self.submits.len() - 1,
         })
+    }
+
+    /// Must be used to submit the final command buffer in the frame
+    pub fn submit_for_present<A: Allocator>(&mut self, cmd: CommandBuffer<D>, ifc: &InFlightContext<A>) -> Result<SubmitHandle> {
+        self.submit_for_present_after(cmd, ifc, &[], &[])
+    }
+
+    /// Submit the frame commands, waiting on the given previous submits
+    pub fn submit_for_present_after<A: Allocator>(
+        &mut self,
+        cmd: CommandBuffer<D>,
+        ifc: &InFlightContext<A>,
+        submits: &[SubmitHandle],
+        wait_stages: &[PipelineStage],
+    ) -> Result<SubmitHandle> {
+        ensure!(
+            submits.len() == wait_stages.len(),
+            "Number of wait stages must match number of submits"
+        );
+        let mut wait_semaphores = submits
+            .iter()
+            .map(|handle| self.get_submit_semaphore(*handle).unwrap())
+            .collect::<Vec<_>>();
+        let mut wait_stages = wait_stages.to_vec();
+        wait_semaphores.push(
+            ifc.wait_semaphore
+                .clone()
+                .expect("cannot submit for present outside of a frame context"),
+        );
+        wait_stages.push(PipelineStage::COLOR_ATTACHMENT_OUTPUT);
+        self.submits.push(SubmitInfo {
+            cmd,
+            signal_semaphore: Some(
+                ifc.signal_semaphore
+                    .clone()
+                    .expect("cannot submit for present outside of a frame context"),
+            ),
+            wait_semaphores,
+            wait_stages,
+        });
+
+        Ok(SubmitHandle {
+            index: self.submits.len() - 1,
+        })
+    }
+
+    /// Submit the frame commands, waiting on all previous submissions in the same pipeline stage
+    pub fn submit_for_present_after_all<A: Allocator>(
+        &mut self,
+        cmd: CommandBuffer<D>,
+        ifc: &InFlightContext<A>,
+        wait_stage: PipelineStage,
+    ) -> Result<SubmitHandle> {
+        let submits = (0..self.submits.len())
+            .map(|index| SubmitHandle {
+                index,
+            })
+            .collect::<Vec<_>>();
+        let stages = vec![wait_stage; self.submits.len()];
+        self.submit_for_present_after(cmd, ifc, &submits, &stages)
     }
 
     /// Submit a new command buffer in this batch with no dependencies.

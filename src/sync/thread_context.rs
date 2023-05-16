@@ -55,6 +55,8 @@ impl<A: Allocator> ThreadContext<A> {
             index_allocator: &mut self.ibo_allocator,
             uniform_allocator: &mut self.ubo_allocator,
             storage_allocator: &mut self.ssbo_allocator,
+            wait_semaphore: None,
+            signal_semaphore: None,
         }
     }
 }

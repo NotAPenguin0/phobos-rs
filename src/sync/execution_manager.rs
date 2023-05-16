@@ -123,8 +123,8 @@ impl ExecutionManager {
     /// ```
     /// use phobos::prelude::*;
     /// let exec = ExecutionManager::new(device.clone(), &physical_device)?;
-    /// let cmd1 = exec.on_domain::<domain::All>(None, None)?.finish()?;
-    /// let cmd2 = exec.on_domain::<domain::All>(None, None)?.finish()?;
+    /// let cmd1 = exec.on_domain::<domain::All, _>(None, None)?.finish()?;
+    /// let cmd2 = exec.on_domain::<domain::All, _>(None, None)?.finish()?;
     /// let mut batch = exec.start_submit_batch()?;
     /// // Submit the first command buffer first
     /// batch.submit(cmd1)?
