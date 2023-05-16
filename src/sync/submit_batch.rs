@@ -1,6 +1,6 @@
 //! Provides the [`SubmitBatch`] struct to batch submits together and synchronize between them easily.
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
@@ -12,8 +12,8 @@ use crate::sync::domain::ExecutionDomain;
 #[derive(Debug)]
 struct SubmitInfo<D: ExecutionDomain> {
     cmd: CommandBuffer<D>,
-    signal_semaphore: Option<Rc<Semaphore>>,
-    wait_semaphores: Vec<Rc<Semaphore>>,
+    signal_semaphore: Option<Arc<Semaphore>>,
+    wait_semaphores: Vec<Arc<Semaphore>>,
     wait_stages: Vec<PipelineStage>,
 }
 
@@ -45,7 +45,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
         })
     }
 
-    fn get_submit_semaphore(&self, submit: SubmitHandle) -> Option<Rc<Semaphore>> {
+    fn get_submit_semaphore(&self, submit: SubmitHandle) -> Option<Arc<Semaphore>> {
         self.submits
             .get(submit.index)
             .and_then(|submit| submit.signal_semaphore.clone())
@@ -59,7 +59,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
 
         self.submits.push(SubmitInfo {
             cmd,
-            signal_semaphore: Some(Rc::new(Semaphore::new(self.device.clone())?)),
+            signal_semaphore: Some(Arc::new(Semaphore::new(self.device.clone())?)),
             wait_semaphores,
             wait_stages: wait_stages.to_vec(),
         });
@@ -73,7 +73,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
     pub fn submit(&mut self, cmd: CommandBuffer<D>) -> Result<SubmitHandle> {
         self.submits.push(SubmitInfo {
             cmd,
-            signal_semaphore: Some(Rc::new(Semaphore::new(self.device.clone())?)),
+            signal_semaphore: Some(Arc::new(Semaphore::new(self.device.clone())?)),
             wait_semaphores: vec![],
             wait_stages: vec![],
         });
