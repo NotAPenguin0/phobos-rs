@@ -261,8 +261,13 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
         match entry {
             Entry::Occupied(mut entry) => {
                 let version = resource.version();
-                if version >= entry.get().0 {
+                // If our version is strictly newer, replace the stage entirely
+                if version > entry.get().0 {
                     entry.insert((version, stage));
+                }
+                // Otherwise, if we have the same version, add this stage as well
+                else if version == entry.get().0 {
+                    entry.insert((version, stage | entry.get().1))
                 }
             }
             Entry::Vacant(entry) => {
