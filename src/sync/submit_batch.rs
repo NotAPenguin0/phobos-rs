@@ -92,13 +92,18 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
             .collect::<Vec<_>>();
         let mut wait_stages = wait_stages.to_vec();
         let frame_wait_semaphore = ifc.wait_semaphore.clone().expect("cannot submit for present outside of a frame context");
-        // Add this semaphore as a wait semaphore for every other submit
-        self.submits.iter_mut().for_each(|submit| {
-            submit.wait_stages.push(PipelineStage::TOP_OF_PIPE);
-            submit.wait_semaphores.push(frame_wait_semaphore.clone());
-        });
-        wait_semaphores.push(frame_wait_semaphore);
-        wait_stages.push(PipelineStage::COLOR_ATTACHMENT_OUTPUT);
+        // Add this semaphore as a wait semaphore for the first submit, or to the frame commands if there is no other submit
+        match self.submits.first_mut() {
+            None => {
+                wait_semaphores.push(frame_wait_semaphore);
+                wait_stages.push(PipelineStage::COLOR_ATTACHMENT_OUTPUT);
+            }
+            Some(submit) => {
+                submit.wait_stages.push(PipelineStage::TOP_OF_PIPE);
+                submit.wait_semaphores.push(frame_wait_semaphore);
+            }
+        }
+
         self.submits.push(SubmitInfo {
             cmd,
             signal_semaphore: Some(
