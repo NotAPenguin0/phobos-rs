@@ -267,7 +267,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
                 }
                 // Otherwise, if we have the same version, add this stage as well
                 else if version == entry.get().0 {
-                    entry.insert((version, stage | entry.get().1))
+                    entry.insert((version, stage | entry.get().1));
                 }
             }
             Entry::Vacant(entry) => {
