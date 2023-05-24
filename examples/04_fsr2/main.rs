@@ -118,9 +118,10 @@ impl ExampleApp for Fsr2Sample {
 
         let pci = PipelineBuilder::new("render")
             .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
+            .depth(true, true, false, vk::CompareOp::GREATER_OR_EQUAL)
             .blend_attachment_none()
             .blend_attachment_none()
-            .cull_mask(vk::CullModeFlags::NONE)
+            .cull_mask(vk::CullModeFlags::BACK)
             .attach_shader(vertex)
             .attach_shader(fragment)
             .build();
@@ -243,14 +244,13 @@ impl ExampleApp for Fsr2Sample {
         self.previous_time = time;
 
         let near = 0.1f32;
-        let far = 100.0f32;
         let fov = 90.0f32.to_radians();
 
         let (jitter_x, jitter_y) = ctx.device.fsr2_context().jitter_offset(self.render_width, self.display_width)?;
 
         let transform = Mat4::IDENTITY;
         let view = self.camera.matrix();
-        let mut projection = Mat4::perspective_rh(fov, self.render_width as f32 / self.render_height as f32, near, far);
+        let mut projection = Mat4::perspective_infinite_reverse_rh(fov, self.render_width as f32 / self.render_height as f32, near);
         // Jitter projection matrix
         let jitter_x = 2.0 * jitter_x / self.render_width as f32;
         let jitter_y = -2.0 * jitter_y / self.render_height as f32;
@@ -318,8 +318,8 @@ impl ExampleApp for Fsr2Sample {
             frametime_delta: frame_time,
             pre_exposure: 1.0,
             reset: false,
-            camera_near: near,
-            camera_far: far,
+            camera_near: f32::MAX,
+            camera_far: near, // reverse z!
             camera_fov_vertical: fov,
             viewspace_to_meters_factor: 1.0,
             auto_reactive: None,
@@ -389,7 +389,12 @@ fn main() -> Result<()> {
     ExampleRunner::new("04_fsr2", Some(&window), |settings| {
         settings
             .fsr2_display_size(512, 512)
-            .fsr2_flags(FfxFsr2InitializationFlagBits::ENABLE_DEBUG_CHECKING | FfxFsr2InitializationFlagBits::ENABLE_AUTO_EXPOSURE)
+            .fsr2_flags(
+                FfxFsr2InitializationFlagBits::ENABLE_DEBUG_CHECKING
+                    | FfxFsr2InitializationFlagBits::ENABLE_AUTO_EXPOSURE
+                    | FfxFsr2InitializationFlagBits::ENABLE_DEPTH_INFINITE
+                    | FfxFsr2InitializationFlagBits::ENABLE_DEPTH_INVERTED,
+            )
             .build()
     })?
         .run::<Fsr2Sample>(Some(window));
