@@ -25,7 +25,7 @@ spv-cross = { version = "0.23.2", optional = true, features = ["glsl", "hlsl"] }
 log = "0.4.17"
 rayon = { version = "1.7.0", optional = true }
 static_assertions = "1.1.0"
-fsr2-sys = { git = "https://github.com/NotAPenguin0/fsr2-rs", optional = true, features = ["vk"] }
+fsr2-sys = { version = "0.1.2", optional = true, features = ["vk"] }
 widestring = { version = "1.0.2", optional = true }
 
 [build-dependencies]
