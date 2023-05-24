@@ -9,9 +9,10 @@ use ash::vk;
 use ash::vk::Handle;
 use fsr2_sys::{
     FfxDimensions2D, FfxErrorCode, FfxFloatCoords2D, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription,
-    ffxFsr2ContextDestroy, ffxFsr2ContextDispatch, FfxFsr2DispatchDescription, ffxFsr2GetInterfaceVK, ffxFsr2GetJitterOffset, ffxFsr2GetJitterPhaseCount, ffxFsr2GetScratchMemorySizeVK,
-    FfxFsr2InitializationFlagBits, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType, ffxGetCommandListVK,
-    ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource, FfxResourceState, VkDevice, VkGetDeviceProcAddrFunc, VkPhysicalDevice,
+    ffxFsr2ContextDestroy, ffxFsr2ContextDispatch, FfxFsr2DispatchDescription, ffxFsr2GetInterfaceVK, ffxFsr2GetJitterOffset, ffxFsr2GetJitterPhaseCount,
+    ffxFsr2GetRenderResolutionFromQualityMode, ffxFsr2GetScratchMemorySizeVK, FfxFsr2InitializationFlagBits, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType,
+    FfxFsr2QualityMode, ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource, FfxResourceState, VkDevice,
+    VkGetDeviceProcAddrFunc, VkPhysicalDevice,
 };
 use thiserror::Error;
 use widestring::{WideChar as wchar_t, WideCStr};
@@ -416,6 +417,25 @@ impl Fsr2Context {
         let error = unsafe { ffxFsr2GetJitterOffset(&mut jitter_x, &mut jitter_y, index as i32, phase_count as u32) };
         check_fsr2_error(error)?;
         Ok((jitter_x, jitter_y))
+    }
+
+    pub fn get_render_resolution(&mut self, quality_mode: FfxFsr2QualityMode) -> Result<FfxDimensions2D> {
+        let mut render_width = 0;
+        let mut render_height = 0;
+        let err = unsafe {
+            ffxFsr2GetRenderResolutionFromQualityMode(
+                &mut render_width,
+                &mut render_height,
+                self.display_size.width,
+                self.display_size.height,
+                quality_mode,
+            )
+        };
+        check_fsr2_error(err)?;
+        Ok(FfxDimensions2D {
+            width: render_width,
+            height: render_height,
+        })
     }
 
     pub fn set_display_resolution(&mut self, display_size: FfxDimensions2D, max_render_size: Option<FfxDimensions2D>) -> Result<()> {

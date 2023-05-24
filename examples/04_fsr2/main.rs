@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use ash::vk;
-use fsr2_sys::{FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits};
+use fsr2_sys::{FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits, FfxFsr2QualityMode};
 use glam::{Mat4, Vec3};
 use winit::event::{Event, WindowEvent};
 
@@ -64,6 +64,7 @@ struct Fsr2Sample {
     pub display_height: u32,
     pub deferred_delete: DeletionQueue<Attachment>,
     pub ctx: Context,
+    pub quality: FfxFsr2QualityMode,
 }
 
 struct Attachments {
@@ -142,11 +143,13 @@ impl ExampleApp for Fsr2Sample {
 
         let sampler = Sampler::default(ctx.device.clone())?;
 
-        let render_width = 512;
-        let render_height = 512;
-
         let display_width = 512;
         let display_height = 512;
+
+        let quality = FfxFsr2QualityMode::Quality;
+        let render_size = ctx.device.fsr2_context().get_render_resolution(quality)?;
+        let render_width = render_size.width;
+        let render_height = render_size.height;
 
         let Attachments {
             color,
@@ -170,6 +173,7 @@ impl ExampleApp for Fsr2Sample {
             display_height,
             deferred_delete: DeletionQueue::new(4),
             ctx,
+            quality,
         })
     }
 
@@ -185,8 +189,10 @@ impl ExampleApp for Fsr2Sample {
                 // If the window was resized, recreate the FSR2 context and attachments with new display size
                 self.display_width = size.width;
                 self.display_height = size.height;
-                self.render_width = size.width;
-                self.render_height = size.height;
+                // Get render width/height as function of quality parameter
+                let render_size = self.ctx.device.fsr2_context().get_render_resolution(self.quality)?;
+                self.render_width = render_size.width;
+                self.render_height = render_size.height;
 
                 let Attachments {
                     mut color,
@@ -216,7 +222,7 @@ impl ExampleApp for Fsr2Sample {
                         width: self.display_width,
                         height: self.display_height,
                     },
-                    None,
+                    Some(render_size),
                 )?;
             }
         }
