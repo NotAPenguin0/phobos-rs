@@ -95,7 +95,7 @@ impl Display for Fsr2Error {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Fsr2Context {
-    context: FfxFsr2Context,
+    context: Box<FfxFsr2Context>,
     backend: FfxFsr2Interface,
     backend_scratch_data: Box<[u8]>,
     current_frame: usize,
@@ -195,7 +195,7 @@ pub struct Fsr2ContextCreateInfo<'a> {
 }
 
 struct ReleasedFsr2Context {
-    pub context: FfxFsr2Context,
+    pub context: Box<FfxFsr2Context>,
     pub backend: FfxFsr2Interface,
     pub backend_data: Box<[u8]>,
 }
@@ -213,7 +213,7 @@ impl Fsr2Context {
         flags: FfxFsr2InitializationFlagBits,
         display_size: FfxDimensions2D,
         max_render_size: FfxDimensions2D,
-    ) -> Result<(FfxFsr2Context, FfxFsr2Interface, Box<[u8]>)> {
+    ) -> Result<(Box<FfxFsr2Context>, FfxFsr2Interface, Box<[u8]>)> {
         // First allocate a scratch buffer for backend instance data.
         // SAFETY: We assume a valid VkPhysicalDevice was passed in.
         let scratch_size = ffxFsr2GetScratchMemorySizeVK(phys_device, &fp_table);
@@ -239,7 +239,7 @@ impl Fsr2Context {
 
         // Now that we have the backend interface we can create the FSR2 context. We use the same strategy to
         // defer initialization to the API as above
-        let mut context = MaybeUninit::<FfxFsr2Context>::uninit();
+        let mut context = Box::<FfxFsr2Context>::new_uninit();
 
         // Obtain FSR2 device
         let device = ffxGetDeviceVK(device);
@@ -330,7 +330,7 @@ impl Fsr2Context {
             let image_raw = fsr2_sys::VkImage::from_raw(image.image().as_raw());
             let view_raw = fsr2_sys::VkImageView::from_raw(image.handle().as_raw());
             ffxGetTextureResourceVK(
-                &mut self.context,
+                &mut *self.context,
                 image_raw,
                 view_raw,
                 image.width(),
@@ -396,7 +396,7 @@ impl Fsr2Context {
             auto_reactive_max: 0.0,
         };
 
-        let err = unsafe { ffxFsr2ContextDispatch(&mut self.context, &description) };
+        let err = unsafe { ffxFsr2ContextDispatch(&mut *self.context, &description) };
         check_fsr2_error(err)?;
 
         self.current_frame += 1;
@@ -439,31 +439,40 @@ impl Fsr2Context {
                 max_render_size,
             )?
         };
-        // Swap out scratch data
+        // Swap out data
         let old_scratch = std::mem::replace(&mut self.backend_scratch_data, scratch);
+        let old_context = std::mem::replace(&mut self.context, context);
+        let old_backend = std::mem::replace(&mut self.backend, backend);
         // Defer deletion of old context
         self.deferred_backend_delete.push(ReleasedFsr2Context {
-            context: self.context,
-            backend: self.backend,
+            context: old_context,
+            backend: old_backend,
             backend_data: old_scratch,
         });
-        // Set new context data
+        // Reset context info
         self.display_size = display_size;
         self.max_render_size = max_render_size;
-        self.context = context;
-        self.backend = backend;
         self.current_frame = 0;
         Ok(())
     }
 }
 
 unsafe impl Send for Fsr2Context {}
+
 unsafe impl Sync for Fsr2Context {}
 
 impl Drop for Fsr2Context {
     fn drop(&mut self) {
         unsafe {
-            ffxFsr2ContextDestroy(&mut self.context);
+            ffxFsr2ContextDestroy(&mut *self.context);
+        }
+    }
+}
+
+impl Drop for ReleasedFsr2Context {
+    fn drop(&mut self) {
+        unsafe {
+            ffxFsr2ContextDestroy(&mut *self.context);
         }
     }
 }
