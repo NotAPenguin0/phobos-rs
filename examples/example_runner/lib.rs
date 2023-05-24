@@ -5,15 +5,180 @@ use std::path::Path;
 
 use anyhow::{bail, Result};
 use futures::executor::block_on;
+use glam::{Mat4, Vec3};
 use layout::backends::svg::SVGWriter;
 use layout::gv;
 use layout::gv::GraphBuilder;
-use winit::event::{Event, WindowEvent};
+use winit::event::{ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use winit::window::{Window, WindowBuilder};
 
 use phobos::prelude::*;
 use phobos::sync::submit_batch::SubmitBatch;
+
+pub fn front_direction(rotation: Vec3) -> Vec3 {
+    let cos_pitch = rotation.x.cos();
+    let cos_yaw = rotation.y.cos();
+    let sin_pitch = rotation.x.sin();
+    let sin_yaw = rotation.y.sin();
+
+    Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize()
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Camera {
+    pub position: Vec3,
+    pub rotation: Vec3,
+    middle: bool,
+    shift: bool,
+    prev_position: (f32, f32),
+}
+
+impl Camera {
+    pub fn new(position: Vec3, rotation: Vec3) -> Self {
+        Self {
+            position,
+            rotation,
+            middle: false,
+            shift: false,
+            prev_position: (0.0, 0.0),
+        }
+    }
+
+    fn clamp_rotation(rot: Vec3) -> Vec3 {
+        const MAX_ANGLE: f32 = std::f32::consts::PI / 2.0 - 0.0001;
+        const UNBOUNDED: f32 = f32::MAX;
+        rot.clamp(Vec3::new(-MAX_ANGLE, -UNBOUNDED, 0.0), Vec3::new(MAX_ANGLE, UNBOUNDED, 0.0))
+    }
+
+    pub fn update_position(&mut self, pos: Vec3) {
+        self.position += pos;
+    }
+
+    pub fn update_rotation(&mut self, rot: Vec3) {
+        self.rotation += rot;
+        self.rotation = Self::clamp_rotation(self.rotation);
+    }
+
+    fn handle_move(&mut self, dx: f32, dy: f32) {
+        const SPEED: f32 = 0.1;
+        let delta = self.up() * (dy as f32) + self.right() * (-dx as f32);
+        self.update_position(delta * SPEED);
+    }
+
+    fn handle_rotate(&mut self, dx: f32, dy: f32) {
+        const SPEED: f32 = 0.01;
+        let delta = Vec3::new(-dy as f32, dx as f32, 0.0);
+        self.update_rotation(delta * SPEED);
+    }
+
+    fn handle_scroll(&mut self, dy: f32) {
+        const SPEED: f32 = 0.2;
+        let delta = self.front() * dy;
+        self.update_position(delta * SPEED);
+    }
+
+    pub fn controls(&mut self, event: &Event<()>) {
+        match event {
+            Event::WindowEvent {
+                event,
+                ..
+            } => match event {
+                WindowEvent::MouseWheel { delta, .. } => {
+                    if let MouseScrollDelta::PixelDelta(pos) = delta {
+                        self.handle_scroll(pos.y as f32);
+                    } else if let MouseScrollDelta::LineDelta(_, y) = delta {
+                        self.handle_scroll(*y);
+                    }
+                },
+                WindowEvent::KeyboardInput {
+                    input,
+                    ..
+                } => {
+                    if let Some(keycode) = input.virtual_keycode {
+                        if keycode == VirtualKeyCode::LShift {
+                            self.shift = input.state == ElementState::Pressed;
+                        }
+                    }
+                }
+                WindowEvent::CursorMoved {
+                    position,
+                    ..
+                } => {
+                    let x = position.x as f32;
+                    let y = position.y as f32;
+                    let dx = x - self.prev_position.0;
+                    let dy = y - self.prev_position.1;
+                    if self.middle {
+                        if self.shift {
+                            self.handle_move(dx, dy);
+                        } else {
+                            self.handle_rotate(dx, dy);
+                        }
+                    }
+                    self.prev_position.0 = x;
+                    self.prev_position.1 = y;
+                }
+                WindowEvent::MouseInput {
+                    button,
+                    state,
+                    ..
+                } => {
+                    if *button == MouseButton::Middle {
+                        self.middle = *state == ElementState::Pressed;
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+
+    pub fn front(&self) -> Vec3 {
+        front_direction(self.rotation)
+    }
+
+    pub fn right(&self) -> Vec3 {
+        self.front().cross(Vec3::new(0.0, 1.0, 0.0)).normalize()
+    }
+
+    pub fn up(&self) -> Vec3 {
+        self.right().cross(self.front())
+    }
+
+    pub fn matrix(&self) -> Mat4 {
+        let front = self.front();
+        let up = self.up();
+        Mat4::look_at_rh(self.position, self.position + front, up)
+    }
+}
+
+#[macro_export]
+macro_rules! ubo_struct_assign {
+    (
+        $var:ident,
+        $ifc:ident,
+        struct $name:ident {
+            $(
+                $fname:ident:$ftype:ty = $finit:expr,
+            )*
+        }) => {
+        concat_idents::concat_idents!(buffer_name = $var, _, buffer {
+            #[repr(C)]
+            struct $name {
+                $($fname:$ftype,)*
+            }
+
+            let mut buffer_name = $ifc.allocate_scratch_ubo(std::mem::size_of::<$name>() as vk::DeviceSize)?;
+            let $var = buffer_name.mapped_slice::<$name>()?;
+            let mut $var = $var.get_mut(0).unwrap();
+
+            $(
+                $var.$fname = $finit;
+            )*
+        });
+    };
+}
 
 #[allow(dead_code)]
 pub fn load_spirv_file(path: &Path) -> Vec<u32> {
@@ -113,6 +278,10 @@ pub trait ExampleApp {
     // Implement this for a headless application
     fn run(&mut self, _ctx: Context, _thread: ThreadContext) -> Result<()> {
         bail!("run() not implemented for headless example app");
+    }
+
+    fn handle_event(&mut self, event: &Event<()>) -> Result<()> {
+        Ok(())
     }
 }
 
@@ -226,6 +395,13 @@ impl ExampleRunner {
                 return;
             }
             *control_flow = ControlFlow::Poll;
+
+            match &mut app {
+                None => {}
+                Some(app) => {
+                    app.handle_event(&event).unwrap();
+                }
+            }
 
             // Note that we want to handle events after processing our current frame, so that
             // requesting an exit doesn't attempt to render another frame, which causes

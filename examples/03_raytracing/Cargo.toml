@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 phobos = { path = "../..", features = ["shaderc"] }
+concat-idents = "1.1.4"

@@ -8,9 +8,9 @@ use ash::vk;
 use ash::vk::Handle;
 use fsr2_sys::{
     FfxDimensions2D, FfxErrorCode, FfxFloatCoords2D, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription,
-    ffxFsr2ContextDestroy, ffxFsr2ContextDispatch, FfxFsr2DispatchDescription, ffxFsr2GetInterfaceVK, ffxFsr2GetScratchMemorySizeVK, FfxFsr2InitializationFlagBits, FfxFsr2InstanceFunctionPointerTableVk,
-    FfxFsr2Interface, FfxFsr2MsgType, ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource,
-    FfxResourceState, VkDevice, VkGetDeviceProcAddrFunc, VkPhysicalDevice,
+    ffxFsr2ContextDestroy, ffxFsr2ContextDispatch, FfxFsr2DispatchDescription, ffxFsr2GetInterfaceVK, ffxFsr2GetJitterOffset, ffxFsr2GetJitterPhaseCount, ffxFsr2GetScratchMemorySizeVK,
+    FfxFsr2InitializationFlagBits, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType, ffxGetCommandListVK,
+    ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource, FfxResourceState, VkDevice, VkGetDeviceProcAddrFunc, VkPhysicalDevice,
 };
 use thiserror::Error;
 use widestring::{WideChar as wchar_t, WideCStr};
@@ -93,9 +93,10 @@ impl Display for Fsr2Error {
 
 #[derive(Debug)]
 pub struct Fsr2Context {
-    pub context: FfxFsr2Context,
-    pub backend: FfxFsr2Interface,
-    pub backend_scratch_data: Box<[u8]>,
+    context: FfxFsr2Context,
+    backend: FfxFsr2Interface,
+    backend_scratch_data: Box<[u8]>,
+    current_frame: usize,
 }
 
 /// Experimental reactive mask generation parameters
@@ -236,7 +237,24 @@ impl Fsr2Context {
                 fp_message: fsr2_message_callback,
             };
 
-            let err = ffxFsr2ContextCreate(context.as_mut_ptr(), &info);
+            // With validation enabled, FSR2 initialization overflows the stack,
+            // possibly because of large shader binaries? As a workaround, we move
+            // initialization to a separate thread with a larger stack size.
+
+            struct Ptr<T>(pub *mut T);
+            unsafe impl<T> Send for Ptr<T> {}
+
+            let context_ptr = Ptr(context.as_mut_ptr());
+            let err = std::thread::Builder::new()
+                .name("phobos::fsr2 context init".into())
+                .stack_size(4 * 1024 * 1024)
+                .spawn(move || {
+                    let ptr = context_ptr;
+                    ffxFsr2ContextCreate(ptr.0, &info)
+                })
+                .unwrap()
+                .join()
+                .unwrap();
             check_fsr2_error(err)?;
 
             let context = context.assume_init();
@@ -252,6 +270,7 @@ impl Fsr2Context {
                 context,
                 backend: interface,
                 backend_scratch_data: scratch_data,
+                current_frame: 0,
             })
         }
     }
@@ -261,6 +280,7 @@ impl Fsr2Context {
             let image_raw = fsr2_sys::VkImage::from_raw(image.image().as_raw());
             let view_raw = fsr2_sys::VkImageView::from_raw(image.handle().as_raw());
             ffxGetTextureResourceVK(
+                &mut self.context,
                 image_raw,
                 view_raw,
                 image.width(),
@@ -326,7 +346,24 @@ impl Fsr2Context {
 
         let err = unsafe { ffxFsr2ContextDispatch(&mut self.context, &description) };
         check_fsr2_error(err)?;
+
+        self.current_frame += 1;
+
         Ok(())
+    }
+
+    pub fn jitter_phase_count(&mut self, render_width: u32, display_width: u32) -> i32 {
+        unsafe { ffxFsr2GetJitterPhaseCount(render_width, display_width) }
+    }
+
+    pub fn jitter_offset(&mut self, render_width: u32, display_width: u32) -> Result<(f32, f32)> {
+        let phase_count = self.jitter_phase_count(render_width, display_width);
+        let index = self.current_frame % phase_count as usize;
+        let mut jitter_x = 0.0;
+        let mut jitter_y = 0.0;
+        let error = unsafe { ffxFsr2GetJitterOffset(&mut jitter_x, &mut jitter_y, index as i32, phase_count as u32) };
+        check_fsr2_error(error)?;
+        Ok((jitter_x, jitter_y))
     }
 }
 
