@@ -79,6 +79,7 @@ use ash::vk;
 
 use crate::{Allocator, ComputeSupport, DefaultAllocator, Device, Error, ImageView, InFlightContext, PhysicalResourceBindings, VirtualResource};
 use crate::command_buffer::IncompleteCommandBuffer;
+#[cfg(feature = "fsr2")]
 use crate::fsr2::{Fsr2DispatchDescription, Fsr2DispatchResources};
 use crate::graph::pass_graph::PassResource;
 use crate::graph::physical_resource::PhysicalResource;

@@ -30,6 +30,6 @@ impl ExampleApp for Fsr2Sample {
 }
 
 fn main() -> Result<()> {
-    let window = WindowContext::new("04_fsr2")?;
+    let window = WindowContext::with_size("04_fsr2", 512.0, 512.0)?;
     ExampleRunner::new("04_fsr2", Some(&window), |settings| settings.build())?.run::<Fsr2Sample>(Some(window));
 }

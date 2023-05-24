@@ -495,6 +495,7 @@ impl Device {
         self.inner.queue_families.len() == 1
     }
 
+    #[cfg(feature = "fsr2")]
     pub fn fsr2_context(&self) -> MutexGuard<ManuallyDrop<Fsr2Context>> {
         self.inner.fsr2_context.lock().unwrap()
     }

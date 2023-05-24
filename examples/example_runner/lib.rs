@@ -56,7 +56,6 @@ pub fn save_dotfile<G>(graph: &G, path: &str)
     }
 }
 
-
 #[derive(Debug)]
 pub struct WindowContext {
     pub event_loop: EventLoop<()>,
@@ -66,10 +65,14 @@ pub struct WindowContext {
 impl WindowContext {
     #[allow(dead_code)]
     pub fn new(title: impl Into<String>) -> Result<Self> {
+        Self::with_size(title, 800.0, 600.0)
+    }
+
+    pub fn with_size(title: impl Into<String>, width: f32, height: f32) -> Result<Self> {
         let event_loop = EventLoopBuilder::new().build();
         let window = WindowBuilder::new()
             .with_title(title)
-            .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
+            .with_inner_size(winit::dpi::LogicalSize::new(width, height))
             .build(&event_loop)?;
         Ok(Self {
             event_loop,
