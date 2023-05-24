@@ -508,6 +508,7 @@ impl Deref for Device {
 
 impl Drop for DeviceInner {
     fn drop(&mut self) {
+        #[cfg(feature = "fsr2")]
         unsafe {
             ManuallyDrop::drop(&mut self.fsr2_context);
         }
