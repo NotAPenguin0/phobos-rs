@@ -5,11 +5,7 @@ use std::mem::MaybeUninit;
 use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
-use fsr2_sys::{
-    FfxDimensions2D, FfxErrorCode, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription, ffxFsr2GetInterfaceVK, ffxFsr2GetScratchMemorySizeVK,
-    FfxFsr2InitializationFlagBits, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType, ffxGetDeviceVK, VkDevice,
-    VkGetDeviceProcAddrFunc, VkPhysicalDevice,
-};
+use fsr2_sys::{FfxDimensions2D, FfxErrorCode, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription, ffxFsr2ContextDestroy, ffxFsr2GetInterfaceVK, ffxFsr2GetScratchMemorySizeVK, FfxFsr2InitializationFlagBits, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType, ffxGetDeviceVK, VkDevice, VkGetDeviceProcAddrFunc, VkPhysicalDevice};
 use thiserror::Error;
 use widestring::{WideChar as wchar_t, WideCStr};
 
@@ -186,5 +182,12 @@ impl Fsr2Context {
 }
 
 unsafe impl Send for Fsr2Context {}
-
 unsafe impl Sync for Fsr2Context {}
+
+impl Drop for Fsr2Context {
+    fn drop(&mut self) {
+        unsafe {
+            ffxFsr2ContextDestroy(&mut self.context);
+        }
+    }
+}

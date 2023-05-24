@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, NulError};
 use std::fmt::Formatter;
+use std::mem::ManuallyDrop;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -44,6 +45,8 @@ impl std::fmt::Display for ExtensionID {
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct DeviceInner {
+    #[cfg(feature = "fsr2")]
+    fsr2_context: ManuallyDrop<Fsr2Context>,
     #[derivative(Debug = "ignore")]
     handle: ash::Device,
     queue_families: Vec<u32>,
@@ -57,8 +60,6 @@ struct DeviceInner {
     acceleration_structure: Option<khr::AccelerationStructure>,
     #[derivative(Debug = "ignore")]
     rt_pipeline: Option<khr::RayTracingPipeline>,
-    #[cfg(feature = "fsr2")]
-    fsr2_context: Fsr2Context,
 }
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
@@ -323,7 +324,9 @@ impl Device {
 
         // Create FSR2 context
         #[cfg(feature = "fsr2")]
-            let fsr2 = unsafe { Fsr2Context::new(&instance, physical_device.handle(), handle.handle())? };
+            let fsr2 = unsafe {
+            ManuallyDrop::new(Fsr2Context::new(&instance, physical_device.handle(), handle.handle())?)
+        };
 
         let inner = DeviceInner {
             handle,
@@ -505,6 +508,9 @@ impl Deref for Device {
 
 impl Drop for DeviceInner {
     fn drop(&mut self) {
+        unsafe {
+            ManuallyDrop::drop(&mut self.fsr2_context);
+        }
         #[cfg(feature = "log-objects")]
         trace!("Destroying VkDevice {:p}", self.handle.handle());
         unsafe {
