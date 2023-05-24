@@ -420,6 +420,13 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         self
     }
 
+    fn read_optional_storage_image(mut self, resource: &Option<VirtualResource>, stage: PipelineStage) -> Self {
+        match resource {
+            None => self,
+            Some(resource) => self.read_storage_image(resource, stage),
+        }
+    }
+
     /// Set the executor to be called when recording this pass.
     pub fn executor(mut self, exec: impl PassExecutor<D, U, A> + 'cb) -> Self {
         self.inner.execute = Box::new(exec);
@@ -493,11 +500,18 @@ impl Fsr2DispatchVirtualResources {
     }
 }
 
+#[cfg(feature = "fsr2")]
 impl<'cb, D: ExecutionDomain + ComputeSupport, U, A: Allocator> PassBuilder<'cb, D, U, A> {
-    #[cfg(feature = "fsr2")]
     /// Create a pass for FSR2.
     pub fn fsr2(device: Device, descr: Fsr2DispatchDescription, resources: Fsr2DispatchVirtualResources) -> Pass<'cb, D, U, A> {
         let pass = PassBuilder::<'cb, D, U, A>::new("fsr2")
+            .read_storage_image(&resources.color, PipelineStage::COMPUTE_SHADER)
+            .read_storage_image(&resources.motion_vectors, PipelineStage::COMPUTE_SHADER)
+            .read_storage_image(&resources.depth, PipelineStage::COMPUTE_SHADER)
+            .read_optional_storage_image(&resources.exposure, PipelineStage::COMPUTE_SHADER)
+            .read_optional_storage_image(&resources.reactive, PipelineStage::COMPUTE_SHADER)
+            .read_optional_storage_image(&resources.transparency_and_composition, PipelineStage::COMPUTE_SHADER)
+            .write_storage_image(&resources.output, PipelineStage::COMPUTE_SHADER)
             .execute_fn(move |cmd, _, bindings, _| {
                 let resolved_resources = resources.resolve(bindings)?;
                 let mut fsr2 = device.fsr2_context();
