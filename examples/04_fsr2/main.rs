@@ -58,6 +58,10 @@ struct Fsr2Sample {
     pub previous_time: Instant,
     pub previous_matrix: Mat4,
     pub camera: Camera,
+    pub render_width: u32,
+    pub render_height: u32,
+    pub display_width: u32,
+    pub display_height: u32,
 }
 
 impl ExampleApp for Fsr2Sample {
@@ -96,27 +100,49 @@ impl ExampleApp for Fsr2Sample {
 
         let sampler = Sampler::default(ctx.device.clone())?;
 
+        let render_width = 512;
+        let render_height = 512;
+
+        let display_width = 512;
+        let display_height = 512;
+
         Ok(Self {
             color: Attachment::new(
                 &mut ctx,
                 vk::Format::R32G32B32A32_SFLOAT,
-                512,
-                512,
+                render_width,
+                render_height,
                 vk::ImageUsageFlags::SAMPLED,
             )?,
-            depth: Attachment::new(&mut ctx, vk::Format::D32_SFLOAT, 512, 512, vk::ImageUsageFlags::SAMPLED)?,
-            motion_vectors: Attachment::new(&mut ctx, vk::Format::R16G16_SFLOAT, 512, 512, vk::ImageUsageFlags::SAMPLED)?,
+            depth: Attachment::new(
+                &mut ctx,
+                vk::Format::D32_SFLOAT,
+                render_width,
+                render_height,
+                vk::ImageUsageFlags::SAMPLED,
+            )?,
+            motion_vectors: Attachment::new(
+                &mut ctx,
+                vk::Format::R16G16_SFLOAT,
+                render_width,
+                render_height,
+                vk::ImageUsageFlags::SAMPLED,
+            )?,
             color_upscaled: Attachment::new(
                 &mut ctx,
                 vk::Format::R32G32B32A32_SFLOAT,
-                512,
-                512,
+                display_width,
+                display_height,
                 vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED,
             )?,
             sampler,
             previous_time: Instant::now(),
             previous_matrix: Mat4::IDENTITY,
             camera: Camera::new(Vec3::new(-3.0, 2.0, 0.0), Vec3::new(-20.0f32.to_radians(), 0.0, 0.0)),
+            render_width,
+            render_height,
+            display_width,
+            display_height,
         })
     }
 
@@ -140,14 +166,14 @@ impl ExampleApp for Fsr2Sample {
         let far = 100.0f32;
         let fov = 90.0f32.to_radians();
 
-        let (jitter_x, jitter_y) = ctx.device.fsr2_context().jitter_offset(512, 512)?;
+        let (jitter_x, jitter_y) = ctx.device.fsr2_context().jitter_offset(self.render_width, self.display_width)?;
 
         let transform = Mat4::IDENTITY;
         let view = self.camera.matrix();
-        let mut projection = Mat4::perspective_rh(fov, 1.0, near, far);
+        let mut projection = Mat4::perspective_rh(fov, self.render_width as f32 / self.render_height as f32, near, far);
         // Jitter projection matrix
-        let jitter_x = 2.0 * jitter_x / 512.0f32;
-        let jitter_y = -2.0 * jitter_y / 512.0f32;
+        let jitter_x = 2.0 * jitter_x / self.render_width as f32;
+        let jitter_y = -2.0 * jitter_y / self.render_height as f32;
         let jitter_translation_matrix = Mat4::from_translation(Vec3::new(jitter_x, jitter_y, 0.0));
         projection = jitter_translation_matrix * projection;
         // Flip y because Vulkan
@@ -204,8 +230,8 @@ impl ExampleApp for Fsr2Sample {
                 y: jitter_y,
             },
             motion_vector_scale: FfxFloatCoords2D {
-                x: 512.0,
-                y: 512.0,
+                x: self.render_width as f32,
+                y: self.render_height as f32,
             },
             enable_sharpening: false,
             sharpness: 0.0,

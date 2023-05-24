@@ -172,12 +172,21 @@ extern "system" fn fsr2_message_callback(ty: FfxFsr2MsgType, message: *const wch
     }
 }
 
+pub struct Fsr2ContextCreateInfo<'a> {
+    pub instance: &'a ash::Instance,
+    pub physical_device: vk::PhysicalDevice,
+    pub device: vk::Device,
+    pub flags: FfxFsr2InitializationFlagBits,
+    pub max_render_size: FfxDimensions2D,
+    pub display_size: FfxDimensions2D,
+}
+
 impl Fsr2Context {
-    pub(crate) fn new(instance: &ash::Instance, physical_device: vk::PhysicalDevice, device: vk::Device) -> Result<Self> {
+    pub(crate) fn new(info: Fsr2ContextCreateInfo) -> Result<Self> {
         unsafe {
             // Build a function pointer table with vulkan functions to pass to FSR2
-            let functions_1_0 = instance.fp_v1_0();
-            let functions_1_1 = instance.fp_v1_1();
+            let functions_1_0 = info.instance.fp_v1_0();
+            let functions_1_1 = info.instance.fp_v1_1();
             let fp_table = FfxFsr2InstanceFunctionPointerTableVk {
                 // SAFETY: These are the same functions, but their types are from different crates.
                 fp_enumerate_device_extension_properties: std::mem::transmute::<_, _>(functions_1_0.enumerate_device_extension_properties),
@@ -188,7 +197,7 @@ impl Fsr2Context {
                 fp_get_physical_device_features2: std::mem::transmute::<_, _>(functions_1_1.get_physical_device_features2),
             };
 
-            let physical_device = VkPhysicalDevice::from_raw(physical_device.as_raw());
+            let physical_device = VkPhysicalDevice::from_raw(info.physical_device.as_raw());
             // First allocate a scratch buffer for backend instance data.
             // SAFETY: We assume a valid VkPhysicalDevice was passed in.
             let scratch_size = ffxFsr2GetScratchMemorySizeVK(physical_device, &fp_table);
@@ -218,20 +227,13 @@ impl Fsr2Context {
             let mut context = MaybeUninit::<FfxFsr2Context>::uninit();
 
             // Obtain FSR2 device
-            let vk_device = VkDevice::from_raw(device.as_raw());
+            let vk_device = VkDevice::from_raw(info.device.as_raw());
             let device = ffxGetDeviceVK(vk_device);
 
             let info = FfxFsr2ContextDescription {
-                flags: FfxFsr2InitializationFlagBits::ENABLE_DEBUG_CHECKING,
-                // TODO: Correct render/display size
-                max_render_size: FfxDimensions2D {
-                    width: 512,
-                    height: 512,
-                },
-                display_size: FfxDimensions2D {
-                    width: 512,
-                    height: 512,
-                },
+                flags: info.flags,
+                max_render_size: info.max_render_size,
+                display_size: info.display_size,
                 callbacks: interface,
                 device,
                 fp_message: fsr2_message_callback,

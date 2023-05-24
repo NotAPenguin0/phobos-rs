@@ -10,10 +10,13 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::extensions::{ext, khr};
 use ash::vk;
+#[cfg(feature = "fsr2")]
+use fsr2_sys::{FfxDimensions2D, FfxFsr2InitializationFlagBits};
 
 use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
+use crate::fsr2::Fsr2ContextCreateInfo;
 use crate::util::string::unwrap_to_raw_strings;
 
 /// Device extensions that phobos requests but might not be available.
@@ -324,7 +327,23 @@ impl Device {
 
         // Create FSR2 context
         #[cfg(feature = "fsr2")]
-            let fsr2 = unsafe { ManuallyDrop::new(Fsr2Context::new(&instance, physical_device.handle(), handle.handle())?) };
+            let fsr2 = unsafe {
+            let info = Fsr2ContextCreateInfo {
+                instance: &instance,
+                physical_device: physical_device.handle(),
+                device: handle.handle(),
+                flags: FfxFsr2InitializationFlagBits::ENABLE_DEBUG_CHECKING,
+                max_render_size: FfxDimensions2D {
+                    width: 512,
+                    height: 512,
+                },
+                display_size: FfxDimensions2D {
+                    width: 512,
+                    height: 512,
+                },
+            };
+            ManuallyDrop::new(Fsr2Context::new(info)?)
+        };
 
         let inner = DeviceInner {
             handle,
