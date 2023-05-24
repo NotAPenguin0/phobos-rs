@@ -11,6 +11,8 @@ use ash::extensions::{ext, khr};
 use ash::vk;
 
 use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
+#[cfg(feature = "fsr2")]
+use crate::fsr2::Fsr2Context;
 use crate::util::string::unwrap_to_raw_strings;
 
 /// Device extensions that phobos requests but might not be available.
@@ -55,6 +57,8 @@ struct DeviceInner {
     acceleration_structure: Option<khr::AccelerationStructure>,
     #[derivative(Debug = "ignore")]
     rt_pipeline: Option<khr::RayTracingPipeline>,
+    #[cfg(feature = "fsr2")]
+    fsr2_context: Fsr2Context,
 }
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
@@ -200,6 +204,13 @@ impl Device {
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
         features_1_3.maintenance4 = vk::TRUE;
+        #[cfg(feature = "fsr2")]
+        {
+            // Enable required and recommended features for FSR2
+            features_1_2.shader_float16 = vk::TRUE;
+            features.shader_int16 = vk::TRUE;
+            features_1_1.storage_buffer16_bit_access = vk::TRUE;
+        }
 
         let extension_names_raw = unwrap_to_raw_strings(extension_names.as_slice());
         let mut info = vk::DeviceCreateInfo::builder()
@@ -310,6 +321,10 @@ impl Device {
 
         unsafe { instance.get_physical_device_properties2(physical_device.handle(), &mut properties2) };
 
+        // Create FSR2 context
+        #[cfg(feature = "fsr2")]
+            let fsr2 = unsafe { Fsr2Context::new(&instance, physical_device.handle(), handle.handle())? };
+
         let inner = DeviceInner {
             handle,
             queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
@@ -320,6 +335,8 @@ impl Device {
             dynamic_state3,
             acceleration_structure,
             rt_pipeline,
+            #[cfg(feature = "fsr2")]
+            fsr2_context: fsr2,
         };
 
         Ok(Device {

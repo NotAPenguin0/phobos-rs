@@ -87,6 +87,7 @@
 //! - [`util`] for various utilities and common patterns like buffer uploads.
 
 #![feature(min_specialization)]
+#![cfg_attr(feature = "fsr2", feature(new_uninit))]
 
 #![warn(missing_docs)]
 
@@ -111,3 +112,6 @@ pub mod sync;
 pub mod util;
 pub mod wsi;
 pub mod resource;
+
+#[cfg(feature = "fsr2")]
+pub mod fsr2;
