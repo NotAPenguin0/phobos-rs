@@ -68,6 +68,7 @@ pub struct SBTEntry {
 }
 
 /// A ShaderBindingTable resource. This can be derived from the ray tracing pipeline.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct ShaderBindingTable<A: Allocator> {
     pub(crate) buffer: Buffer<A>,

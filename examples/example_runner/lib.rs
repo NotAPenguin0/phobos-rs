@@ -281,7 +281,7 @@ pub trait ExampleApp {
         bail!("run() not implemented for headless example app");
     }
 
-    fn handle_event(&mut self, event: &Event<()>) -> Result<()> {
+    fn handle_event(&mut self, _event: &Event<()>) -> Result<()> {
         Ok(())
     }
 }

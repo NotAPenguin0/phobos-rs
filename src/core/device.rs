@@ -11,7 +11,7 @@ use anyhow::Result;
 use ash::extensions::{ext, khr};
 use ash::vk;
 #[cfg(feature = "fsr2")]
-use fsr2_sys::{FfxDimensions2D, FfxFsr2InitializationFlagBits};
+use fsr2_sys::FfxDimensions2D;
 
 use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 #[cfg(feature = "fsr2")]
@@ -521,6 +521,7 @@ impl Device {
         self.inner.queue_families.len() == 1
     }
 
+    /// Get access to the FSR2 context. See [`Fsr2Context`](crate::fsr2::Fsr2Context)
     #[cfg(feature = "fsr2")]
     pub fn fsr2_context(&self) -> MutexGuard<ManuallyDrop<Fsr2Context>> {
         self.inner.fsr2_context.lock().unwrap()

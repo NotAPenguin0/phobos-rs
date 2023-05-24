@@ -421,7 +421,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         self
     }
 
-    fn sample_optional_image(mut self, resource: &Option<VirtualResource>, stage: PipelineStage) -> Self {
+    fn sample_optional_image(self, resource: &Option<VirtualResource>, stage: PipelineStage) -> Self {
         match resource {
             None => self,
             Some(resource) => self.sample_image(resource, stage),
@@ -449,6 +449,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     }
 }
 
+/// Holds virtual resources needed to declare a FSR2 dispatch.
 #[cfg(feature = "fsr2")]
 #[derive(Debug, Clone)]
 pub struct Fsr2DispatchVirtualResources {
@@ -488,6 +489,8 @@ impl Fsr2DispatchVirtualResources {
         }
     }
 
+    /// Resolve all resources to their respective physical resources.
+    /// Fails if any resource resolve fails.
     pub fn resolve(&self, bindings: &PhysicalResourceBindings) -> Result<Fsr2DispatchResources> {
         Ok(Fsr2DispatchResources {
             color: Self::resolve_image_resource(&self.color, bindings)?,

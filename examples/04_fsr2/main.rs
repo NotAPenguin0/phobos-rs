@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use anyhow::Result;
 use ash::vk;
@@ -7,7 +7,7 @@ use glam::{Mat4, Vec3};
 use winit::event::{Event, WindowEvent};
 
 use phobos::{
-    DeletionQueue, GraphicsCmdBuffer, image, Image, ImageView, IncompleteCmdBuffer, InFlightContext, Pass, PassBuilder, PassGraph, PhysicalResourceBindings,
+    DeletionQueue, GraphicsCmdBuffer, image, Image, ImageView, IncompleteCmdBuffer, InFlightContext, PassBuilder, PassGraph, PhysicalResourceBindings,
     PipelineBuilder, PipelineStage, RecordGraphToCommandBuffer, Sampler,
 };
 use phobos::domain::All;
@@ -20,6 +20,7 @@ use crate::example_runner::{Camera, Context, create_shader, ExampleApp, ExampleR
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
 
+#[allow(dead_code)]
 struct Attachment {
     pub image: Image,
     pub view: ImageView,
@@ -246,7 +247,7 @@ impl ExampleApp for Fsr2Sample {
         let near = 0.1f32;
         let fov = 90.0f32.to_radians();
 
-        let (jitter_x, jitter_y) = ctx.device.fsr2_context().jitter_offset(self.render_width, self.display_width)?;
+        let (jitter_x, jitter_y) = ctx.device.fsr2_context().jitter_offset(self.render_width)?;
 
         let transform = Mat4::IDENTITY;
         let view = self.camera.matrix();

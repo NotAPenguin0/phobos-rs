@@ -89,11 +89,17 @@ pub struct GPURequirements {
     pub device_extensions: Vec<String>,
 }
 
+/// Holds context settings for the FSR2 library
 #[cfg(feature = "fsr2")]
 #[derive(Debug)]
 pub struct Fsr2Settings {
+    /// The initial display size
     pub display_size: (u32, u32),
+    /// The initial maximum render size. If left to None, this is assumed to be equal to `display_size`.
+    /// Prefer setting this as low as possible to save memory.
     pub max_render_size: Option<(u32, u32)>,
+    /// Flags for FSR2 initialization. For more information on each possible value, see
+    /// <https://github.com/GPUOpen-Effects/FidelityFX-FSR2>
     pub flags: FfxFsr2InitializationFlagBits,
 }
 
@@ -143,6 +149,7 @@ pub struct AppSettings<'a, Window: WindowInterface> {
     pub scratch_ssbo_size: vk::DeviceSize,
     /// Whether to enable raytracing extensions.
     pub raytracing: bool,
+    /// FSR2 context settings.
     #[cfg(feature = "fsr2")]
     pub fsr2_settings: Fsr2Settings,
 }
@@ -271,18 +278,21 @@ impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
         self
     }
 
+    /// Set the initial FSR2 display size
     #[cfg(feature = "fsr2")]
     pub fn fsr2_display_size(mut self, width: u32, height: u32) -> Self {
         self.inner.fsr2_settings.display_size = (width, height);
         self
     }
 
+    /// Set the initial FSR2 maximum render size
     #[cfg(feature = "fsr2")]
     pub fn fsr2_max_render_size(mut self, width: u32, height: u32) -> Self {
         self.inner.fsr2_settings.max_render_size = Some((width, height));
         self
     }
 
+    /// Set the FSR2 context flags
     #[cfg(feature = "fsr2")]
     pub fn fsr2_flags(mut self, flags: FfxFsr2InitializationFlagBits) -> Self {
         self.inner.fsr2_settings.flags = flags;

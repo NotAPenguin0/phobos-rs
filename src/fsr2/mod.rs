@@ -1,4 +1,5 @@
-use std::cmp::max;
+//! Exposes wrappers around the FSR2 library for supersampling, integrated with the phobos library.
+
 use std::ffi::c_void;
 use std::fmt::{Display, Formatter};
 use std::mem::MaybeUninit;
@@ -11,20 +12,23 @@ use fsr2_sys::{
     FfxDimensions2D, FfxErrorCode, FfxFloatCoords2D, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription,
     ffxFsr2ContextDestroy, ffxFsr2ContextDispatch, FfxFsr2DispatchDescription, ffxFsr2GetInterfaceVK, ffxFsr2GetJitterOffset, ffxFsr2GetJitterPhaseCount,
     ffxFsr2GetRenderResolutionFromQualityMode, ffxFsr2GetScratchMemorySizeVK, FfxFsr2InitializationFlagBits, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType,
-    FfxFsr2QualityMode, ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource, FfxResourceState, VkDevice,
-    VkGetDeviceProcAddrFunc, VkPhysicalDevice,
+    FfxFsr2QualityMode, ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource, FfxResourceState, VkDevice, VkPhysicalDevice,
 };
 use thiserror::Error;
 use widestring::{WideChar as wchar_t, WideCStr};
 
-use crate::{Allocator, ComputeSupport, DeletionQueue, ImageView, IncompleteCommandBuffer, VirtualResource};
+use crate::{Allocator, ComputeSupport, DeletionQueue, ImageView, IncompleteCommandBuffer};
 use crate::domain::ExecutionDomain;
 
+/// FSR2 API error, stores an error code that describes the cause of the error
 #[derive(Debug, Error)]
 pub struct Fsr2Error {
+    /// Error code with the cause of the FSR2 error.
     pub code: FfxErrorCode,
 }
 
+/// Check the FSR2 error code for an Ok status, and return Ok(()) in that case,
+/// or an error result instead.
 fn check_fsr2_error(code: FfxErrorCode) -> Result<()> {
     if code == FfxErrorCode::Ok {
         Ok(())
@@ -93,6 +97,7 @@ impl Display for Fsr2Error {
     }
 }
 
+/// Represents the initialized FSR2 context with its backend data.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Fsr2Context {
@@ -128,6 +133,7 @@ pub struct Fsr2AutoReactiveDescription {
     pub auto_reactive_max: f32,
 }
 
+/// Stores resources needed to execute an FSR2 dispatch.
 #[derive(Debug, Clone)]
 pub struct Fsr2DispatchResources {
     /// Color buffer for the current frame, at render resolution.
@@ -146,6 +152,7 @@ pub struct Fsr2DispatchResources {
     pub output: ImageView,
 }
 
+/// Holds all settings for an FSR2 dispatch.
 #[derive(Debug, Clone)]
 pub struct Fsr2DispatchDescription {
     /// Subpixel jitter offset applied to the camera
@@ -186,7 +193,7 @@ extern "system" fn fsr2_message_callback(ty: FfxFsr2MsgType, message: *const wch
     }
 }
 
-pub struct Fsr2ContextCreateInfo<'a> {
+pub(crate) struct Fsr2ContextCreateInfo<'a> {
     pub instance: &'a ash::Instance,
     pub physical_device: vk::PhysicalDevice,
     pub device: vk::Device,
@@ -195,6 +202,7 @@ pub struct Fsr2ContextCreateInfo<'a> {
     pub display_size: FfxDimensions2D,
 }
 
+#[allow(dead_code)]
 struct ReleasedFsr2Context {
     pub context: Box<FfxFsr2Context>,
     pub backend: FfxFsr2Interface,
@@ -405,12 +413,14 @@ impl Fsr2Context {
         Ok(())
     }
 
-    pub fn jitter_phase_count(&mut self, render_width: u32, display_width: u32) -> i32 {
-        unsafe { ffxFsr2GetJitterPhaseCount(render_width, display_width) }
+    /// Get the number of jitter phases. Must be supplied with the current render width.
+    pub fn jitter_phase_count(&mut self, render_width: u32) -> i32 {
+        unsafe { ffxFsr2GetJitterPhaseCount(render_width, self.display_size.width) }
     }
 
-    pub fn jitter_offset(&mut self, render_width: u32, display_width: u32) -> Result<(f32, f32)> {
-        let phase_count = self.jitter_phase_count(render_width, display_width);
+    /// Get the jitter offset values for this frame, given the current render width.
+    pub fn jitter_offset(&mut self, render_width: u32) -> Result<(f32, f32)> {
+        let phase_count = self.jitter_phase_count(render_width);
         let index = self.current_frame % phase_count as usize;
         let mut jitter_x = 0.0;
         let mut jitter_y = 0.0;
@@ -419,6 +429,7 @@ impl Fsr2Context {
         Ok((jitter_x, jitter_y))
     }
 
+    /// Get the recommended render resolution based on a quality setting and the current display resolution.
     pub fn get_render_resolution(&mut self, quality_mode: FfxFsr2QualityMode) -> Result<FfxDimensions2D> {
         let mut render_width = 0;
         let mut render_height = 0;
@@ -438,6 +449,11 @@ impl Fsr2Context {
         })
     }
 
+    /// Set the display resolution to a new resolution. After doing this, you should also recreate the relevant
+    /// attachments with a new size based on the display size. This new size may not be greater than `max_render_size`.
+    /// If `max_render_size` is set to `None`, it is assumed to be equal to `display_size`.
+    /// Prefer setting `max_render_size` as low as possible to save memory.
+    /// If the new display size and max render size are the same as the old values, this function is a no-op.
     pub fn set_display_resolution(&mut self, display_size: FfxDimensions2D, max_render_size: Option<FfxDimensions2D>) -> Result<()> {
         // Create new context if something changed
         let max_render_size = max_render_size.unwrap_or(display_size);
