@@ -108,6 +108,7 @@ impl Fsr2Context {
             let functions_1_0 = instance.fp_v1_0();
             let functions_1_1 = instance.fp_v1_1();
             let fp_table = FfxFsr2InstanceFunctionPointerTableVk {
+                // SAFETY: These are the same functions, but their types are from different crates.
                 fp_enumerate_device_extension_properties: std::mem::transmute::<_, _>(functions_1_0.enumerate_device_extension_properties),
                 fp_get_device_proc_addr: std::mem::transmute::<_, _>(functions_1_0.get_device_proc_addr),
                 fp_get_physical_device_memory_properties: std::mem::transmute::<_, _>(functions_1_0.get_physical_device_memory_properties),
