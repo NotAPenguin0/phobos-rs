@@ -91,12 +91,20 @@ impl Display for Fsr2Error {
     }
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Fsr2Context {
     context: FfxFsr2Context,
     backend: FfxFsr2Interface,
     backend_scratch_data: Box<[u8]>,
     current_frame: usize,
+    #[derivative(Debug = "ignore")]
+    fp_table: FfxFsr2InstanceFunctionPointerTableVk,
+    create_flags: FfxFsr2InitializationFlagBits,
+    #[derivative(Debug = "ignore")]
+    device: VkDevice,
+    #[derivative(Debug = "ignore")]
+    phys_device: VkPhysicalDevice,
 }
 
 /// Experimental reactive mask generation parameters
@@ -181,7 +189,105 @@ pub struct Fsr2ContextCreateInfo<'a> {
     pub display_size: FfxDimensions2D,
 }
 
+struct Ptr<T>(pub *mut T);
+
+unsafe impl<T> Send for Ptr<T> {}
+
 impl Fsr2Context {
+    /// Creates the FSR2 context.
+    /// If the scratch data still fit inside the old scratch data, this does not allocate
+    /// any new scratch data.
+    /// Otherwise, a new buffer is returned
+    unsafe fn create_context(
+        fp_table: FfxFsr2InstanceFunctionPointerTableVk,
+        device: VkDevice,
+        phys_device: VkPhysicalDevice,
+        flags: FfxFsr2InitializationFlagBits,
+        display_size: FfxDimensions2D,
+        max_render_size: FfxDimensions2D,
+        old_scratch_data: Option<&mut Box<[u8]>>,
+    ) -> Result<(FfxFsr2Context, FfxFsr2Interface, Option<Box<[u8]>>)> {
+        // First allocate a scratch buffer for backend instance data.
+        // SAFETY: We assume a valid VkPhysicalDevice was passed in.
+        let scratch_size = ffxFsr2GetScratchMemorySizeVK(phys_device, &fp_table);
+
+        let (scratch_data, scratch_pointer) = match old_scratch_data {
+            None => {
+                let data = Box::new_zeroed_slice(scratch_size);
+                // SAFETY: We do not care about the contents of this buffer, so we assume it is initialized and let
+                // the FSR2 API handle its contents.
+                let mut data = data.assume_init();
+                let ptr = data.as_mut_ptr();
+                (Some(data), ptr)
+            }
+            Some(data) => {
+                // Buffer still large enough, we don't need to allocate a new one
+                if data.len() >= scratch_size {
+                    (None, data.as_mut_ptr())
+                } else {
+                    // Allocate a new buffer
+                    let mut data = Box::new_zeroed_slice(scratch_size);
+                    // SAFETY: We do not care about the contents of this buffer, so we assume it is initialized and let
+                    // the FSR2 API handle its contents.
+                    let mut data = data.assume_init();
+                    let ptr = data.as_mut_ptr();
+                    (Some(data), ptr)
+                }
+            }
+        };
+        // Create the backend interface. We create an uninitialized interface struct first and let the API function
+        // fill it in.
+        let mut interface = MaybeUninit::<FfxFsr2Interface>::uninit();
+        let err = ffxFsr2GetInterfaceVK(
+            interface.as_mut_ptr(),
+            scratch_pointer as *mut c_void,
+            scratch_size,
+            phys_device,
+            &fp_table,
+        );
+        check_fsr2_error(err)?;
+
+        // SAFETY: We just initialized the interface using the FSR2 API call above.
+        let interface = interface.assume_init();
+
+        // Now that we have the backend interface we can create the FSR2 context. We use the same strategy to
+        // defer initialization to the API as above
+        let mut context = MaybeUninit::<FfxFsr2Context>::uninit();
+
+        // Obtain FSR2 device
+        let device = ffxGetDeviceVK(device);
+
+        let info = FfxFsr2ContextDescription {
+            flags,
+            max_render_size,
+            display_size,
+            callbacks: interface,
+            device,
+            fp_message: fsr2_message_callback,
+        };
+
+        // With validation enabled, FSR2 initialization overflows the stack,
+        // possibly because of large shader binaries? As a workaround, we move
+        // initialization to a separate thread with a larger stack size.
+
+        let context_ptr = Ptr(context.as_mut_ptr());
+        let err = std::thread::Builder::new()
+            .name("phobos::fsr2 context init".into())
+            .stack_size(4 * 1024 * 1024)
+            .spawn(move || {
+                let ptr = context_ptr;
+                ffxFsr2ContextCreate(ptr.0, &info)
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+        check_fsr2_error(err)?;
+
+        let context = context.assume_init();
+
+        Ok((context, interface, scratch_data))
+    }
+
     pub(crate) fn new(info: Fsr2ContextCreateInfo) -> Result<Self> {
         unsafe {
             // Build a function pointer table with vulkan functions to pass to FSR2
@@ -197,69 +303,20 @@ impl Fsr2Context {
                 fp_get_physical_device_features2: std::mem::transmute::<_, _>(functions_1_1.get_physical_device_features2),
             };
 
-            let physical_device = VkPhysicalDevice::from_raw(info.physical_device.as_raw());
-            // First allocate a scratch buffer for backend instance data.
-            // SAFETY: We assume a valid VkPhysicalDevice was passed in.
-            let scratch_size = ffxFsr2GetScratchMemorySizeVK(physical_device, &fp_table);
-            let scratch_data = Box::new_zeroed_slice(scratch_size);
+            let phys_device = VkPhysicalDevice::from_raw(info.physical_device.as_raw());
+            let device = VkDevice::from_raw(info.device.as_raw());
 
-            // SAFETY: We do not care about the contents of this buffer, so we assume it is initialized and let
-            // the FSR2 API handle its contents.
-            let mut scratch_data = scratch_data.assume_init();
-
-            // Create the backend interface. We create an uninitialized interface struct first and let the API function
-            // fill it in.
-            let mut interface = MaybeUninit::<FfxFsr2Interface>::uninit();
-            let err = ffxFsr2GetInterfaceVK(
-                interface.as_mut_ptr(),
-                scratch_data.as_mut_ptr() as *mut c_void,
-                scratch_size,
-                physical_device,
-                &fp_table,
-            );
-            check_fsr2_error(err)?;
-
-            // SAFETY: We just initialized the interface using the FSR2 API call above.
-            let interface = interface.assume_init();
-
-            // Now that we have the backend interface we can create the FSR2 context. We use the same strategy to
-            // defer initialization to the API as above
-            let mut context = MaybeUninit::<FfxFsr2Context>::uninit();
-
-            // Obtain FSR2 device
-            let vk_device = VkDevice::from_raw(info.device.as_raw());
-            let device = ffxGetDeviceVK(vk_device);
-
-            let info = FfxFsr2ContextDescription {
-                flags: info.flags,
-                max_render_size: info.max_render_size,
-                display_size: info.display_size,
-                callbacks: interface,
+            let (context, backend, scratch) = Self::create_context(
+                fp_table,
                 device,
-                fp_message: fsr2_message_callback,
-            };
-
-            // With validation enabled, FSR2 initialization overflows the stack,
-            // possibly because of large shader binaries? As a workaround, we move
-            // initialization to a separate thread with a larger stack size.
-
-            struct Ptr<T>(pub *mut T);
-            unsafe impl<T> Send for Ptr<T> {}
-
-            let context_ptr = Ptr(context.as_mut_ptr());
-            let err = std::thread::Builder::new()
-                .name("phobos::fsr2 context init".into())
-                .stack_size(4 * 1024 * 1024)
-                .spawn(move || {
-                    let ptr = context_ptr;
-                    ffxFsr2ContextCreate(ptr.0, &info)
-                })
-                .unwrap()
-                .join()
-                .unwrap();
-            check_fsr2_error(err)?;
-
-            let context = context.assume_init();
+                phys_device,
+                info.flags,
+                info.display_size,
+                info.max_render_size,
+                None,
+            )?;
+            // We didn't provide any old scratch buffer, so this should always contain a new buffer
+            let scratch = scratch.unwrap();
 
             info!(
                 "Initialized FSR2 context. FSR2 version: {}.{}.{}",
@@ -270,9 +327,13 @@ impl Fsr2Context {
 
             Ok(Self {
                 context,
-                backend: interface,
-                backend_scratch_data: scratch_data,
+                backend,
+                backend_scratch_data: scratch,
                 current_frame: 0,
+                fp_table,
+                create_flags: info.flags,
+                device,
+                phys_device,
             })
         }
     }
@@ -367,6 +428,8 @@ impl Fsr2Context {
         check_fsr2_error(error)?;
         Ok((jitter_x, jitter_y))
     }
+
+    pub fn set_display_resolution(&mut self, display_size: FfxDimensions2D, max_render_size: Option<FfxDimensions2D>) {}
 }
 
 unsafe impl Send for Fsr2Context {}

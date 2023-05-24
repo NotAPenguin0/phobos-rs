@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use ash::vk;
-use fsr2_sys::FfxFloatCoords2D;
+use fsr2_sys::{FfxFloatCoords2D, FfxFsr2InitializationFlagBits};
 use glam::{Mat4, Vec3};
 use winit::event::Event;
 
@@ -230,8 +230,8 @@ impl ExampleApp for Fsr2Sample {
                 y: jitter_y,
             },
             motion_vector_scale: FfxFloatCoords2D {
-                x: self.render_width as f32,
-                y: self.render_height as f32,
+                x: self.render_width as f32 / 2.0,
+                y: self.render_height as f32 / 2.0,
             },
             enable_sharpening: false,
             sharpness: 0.0,
@@ -306,5 +306,11 @@ impl ExampleApp for Fsr2Sample {
 
 fn main() -> Result<()> {
     let window = WindowContext::with_size("04_fsr2", 512.0, 512.0)?;
-    ExampleRunner::new("04_fsr2", Some(&window), |settings| settings.build())?.run::<Fsr2Sample>(Some(window));
+    ExampleRunner::new("04_fsr2", Some(&window), |settings| {
+        settings
+            .fsr2_display_size(512, 512)
+            .fsr2_flags(FfxFsr2InitializationFlagBits::ENABLE_DEBUG_CHECKING | FfxFsr2InitializationFlagBits::ENABLE_AUTO_EXPOSURE)
+            .build()
+    })?
+        .run::<Fsr2Sample>(Some(window));
 }
