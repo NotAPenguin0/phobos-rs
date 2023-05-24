@@ -1,13 +1,22 @@
 use std::ffi::c_void;
 use std::fmt::{Display, Formatter};
 use std::mem::MaybeUninit;
+use std::time::Duration;
 
 use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
-use fsr2_sys::{FfxDimensions2D, FfxErrorCode, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription, ffxFsr2ContextDestroy, ffxFsr2GetInterfaceVK, ffxFsr2GetScratchMemorySizeVK, FfxFsr2InitializationFlagBits, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType, ffxGetDeviceVK, VkDevice, VkGetDeviceProcAddrFunc, VkPhysicalDevice};
+use fsr2_sys::{
+    FfxDimensions2D, FfxErrorCode, FfxFloatCoords2D, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription,
+    ffxFsr2ContextDestroy, ffxFsr2ContextDispatch, FfxFsr2DispatchDescription, ffxFsr2GetInterfaceVK, ffxFsr2GetScratchMemorySizeVK, FfxFsr2InitializationFlagBits, FfxFsr2InstanceFunctionPointerTableVk,
+    FfxFsr2Interface, FfxFsr2MsgType, ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource,
+    FfxResourceState, VkDevice, VkGetDeviceProcAddrFunc, VkPhysicalDevice,
+};
 use thiserror::Error;
 use widestring::{WideChar as wchar_t, WideCStr};
+
+use crate::{ComputeSupport, ImageView, IncompleteCommandBuffer};
+use crate::domain::ExecutionDomain;
 
 #[derive(Debug, Error)]
 pub struct Fsr2Error {
@@ -87,6 +96,63 @@ pub struct Fsr2Context {
     pub context: FfxFsr2Context,
     pub backend: FfxFsr2Interface,
     pub backend_scratch_data: Box<[u8]>,
+}
+
+/// Experimental reactive mask generation parameters
+#[derive(Debug, Clone)]
+pub struct Fsr2AutoReactiveDescription {
+    /// Opaque only color buffer for the current frame, at render resolution
+    pub color_opaque_only: Option<ImageView>,
+    /// Cutoff value for TC
+    pub auto_tc_threshold: f32,
+    /// Value to scale the transparency and composition mask
+    pub auto_tc_scale: f32,
+    /// Value to scale the reactive mask
+    pub auto_reactive_scale: f32,
+    /// Value to clamp the reactive mask
+    pub auto_reactive_max: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct Fsr2DispatchDescription {
+    /// Color buffer for the current frame, at render resolution.
+    pub color: ImageView,
+    /// Depth buffer for the current frame, at render resolution
+    pub depth: ImageView,
+    /// Motion vectors for the current frame, at render resolution
+    pub motion_vectors: ImageView,
+    /// Optional 1x1 texture with the exposure value
+    pub exposure: Option<ImageView>,
+    /// Optional resource with the alpha value of reactive objects in the scene
+    pub reactive: Option<ImageView>,
+    /// Optional resource with the alpha value of special objects in the scene
+    pub transparency_and_composition: Option<ImageView>,
+    /// Output color buffer for the current frame at presentation resolution
+    pub output: ImageView,
+    /// Subpixel jitter offset applied to the camera
+    pub jitter_offset: FfxFloatCoords2D,
+    /// Scale factor to apply to motion vectors
+    pub motion_vector_scale: FfxFloatCoords2D,
+    /// Enable additional sharpening
+    pub enable_sharpening: bool,
+    /// 0..1 value for sharpening, where 0 is no additional sharpness
+    pub sharpness: f32,
+    /// Delta time between this frame and the previous frame
+    pub frametime_delta: Duration,
+    /// Pre exposure value, must be > 0.0
+    pub pre_exposure: f32,
+    /// Indicates the camera has moved discontinuously
+    pub reset: bool,
+    /// Distance to the near plane of the camera
+    pub camera_near: f32,
+    /// Distance to the far plane of the camera
+    pub camera_far: f32,
+    /// Camera angle FOV in the vertical direction, in radians
+    pub camera_fov_vertical: f32,
+    /// The scale factor to convert view space units to meters
+    pub viewspace_to_meters_factor: f32,
+    /// Experimental reactive mask generation parameters
+    pub auto_reactive: Option<Fsr2AutoReactiveDescription>,
 }
 
 extern "system" fn fsr2_message_callback(ty: FfxFsr2MsgType, message: *const wchar_t) {
@@ -171,7 +237,12 @@ impl Fsr2Context {
 
             let context = context.assume_init();
 
-            info!("Initialized FSR2 context");
+            info!(
+                "Initialized FSR2 context. FSR2 version: {}.{}.{}",
+                fsr2_sys::FFX_FSR2_VERSION_MAJOR,
+                fsr2_sys::FFX_FSR2_VERSION_MINOR,
+                fsr2_sys::FFX_FSR2_VERSION_PATCH
+            );
 
             Ok(Self {
                 context,
@@ -179,6 +250,74 @@ impl Fsr2Context {
                 backend_scratch_data: scratch_data,
             })
         }
+    }
+
+    fn get_image_resource(&mut self, image: &ImageView, state: FfxResourceState) -> FfxResource {
+        unsafe {
+            let image_raw = fsr2_sys::VkImage::from_raw(image.image().as_raw());
+            let view_raw = fsr2_sys::VkImageView::from_raw(image.handle().as_raw());
+            ffxGetTextureResourceVK(
+                image_raw,
+                view_raw,
+                image.width(),
+                image.height(),
+                image.format().as_raw(),
+                std::ptr::null(),
+                state,
+            )
+        }
+    }
+
+    fn get_optional_image_resource(&mut self, image: &Option<ImageView>, state: FfxResourceState) -> FfxResource {
+        image
+            .as_ref()
+            .map(|image| self.get_image_resource(image, state))
+            .unwrap_or_else(|| FfxResource::NULL)
+    }
+
+    /// Dispatch FSR2 commands, with no additional synchronization on resources used
+    pub(crate) fn dispatch<D: ExecutionDomain + ComputeSupport>(&mut self, descr: &Fsr2DispatchDescription, cmd: &IncompleteCommandBuffer<D>) -> Result<()> {
+        let cmd_raw = unsafe { fsr2_sys::VkCommandBuffer::from_raw(cmd.handle().as_raw()) };
+        let cmd_list = unsafe { ffxGetCommandListVK(cmd_raw) };
+        if descr.auto_reactive.is_some() {
+            warn!("Auto-reactive is currently not supported. Please open an issue if you would like this added.");
+        }
+        let description = FfxFsr2DispatchDescription {
+            command_list: cmd_list,
+            color: self.get_image_resource(&descr.color, FfxResourceState::COMPUTE_READ),
+            depth: self.get_image_resource(&descr.depth, FfxResourceState::COMPUTE_READ),
+            motion_vectors: self.get_image_resource(&descr.motion_vectors, FfxResourceState::COMPUTE_READ),
+            exposure: self.get_optional_image_resource(&descr.exposure, FfxResourceState::COMPUTE_READ),
+            reactive: self.get_optional_image_resource(&descr.reactive, FfxResourceState::COMPUTE_READ),
+            transparency_and_composition: self.get_optional_image_resource(&descr.transparency_and_composition, FfxResourceState::COMPUTE_READ),
+            output: self.get_image_resource(&descr.output, FfxResourceState::UNORDERED_ACCESS),
+            jitter_offset: descr.jitter_offset,
+            motion_vector_scale: descr.motion_vector_scale,
+            // Infer render size from color resource size
+            render_size: FfxDimensions2D {
+                width: descr.color.width(),
+                height: descr.color.height(),
+            },
+            enable_sharpening: descr.enable_sharpening,
+            sharpness: descr.sharpness,
+            frametime_delta: descr.frametime_delta.as_secs_f32() * 1000.0,
+            pre_exposure: descr.pre_exposure,
+            reset: descr.reset,
+            camera_near: descr.camera_near,
+            camera_far: descr.camera_far,
+            camera_vertical_fov: descr.camera_fov_vertical,
+            viewspace_to_meters_factor: descr.viewspace_to_meters_factor,
+            enable_auto_reactive: false,
+            color_opaque_only: FfxResource::NULL,
+            auto_tc_threshold: 0.0,
+            auto_tc_scale: 0.0,
+            auto_reactive_scale: 0.0,
+            auto_reactive_max: 0.0,
+        };
+
+        let err = unsafe { ffxFsr2ContextDispatch(&mut self.context, &description) };
+        check_fsr2_error(err)?;
+        Ok(())
     }
 }
 

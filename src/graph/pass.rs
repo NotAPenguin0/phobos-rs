@@ -77,7 +77,7 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
+use crate::{Allocator, ComputeSupport, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::graph::pass_graph::PassResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
@@ -436,5 +436,13 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     /// Obtain a built [`Pass`] object.
     pub fn build(self) -> Pass<'cb, D, U, A> {
         self.inner
+    }
+}
+
+impl<'cb, D: ExecutionDomain + ComputeSupport, U, A: Allocator> PassBuilder<'cb, D, U, A> {
+    #[cfg(feature = "fsr2")]
+    /// Create a pass for FSR2.
+    pub fn fsr2() -> Pass<'cb, D, U, A> {
+        todo!()
     }
 }
