@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::ffi::c_void;
 use std::fmt::{Display, Formatter};
 use std::mem::MaybeUninit;
@@ -15,7 +16,7 @@ use fsr2_sys::{
 use thiserror::Error;
 use widestring::{WideChar as wchar_t, WideCStr};
 
-use crate::{Allocator, ComputeSupport, ImageView, IncompleteCommandBuffer, VirtualResource};
+use crate::{Allocator, ComputeSupport, DeletionQueue, ImageView, IncompleteCommandBuffer, VirtualResource};
 use crate::domain::ExecutionDomain;
 
 #[derive(Debug, Error)]
@@ -101,10 +102,14 @@ pub struct Fsr2Context {
     #[derivative(Debug = "ignore")]
     fp_table: FfxFsr2InstanceFunctionPointerTableVk,
     create_flags: FfxFsr2InitializationFlagBits,
+    display_size: FfxDimensions2D,
+    max_render_size: FfxDimensions2D,
     #[derivative(Debug = "ignore")]
     device: VkDevice,
     #[derivative(Debug = "ignore")]
     phys_device: VkPhysicalDevice,
+    #[derivative(Debug = "ignore")]
+    deferred_backend_delete: DeletionQueue<ReleasedFsr2Context>,
 }
 
 /// Experimental reactive mask generation parameters
@@ -189,15 +194,18 @@ pub struct Fsr2ContextCreateInfo<'a> {
     pub display_size: FfxDimensions2D,
 }
 
+struct ReleasedFsr2Context {
+    pub context: FfxFsr2Context,
+    pub backend: FfxFsr2Interface,
+    pub backend_data: Box<[u8]>,
+}
+
 struct Ptr<T>(pub *mut T);
 
 unsafe impl<T> Send for Ptr<T> {}
 
 impl Fsr2Context {
     /// Creates the FSR2 context.
-    /// If the scratch data still fit inside the old scratch data, this does not allocate
-    /// any new scratch data.
-    /// Otherwise, a new buffer is returned
     unsafe fn create_context(
         fp_table: FfxFsr2InstanceFunctionPointerTableVk,
         device: VkDevice,
@@ -205,36 +213,15 @@ impl Fsr2Context {
         flags: FfxFsr2InitializationFlagBits,
         display_size: FfxDimensions2D,
         max_render_size: FfxDimensions2D,
-        old_scratch_data: Option<&mut Box<[u8]>>,
-    ) -> Result<(FfxFsr2Context, FfxFsr2Interface, Option<Box<[u8]>>)> {
+    ) -> Result<(FfxFsr2Context, FfxFsr2Interface, Box<[u8]>)> {
         // First allocate a scratch buffer for backend instance data.
         // SAFETY: We assume a valid VkPhysicalDevice was passed in.
         let scratch_size = ffxFsr2GetScratchMemorySizeVK(phys_device, &fp_table);
 
-        let (scratch_data, scratch_pointer) = match old_scratch_data {
-            None => {
-                let data = Box::new_zeroed_slice(scratch_size);
-                // SAFETY: We do not care about the contents of this buffer, so we assume it is initialized and let
-                // the FSR2 API handle its contents.
-                let mut data = data.assume_init();
-                let ptr = data.as_mut_ptr();
-                (Some(data), ptr)
-            }
-            Some(data) => {
-                // Buffer still large enough, we don't need to allocate a new one
-                if data.len() >= scratch_size {
-                    (None, data.as_mut_ptr())
-                } else {
-                    // Allocate a new buffer
-                    let mut data = Box::new_zeroed_slice(scratch_size);
-                    // SAFETY: We do not care about the contents of this buffer, so we assume it is initialized and let
-                    // the FSR2 API handle its contents.
-                    let mut data = data.assume_init();
-                    let ptr = data.as_mut_ptr();
-                    (Some(data), ptr)
-                }
-            }
-        };
+        let scratch_data = Box::new_zeroed_slice(scratch_size);
+        let mut scratch_data = scratch_data.assume_init();
+        let scratch_pointer = scratch_data.as_mut_ptr();
+
         // Create the backend interface. We create an uninitialized interface struct first and let the API function
         // fill it in.
         let mut interface = MaybeUninit::<FfxFsr2Interface>::uninit();
@@ -313,10 +300,7 @@ impl Fsr2Context {
                 info.flags,
                 info.display_size,
                 info.max_render_size,
-                None,
             )?;
-            // We didn't provide any old scratch buffer, so this should always contain a new buffer
-            let scratch = scratch.unwrap();
 
             info!(
                 "Initialized FSR2 context. FSR2 version: {}.{}.{}",
@@ -332,8 +316,11 @@ impl Fsr2Context {
                 current_frame: 0,
                 fp_table,
                 create_flags: info.flags,
+                display_size: info.display_size,
+                max_render_size: info.max_render_size,
                 device,
                 phys_device,
+                deferred_backend_delete: DeletionQueue::new(4),
             })
         }
     }
@@ -369,6 +356,8 @@ impl Fsr2Context {
         resources: &Fsr2DispatchResources,
         cmd: &IncompleteCommandBuffer<D, A>,
     ) -> Result<()> {
+        // Clean up old fsr2 contexts after resizes
+        self.deferred_backend_delete.next_frame();
         let cmd_raw = unsafe { fsr2_sys::VkCommandBuffer::from_raw(cmd.handle().as_raw()) };
         let cmd_list = unsafe { ffxGetCommandListVK(cmd_raw) };
         if descr.auto_reactive.is_some() {
@@ -429,7 +418,43 @@ impl Fsr2Context {
         Ok((jitter_x, jitter_y))
     }
 
-    pub fn set_display_resolution(&mut self, display_size: FfxDimensions2D, max_render_size: Option<FfxDimensions2D>) {}
+    pub fn set_display_resolution(&mut self, display_size: FfxDimensions2D, max_render_size: Option<FfxDimensions2D>) -> Result<()> {
+        // Create new context if something changed
+        let max_render_size = max_render_size.unwrap_or(display_size);
+        if display_size.width == self.display_size.width
+            && display_size.height == self.display_size.height
+            && self.max_render_size.width == max_render_size.width
+            && self.max_render_size.height == max_render_size.height
+        {
+            // nothing to do
+            return Ok(());
+        }
+        let (context, backend, scratch) = unsafe {
+            Self::create_context(
+                self.fp_table,
+                self.device,
+                self.phys_device,
+                self.create_flags,
+                display_size,
+                max_render_size,
+            )?
+        };
+        // Swap out scratch data
+        let old_scratch = std::mem::replace(&mut self.backend_scratch_data, scratch);
+        // Defer deletion of old context
+        self.deferred_backend_delete.push(ReleasedFsr2Context {
+            context: self.context,
+            backend: self.backend,
+            backend_data: old_scratch,
+        });
+        // Set new context data
+        self.display_size = display_size;
+        self.max_render_size = max_render_size;
+        self.context = context;
+        self.backend = backend;
+        self.current_frame = 0;
+        Ok(())
+    }
 }
 
 unsafe impl Send for Fsr2Context {}

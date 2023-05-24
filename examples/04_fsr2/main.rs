@@ -2,13 +2,13 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use ash::vk;
-use fsr2_sys::{FfxFloatCoords2D, FfxFsr2InitializationFlagBits};
+use fsr2_sys::{FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits};
 use glam::{Mat4, Vec3};
-use winit::event::Event;
+use winit::event::{Event, WindowEvent};
 
 use phobos::{
-    GraphicsCmdBuffer, image, Image, ImageView, IncompleteCmdBuffer, InFlightContext, Pass, PassBuilder, PassGraph, PhysicalResourceBindings, PipelineBuilder,
-    PipelineStage, RecordGraphToCommandBuffer, Sampler,
+    DeletionQueue, GraphicsCmdBuffer, image, Image, ImageView, IncompleteCmdBuffer, InFlightContext, Pass, PassBuilder, PassGraph, PhysicalResourceBindings,
+    PipelineBuilder, PipelineStage, RecordGraphToCommandBuffer, Sampler,
 };
 use phobos::domain::All;
 use phobos::fsr2::Fsr2DispatchDescription;
@@ -62,6 +62,48 @@ struct Fsr2Sample {
     pub render_height: u32,
     pub display_width: u32,
     pub display_height: u32,
+    pub deferred_delete: DeletionQueue<Attachment>,
+    pub ctx: Context,
+}
+
+struct Attachments {
+    pub color: Attachment,
+    pub depth: Attachment,
+    pub motion: Attachment,
+    pub color_upscaled: Attachment,
+}
+
+fn make_attachments(mut ctx: Context, render_width: u32, render_height: u32, display_width: u32, display_height: u32) -> Result<Attachments> {
+    Ok(Attachments {
+        color: Attachment::new(
+            &mut ctx,
+            vk::Format::R32G32B32A32_SFLOAT,
+            render_width,
+            render_height,
+            vk::ImageUsageFlags::SAMPLED,
+        )?,
+        depth: Attachment::new(
+            &mut ctx,
+            vk::Format::D32_SFLOAT,
+            render_width,
+            render_height,
+            vk::ImageUsageFlags::SAMPLED,
+        )?,
+        motion: Attachment::new(
+            &mut ctx,
+            vk::Format::R16G16_SFLOAT,
+            render_width,
+            render_height,
+            vk::ImageUsageFlags::SAMPLED,
+        )?,
+        color_upscaled: Attachment::new(
+            &mut ctx,
+            vk::Format::R32G32B32A32_SFLOAT,
+            display_width,
+            display_height,
+            vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED,
+        )?,
+    })
 }
 
 impl ExampleApp for Fsr2Sample {
@@ -106,35 +148,18 @@ impl ExampleApp for Fsr2Sample {
         let display_width = 512;
         let display_height = 512;
 
+        let Attachments {
+            color,
+            depth,
+            motion,
+            color_upscaled,
+        } = make_attachments(ctx.clone(), render_width, render_height, display_width, display_height)?;
+
         Ok(Self {
-            color: Attachment::new(
-                &mut ctx,
-                vk::Format::R32G32B32A32_SFLOAT,
-                render_width,
-                render_height,
-                vk::ImageUsageFlags::SAMPLED,
-            )?,
-            depth: Attachment::new(
-                &mut ctx,
-                vk::Format::D32_SFLOAT,
-                render_width,
-                render_height,
-                vk::ImageUsageFlags::SAMPLED,
-            )?,
-            motion_vectors: Attachment::new(
-                &mut ctx,
-                vk::Format::R16G16_SFLOAT,
-                render_width,
-                render_height,
-                vk::ImageUsageFlags::SAMPLED,
-            )?,
-            color_upscaled: Attachment::new(
-                &mut ctx,
-                vk::Format::R32G32B32A32_SFLOAT,
-                display_width,
-                display_height,
-                vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::SAMPLED,
-            )?,
+            color,
+            depth,
+            motion_vectors: motion,
+            color_upscaled,
             sampler,
             previous_time: Instant::now(),
             previous_matrix: Mat4::IDENTITY,
@@ -143,15 +168,64 @@ impl ExampleApp for Fsr2Sample {
             render_height,
             display_width,
             display_height,
+            deferred_delete: DeletionQueue::new(4),
+            ctx,
         })
     }
 
     fn handle_event(&mut self, event: &Event<()>) -> Result<()> {
         self.camera.controls(event);
+        // Resize if necessary
+        if let Event::WindowEvent {
+            event,
+            ..
+        } = event
+        {
+            if let WindowEvent::Resized(size) = event {
+                // If the window was resized, recreate the FSR2 context and attachments with new display size
+                self.display_width = size.width;
+                self.display_height = size.height;
+                self.render_width = size.width;
+                self.render_height = size.height;
+
+                let Attachments {
+                    mut color,
+                    mut depth,
+                    mut motion,
+                    mut color_upscaled,
+                } = make_attachments(
+                    self.ctx.clone(),
+                    self.render_width,
+                    self.render_height,
+                    self.display_width,
+                    self.display_height,
+                )?;
+
+                std::mem::swap(&mut self.color, &mut color);
+                std::mem::swap(&mut self.depth, &mut depth);
+                std::mem::swap(&mut self.motion_vectors, &mut motion);
+                std::mem::swap(&mut self.color_upscaled, &mut color_upscaled);
+
+                self.deferred_delete.push(color);
+                self.deferred_delete.push(depth);
+                self.deferred_delete.push(motion);
+                self.deferred_delete.push(color_upscaled);
+
+                self.ctx.device.fsr2_context().set_display_resolution(
+                    FfxDimensions2D {
+                        width: self.display_width,
+                        height: self.display_height,
+                    },
+                    None,
+                )?;
+            }
+        }
         Ok(())
     }
 
     fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<SubmitBatch<All>> {
+        self.deferred_delete.next_frame();
+
         let swapchain = image!("swapchain");
         let color = image!("color");
         let depth = image!("depth");

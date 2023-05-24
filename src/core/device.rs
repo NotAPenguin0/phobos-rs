@@ -16,6 +16,7 @@ use fsr2_sys::{FfxDimensions2D, FfxFsr2InitializationFlagBits};
 use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
+#[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2ContextCreateInfo;
 use crate::util::string::unwrap_to_raw_strings;
 

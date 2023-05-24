@@ -257,6 +257,7 @@ pub struct VulkanContext {
     pub instance: VkInstance,
 }
 
+#[derive(Clone)]
 pub struct Context {
     pub device: Device,
     pub exec: ExecutionManager,

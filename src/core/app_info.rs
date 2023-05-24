@@ -97,6 +97,7 @@ pub struct Fsr2Settings {
     pub flags: FfxFsr2InitializationFlagBits,
 }
 
+#[cfg(feature = "fsr2")]
 impl Default for Fsr2Settings {
     fn default() -> Self {
         Self {
