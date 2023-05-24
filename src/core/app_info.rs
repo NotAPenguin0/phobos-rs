@@ -1,6 +1,8 @@
 //! Exposes all structs needed to store initialization parameters.
 
 use ash::vk;
+#[cfg(feature = "fsr2")]
+use fsr2_sys::FfxFsr2InitializationFlagBits;
 
 use crate::core::queue::QueueType;
 use crate::WindowInterface;
@@ -87,6 +89,24 @@ pub struct GPURequirements {
     pub device_extensions: Vec<String>,
 }
 
+#[cfg(feature = "fsr2")]
+#[derive(Debug)]
+pub struct Fsr2Settings {
+    pub display_size: (u32, u32),
+    pub max_render_size: Option<(u32, u32)>,
+    pub flags: FfxFsr2InitializationFlagBits,
+}
+
+impl Default for Fsr2Settings {
+    fn default() -> Self {
+        Self {
+            display_size: (0, 0),
+            max_render_size: None,
+            flags: FfxFsr2InitializationFlagBits::from_bits_retain(0),
+        }
+    }
+}
+
 /// Application settings used to initialize the phobos context.
 #[derive(Debug)]
 pub struct AppSettings<'a, Window: WindowInterface> {
@@ -122,6 +142,8 @@ pub struct AppSettings<'a, Window: WindowInterface> {
     pub scratch_ssbo_size: vk::DeviceSize,
     /// Whether to enable raytracing extensions.
     pub raytracing: bool,
+    #[cfg(feature = "fsr2")]
+    pub fsr2_settings: Fsr2Settings,
 }
 
 impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
@@ -142,6 +164,8 @@ impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
             scratch_ubo_size: 1,
             scratch_ssbo_size: 1,
             raytracing: false,
+            #[cfg(feature = "fsr2")]
+            fsr2_settings: Fsr2Settings::default(),
         }
     }
 }
@@ -243,6 +267,24 @@ impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
     /// - `VK_KHR_ray_tracing_pipeline`
     pub fn raytracing(mut self, enabled: bool) -> Self {
         self.inner.raytracing = enabled;
+        self
+    }
+
+    #[cfg(feature = "fsr2")]
+    pub fn fsr2_display_size(mut self, width: u32, height: u32) -> Self {
+        self.inner.fsr2_settings.display_size = (width, height);
+        self
+    }
+
+    #[cfg(feature = "fsr2")]
+    pub fn fsr2_max_render_size(mut self, width: u32, height: u32) -> Self {
+        self.inner.fsr2_settings.max_render_size = Some((width, height));
+        self
+    }
+
+    #[cfg(feature = "fsr2")]
+    pub fn fsr2_flags(mut self, flags: FfxFsr2InitializationFlagBits) -> Self {
+        self.inner.fsr2_settings.flags = flags;
         self
     }
 

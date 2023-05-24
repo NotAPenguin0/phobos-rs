@@ -325,6 +325,19 @@ impl Device {
 
         unsafe { instance.get_physical_device_properties2(physical_device.handle(), &mut properties2) };
 
+        let display_size = FfxDimensions2D {
+            width: settings.fsr2_settings.display_size.0,
+            height: settings.fsr2_settings.display_size.1,
+        };
+
+        let max_render_size = match settings.fsr2_settings.max_render_size {
+            None => display_size,
+            Some((width, height)) => FfxDimensions2D {
+                width,
+                height,
+            },
+        };
+
         // Create FSR2 context
         #[cfg(feature = "fsr2")]
             let fsr2 = unsafe {
@@ -332,15 +345,9 @@ impl Device {
                 instance: &instance,
                 physical_device: physical_device.handle(),
                 device: handle.handle(),
-                flags: FfxFsr2InitializationFlagBits::ENABLE_DEBUG_CHECKING,
-                max_render_size: FfxDimensions2D {
-                    width: 512,
-                    height: 512,
-                },
-                display_size: FfxDimensions2D {
-                    width: 512,
-                    height: 512,
-                },
+                flags: settings.fsr2_settings.flags,
+                max_render_size,
+                display_size,
             };
             ManuallyDrop::new(Fsr2Context::new(info)?)
         };
