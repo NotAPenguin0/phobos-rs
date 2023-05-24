@@ -5,7 +5,7 @@ use std::ffi::{CStr, CString, NulError};
 use std::fmt::Formatter;
 use std::mem::ManuallyDrop;
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::Result;
 use ash::extensions::{ext, khr};
@@ -46,7 +46,7 @@ impl std::fmt::Display for ExtensionID {
 #[derivative(Debug)]
 struct DeviceInner {
     #[cfg(feature = "fsr2")]
-    fsr2_context: ManuallyDrop<Fsr2Context>,
+    fsr2_context: Mutex<ManuallyDrop<Fsr2Context>>,
     #[derivative(Debug = "ignore")]
     handle: ash::Device,
     queue_families: Vec<u32>,
@@ -324,9 +324,7 @@ impl Device {
 
         // Create FSR2 context
         #[cfg(feature = "fsr2")]
-            let fsr2 = unsafe {
-            ManuallyDrop::new(Fsr2Context::new(&instance, physical_device.handle(), handle.handle())?)
-        };
+            let fsr2 = unsafe { ManuallyDrop::new(Fsr2Context::new(&instance, physical_device.handle(), handle.handle())?) };
 
         let inner = DeviceInner {
             handle,
@@ -339,7 +337,7 @@ impl Device {
             acceleration_structure,
             rt_pipeline,
             #[cfg(feature = "fsr2")]
-            fsr2_context: fsr2,
+            fsr2_context: Mutex::new(fsr2),
         };
 
         Ok(Device {
@@ -496,6 +494,10 @@ impl Device {
     pub fn is_single_queue(&self) -> bool {
         self.inner.queue_families.len() == 1
     }
+
+    pub fn fsr2_context(&self) -> MutexGuard<ManuallyDrop<Fsr2Context>> {
+        self.inner.fsr2_context.lock().unwrap()
+    }
 }
 
 impl Deref for Device {
@@ -510,7 +512,8 @@ impl Drop for DeviceInner {
     fn drop(&mut self) {
         #[cfg(feature = "fsr2")]
         unsafe {
-            ManuallyDrop::drop(&mut self.fsr2_context);
+            let mut fsr2 = self.fsr2_context.lock().unwrap();
+            ManuallyDrop::drop(&mut fsr2);
         }
         #[cfg(feature = "log-objects")]
         trace!("Destroying VkDevice {:p}", self.handle.handle());

@@ -74,12 +74,14 @@
 //!
 //! Binding physical resources and recording is covered under the [`graph`](crate::graph) module documentation.
 
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use ash::vk;
 
-use crate::{Allocator, ComputeSupport, DefaultAllocator, Error, InFlightContext, PhysicalResourceBindings, VirtualResource};
+use crate::{Allocator, ComputeSupport, DefaultAllocator, Device, Error, ImageView, InFlightContext, PhysicalResourceBindings, VirtualResource};
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::fsr2::{Fsr2DispatchDescription, Fsr2DispatchResources};
 use crate::graph::pass_graph::PassResource;
+use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
 use crate::sync::domain::ExecutionDomain;
@@ -439,10 +441,70 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     }
 }
 
+#[cfg(feature = "fsr2")]
+#[derive(Debug, Clone)]
+pub struct Fsr2DispatchVirtualResources {
+    /// Color buffer for the current frame, at render resolution.
+    pub color: VirtualResource,
+    /// Depth buffer for the current frame, at render resolution
+    pub depth: VirtualResource,
+    /// Motion vectors for the current frame, at render resolution
+    pub motion_vectors: VirtualResource,
+    /// Optional 1x1 texture with the exposure value
+    pub exposure: Option<VirtualResource>,
+    /// Optional resource with the alpha value of reactive objects in the scene
+    pub reactive: Option<VirtualResource>,
+    /// Optional resource with the alpha value of special objects in the scene
+    pub transparency_and_composition: Option<VirtualResource>,
+    /// Output color buffer for the current frame at presentation resolution
+    pub output: VirtualResource,
+}
+
+#[cfg(feature = "fsr2")]
+impl Fsr2DispatchVirtualResources {
+    fn resolve_image_resource(resource: &VirtualResource, bindings: &PhysicalResourceBindings) -> Result<ImageView> {
+        let resolved = bindings
+            .resolve(resource)
+            .ok_or_else(|| anyhow!("Missing physical binding for required FSR2 resource: {}", resource.name()))?;
+        let PhysicalResource::Image(image) = &resolved else {
+            bail!("FSR2 resource {} should be an image", resource.name());
+        };
+
+        Ok(image.clone())
+    }
+
+    fn resolve_optional_image_resource(resource: &Option<VirtualResource>, bindings: &PhysicalResourceBindings) -> Result<Option<ImageView>> {
+        match resource {
+            None => Ok(None),
+            Some(resource) => Ok(Some(Self::resolve_image_resource(resource, bindings)?)),
+        }
+    }
+
+    pub fn resolve(&self, bindings: &PhysicalResourceBindings) -> Result<Fsr2DispatchResources> {
+        Ok(Fsr2DispatchResources {
+            color: Self::resolve_image_resource(&self.color, bindings)?,
+            depth: Self::resolve_image_resource(&self.depth, bindings)?,
+            motion_vectors: Self::resolve_image_resource(&self.motion_vectors, bindings)?,
+            exposure: Self::resolve_optional_image_resource(&self.exposure, bindings)?,
+            reactive: Self::resolve_optional_image_resource(&self.reactive, bindings)?,
+            transparency_and_composition: Self::resolve_optional_image_resource(&self.transparency_and_composition, bindings)?,
+            output: Self::resolve_image_resource(&self.output, bindings)?,
+        })
+    }
+}
+
 impl<'cb, D: ExecutionDomain + ComputeSupport, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     #[cfg(feature = "fsr2")]
     /// Create a pass for FSR2.
-    pub fn fsr2() -> Pass<'cb, D, U, A> {
-        todo!()
+    pub fn fsr2(device: Device, descr: Fsr2DispatchDescription, resources: Fsr2DispatchVirtualResources) -> Pass<'cb, D, U, A> {
+        let pass = PassBuilder::<'cb, D, U, A>::new("fsr2")
+            .execute_fn(move |cmd, _, bindings, _| {
+                let resolved_resources = resources.resolve(bindings)?;
+                let mut fsr2 = device.fsr2_context();
+                fsr2.dispatch(&descr, &resolved_resources, &cmd)?;
+                Ok(cmd)
+            })
+            .build();
+        pass
     }
 }

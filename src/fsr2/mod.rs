@@ -15,7 +15,7 @@ use fsr2_sys::{
 use thiserror::Error;
 use widestring::{WideChar as wchar_t, WideCStr};
 
-use crate::{ComputeSupport, ImageView, IncompleteCommandBuffer};
+use crate::{Allocator, ComputeSupport, ImageView, IncompleteCommandBuffer, VirtualResource};
 use crate::domain::ExecutionDomain;
 
 #[derive(Debug, Error)]
@@ -114,7 +114,7 @@ pub struct Fsr2AutoReactiveDescription {
 }
 
 #[derive(Debug, Clone)]
-pub struct Fsr2DispatchDescription {
+pub struct Fsr2DispatchResources {
     /// Color buffer for the current frame, at render resolution.
     pub color: ImageView,
     /// Depth buffer for the current frame, at render resolution
@@ -129,6 +129,10 @@ pub struct Fsr2DispatchDescription {
     pub transparency_and_composition: Option<ImageView>,
     /// Output color buffer for the current frame at presentation resolution
     pub output: ImageView,
+}
+
+#[derive(Debug, Clone)]
+pub struct Fsr2DispatchDescription {
     /// Subpixel jitter offset applied to the camera
     pub jitter_offset: FfxFloatCoords2D,
     /// Scale factor to apply to motion vectors
@@ -276,7 +280,12 @@ impl Fsr2Context {
     }
 
     /// Dispatch FSR2 commands, with no additional synchronization on resources used
-    pub(crate) fn dispatch<D: ExecutionDomain + ComputeSupport>(&mut self, descr: &Fsr2DispatchDescription, cmd: &IncompleteCommandBuffer<D>) -> Result<()> {
+    pub(crate) fn dispatch<D: ExecutionDomain + ComputeSupport, A: Allocator>(
+        &mut self,
+        descr: &Fsr2DispatchDescription,
+        resources: &Fsr2DispatchResources,
+        cmd: &IncompleteCommandBuffer<D, A>,
+    ) -> Result<()> {
         let cmd_raw = unsafe { fsr2_sys::VkCommandBuffer::from_raw(cmd.handle().as_raw()) };
         let cmd_list = unsafe { ffxGetCommandListVK(cmd_raw) };
         if descr.auto_reactive.is_some() {
@@ -284,19 +293,19 @@ impl Fsr2Context {
         }
         let description = FfxFsr2DispatchDescription {
             command_list: cmd_list,
-            color: self.get_image_resource(&descr.color, FfxResourceState::COMPUTE_READ),
-            depth: self.get_image_resource(&descr.depth, FfxResourceState::COMPUTE_READ),
-            motion_vectors: self.get_image_resource(&descr.motion_vectors, FfxResourceState::COMPUTE_READ),
-            exposure: self.get_optional_image_resource(&descr.exposure, FfxResourceState::COMPUTE_READ),
-            reactive: self.get_optional_image_resource(&descr.reactive, FfxResourceState::COMPUTE_READ),
-            transparency_and_composition: self.get_optional_image_resource(&descr.transparency_and_composition, FfxResourceState::COMPUTE_READ),
-            output: self.get_image_resource(&descr.output, FfxResourceState::UNORDERED_ACCESS),
+            color: self.get_image_resource(&resources.color, FfxResourceState::COMPUTE_READ),
+            depth: self.get_image_resource(&resources.depth, FfxResourceState::COMPUTE_READ),
+            motion_vectors: self.get_image_resource(&resources.motion_vectors, FfxResourceState::COMPUTE_READ),
+            exposure: self.get_optional_image_resource(&resources.exposure, FfxResourceState::COMPUTE_READ),
+            reactive: self.get_optional_image_resource(&resources.reactive, FfxResourceState::COMPUTE_READ),
+            transparency_and_composition: self.get_optional_image_resource(&resources.transparency_and_composition, FfxResourceState::COMPUTE_READ),
+            output: self.get_image_resource(&resources.output, FfxResourceState::UNORDERED_ACCESS),
             jitter_offset: descr.jitter_offset,
             motion_vector_scale: descr.motion_vector_scale,
             // Infer render size from color resource size
             render_size: FfxDimensions2D {
-                width: descr.color.width(),
-                height: descr.color.height(),
+                width: resources.color.width(),
+                height: resources.color.height(),
             },
             enable_sharpening: descr.enable_sharpening,
             sharpness: descr.sharpness,
