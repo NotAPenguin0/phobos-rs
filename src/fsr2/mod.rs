@@ -9,12 +9,12 @@ use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
 use fsr2_sys::{
-    FfxErrorCode, FfxFloatCoords2D, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription, ffxFsr2ContextDestroy,
+    FfxErrorCode, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription, ffxFsr2ContextDestroy,
     ffxFsr2ContextDispatch, FfxFsr2DispatchDescription, ffxFsr2GetInterfaceVK, ffxFsr2GetJitterOffset, ffxFsr2GetJitterPhaseCount, ffxFsr2GetRenderResolutionFromQualityMode,
     ffxFsr2GetScratchMemorySizeVK, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType,
     ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource, FfxResourceState, VkDevice, VkPhysicalDevice,
 };
-pub use fsr2_sys::{FfxDimensions2D, FfxFsr2InitializationFlagBits, FfxFsr2QualityMode};
+pub use fsr2_sys::{FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits, FfxFsr2QualityMode};
 use thiserror::Error;
 use widestring::{WideChar as wchar_t, WideCStr};
 
