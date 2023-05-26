@@ -114,11 +114,11 @@ struct PerFrame<A> {
 #[derivative(Debug)]
 pub struct InFlightContext {
     /// The current frame's swapchain image
-    pub swapchain_image: Option<ImageView>,
+    pub swapchain_image: ImageView,
     /// The current frame's swapchain image index
-    pub swapchain_image_index: Option<usize>,
-    pub(crate) wait_semaphore: Option<Arc<Semaphore>>,
-    pub(crate) signal_semaphore: Option<Arc<Semaphore>>,
+    pub swapchain_image_index: usize,
+    pub(crate) wait_semaphore: Arc<Semaphore>,
+    pub(crate) signal_semaphore: Arc<Semaphore>,
 }
 
 /// The number of frames in flight. A frame in-flight is a frame that is rendering on the GPU or scheduled to do so.
@@ -384,10 +384,10 @@ impl<A: Allocator> FrameManager<A> {
                 .clone();
 
             let ifc = InFlightContext {
-                swapchain_image: Some(image),
-                swapchain_image_index: Some(self.current_image as usize),
-                wait_semaphore: Some(per_frame.image_ready.clone()),
-                signal_semaphore: Some(per_frame.gpu_finished.clone()),
+                swapchain_image: image,
+                swapchain_image_index: self.current_image as usize,
+                wait_semaphore: per_frame.image_ready.clone(),
+                signal_semaphore: per_frame.gpu_finished.clone(),
             };
             f(ifc)?
         };

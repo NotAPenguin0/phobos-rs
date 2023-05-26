@@ -415,7 +415,7 @@ impl ExampleApp for Fsr2Sample {
             .add_pass(fsr2_pass)?
             .add_pass(output_pass)?;
         let mut bindings = PhysicalResourceBindings::new();
-        bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
+        bindings.bind_image("swapchain", &ifc.swapchain_image);
         bindings.bind_image("color", &self.color.view);
         bindings.bind_image("depth", &self.depth.view);
         bindings.bind_image("motion_vectors", &self.motion_vectors.view);
