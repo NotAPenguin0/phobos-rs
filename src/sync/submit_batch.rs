@@ -94,7 +94,7 @@ impl<D: ExecutionDomain + 'static, A: Allocator> SubmitBatch<D, A> {
     pub fn submit_for_present(
         &mut self,
         cmd: CommandBuffer<D>,
-        ifc: &InFlightContext<A>,
+        ifc: &InFlightContext,
         pool: LocalPool<A>,
     ) -> Result<SubmitHandle> {
         self.submit_for_present_after(cmd, ifc, pool, &[], &[])
@@ -106,7 +106,7 @@ impl<D: ExecutionDomain + 'static, A: Allocator> SubmitBatch<D, A> {
     pub fn submit_for_present_after(
         &mut self,
         cmd: CommandBuffer<D>,
-        ifc: &InFlightContext<A>,
+        ifc: &InFlightContext,
         pool: LocalPool<A>,
         submits: &[SubmitHandle],
         wait_stages: &[PipelineStage],
@@ -159,7 +159,7 @@ impl<D: ExecutionDomain + 'static, A: Allocator> SubmitBatch<D, A> {
     pub fn submit_for_present_after_all(
         &mut self,
         cmd: CommandBuffer<D>,
-        ifc: &InFlightContext<A>,
+        ifc: &InFlightContext,
         pool: LocalPool<A>,
         wait_stage: PipelineStage,
     ) -> Result<SubmitHandle> {
