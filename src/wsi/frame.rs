@@ -70,8 +70,9 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{
-    Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore,
-    Surface, Swapchain, VkInstance, WindowInterface,
+    Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error,
+    ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore, Surface, Swapchain,
+    VkInstance, WindowInterface,
 };
 use crate::allocator::scratch_allocator::ScratchAllocatorCreateInfo;
 use crate::pool::{Poolable, Pooled, ResourcePool};
@@ -160,8 +161,12 @@ impl<A: Allocator> FrameManager<A> {
         // We do want to call cleanup functions now
         frame.fence.wait()?;
         let result = unsafe {
-            self.swapchain
-                .acquire_next_image(self.swapchain.handle(), u64::MAX, frame.image_ready.handle(), vk::Fence::null())
+            self.swapchain.acquire_next_image(
+                self.swapchain.handle(),
+                u64::MAX,
+                frame.image_ready.handle(),
+                vk::Fence::null(),
+            )
         };
 
         match result {
@@ -178,7 +183,11 @@ impl<A: Allocator> FrameManager<A> {
         }
     }
 
-    fn resize_swapchain<Window: WindowInterface>(&mut self, window: &Window, surface: &Surface) -> Result<Swapchain> {
+    fn resize_swapchain<Window: WindowInterface>(
+        &mut self,
+        window: &Window,
+        surface: &Surface,
+    ) -> Result<Swapchain> {
         let mut new_swapchain = Swapchain {
             handle: vk::SwapchainKHR::null(),
             images: vec![],
@@ -217,30 +226,31 @@ impl<A: Allocator> FrameManager<A> {
         new_swapchain.handle = unsafe { self.swapchain.create_swapchain(&info, None)? };
 
         // Now that the new swapchain is created, we still need to acquire the images again.
-        new_swapchain.images = unsafe { self.swapchain.get_swapchain_images(new_swapchain.handle)? }
-            .iter()
-            .map(move |image| -> Result<SwapchainImage> {
-                let image = Image::new_managed(
-                    self.device.clone(),
-                    *image,
-                    new_swapchain.format.format,
-                    vk::Extent3D {
-                        width: new_swapchain.extent.width,
-                        height: new_swapchain.extent.height,
-                        depth: 1,
-                    },
-                    1,
-                    1,
-                    vk::SampleCountFlags::TYPE_1,
-                );
-                // Create a trivial ImageView.
-                let view = image.view(vk::ImageAspectFlags::COLOR)?;
-                Ok(SwapchainImage {
-                    image,
-                    view,
+        new_swapchain.images =
+            unsafe { self.swapchain.get_swapchain_images(new_swapchain.handle)? }
+                .iter()
+                .map(move |image| -> Result<SwapchainImage> {
+                    let image = Image::new_managed(
+                        self.device.clone(),
+                        *image,
+                        new_swapchain.format.format,
+                        vk::Extent3D {
+                            width: new_swapchain.extent.width,
+                            height: new_swapchain.extent.height,
+                            depth: 1,
+                        },
+                        1,
+                        1,
+                        vk::SampleCountFlags::TYPE_1,
+                    );
+                    // Create a trivial ImageView.
+                    let view = image.view(vk::ImageAspectFlags::COLOR)?;
+                    Ok(SwapchainImage {
+                        image,
+                        view,
+                    })
                 })
-            })
-            .collect::<Result<Vec<SwapchainImage>>>()?;
+                .collect::<Result<Vec<SwapchainImage>>>()?;
 
         Ok(new_swapchain)
     }
@@ -290,7 +300,9 @@ impl<A: Allocator> FrameManager<A> {
     /// This reference is valid as long as the swapchain is not resized.
     #[allow(dead_code)]
     unsafe fn get_swapchain_image(&self) -> Result<ImageView> {
-        Ok(self.swapchain.images[self.current_image as usize].view.clone())
+        Ok(self.swapchain.images[self.current_image as usize]
+            .view
+            .clone())
     }
 }
 
@@ -334,7 +346,13 @@ impl<A: Allocator> FrameManager<A> {
     /// Obtain a new frame context to run commands in.
     /// This will call the provided callback function to obtain a [`SubmitBatch`](crate::sync::submit_batch::SubmitBatch)
     /// which contains the commands to be submitted for this frame.
-    pub async fn new_frame<Window, D, F>(&mut self, exec: ExecutionManager<A>, window: &Window, surface: &Surface, f: F) -> Result<()>
+    pub async fn new_frame<Window, D, F>(
+        &mut self,
+        exec: ExecutionManager<A>,
+        window: &Window,
+        surface: &Surface,
+        f: F,
+    ) -> Result<()>
         where
             Window: WindowInterface,
             D: ExecutionDomain + 'static,
@@ -371,7 +389,9 @@ impl<A: Allocator> FrameManager<A> {
                 unsafe { cmd.delete(exec.clone())? }
             }
             per_frame.command_buffer = None;
-            let image = self.swapchain.images()[self.current_image as usize].view.clone();
+            let image = self.swapchain.images()[self.current_image as usize]
+                .view
+                .clone();
 
             let ifc = InFlightContext::<A> {
                 swapchain_image: Some(image),
@@ -379,25 +399,33 @@ impl<A: Allocator> FrameManager<A> {
                 vertex_allocator: ScratchAllocator::new_in_pool(
                     &self.pool.allocators,
                     &ScratchAllocatorCreateInfo {
-                        usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::VERTEX_BUFFER,
+                        usage: vk::BufferUsageFlags::TRANSFER_DST
+                            | vk::BufferUsageFlags::TRANSFER_SRC
+                            | vk::BufferUsageFlags::VERTEX_BUFFER,
                     },
                 )?,
                 index_allocator: ScratchAllocator::new_in_pool(
                     &self.pool.allocators,
                     &ScratchAllocatorCreateInfo {
-                        usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::INDEX_BUFFER,
+                        usage: vk::BufferUsageFlags::TRANSFER_DST
+                            | vk::BufferUsageFlags::TRANSFER_SRC
+                            | vk::BufferUsageFlags::INDEX_BUFFER,
                     },
                 )?,
                 uniform_allocator: ScratchAllocator::new_in_pool(
                     &self.pool.allocators,
                     &ScratchAllocatorCreateInfo {
-                        usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::UNIFORM_BUFFER,
+                        usage: vk::BufferUsageFlags::TRANSFER_DST
+                            | vk::BufferUsageFlags::TRANSFER_SRC
+                            | vk::BufferUsageFlags::UNIFORM_BUFFER,
                     },
                 )?,
                 storage_allocator: ScratchAllocator::new_in_pool(
                     &self.pool.allocators,
                     &ScratchAllocatorCreateInfo {
-                        usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::STORAGE_BUFFER,
+                        usage: vk::BufferUsageFlags::TRANSFER_DST
+                            | vk::BufferUsageFlags::TRANSFER_SRC
+                            | vk::BufferUsageFlags::STORAGE_BUFFER,
                     },
                 )?,
                 wait_semaphore: Some(per_frame.image_ready.clone()),

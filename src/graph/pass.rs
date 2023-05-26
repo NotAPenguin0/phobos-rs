@@ -60,7 +60,7 @@
 //!                       Some(vk::ClearColorValue{ float32: [0.0, 0.0, 0.0, 1.0] }))?
 //!     // We sample the input resource in the fragment shader.
 //!     .sample_image(&input_resource, PipelineStage::FRAGMENT_SHADER)
-//!     .execute_fn(|mut cmd, ifc, bindings, _| {
+//!     .execute_fn(|mut cmd, local_pool, bindings, _| {
 //!         // Draw a fullscreen quad using our sample pipeline and a descriptor set pointing to the input resource.
 //!         // This assumes we created a pipeline before and a sampler before, and that we bind the proper resources
 //!         // before recording the graph.
@@ -85,6 +85,7 @@ use crate::graph::pass_graph::PassResource;
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
+use crate::pool::LocalPool;
 use crate::sync::domain::ExecutionDomain;
 
 /// The returned value from a pass callback function.
@@ -96,7 +97,7 @@ pub trait PassExecutor<D: ExecutionDomain, U, A: Allocator> {
     fn execute<'q>(
         &mut self,
         cmd: IncompleteCommandBuffer<'q, D, A>,
-        ifc: &mut InFlightContext<A>,
+        local_pool: &mut LocalPool<A>,
         bindings: &PhysicalResourceBindings,
         user_data: &mut U,
     ) -> PassFnResult<'q, D, A>;
@@ -106,17 +107,17 @@ impl<D, U, A, F> PassExecutor<D, U, A> for F
     where
         D: ExecutionDomain,
         A: Allocator,
-        F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A>,
+        F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut LocalPool<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A>,
 {
     /// Record this pass to a command buffer by calling the given function.
     fn execute<'q>(
         &mut self,
         cmd: IncompleteCommandBuffer<'q, D, A>,
-        ifc: &mut InFlightContext<A>,
+        local_pool: &mut LocalPool<A>,
         bindings: &PhysicalResourceBindings,
         user_data: &mut U,
     ) -> PassFnResult<'q, D, A> {
-        self(cmd, ifc, bindings, user_data)
+        self(cmd, local_pool, bindings, user_data)
     }
 }
 
@@ -142,7 +143,7 @@ impl<D: ExecutionDomain, U, A: Allocator> PassExecutor<D, U, A> for EmptyPassExe
     fn execute<'q>(
         &mut self,
         cmd: IncompleteCommandBuffer<'q, D, A>,
-        _ifc: &mut InFlightContext<A>,
+        _local_pool: &mut LocalPool<A>,
         _bindings: &PhysicalResourceBindings,
         _user_data: &mut U,
     ) -> PassFnResult<'q, D, A> {
@@ -438,7 +439,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     /// when a function is used as a pass executor.
     pub fn execute_fn<F>(mut self, exec: F) -> Self
         where
-            F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut InFlightContext<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A> + 'cb, {
+            F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut LocalPool<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A> + 'cb, {
         self.inner.execute = Box::new(exec);
         self
     }

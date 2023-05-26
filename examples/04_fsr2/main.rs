@@ -2,20 +2,26 @@ use std::time::Instant;
 
 use anyhow::Result;
 use ash::vk;
-use fsr2_sys::{FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits, FfxFsr2QualityMode};
+use fsr2_sys::{
+    FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits, FfxFsr2QualityMode,
+};
 use glam::{Mat4, Vec3};
 use winit::event::{Event, WindowEvent};
 
 use phobos::{
-    DeletionQueue, GraphicsCmdBuffer, image, Image, ImageView, IncompleteCmdBuffer, InFlightContext, PassBuilder, PassGraph, PhysicalResourceBindings,
-    PipelineBuilder, PipelineStage, RecordGraphToCommandBuffer, Sampler,
+    DeletionQueue, GraphicsCmdBuffer, image, Image, ImageView, IncompleteCmdBuffer,
+    InFlightContext, PassBuilder, PassGraph, PhysicalResourceBindings, PipelineBuilder,
+    PipelineStage, RecordGraphToCommandBuffer, Sampler,
 };
 use phobos::domain::All;
 use phobos::fsr2::Fsr2DispatchDescription;
 use phobos::graph::pass::Fsr2DispatchVirtualResources;
+use phobos::pool::LocalPool;
 use phobos::sync::submit_batch::SubmitBatch;
 
-use crate::example_runner::{Camera, Context, create_shader, ExampleApp, ExampleRunner, WindowContext};
+use crate::example_runner::{
+    Camera, Context, create_shader, ExampleApp, ExampleRunner, WindowContext,
+};
 
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
@@ -27,7 +33,13 @@ struct Attachment {
 }
 
 impl Attachment {
-    pub fn new(ctx: &mut Context, format: vk::Format, width: u32, height: u32, extra_usage: vk::ImageUsageFlags) -> Result<Self> {
+    pub fn new(
+        ctx: &mut Context,
+        format: vk::Format,
+        width: u32,
+        height: u32,
+        extra_usage: vk::ImageUsageFlags,
+    ) -> Result<Self> {
         let (usage, aspect) = if format == vk::Format::D32_SFLOAT {
             (vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT, vk::ImageAspectFlags::DEPTH)
         } else {
@@ -75,7 +87,13 @@ struct Attachments {
     pub color_upscaled: Attachment,
 }
 
-fn make_attachments(mut ctx: Context, render_width: u32, render_height: u32, display_width: u32, display_height: u32) -> Result<Attachments> {
+fn make_attachments(
+    mut ctx: Context,
+    render_width: u32,
+    render_height: u32,
+    display_width: u32,
+    display_height: u32,
+) -> Result<Attachments> {
     Ok(Attachments {
         color: Attachment::new(
             &mut ctx,
@@ -114,8 +132,10 @@ impl ExampleApp for Fsr2Sample {
             Self: Sized, {
         // Create pipelines
 
-        let vertex = create_shader("examples/data/fsr_render_vert.spv", vk::ShaderStageFlags::VERTEX);
-        let fragment = create_shader("examples/data/fsr_render_frag.spv", vk::ShaderStageFlags::FRAGMENT);
+        let vertex =
+            create_shader("examples/data/fsr_render_vert.spv", vk::ShaderStageFlags::VERTEX);
+        let fragment =
+            create_shader("examples/data/fsr_render_frag.spv", vk::ShaderStageFlags::FRAGMENT);
 
         let pci = PipelineBuilder::new("render")
             .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR])
@@ -158,7 +178,13 @@ impl ExampleApp for Fsr2Sample {
             depth,
             motion,
             color_upscaled,
-        } = make_attachments(ctx.clone(), render_width, render_height, display_width, display_height)?;
+        } = make_attachments(
+            ctx.clone(),
+            render_width,
+            render_height,
+            display_width,
+            display_height,
+        )?;
 
         Ok(Self {
             color,
@@ -168,7 +194,10 @@ impl ExampleApp for Fsr2Sample {
             sampler,
             previous_time: Instant::now(),
             previous_matrix: Mat4::IDENTITY,
-            camera: Camera::new(Vec3::new(-3.0, 2.0, 0.0), Vec3::new(-20.0f32.to_radians(), 0.0, 0.0)),
+            camera: Camera::new(
+                Vec3::new(-3.0, 2.0, 0.0),
+                Vec3::new(-20.0f32.to_radians(), 0.0, 0.0),
+            ),
             render_width,
             render_height,
             display_width,
@@ -192,7 +221,11 @@ impl ExampleApp for Fsr2Sample {
                 self.display_width = size.width;
                 self.display_height = size.height;
                 // Get render width/height as function of quality parameter
-                let render_size = self.ctx.device.fsr2_context().get_render_resolution(self.quality)?;
+                let render_size = self
+                    .ctx
+                    .device
+                    .fsr2_context()
+                    .get_render_resolution(self.quality)?;
                 self.render_width = render_size.width;
                 self.render_height = render_size.height;
 
@@ -251,17 +284,24 @@ impl ExampleApp for Fsr2Sample {
 
         let transform = Mat4::IDENTITY;
         let view = self.camera.matrix();
-        let mut projection = Mat4::perspective_infinite_reverse_rh(fov, self.render_width as f32 / self.render_height as f32, near);
+        let mut projection = Mat4::perspective_infinite_reverse_rh(
+            fov,
+            self.render_width as f32 / self.render_height as f32,
+            near,
+        );
         // Jitter projection matrix
         let jitter_projection_x = 2.0 * jitter_x / self.render_width as f32;
         let jitter_projection_y = -2.0 * jitter_y / self.render_height as f32;
-        let jitter_translation_matrix = Mat4::from_translation(Vec3::new(jitter_projection_x, jitter_projection_y, 0.0));
+        let jitter_translation_matrix =
+            Mat4::from_translation(Vec3::new(jitter_projection_x, jitter_projection_y, 0.0));
         projection = jitter_translation_matrix * projection;
         // Flip y because Vulkan
         let v = projection.col_mut(1).y;
         projection.col_mut(1).y = v * -1.0;
         let previous_matrix = self.previous_matrix;
         self.previous_matrix = projection * view * transform;
+
+        let mut pool = LocalPool::new(ctx.pool.clone())?;
 
         let render_pass = PassBuilder::render("main_render")
             .color_attachment(
@@ -286,8 +326,8 @@ impl ExampleApp for Fsr2Sample {
                     stencil: 0,
                 }),
             )?
-            .execute_fn(|cmd, ifc, _, _| {
-                ubo_struct_assign!(data, ifc,
+            .execute_fn(|cmd, pool, _, _| {
+                ubo_struct_assign!(data, pool,
                     struct Data {
                         transform: Mat4 = transform,
                         view: Mat4 = view,
@@ -346,11 +386,18 @@ impl ExampleApp for Fsr2Sample {
                     float32: [0.0, 0.0, 0.0, 0.0],
                 }),
             )?
-            .sample_image(fsr2_pass.output(&color_upscaled).unwrap(), PipelineStage::FRAGMENT_SHADER)
-            .execute_fn(|cmd, ifc, bindings, _| {
-                let vertices: Vec<f32> =
-                    vec![-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
-                let mut vtx_buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
+            .sample_image(
+                fsr2_pass.output(&color_upscaled).unwrap(),
+                PipelineStage::FRAGMENT_SHADER,
+            )
+            .execute_fn(|cmd, local_pool, bindings, _| {
+                let vertices: Vec<f32> = vec![
+                    -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0,
+                    1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
+                ];
+                let mut vtx_buffer = local_pool.allocate_scratch_vbo(
+                    (vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize,
+                )?;
                 let slice = vtx_buffer.mapped_slice::<f32>()?;
                 slice.copy_from_slice(vertices.as_slice());
                 cmd.full_viewport_scissor()
@@ -375,10 +422,10 @@ impl ExampleApp for Fsr2Sample {
         bindings.bind_image("color_upscaled", &self.color_upscaled.view);
         let mut graph = graph.build()?;
         let cmd = ctx.exec.on_domain::<All>()?;
-        let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?;
+        let cmd = graph.record(cmd, &bindings, &mut pool, None, &mut ())?;
         let cmd = cmd.finish()?;
         let mut batch = ctx.exec.start_submit_batch()?;
-        batch.submit_for_present(cmd, &ifc)?;
+        batch.submit_for_present(cmd, &ifc, pool)?;
         Ok(batch)
     }
 }

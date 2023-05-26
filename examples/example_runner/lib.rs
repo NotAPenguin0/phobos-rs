@@ -161,7 +161,7 @@ impl Camera {
 macro_rules! ubo_struct_assign {
     (
         $var:ident,
-        $ifc:ident,
+        $pool:ident,
         struct $name:ident {
             $(
                 $fname:ident:$ftype:ty = $finit:expr,
@@ -173,7 +173,7 @@ macro_rules! ubo_struct_assign {
                 $($fname:$ftype,)*
             }
 
-            let mut buffer_name = $ifc.allocate_scratch_ubo(std::mem::size_of::<$name>() as vk::DeviceSize)?;
+            let mut buffer_name = $pool.allocate_scratch_ubo(std::mem::size_of::<$name>() as vk::DeviceSize)?;
             let $var = buffer_name.mapped_slice::<$name>()?;
             let mut $var = $var.get_mut(0).unwrap();
 
