@@ -93,7 +93,7 @@ impl DescriptorCache {
     }
 
     /// Advance the descriptor cache to the next frame. This allows resources to be reclaimed safely where possible.
-    pub fn next_frame(&mut self) {
+    pub fn next_frame(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.cache.next_frame();
         inner.deferred_pool_delete.next_frame();

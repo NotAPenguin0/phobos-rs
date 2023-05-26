@@ -641,7 +641,7 @@ impl<A: Allocator> PipelineCache<A> {
     }
 
     /// Advance cache resource time to live so resources that have not been used in a while can be cleaned up
-    pub fn next_frame(&mut self) {
+    pub fn next_frame(&self) {
         let mut inner = self.inner.write().unwrap();
         inner.pipelines.next_frame();
         inner.compute_pipelines.next_frame();
