@@ -10,6 +10,7 @@ use ash::prelude::VkResult;
 use ash::vk;
 
 use crate::Device;
+use crate::pool::Poolable;
 
 struct CleanupFnLink<'f> {
     pub f: Box<dyn FnOnce() + 'f>,
@@ -302,5 +303,11 @@ impl<T> Drop for Fence<T> {
         unsafe {
             self.device.destroy_fence(self.handle, None);
         }
+    }
+}
+
+impl<T> Poolable for Fence<T> {
+    fn on_release(&mut self) {
+        self.reset().unwrap();
     }
 }

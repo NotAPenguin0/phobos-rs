@@ -28,13 +28,13 @@
 //! }
 //! ```
 
-
 use anyhow::Result;
 use ash::vk;
 use gpu_allocator::AllocationError::OutOfMemory;
 
 use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};
 use crate::Error::AllocationError;
+use crate::pool::Poolable;
 
 /// A linear allocator used for short-lived resources. A good example of such a resource is a buffer
 /// that needs to be updated every frame, like a uniform buffer for transform data.
@@ -168,5 +168,11 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// ```
     pub unsafe fn reset(&mut self) {
         self.offset = 0;
+    }
+}
+
+impl Poolable for ScratchAllocator {
+    fn on_release(&mut self) {
+        unsafe { self.reset() }
     }
 }
