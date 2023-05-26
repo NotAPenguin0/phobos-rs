@@ -5,8 +5,9 @@ use std::sync::Arc;
 use anyhow::{ensure, Result};
 use ash::vk;
 
-use crate::{Allocator, CmdBuffer, Device, ExecutionManager, Fence, InFlightContext, PipelineStage, Semaphore};
+use crate::{Allocator, CmdBuffer, DefaultAllocator, Device, ExecutionManager, Fence, InFlightContext, PipelineStage, Semaphore};
 use crate::command_buffer::CommandBuffer;
+use crate::pool::{Poolable, Pooled, ResourcePool};
 use crate::sync::domain::ExecutionDomain;
 
 #[derive(Debug)]
@@ -27,19 +28,21 @@ pub struct SubmitHandle {
 /// A batch of submits containing multiple command buffers that possibly
 /// wait on each other using semaphores. An example usage is given in the documentation for
 /// [`ExecutionManager::start_submit_batch`].
-#[derive(Debug)]
-pub struct SubmitBatch<D: ExecutionDomain> {
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct SubmitBatch<D: ExecutionDomain, A: Allocator = DefaultAllocator> {
     device: Device,
-    exec: ExecutionManager,
+    exec: ExecutionManager<A>,
     submits: Vec<SubmitInfo<D>>,
-    signal_fence: Fence,
+    #[derivative(Debug = "ignore")]
+    signal_fence: Pooled<Fence>,
 }
 
-impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
-    pub(crate) fn new(device: Device, exec: ExecutionManager) -> Result<Self> {
+impl<D: ExecutionDomain + 'static, A: Allocator> SubmitBatch<D, A> {
+    pub(crate) fn new(device: Device, exec: ExecutionManager<A>, pool: &ResourcePool<A>) -> Result<Self> {
         Ok(Self {
             submits: vec![],
-            signal_fence: Fence::new(device.clone(), false)?,
+            signal_fence: Fence::new_in_pool(&pool.fences, &())?,
             device,
             exec,
         })
@@ -70,12 +73,12 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
     }
 
     /// Must be used to submit the final command buffer in the frame
-    pub fn submit_for_present<A: Allocator>(&mut self, cmd: CommandBuffer<D>, ifc: &InFlightContext<A>) -> Result<SubmitHandle> {
+    pub fn submit_for_present(&mut self, cmd: CommandBuffer<D>, ifc: &InFlightContext<A>) -> Result<SubmitHandle> {
         self.submit_for_present_after(cmd, ifc, &[], &[])
     }
 
     /// Submit the frame commands, waiting on the given previous submits
-    pub fn submit_for_present_after<A: Allocator>(
+    pub fn submit_for_present_after(
         &mut self,
         cmd: CommandBuffer<D>,
         ifc: &InFlightContext<A>,
@@ -91,7 +94,10 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
             .map(|handle| self.get_submit_semaphore(*handle).unwrap())
             .collect::<Vec<_>>();
         let mut wait_stages = wait_stages.to_vec();
-        let frame_wait_semaphore = ifc.wait_semaphore.clone().expect("cannot submit for present outside of a frame context");
+        let frame_wait_semaphore = ifc
+            .wait_semaphore
+            .clone()
+            .expect("cannot submit for present outside of a frame context");
         // Add this semaphore as a wait semaphore for the first submit, or to the frame commands if there is no other submit
         match self.submits.first_mut() {
             None => {
@@ -121,12 +127,7 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
     }
 
     /// Submit the frame commands, waiting on all previous submissions in the same pipeline stage
-    pub fn submit_for_present_after_all<A: Allocator>(
-        &mut self,
-        cmd: CommandBuffer<D>,
-        ifc: &InFlightContext<A>,
-        wait_stage: PipelineStage,
-    ) -> Result<SubmitHandle> {
+    pub fn submit_for_present_after_all(&mut self, cmd: CommandBuffer<D>, ifc: &InFlightContext<A>, wait_stage: PipelineStage) -> Result<SubmitHandle> {
         let submits = (0..self.submits.len())
             .map(|index| SubmitHandle {
                 index,
@@ -149,10 +150,12 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
             index: self.submits.len() - 1,
         })
     }
+}
 
+impl<D: ExecutionDomain + 'static, A: Allocator + 'static> SubmitBatch<D, A> {
     /// Finish this batch by submitting it to the execution manager.
     /// This returns a [`Fence`] that can be awaited to wait for completion.
-    pub fn finish(self) -> Result<Fence> {
+    pub fn finish(mut self) -> Result<Pooled<Fence>> {
         struct PerSubmit {
             wait_semaphores: Vec<vk::SemaphoreSubmitInfo>,
             cmd_buffer: Vec<vk::CommandBufferSubmitInfo>,
@@ -215,22 +218,28 @@ impl<D: ExecutionDomain + 'static> SubmitBatch<D> {
             .collect::<Vec<_>>();
 
         self.exec.submit_batch::<D>(submits.as_slice(), &self.signal_fence)?;
-        let fence = self.signal_fence.with_cleanup(move || {
-            // Take ownership of every resource inside the submit batch, to delete it afterwards
-            for mut submit in self.submits {
-                unsafe {
-                    submit.cmd.delete(self.exec.clone()).unwrap();
+        self.signal_fence.replace(move |fence| {
+            fence.with_cleanup(move || {
+                // Take ownership of every resource inside the submit batch, to delete it afterwards
+                for mut submit in self.submits {
+                    unsafe {
+                        submit.cmd.delete(self.exec.clone()).unwrap();
+                    }
                 }
-            }
+            })
         });
-
-        Ok(fence)
+        Ok(self.signal_fence)
     }
 }
 
 impl SubmitHandle {
     /// Add another submit to the batch that waits on this submit at the specified wait stage mask.
-    pub fn then<D: ExecutionDomain + 'static>(&self, wait_stage: PipelineStage, cmd: CommandBuffer<D>, batch: &mut SubmitBatch<D>) -> Result<SubmitHandle> {
+    pub fn then<D: ExecutionDomain + 'static, A: Allocator>(
+        &self,
+        wait_stage: PipelineStage,
+        cmd: CommandBuffer<D>,
+        batch: &mut SubmitBatch<D, A>,
+    ) -> Result<SubmitHandle> {
         batch.submit_after(std::slice::from_ref(self), cmd, std::slice::from_ref(&wait_stage))
     }
 }

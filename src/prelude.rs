@@ -42,7 +42,6 @@ pub use crate::sync::domain;
 pub use crate::sync::execution_manager::ExecutionManager;
 pub use crate::sync::fence::*;
 pub use crate::sync::semaphore::*;
-pub use crate::sync::thread_context::ThreadContext;
 pub use crate::util::address::*;
 pub use crate::util::byte_size::ByteSize;
 pub use crate::util::deferred_delete::DeletionQueue;

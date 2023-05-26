@@ -6,9 +6,10 @@ use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, CmdBuffer, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
+use crate::{Allocator, CmdBuffer, DefaultAllocator, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
 use crate::command_buffer::*;
 use crate::core::queue::{DeviceQueue, Queue};
+use crate::pool::{Poolable, Pooled, ResourcePool};
 use crate::sync::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
 
@@ -30,9 +31,9 @@ use crate::sync::submit_batch::SubmitBatch;
 /// ```
 /// use phobos::prelude::*;
 /// // Create an execution manager first. You only want one of these.
-/// let exec = ExecutionManager::new(device.clone(), &physical_device);
+/// let exec = ExecutionManager::new(device.clone(), &physical_device, pool);
 /// // Obtain a command buffer on the Transfer domain
-/// let cmd = exec.on_domain::<domain::Transfer>(None, None)?
+/// let cmd = exec.on_domain::<domain::Transfer>()?
 ///               .copy_image(/*command parameters*/)
 ///               .finish()?;
 /// // Submit the command buffer, either to this frame's command list,
@@ -40,9 +41,10 @@ use crate::sync::submit_batch::SubmitBatch;
 /// // frame context (such as on another thread).
 /// ```
 #[derive(Debug, Clone)]
-pub struct ExecutionManager {
+pub struct ExecutionManager<A: Allocator = DefaultAllocator> {
     device: Device,
     queues: Arc<Vec<Mutex<Queue>>>,
+    pool: ResourcePool<A>,
 }
 
 fn max_queue_count(family: u32, families: &[vk::QueueFamilyProperties]) -> u32 {
@@ -50,10 +52,10 @@ fn max_queue_count(family: u32, families: &[vk::QueueFamilyProperties]) -> u32 {
     families.get(family as usize).unwrap().queue_count
 }
 
-impl ExecutionManager {
+impl<A: Allocator> ExecutionManager<A> {
     /// Create a new execution manager. You should only ever have on instance of this struct
     /// in your program.
-    pub fn new(device: Device, physical_device: &PhysicalDevice) -> Result<Self> {
+    pub fn new(device: Device, physical_device: &PhysicalDevice, pool: ResourcePool<A>) -> Result<Self> {
         let mut counts = HashMap::new();
         let mut device_queues = HashMap::new();
 
@@ -101,30 +103,41 @@ impl ExecutionManager {
         Ok(ExecutionManager {
             device,
             queues: Arc::new(queues),
+            pool,
         })
     }
 
     /// Tries to obtain a command buffer over a domain, or returns an Err state if the lock is currently being held.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn try_on_domain<'q, D: ExecutionDomain, A: Allocator>(&'q self, pipelines: Option<PipelineCache<A>>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q, A>> {
+    pub fn try_on_domain<'q, D: ExecutionDomain>(&'q self) -> Result<D::CmdBuf<'q, A>> {
         let queue = self.try_get_queue::<D>().map_err(|_| Error::QueueLocked)?;
-        Queue::allocate_command_buffer::<'q, A, D::CmdBuf<'q, A>>(self.device.clone(), queue, pipelines, descriptors)
+        Queue::allocate_command_buffer::<'q, A, D::CmdBuf<'q, A>>(
+            self.device.clone(),
+            queue,
+            Some(self.pool.pipelines.clone()),
+            Some(self.pool.descriptors.clone()),
+        )
     }
 
     /// Obtain a command buffer capable of operating on the specified domain.
     /// If this command buffer needs access to pipelines or descriptor sets, pass in the relevant caches.
-    pub fn on_domain<'q, D: ExecutionDomain, A: Allocator>(&'q self, pipelines: Option<PipelineCache<A>>, descriptors: Option<DescriptorCache>) -> Result<D::CmdBuf<'q, A>> {
+    pub fn on_domain<'q, D: ExecutionDomain>(&'q self) -> Result<D::CmdBuf<'q, A>> {
         let queue = self.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
-        Queue::allocate_command_buffer::<'q, A, D::CmdBuf<'q, A>>(self.device.clone(), queue, pipelines, descriptors)
+        Queue::allocate_command_buffer::<'q, A, D::CmdBuf<'q, A>>(
+            self.device.clone(),
+            queue,
+            Some(self.pool.pipelines.clone()),
+            Some(self.pool.descriptors.clone()),
+        )
     }
 
     /// Begin a submit batch. Note that all submits in a batch are over a single domain (currently).
     /// # Example
     /// ```
     /// use phobos::prelude::*;
-    /// let exec = ExecutionManager::new(device.clone(), &physical_device)?;
-    /// let cmd1 = exec.on_domain::<domain::All, _>(None, None)?.finish()?;
-    /// let cmd2 = exec.on_domain::<domain::All, _>(None, None)?.finish()?;
+    /// let exec = ExecutionManager::new(device.clone(), &physical_device, pool)?;
+    /// let cmd1 = exec.on_domain::<domain::All>()?.finish()?;
+    /// let cmd2 = exec.on_domain::<domain::All>()?.finish()?;
     /// let mut batch = exec.start_submit_batch()?;
     /// // Submit the first command buffer first
     /// batch.submit(cmd1)?
@@ -132,33 +145,8 @@ impl ExecutionManager {
     ///      .then(PipelineStage::COLOR_ATTACHMENT_OUTPUT, cmd2, &mut batch)?;
     /// batch.finish()?.wait()?;
     /// ```
-    pub fn start_submit_batch<D: ExecutionDomain + 'static>(&self) -> Result<SubmitBatch<D>> {
-        SubmitBatch::new(self.device.clone(), self.clone())
-    }
-
-    /// Submit a command buffer to its queue.
-    pub fn submit<D: ExecutionDomain + 'static>(&self, mut cmd: CommandBuffer<D>) -> Result<Fence> {
-        let fence = Fence::new(self.device.clone(), false)?;
-
-        let handle = unsafe { cmd.handle() };
-        let info = vk::SubmitInfo {
-            s_type: vk::StructureType::SUBMIT_INFO,
-            p_next: std::ptr::null(),
-            wait_semaphore_count: 0,
-            p_wait_semaphores: std::ptr::null(),
-            p_wait_dst_stage_mask: std::ptr::null(),
-            command_buffer_count: 1,
-            p_command_buffers: &handle,
-            signal_semaphore_count: 0,
-            p_signal_semaphores: std::ptr::null(),
-        };
-
-        let queue = self.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
-        queue.submit(std::slice::from_ref(&info), Some(&fence))?;
-        let exec = self.clone();
-        Ok(fence.with_cleanup(move || unsafe {
-            cmd.delete(exec).unwrap();
-        }))
+    pub fn start_submit_batch<D: ExecutionDomain + 'static>(&self) -> Result<SubmitBatch<D, A>> {
+        SubmitBatch::new(self.device.clone(), self.clone(), &self.pool)
     }
 
     /// Submit multiple SubmitInfo2 structures.
@@ -201,5 +189,35 @@ impl ExecutionManager {
                 D::queue_is_compatible(&q)
             })
             .map(|q| q.lock().unwrap())
+    }
+}
+
+impl<A: Allocator + 'static> ExecutionManager<A> {
+    /// Submit a command buffer to its queue.
+    pub fn submit<D: ExecutionDomain + 'static>(&self, mut cmd: CommandBuffer<D>) -> Result<Pooled<Fence>> {
+        let mut fence = Fence::new_in_pool(&self.pool.fences, &())?;
+
+        let handle = unsafe { cmd.handle() };
+        let info = vk::SubmitInfo {
+            s_type: vk::StructureType::SUBMIT_INFO,
+            p_next: std::ptr::null(),
+            wait_semaphore_count: 0,
+            p_wait_semaphores: std::ptr::null(),
+            p_wait_dst_stage_mask: std::ptr::null(),
+            command_buffer_count: 1,
+            p_command_buffers: &handle,
+            signal_semaphore_count: 0,
+            p_signal_semaphores: std::ptr::null(),
+        };
+
+        let queue = self.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
+        queue.submit(std::slice::from_ref(&info), Some(&fence))?;
+        let exec = self.clone();
+        fence.replace(move |fence| {
+            fence.with_cleanup(move || unsafe {
+                cmd.delete(exec).unwrap();
+            })
+        });
+        Ok(fence)
     }
 }

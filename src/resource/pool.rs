@@ -1,4 +1,5 @@
 use std::hash::Hash;
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -52,21 +53,25 @@ pub struct Pool<P: Poolable> {
 }
 
 /// Acts as a global resource pool that can safely be shared everywhere.
-#[derive(Clone)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct ResourcePool<A: Allocator = DefaultAllocator> {
     /// Pipeline cache used to create pipelines on demand
     pub pipelines: PipelineCache<A>,
     /// Descriptor cache used to create descriptor sets on demand
     pub descriptors: DescriptorCache,
     /// Scratch allocator pool used to easily create scratch buffers anywhere
+    #[derivative(Debug = "ignore")]
     pub allocators: Pool<ScratchAllocator<A>>,
     /// Fence pool to reuse fences where possible
+    #[derivative(Debug = "ignore")]
     pub fences: Pool<Fence<()>>,
 }
 
 pub struct ResourcePoolCreateInfo<A: Allocator = DefaultAllocator> {
     pub device: Device,
     pub allocator: A,
+    pub scratch_size: u64,
 }
 
 impl<P: Poolable> Clone for Pool<P> {
@@ -92,6 +97,20 @@ impl<P: Poolable> Pooled<P> {
     pub fn replace<F: FnOnce(P) -> P>(&mut self, f: F) {
         let item = self.item.take().unwrap();
         self.item = Some(f(item));
+    }
+}
+
+impl<P: Poolable> Deref for Pooled<P> {
+    type Target = P;
+
+    fn deref(&self) -> &Self::Target {
+        self.item.as_ref().unwrap()
+    }
+}
+
+impl<P: Poolable> DerefMut for Pooled<P> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.item.as_mut().unwrap()
     }
 }
 
@@ -154,7 +173,7 @@ impl<A: Allocator + 'static> ResourcePool<A> {
         let descriptors = DescriptorCache::new(info.device.clone())?;
         let device = info.device.clone();
         let mut alloc = info.allocator.clone();
-        let allocators = Pool::new(move |key: &ScratchAllocatorCreateInfo| ScratchAllocator::new(device.clone(), &mut alloc, key.max_size, key.usage))?;
+        let allocators = Pool::new(move |key: &ScratchAllocatorCreateInfo| ScratchAllocator::new(device.clone(), &mut alloc, info.scratch_size, key.usage))?;
         let device = info.device.clone();
         let fences = Pool::new(move |_| Ok(Fence::new(device.clone(), false)?))?;
 

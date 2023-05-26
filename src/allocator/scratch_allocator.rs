@@ -38,7 +38,6 @@ use crate::pool::Poolable;
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub struct ScratchAllocatorCreateInfo {
-    pub max_size: vk::DeviceSize,
     pub usage: vk::BufferUsageFlags,
 }
 

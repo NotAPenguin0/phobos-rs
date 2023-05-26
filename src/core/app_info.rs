@@ -135,18 +135,9 @@ pub struct AppSettings<'a, Window: WindowInterface> {
     pub present_mode: Option<vk::PresentModeKHR>,
     /// Minimum requirements the selected physical device should have.
     pub gpu_requirements: GPURequirements,
-    /// Maximum per-frame size of scratch vertex buffer objects. This is the size of each
-    /// frame context's [`ScratchAllocator`](crate::ScratchAllocator)
-    pub scratch_vbo_size: vk::DeviceSize,
-    /// Maximum per-frame size of scratch index buffer objects. This is the size of each
-    /// frame context's [`ScratchAllocator`](crate::ScratchAllocator)
-    pub scratch_ibo_size: vk::DeviceSize,
-    /// Maximum per-frame size of scratch uniform buffer objects. This is the size of each
-    /// frame context's [`ScratchAllocator`](crate::ScratchAllocator)
-    pub scratch_ubo_size: vk::DeviceSize,
-    /// Maximum per-frame size of scratch shader storage buffer objects. This is the size of each
-    /// frame context's [`ScratchAllocator`](crate::ScratchAllocator)
-    pub scratch_ssbo_size: vk::DeviceSize,
+    /// Maximum size of scratch allocators. This is the maximum size of [`ScratchAllocator`](crate::ScratchAllocator) objects
+    /// created from resource pools.
+    pub scratch_buffer_size: u64,
     /// Whether to enable raytracing extensions.
     pub raytracing: bool,
     /// FSR2 context settings.
@@ -167,10 +158,7 @@ impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
             surface_format: None,
             present_mode: None,
             gpu_requirements: GPURequirements::default(),
-            scratch_vbo_size: 1,
-            scratch_ibo_size: 1,
-            scratch_ubo_size: 1,
-            scratch_ssbo_size: 1,
+            scratch_buffer_size: 1,
             raytracing: false,
             #[cfg(feature = "fsr2")]
             fsr2_settings: Fsr2Settings::default(),
@@ -258,13 +246,9 @@ impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
     }
 
     /// Scratch allocator size for each of the buffer types.
-    pub fn scratch_size(mut self, size: impl Into<vk::DeviceSize>) -> Self {
+    pub fn scratch_size(mut self, size: impl Into<u64>) -> Self {
         let size = size.into();
-        self.inner.scratch_vbo_size = size;
-        self.inner.scratch_ibo_size = size;
-        self.inner.scratch_ubo_size = size;
-        self.inner.scratch_ssbo_size = size;
-
+        self.inner.scratch_buffer_size = size;
         self
     }
 

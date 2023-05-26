@@ -374,9 +374,7 @@ impl ExampleApp for Fsr2Sample {
         bindings.bind_image("motion_vectors", &self.motion_vectors.view);
         bindings.bind_image("color_upscaled", &self.color_upscaled.view);
         let mut graph = graph.build()?;
-        let cmd = ctx
-            .exec
-            .on_domain::<All, _>(Some(ctx.pool.pipelines.clone()), Some(ctx.pool.descriptors.clone()))?;
+        let cmd = ctx.exec.on_domain::<All>()?;
         let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?;
         let cmd = cmd.finish()?;
         let mut batch = ctx.exec.start_submit_batch()?;

@@ -39,7 +39,7 @@ impl<W: WindowInterface> ContextInit<W> for HeadlessContext {
         Device,
         A,
         ResourcePool<A>,
-        ExecutionManager,
+        ExecutionManager<A>,
         Option<DebugMessenger>,
     );
 
@@ -58,13 +58,14 @@ impl<W: WindowInterface> ContextInit<W> for HeadlessContext {
         let instance = VkInstance::new(settings)?;
         let physical_device = PhysicalDevice::select(&instance, None, settings)?;
         let device = Device::new(&instance, &physical_device, settings)?;
-        let exec = ExecutionManager::new(device.clone(), &physical_device)?;
         let allocator = make_alloc(&instance, &physical_device, &device)?;
         let pool_info = ResourcePoolCreateInfo {
             device: device.clone(),
             allocator: allocator.clone(),
+            scratch_size: settings.scratch_buffer_size,
         };
         let pool = ResourcePool::new(pool_info)?;
+        let exec = ExecutionManager::new(device.clone(), &physical_device, pool.clone())?;
         let debug_messenger = if settings.enable_validation {
             Some(DebugMessenger::new(&instance)?)
         } else {
@@ -84,7 +85,7 @@ impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
         Device,
         A,
         ResourcePool<A>,
-        ExecutionManager,
+        ExecutionManager<A>,
         FrameManager<A>,
         Option<DebugMessenger>,
     );
@@ -105,13 +106,14 @@ impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
         let (surface, physical_device) = { PhysicalDevice::select_with_surface(&instance, settings)? };
         let device = Device::new(&instance, &physical_device, settings)?;
         let allocator = make_alloc(&instance, &physical_device, &device)?;
-        let exec = ExecutionManager::new(device.clone(), &physical_device)?;
         let pool_info = ResourcePoolCreateInfo {
             device: device.clone(),
             allocator: allocator.clone(),
+            scratch_size: settings.scratch_buffer_size,
         };
         let pool = ResourcePool::new(pool_info)?;
-        let frame = FrameManager::new_with_swapchain(&instance, device.clone(), allocator.clone(), settings, &surface)?;
+        let exec = ExecutionManager::new(device.clone(), &physical_device, pool.clone())?;
+        let frame = FrameManager::new_with_swapchain(&instance, device.clone(), pool.clone(), settings, &surface)?;
         let debug_messenger = if settings.enable_validation {
             Some(DebugMessenger::new(&instance)?)
         } else {
@@ -144,7 +146,7 @@ pub fn initialize_with_allocator<W: WindowInterface, A: Allocator + 'static, F: 
     Device,
     A,
     ResourcePool<A>,
-    ExecutionManager,
+    ExecutionManager<A>,
     Option<FrameManager<A>>,
     Option<DebugMessenger>,
 )> {
@@ -189,7 +191,7 @@ pub fn initialize<W: WindowInterface>(
     Device,
     DefaultAllocator,
     ResourcePool<DefaultAllocator>,
-    ExecutionManager,
+    ExecutionManager<DefaultAllocator>,
     Option<FrameManager<DefaultAllocator>>,
     Option<DebugMessenger>,
 )> {

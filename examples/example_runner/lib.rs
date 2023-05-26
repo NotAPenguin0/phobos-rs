@@ -281,7 +281,7 @@ pub trait ExampleApp {
     }
 
     // Implement this for a headless application
-    fn run(&mut self, _ctx: Context, _thread: ThreadContext) -> Result<()> {
+    fn run(&mut self, _ctx: Context) -> Result<()> {
         bail!("run() not implemented for headless example app");
     }
 
@@ -356,8 +356,7 @@ impl ExampleRunner {
 
     fn run_headless<E: ExampleApp + 'static>(self, mut app: E) -> ! {
         let ctx = self.make_context();
-        let thread = ThreadContext::new(ctx.device.clone(), ctx.allocator.clone(), Some(1024 * 1024u64)).unwrap();
-        app.run(self.make_context(), thread).unwrap();
+        app.run(self.make_context()).unwrap();
         self.vk.device.wait_idle().unwrap();
         drop(app);
         std::process::exit(0);

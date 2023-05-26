@@ -158,7 +158,7 @@ impl Queue {
 
     /// Instantly delete a command buffer, without taking synchronization into account.
     /// This function **must** be externally synchronized.
-    pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer>(&self, cmd: vk::CommandBuffer) -> Result<()> {
+    pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer<A>, A: Allocator>(&self, cmd: vk::CommandBuffer) -> Result<()> {
         self.device.free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd));
         Ok(())
     }

@@ -124,12 +124,12 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
 }
 
 /// Completed command buffer
-pub trait CmdBuffer {
+pub trait CmdBuffer<A: Allocator> {
     /// Delete the command buffer immediately.
     /// This is marked unsafe because there is no guarantee that the command buffer is not in use.
     /// # Safety
     /// The caller must ensure this command buffer is not in use on the GPU.
-    unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()>;
+    unsafe fn delete(&mut self, exec: ExecutionManager<A>) -> Result<()>;
 }
 
 /// Incomplete command buffer

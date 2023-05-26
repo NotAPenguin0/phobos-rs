@@ -101,16 +101,16 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain, A: Allocator = Defaul
     _domain: PhantomData<D>,
 }
 
-impl<D: ExecutionDomain> CmdBuffer for CommandBuffer<D> {
+impl<D: ExecutionDomain, A: Allocator> CmdBuffer<A> for CommandBuffer<D> {
     /// Immediately delete a command buffer. Generally you do not need to call this manually, since
     /// commands buffers submitted through the [`ExecutionManager`] already do this cleanup.
     /// # Safety
     /// * This command buffer must not currently be executing on the GPU.
-    unsafe fn delete(&mut self, exec: ExecutionManager) -> Result<()> {
+    unsafe fn delete(&mut self, exec: ExecutionManager<A>) -> Result<()> {
         let queue = exec.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
         let handle = self.handle;
         self.handle = vk::CommandBuffer::null();
-        queue.free_command_buffer::<Self>(handle)
+        queue.free_command_buffer::<Self, A>(handle)
     }
 }
 
