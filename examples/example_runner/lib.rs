@@ -13,6 +13,7 @@ use winit::event::{ElementState, Event, MouseButton, MouseScrollDelta, VirtualKe
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use winit::window::{Window, WindowBuilder};
 
+use phobos::pool::ResourcePool;
 use phobos::prelude::*;
 use phobos::sync::submit_batch::SubmitBatch;
 
@@ -84,13 +85,16 @@ impl Camera {
                 event,
                 ..
             } => match event {
-                WindowEvent::MouseWheel { delta, .. } => {
+                WindowEvent::MouseWheel {
+                    delta,
+                    ..
+                } => {
                     if let MouseScrollDelta::PixelDelta(pos) = delta {
                         self.handle_scroll(pos.y as f32);
                     } else if let MouseScrollDelta::LineDelta(_, y) = delta {
                         self.handle_scroll(*y);
                     }
-                },
+                }
                 WindowEvent::KeyboardInput {
                     input,
                     ..
@@ -248,6 +252,7 @@ impl WindowContext {
 
 pub struct VulkanContext {
     pub frame: Option<FrameManager>,
+    pub pool: ResourcePool,
     pub exec: ExecutionManager,
     pub allocator: DefaultAllocator,
     pub device: Device,
@@ -331,7 +336,7 @@ impl ExampleRunner {
         };
         let settings = make_settings(settings);
 
-        let (instance, physical_device, surface, device, allocator, exec, frame, Some(debug_messenger)) = initialize(&settings, window.is_none())? else {
+        let (instance, physical_device, surface, device, allocator, pool, exec, frame, Some(debug_messenger)) = initialize(&settings, window.is_none())? else {
             panic!("Asked for debug messenger but didnt get one")
         };
 
@@ -340,6 +345,7 @@ impl ExampleRunner {
 
         let vk = VulkanContext {
             frame,
+            pool,
             exec,
             allocator,
             device,

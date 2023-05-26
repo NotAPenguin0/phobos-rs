@@ -309,6 +309,7 @@ impl<T> Drop for Fence<T> {
 }
 
 impl<T> Poolable for Fence<T> {
+    /// All fences are created equal
     type Key = ();
 
     fn on_release(&mut self) {

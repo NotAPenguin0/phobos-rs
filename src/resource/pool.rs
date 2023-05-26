@@ -4,7 +4,8 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use multimap::{Entry, MultiMap};
 
-use crate::{Allocator, DescriptorCache, Device, Fence, PipelineCache, ScratchAllocator};
+use crate::{Allocator, DefaultAllocator, DescriptorCache, Device, Fence, PipelineCache, ScratchAllocator};
+use crate::allocator::scratch_allocator::ScratchAllocatorCreateInfo;
 
 /// Indicates that this object can be pooled in a [`Pool`](crate::pool::Pool)
 pub trait Poolable {
@@ -21,6 +22,13 @@ pub trait Poolable {
         let item = pool.with(|pool| pool.get(key))?;
         Ok(Pooled::from_pool(pool.clone(), key.clone(), item))
     }
+
+    /// Move this item into the pool when it is dropped
+    fn into_pooled(self, pool: &Pool<Self>, key: Self::Key) -> Pooled<Self>
+        where
+            Self: Sized, {
+        Pooled::from_pool(pool.clone(), key, self)
+    }
 }
 
 /// Represents a pooled object. When this is dropped, it's released back to the pool where it can
@@ -31,7 +39,7 @@ pub struct Pooled<P: Poolable> {
     key: Option<P::Key>,
 }
 
-type BoxedCreateFunc<P> = Box<dyn Fn(&<P as Poolable>::Key) -> Result<P>>;
+type BoxedCreateFunc<P> = Box<dyn FnMut(&<P as Poolable>::Key) -> Result<P>>;
 
 struct PoolInner<P: Poolable> {
     items: MultiMap<P::Key, P>,
@@ -45,7 +53,7 @@ pub struct Pool<P: Poolable> {
 
 /// Acts as a global resource pool that can safely be shared everywhere.
 #[derive(Clone)]
-pub struct ResourcePool<A: Allocator> {
+pub struct ResourcePool<A: Allocator = DefaultAllocator> {
     /// Pipeline cache used to create pipelines on demand
     pub pipelines: PipelineCache<A>,
     /// Descriptor cache used to create descriptor sets on demand
@@ -53,7 +61,12 @@ pub struct ResourcePool<A: Allocator> {
     /// Scratch allocator pool used to easily create scratch buffers anywhere
     pub allocators: Pool<ScratchAllocator<A>>,
     /// Fence pool to reuse fences where possible
-    pub fences: Pool<Fence>,
+    pub fences: Pool<Fence<()>>,
+}
+
+pub struct ResourcePoolCreateInfo<A: Allocator = DefaultAllocator> {
+    pub device: Device,
+    pub allocator: A,
 }
 
 impl<P: Poolable> Clone for Pool<P> {
@@ -123,7 +136,7 @@ impl<P: Poolable> Pool<P> {
     /// Create a new pool. This must be supplied with a callback to be called
     /// when the pool needs to allocate a new object.
     /// Optionally also takes in a count of objects to preallocate using this callback.
-    pub fn new(create_fn: impl Fn(&P::Key) -> Result<P> + 'static) -> Result<Self> {
+    pub fn new(create_fn: impl FnMut(&P::Key) -> Result<P> + 'static) -> Result<Self> {
         let inner = PoolInner {
             items: MultiMap::new(),
             create_fn: Box::new(create_fn),
@@ -135,8 +148,21 @@ impl<P: Poolable> Pool<P> {
     }
 }
 
-impl<A: Allocator> ResourcePool<A> {
-    pub fn new(device: Device, allocator: A) -> Result<Self> {
-        todo!()
+impl<A: Allocator + 'static> ResourcePool<A> {
+    pub fn new(info: ResourcePoolCreateInfo<A>) -> Result<Self> {
+        let pipelines = PipelineCache::new(info.device.clone(), info.allocator.clone())?;
+        let descriptors = DescriptorCache::new(info.device.clone())?;
+        let device = info.device.clone();
+        let mut alloc = info.allocator.clone();
+        let allocators = Pool::new(move |key: &ScratchAllocatorCreateInfo| ScratchAllocator::new(device.clone(), &mut alloc, key.max_size, key.usage))?;
+        let device = info.device.clone();
+        let fences = Pool::new(move |_| Ok(Fence::new(device.clone(), false)?))?;
+
+        Ok(Self {
+            pipelines,
+            descriptors,
+            allocators,
+            fences,
+        })
     }
 }
