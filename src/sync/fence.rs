@@ -33,7 +33,7 @@ pub trait FenceValue<T> {
 ///
 /// let exec = ExecutionManager::new(device, &physical_device)?;
 /// // Obtain some command buffer
-/// let cmd = exec.on_domain::<domain::All>(None, None)?.finish()?;
+/// let cmd = exec.on_domain::<domain::All, _>(None, None)?.finish()?;
 /// let fence = exec.submit(cmd)?;
 /// // We can now await this fence, or attach a resulting value to it to make the future
 /// // a little more useful
