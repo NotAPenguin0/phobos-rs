@@ -355,7 +355,6 @@ impl ExampleRunner {
     }
 
     fn run_headless<E: ExampleApp + 'static>(self, mut app: E) -> ! {
-        let ctx = self.make_context();
         app.run(self.make_context()).unwrap();
         self.vk.device.wait_idle().unwrap();
         drop(app);
