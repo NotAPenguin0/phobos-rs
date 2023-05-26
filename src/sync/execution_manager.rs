@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, CmdBuffer, DefaultAllocator, DescriptorCache, Device, Error, Fence, PhysicalDevice, PipelineCache};
+use crate::{Allocator, CmdBuffer, DefaultAllocator, Device, Error, Fence, PhysicalDevice};
 use crate::command_buffer::*;
 use crate::core::queue::{DeviceQueue, Queue};
 use crate::pool::{Poolable, Pooled, ResourcePool};

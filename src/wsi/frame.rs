@@ -296,7 +296,7 @@ impl<A: Allocator> FrameManager<A> {
 
 impl<A: Allocator> FrameManager<A> {
     /// Initialize frame manager with per-frame data.
-    pub fn new<Window: WindowInterface>(device: Device, pool: ResourcePool<A>, settings: &AppSettings<Window>, swapchain: Swapchain) -> Result<Self> {
+    pub fn new(device: Device, pool: ResourcePool<A>, swapchain: Swapchain) -> Result<Self> {
         Ok(FrameManager {
             device: device.clone(),
             per_frame: (0..FRAMES_IN_FLIGHT)
@@ -320,15 +320,15 @@ impl<A: Allocator> FrameManager<A> {
     }
 
     /// Initialize frame manager and create a swapchain.
-    pub fn new_with_swapchain<Window: WindowInterface>(
+    pub fn new_with_swapchain<W: WindowInterface>(
         instance: &VkInstance,
         device: Device,
         pool: ResourcePool<A>,
-        settings: &AppSettings<Window>,
+        settings: &AppSettings<W>,
         surface: &Surface,
     ) -> Result<Self> {
         let swapchain = Swapchain::new(instance, device.clone(), settings, surface)?;
-        FrameManager::new(device, pool, settings, swapchain)
+        FrameManager::new(device, pool, swapchain)
     }
 
     /// Obtain a new frame context to run commands in.

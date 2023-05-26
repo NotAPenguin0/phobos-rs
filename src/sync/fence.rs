@@ -314,5 +314,7 @@ impl<T> Poolable for Fence<T> {
 
     fn on_release(&mut self) {
         self.reset().unwrap();
+        self.value = None;
+        self.first_cleanup_fn = None;
     }
 }
