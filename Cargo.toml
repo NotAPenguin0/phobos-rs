@@ -27,6 +27,7 @@ rayon = { version = "1.7.0", optional = true }
 static_assertions = "1.1.0"
 fsr2-sys = { version = "0.1.2", optional = true, features = ["vk"] }
 widestring = { version = "1.0.2", optional = true }
+multimap = { version = "0.9.0", features = [], default_features = false }
 
 [build-dependencies]
 shaderc = { version = "0.8.2", optional = true, features = ["build-from-source"] }

@@ -152,7 +152,7 @@ impl Fence<()> {
 }
 
 impl<T> Fence<T> {
-    /// Create a new fence, possibly in the singaled status.
+    /// Create a new fence, possibly in the signaled status.
     pub fn new(device: Device, signaled: bool) -> Result<Self, vk::Result> {
         Self::new_with_poll_rate(device, signaled, Duration::from_millis(5))
     }
@@ -212,17 +212,19 @@ impl<T> Fence<T> {
                 break;
             }
 
-            #[cfg(feature = "rayon")] {
+            #[cfg(feature = "rayon")]
+            {
                 match rayon::yield_now() {
                     // If rayon found no work, yield to the OS scheduler.
                     Some(rayon::Yield::Idle) => {
                         std::thread::yield_now();
-                    },
+                    }
                     _ => {}
                 }
             }
 
-            #[cfg(not(feature = "rayon"))] {
+            #[cfg(not(feature = "rayon"))]
+            {
                 std::thread::yield_now();
             }
         }
@@ -307,6 +309,8 @@ impl<T> Drop for Fence<T> {
 }
 
 impl<T> Poolable for Fence<T> {
+    type Key = ();
+
     fn on_release(&mut self) {
         self.reset().unwrap();
     }

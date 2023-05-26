@@ -36,6 +36,12 @@ use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, Memo
 use crate::Error::AllocationError;
 use crate::pool::Poolable;
 
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+pub struct ScratchAllocatorCreateInfo {
+    pub max_size: vk::DeviceSize,
+    pub usage: vk::BufferUsageFlags,
+}
+
 /// A linear allocator used for short-lived resources. A good example of such a resource is a buffer
 /// that needs to be updated every frame, like a uniform buffer for transform data.
 /// Because of this typical usage, the scratch allocator allocates memory with [`MemoryType::CpuToGpu`].
@@ -171,7 +177,9 @@ impl<A: Allocator> ScratchAllocator<A> {
     }
 }
 
-impl Poolable for ScratchAllocator {
+impl<A: Allocator> Poolable for ScratchAllocator<A> {
+    type Key = ScratchAllocatorCreateInfo;
+
     fn on_release(&mut self) {
         unsafe { self.reset() }
     }
