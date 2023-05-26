@@ -126,7 +126,7 @@ impl ExampleApp for Fsr2Sample {
             .attach_shader(vertex)
             .attach_shader(fragment)
             .build();
-        ctx.pipelines.create_named_pipeline(pci)?;
+        ctx.pool.pipelines.create_named_pipeline(pci)?;
 
         let vertex = create_shader("examples/data/vert.spv", vk::ShaderStageFlags::VERTEX);
         let fragment = create_shader("examples/data/frag.spv", vk::ShaderStageFlags::FRAGMENT);
@@ -141,7 +141,7 @@ impl ExampleApp for Fsr2Sample {
             .attach_shader(vertex)
             .attach_shader(fragment)
             .build();
-        ctx.pipelines.create_named_pipeline(pci)?;
+        ctx.pool.pipelines.create_named_pipeline(pci)?;
 
         let sampler = Sampler::default(ctx.device.clone())?;
 
@@ -376,7 +376,7 @@ impl ExampleApp for Fsr2Sample {
         let mut graph = graph.build()?;
         let cmd = ctx
             .exec
-            .on_domain::<All, _>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
+            .on_domain::<All, _>(Some(ctx.pool.pipelines.clone()), Some(ctx.pool.descriptors.clone()))?;
         let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?;
         let cmd = cmd.finish()?;
         let mut batch = ctx.exec.start_submit_batch()?;

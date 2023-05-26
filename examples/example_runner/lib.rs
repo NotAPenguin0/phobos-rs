@@ -267,8 +267,7 @@ pub struct Context {
     pub device: Device,
     pub exec: ExecutionManager,
     pub allocator: DefaultAllocator,
-    pub pipelines: PipelineCache,
-    pub descriptors: DescriptorCache,
+    pub pool: ResourcePool,
 }
 
 pub trait ExampleApp {
@@ -292,8 +291,6 @@ pub trait ExampleApp {
 }
 
 pub struct ExampleRunner {
-    pipelines: PipelineCache,
-    descriptors: DescriptorCache,
     vk: VulkanContext,
 }
 
@@ -340,9 +337,6 @@ impl ExampleRunner {
             panic!("Asked for debug messenger but didnt get one")
         };
 
-        let pipelines = PipelineCache::new(device.clone(), allocator.clone())?;
-        let descriptors = DescriptorCache::new(device.clone())?;
-
         let vk = VulkanContext {
             frame,
             pool,
@@ -357,8 +351,6 @@ impl ExampleRunner {
 
         Ok(Self {
             vk,
-            pipelines,
-            descriptors,
         })
     }
 
@@ -376,8 +368,7 @@ impl ExampleRunner {
             device: self.vk.device.clone(),
             exec: self.vk.exec.clone(),
             allocator: self.vk.allocator.clone(),
-            pipelines: self.pipelines.clone(),
-            descriptors: self.descriptors.clone(),
+            pool: self.vk.pool.clone(),
         }
     }
 
@@ -435,8 +426,7 @@ impl ExampleRunner {
                     None => {}
                     Some(app) => {
                         self.frame(app, &window).unwrap();
-                        self.pipelines.next_frame();
-                        self.descriptors.next_frame();
+                        self.vk.pool.next_frame();
                     }
                 },
                 _ => (),

@@ -166,3 +166,10 @@ impl<A: Allocator + 'static> ResourcePool<A> {
         })
     }
 }
+
+impl<A: Allocator> ResourcePool<A> {
+    pub fn next_frame(&self) {
+        self.pipelines.next_frame();
+        self.descriptors.next_frame();
+    }
+}
