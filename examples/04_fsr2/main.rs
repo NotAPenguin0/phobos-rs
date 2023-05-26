@@ -253,9 +253,9 @@ impl ExampleApp for Fsr2Sample {
         let view = self.camera.matrix();
         let mut projection = Mat4::perspective_infinite_reverse_rh(fov, self.render_width as f32 / self.render_height as f32, near);
         // Jitter projection matrix
-        let jitter_x = 2.0 * jitter_x / self.render_width as f32;
-        let jitter_y = -2.0 * jitter_y / self.render_height as f32;
-        let jitter_translation_matrix = Mat4::from_translation(Vec3::new(jitter_x, jitter_y, 0.0));
+        let jitter_projection_x = 2.0 * jitter_x / self.render_width as f32;
+        let jitter_projection_y = -2.0 * jitter_y / self.render_height as f32;
+        let jitter_translation_matrix = Mat4::from_translation(Vec3::new(jitter_projection_x, jitter_projection_y, 0.0));
         projection = jitter_translation_matrix * projection;
         // Flip y because Vulkan
         let v = projection.col_mut(1).y;
