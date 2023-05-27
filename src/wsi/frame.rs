@@ -115,8 +115,6 @@ struct PerFrame<A> {
 pub struct InFlightContext {
     /// The current frame's swapchain image
     pub swapchain_image: ImageView,
-    /// The current frame's swapchain image index
-    pub swapchain_image_index: usize,
     pub(crate) wait_semaphore: Arc<Semaphore>,
     pub(crate) signal_semaphore: Arc<Semaphore>,
 }
@@ -385,7 +383,6 @@ impl<A: Allocator> FrameManager<A> {
 
             let ifc = InFlightContext {
                 swapchain_image: image,
-                swapchain_image_index: self.current_image as usize,
                 wait_semaphore: per_frame.image_ready.clone(),
                 signal_semaphore: per_frame.gpu_finished.clone(),
             };
