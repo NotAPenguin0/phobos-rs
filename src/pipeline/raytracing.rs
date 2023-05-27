@@ -3,9 +3,9 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, Buffer, Device, MemoryType, ShaderCreateInfo};
 use crate::core::device::ExtensionID;
 use crate::pipeline::pipeline_layout::PipelineLayoutCreateInfo;
+use crate::{Allocator, Buffer, Device, MemoryType, ShaderCreateInfo};
 
 /// An index of a shader in a shader group into the shaders array.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
@@ -81,19 +81,27 @@ pub struct ShaderBindingTable<A: Allocator> {
 }
 
 impl<A: Allocator> ShaderBindingTable<A> {
-    pub(crate) fn new(device: Device, mut allocator: A, pipeline: vk::Pipeline, info: &RayTracingPipelineCreateInfo) -> Result<Self> {
+    pub(crate) fn new(
+        device: Device,
+        mut allocator: A,
+        pipeline: vk::Pipeline,
+        info: &RayTracingPipelineCreateInfo,
+    ) -> Result<Self> {
         device.require_extension(ExtensionID::RayTracingPipeline)?;
         let group_count = info.shader_groups.len() as u32;
         let group_handle_size = device.ray_tracing_properties()?.shader_group_handle_size;
         let group_alignment = device.ray_tracing_properties()?.shader_group_base_alignment;
-        let aligned_group_size = (group_handle_size + (group_alignment - 1)) & !(group_alignment - 1);
+        let aligned_group_size =
+            (group_handle_size + (group_alignment - 1)) & !(group_alignment - 1);
         let sbt_size = aligned_group_size * group_count;
 
         let buffer = Buffer::new(
             device.clone(),
             &mut allocator,
             sbt_size as u64,
-            vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC,
+            vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
+                | vk::BufferUsageFlags::TRANSFER_DST
+                | vk::BufferUsageFlags::TRANSFER_SRC,
             MemoryType::CpuToGpu,
         )?;
         let handles = unsafe {
@@ -115,26 +123,57 @@ impl<A: Allocator> ShaderBindingTable<A> {
         }
 
         // Now figure out the entry offsets and counts
-        let ray_gen_count = info.shader_groups.iter().filter(|sh| matches!(sh, ShaderGroup::RayGeneration { .. })).count() as u64;
-        let ray_miss_count = info.shader_groups.iter().filter(|sh| matches!(sh, ShaderGroup::RayMiss { .. })).count() as u64;
-        let ray_hit_count = info.shader_groups.iter().filter(|sh| matches!(sh, ShaderGroup::RayHit { .. })).count() as u64;
-        let callable_count = info.shader_groups.iter().filter(|sh| matches!(sh, ShaderGroup::Callable { .. })).count() as u64;
+        let ray_gen_count = info
+            .shader_groups
+            .iter()
+            .filter(|sh| matches!(sh, ShaderGroup::RayGeneration { .. }))
+            .count() as u64;
+        let ray_miss_count = info
+            .shader_groups
+            .iter()
+            .filter(|sh| matches!(sh, ShaderGroup::RayMiss { .. }))
+            .count() as u64;
+        let ray_hit_count = info
+            .shader_groups
+            .iter()
+            .filter(|sh| matches!(sh, ShaderGroup::RayHit { .. }))
+            .count() as u64;
+        let callable_count = info
+            .shader_groups
+            .iter()
+            .filter(|sh| matches!(sh, ShaderGroup::Callable { .. }))
+            .count() as u64;
 
         let ray_gen_offset = 0;
         let ray_miss_offset = if ray_miss_count > 0 {
-            info.shader_groups.iter().enumerate().find(|(_, sh)| matches!(sh, ShaderGroup::RayMiss { .. })).unwrap().0 as u32
+            info.shader_groups
+                .iter()
+                .enumerate()
+                .find(|(_, sh)| matches!(sh, ShaderGroup::RayMiss { .. }))
+                .unwrap()
+                .0 as u32
         } else {
             0
         };
 
         let ray_hit_offset = if ray_hit_count > 0 {
-            info.shader_groups.iter().enumerate().find(|(_, sh)| matches!(sh, ShaderGroup::RayHit { .. })).unwrap().0 as u32
+            info.shader_groups
+                .iter()
+                .enumerate()
+                .find(|(_, sh)| matches!(sh, ShaderGroup::RayHit { .. }))
+                .unwrap()
+                .0 as u32
         } else {
             0
         };
 
         let callable_offset = if callable_count > 0 {
-            info.shader_groups.iter().enumerate().find(|(_, sh)| matches!(sh, ShaderGroup::Callable { .. })).unwrap().0 as u32
+            info.shader_groups
+                .iter()
+                .enumerate()
+                .find(|(_, sh)| matches!(sh, ShaderGroup::Callable { .. }))
+                .unwrap()
+                .0 as u32
         } else {
             0
         };
@@ -161,18 +200,38 @@ impl<A: Allocator> ShaderBindingTable<A> {
                 size: (size * ray_hit_count) as vk::DeviceSize,
             },
             vk::StridedDeviceAddressRegionKHR {
-                device_address: if callable_count > 0 { address + callable_offset as u64 * size } else { 0 },
-                stride: if callable_count > 0 { stride } else { 0 },
+                device_address: if callable_count > 0 {
+                    address + callable_offset as u64 * size
+                } else {
+                    0
+                },
+                stride: if callable_count > 0 {
+                    stride
+                } else {
+                    0
+                },
                 size: (callable_count * size) as vk::DeviceSize,
             },
         ];
 
         Ok(ShaderBindingTable {
             buffer,
-            ray_gen: SBTEntry { offset: ray_gen_offset, count: ray_gen_count as u32 },
-            ray_miss: SBTEntry { offset: ray_miss_offset, count: ray_miss_count as u32 },
-            ray_hit: SBTEntry { offset: ray_hit_offset, count: ray_hit_count as u32 },
-            callable: SBTEntry { offset: callable_offset, count: callable_count as u32 },
+            ray_gen: SBTEntry {
+                offset: ray_gen_offset,
+                count: ray_gen_count as u32,
+            },
+            ray_miss: SBTEntry {
+                offset: ray_miss_offset,
+                count: ray_miss_count as u32,
+            },
+            ray_hit: SBTEntry {
+                offset: ray_hit_offset,
+                count: ray_hit_count as u32,
+            },
+            callable: SBTEntry {
+                offset: callable_offset,
+                count: callable_count as u32,
+            },
             group_size: aligned_group_size,
             regions,
         })
@@ -276,7 +335,11 @@ impl RayTracingPipelineBuilder {
     }
 
     /// Add a ray hit group. Both shaders are optional
-    pub fn add_ray_hit_group(mut self, closest_hit: Option<ShaderCreateInfo>, any_hit: Option<ShaderCreateInfo>) -> Self {
+    pub fn add_ray_hit_group(
+        mut self,
+        closest_hit: Option<ShaderCreateInfo>,
+        any_hit: Option<ShaderCreateInfo>,
+    ) -> Self {
         let closest_hit = closest_hit.map(|sh| self.add_shader(sh));
         let any_hit = any_hit.map(|sh| self.add_shader(sh));
         self.inner.shader_groups.push(ShaderGroup::RayHit {
@@ -309,7 +372,9 @@ impl RayTracingPipelineBuilder {
     /// Build the pipeline create info
     pub fn build(mut self) -> RayTracingPipelineCreateInfo {
         // Sort shader groups by type
-        self.inner.shader_groups.sort_by_key(|group| shader_group_index(group));
+        self.inner
+            .shader_groups
+            .sort_by_key(|group| shader_group_index(group));
         self.inner
     }
 }

@@ -88,7 +88,6 @@
 
 #![feature(min_specialization)]
 #![cfg_attr(feature = "fsr2", feature(new_uninit))]
-
 #![warn(missing_docs)]
 
 #[macro_use]
@@ -108,10 +107,10 @@ pub mod core;
 pub mod descriptor;
 pub mod graph;
 pub mod pipeline;
+pub mod resource;
 pub mod sync;
 pub mod util;
 pub mod wsi;
-pub mod resource;
 
 #[cfg(feature = "fsr2")]
 pub mod fsr2;

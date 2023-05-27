@@ -2,13 +2,12 @@ use std::path::Path;
 
 use anyhow::Result;
 use futures::executor::block_on;
-
 use phobos::command_buffer::traits::*;
 use phobos::prelude::*;
 use phobos::sync::domain::All;
 use phobos::vk;
 
-use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file, WindowContext};
+use crate::example_runner::{load_spirv_file, Context, ExampleApp, ExampleRunner, WindowContext};
 
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
@@ -78,16 +77,24 @@ impl ExampleApp for Basic {
             vk::Format::R8G8B8A8_SRGB,
             vk::SampleCountFlags::TYPE_1,
         )?;
-        let data: Vec<f32> = vec![-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
+        let data: Vec<f32> = vec![
+            -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0,
+            1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
+        ];
 
         let resources = Resources {
             offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
             offscreen: image,
             sampler: Sampler::default(ctx.device.clone())?,
             vertex_buffer: block_on(async {
-                staged_buffer_upload(ctx.device.clone(), ctx.allocator.clone(), ctx.exec.clone(), data.as_slice())
-                    .unwrap()
-                    .await
+                staged_buffer_upload(
+                    ctx.device.clone(),
+                    ctx.allocator.clone(),
+                    ctx.exec.clone(),
+                    data.as_slice(),
+                )
+                .unwrap()
+                .await
             }),
         };
 
@@ -101,8 +108,10 @@ impl ExampleApp for Basic {
         let swap_resource = VirtualResource::image("swapchain");
         let offscreen = VirtualResource::image("offscreen");
 
-        let vertices: Vec<f32> =
-            vec![-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
+        let vertices: Vec<f32> = vec![
+            -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0,
+            1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
+        ];
 
         // Define a render graph with one pass that clears the swapchain image
         let graph = PassGraph::new(Some(&swap_resource));
@@ -119,7 +128,9 @@ impl ExampleApp for Basic {
             )?
             .execute_fn(|mut cmd, ifc, _bindings, _| {
                 // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
-                let mut buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
+                let mut buffer = ifc.allocate_scratch_vbo(
+                    (vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize,
+                )?;
                 let slice = buffer.mapped_slice::<f32>()?;
                 slice.copy_from_slice(vertices.as_slice());
                 cmd = cmd
@@ -141,11 +152,20 @@ impl ExampleApp for Basic {
                     float32: [1.0, 0.0, 0.0, 1.0],
                 }),
             )?
-            .sample_image(offscreen_pass.output(&offscreen).unwrap(), PipelineStage::FRAGMENT_SHADER)
+            .sample_image(
+                offscreen_pass.output(&offscreen).unwrap(),
+                PipelineStage::FRAGMENT_SHADER,
+            )
             .execute_fn(|cmd, _ifc, bindings, _| {
                 cmd.full_viewport_scissor()
                     .bind_graphics_pipeline("sample")?
-                    .resolve_and_bind_sampled_image(0, 0, &offscreen, &self.resources.sampler, bindings)?
+                    .resolve_and_bind_sampled_image(
+                        0,
+                        0,
+                        &offscreen,
+                        &self.resources.sampler,
+                        bindings,
+                    )?
                     .draw(6, 1, 0, 0)
             })
             .build();
@@ -171,7 +191,9 @@ impl ExampleApp for Basic {
             .on_domain::<All, _>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))
             .unwrap();
         // record render graph to this command buffer
-        let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?.finish();
+        let cmd = graph
+            .record(cmd, &bindings, &mut ifc, None, &mut ())?
+            .finish();
         cmd
     }
 }

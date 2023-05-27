@@ -8,16 +8,22 @@ use std::sync::{Arc, MutexGuard};
 use anyhow::{anyhow, ensure, Result};
 use ash::vk;
 
-use crate::{Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder, Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, PipelineStage, Sampler, VirtualResource};
-use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::core::queue::Queue;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::query_pool::{QueryPool, ScopedQuery, TimestampQuery};
 use crate::raytracing::acceleration_structure::AccelerationStructure;
 use crate::sync::domain::ExecutionDomain;
+use crate::{
+    Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder,
+    Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache,
+    PipelineStage, Sampler, VirtualResource,
+};
 
-impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A> for IncompleteCommandBuffer<'q, D, A> {
+impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A>
+    for IncompleteCommandBuffer<'q, D, A>
+{
     type Domain = D;
 
     /// Create a new command buffer ready for recording.
@@ -94,7 +100,10 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # Errors
     /// - Fails if no pipeline was bound.
     pub(super) fn bind_descriptor_set(&self, index: u32, set: &DescriptorSet) -> Result<()> {
-        ensure!(self.current_pipeline_layout != vk::PipelineLayout::null(), "cannot bind descriptor set at index {index} without binding a pipeline first.");
+        ensure!(
+            self.current_pipeline_layout != vk::PipelineLayout::null(),
+            "cannot bind descriptor set at index {index} without binding a pipeline first."
+        );
         unsafe {
             // SAFETY:
             // * self is valid, so self.handle is valid.
@@ -116,7 +125,11 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// Modify the descriptor set state at a given set binding.
     /// # Errors
     /// * Fails if the supplied callback fails.
-    pub(super) fn modify_descriptor_set(&mut self, set: u32, f: impl FnOnce(&mut DescriptorSetBuilder) -> Result<()>) -> Result<()> {
+    pub(super) fn modify_descriptor_set(
+        &mut self,
+        set: u32,
+        f: impl FnOnce(&mut DescriptorSetBuilder) -> Result<()>,
+    ) -> Result<()> {
         if self.current_descriptor_sets.is_none() {
             self.current_descriptor_sets = Some(HashMap::new());
         }
@@ -166,7 +179,13 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// Binds the given pipeline to the given bindpoint.
     /// # Errors
     /// None
-    pub(super) fn bind_pipeline_impl(&mut self, handle: vk::Pipeline, layout: vk::PipelineLayout, set_layouts: Vec<vk::DescriptorSetLayout>, bind_point: vk::PipelineBindPoint) -> Result<()> {
+    pub(super) fn bind_pipeline_impl(
+        &mut self,
+        handle: vk::Pipeline,
+        layout: vk::PipelineLayout,
+        set_layouts: Vec<vk::DescriptorSetLayout>,
+        bind_point: vk::PipelineBindPoint,
+    ) -> Result<()> {
         unsafe {
             // SAFETY:
             // * `self` is valid, so `self.device` and `self.handle` are valid vulkan objects.
@@ -253,7 +272,13 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     ///        .draw(6, 1, 0, 0)
     /// }
     /// ```
-    pub fn bind_sampled_image(mut self, set: u32, binding: u32, image: &ImageView, sampler: &Sampler) -> Result<Self> {
+    pub fn bind_sampled_image(
+        mut self,
+        set: u32,
+        binding: u32,
+        image: &ImageView,
+        sampler: &Sampler,
+    ) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_sampled_image(binding, image, sampler);
             Ok(())
@@ -276,7 +301,12 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     ///        .draw(6, 1, 0, 0)
     /// }
     /// ```
-    pub fn bind_uniform_buffer(mut self, set: u32, binding: u32, buffer: &BufferView) -> Result<Self> {
+    pub fn bind_uniform_buffer(
+        mut self,
+        set: u32,
+        binding: u32,
+        buffer: &BufferView,
+    ) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_uniform_buffer(binding, buffer);
             Ok(())
@@ -299,7 +329,12 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     ///        .draw(6, 1, 0, 0)
     /// }
     /// ```
-    pub fn bind_storage_buffer(mut self, set: u32, binding: u32, buffer: &BufferView) -> Result<Self> {
+    pub fn bind_storage_buffer(
+        mut self,
+        set: u32,
+        binding: u32,
+        buffer: &BufferView,
+    ) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_storage_buffer(binding, buffer);
             Ok(())
@@ -378,7 +413,12 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     ///        .trace_rays(1920, 1080, 1)
     /// }
     /// ```
-    pub fn bind_acceleration_structure(mut self, set: u32, binding: u32, accel: &AccelerationStructure) -> Result<Self> {
+    pub fn bind_acceleration_structure(
+        mut self,
+        set: u32,
+        binding: u32,
+        accel: &AccelerationStructure,
+    ) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_acceleration_structure(binding, accel);
             Ok(())
@@ -430,7 +470,13 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// Insert a global memory barrier. If you want to create a barrier for a buffer, prefer using this as every driver
     /// implements buffer barriers as global memory barriers anyway.
     /// Uses [`vkCmdPipelineBarrier2`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPipelineBarrier2KHR.html) directly.
-    pub fn memory_barrier(self, src_stage: PipelineStage, src_access: vk::AccessFlags2, dst_stage: PipelineStage, dst_access: vk::AccessFlags2) -> Self {
+    pub fn memory_barrier(
+        self,
+        src_stage: PipelineStage,
+        src_access: vk::AccessFlags2,
+        dst_stage: PipelineStage,
+        dst_access: vk::AccessFlags2,
+    ) -> Self {
         let barrier = vk::MemoryBarrier2 {
             s_type: vk::StructureType::MEMORY_BARRIER_2,
             p_next: std::ptr::null(),
@@ -476,7 +522,12 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     ///     let data: f32 = 1.0;
     ///     cmd.push_constant(vk::ShaderStageFlags::VERTEX, 0, &data)
     /// }
-    pub fn push_constant<T: Copy + Sized>(self, stage: vk::ShaderStageFlags, offset: u32, data: &T) -> Self {
+    pub fn push_constant<T: Copy + Sized>(
+        self,
+        stage: vk::ShaderStageFlags,
+        offset: u32,
+        data: &T,
+    ) -> Self {
         self.push_constants(stage, offset, std::slice::from_ref(data))
     }
 
@@ -492,14 +543,24 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     ///     cmd.push_constants(vk::ShaderStageFlags::VERTEX, 0, &data)
     /// }
     /// ```
-    pub fn push_constants<T: Copy + Sized>(self, stage: vk::ShaderStageFlags, offset: u32, data: &[T]) -> Self {
+    pub fn push_constants<T: Copy + Sized>(
+        self,
+        stage: vk::ShaderStageFlags,
+        offset: u32,
+        data: &[T],
+    ) -> Self {
         // TODO: Validate push constant ranges with current pipeline layout to prevent crashes.
         unsafe {
             // SAFETY: every data structure can be aligned to a byte slice.
             let (_, data, _) = data.align_to::<u8>();
             // SAFETY: self is valid, everything else is up to validation layers.
-            self.device
-                .cmd_push_constants(self.handle, self.current_pipeline_layout, stage, offset, data);
+            self.device.cmd_push_constants(
+                self.handle,
+                self.current_pipeline_layout,
+                stage,
+                offset,
+                data,
+            );
         }
         self
     }
@@ -508,7 +569,12 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// [`ScopedQuery`]
     pub fn begin_query<Q: ScopedQuery>(self, query_pool: &QueryPool<Q>, index: u32) -> Self {
         unsafe {
-            self.device.cmd_begin_query(self.handle, query_pool.handle(), index, vk::QueryControlFlags::default());
+            self.device.cmd_begin_query(
+                self.handle,
+                query_pool.handle(),
+                index,
+                vk::QueryControlFlags::default(),
+            );
         }
         self
     }
@@ -516,7 +582,8 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// End a scoped query. This query must be started with [`Self::begin_query()`] first.
     pub fn end_query<Q: ScopedQuery>(self, query_pool: &QueryPool<Q>, index: u32) -> Self {
         unsafe {
-            self.device.cmd_end_query(self.handle, query_pool.handle(), index);
+            self.device
+                .cmd_end_query(self.handle, query_pool.handle(), index);
         }
         self
     }
@@ -524,8 +591,14 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// Write a timestamp to the next entry in a query pool.
     /// # Errors
     /// * Fails if the query pool is out of entries.
-    pub fn write_timestamp(self, query_pool: &mut QueryPool<TimestampQuery>, stage: PipelineStage) -> Result<Self> {
-        let index = query_pool.next().ok_or_else(|| anyhow!("Query pool capacity exceeded"))?;
+    pub fn write_timestamp(
+        self,
+        query_pool: &mut QueryPool<TimestampQuery>,
+        stage: PipelineStage,
+    ) -> Result<Self> {
+        let index = query_pool
+            .next()
+            .ok_or_else(|| anyhow!("Query pool capacity exceeded"))?;
         query_pool.write_timestamp(self.timestamp_valid_bits, self.handle, stage, index);
         Ok(self)
     }
@@ -578,19 +651,27 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
             // SAFETY: A valid RenderingAttachmentInfo always stores a valid image view
             image_view: unsafe { attachment.image_view.handle() },
             image_layout: attachment.image_layout,
-            resolve_mode: attachment.resolve_mode.unwrap_or(vk::ResolveModeFlagsKHR::NONE),
+            resolve_mode: attachment
+                .resolve_mode
+                .unwrap_or(vk::ResolveModeFlagsKHR::NONE),
             resolve_image_view: match &attachment.resolve_image_view {
                 // SAFETY: A valid RenderingAttachmentInfo always stores a valid image view
                 Some(view) => unsafe { view.handle() },
                 None => vk::ImageView::null(),
             },
-            resolve_image_layout: attachment.resolve_image_layout.unwrap_or(vk::ImageLayout::UNDEFINED),
+            resolve_image_layout: attachment
+                .resolve_image_layout
+                .unwrap_or(vk::ImageLayout::UNDEFINED),
             load_op: attachment.load_op,
             store_op: attachment.store_op,
             clear_value: attachment.clear_value,
         };
 
-        let color_attachments = info.color_attachments.iter().map(map_attachment).collect::<Vec<_>>();
+        let color_attachments = info
+            .color_attachments
+            .iter()
+            .map(map_attachment)
+            .collect::<Vec<_>>();
         let depth_attachment = info.depth_attachment.as_ref().map(map_attachment);
         let stencil_attachment = info.stencil_attachment.as_ref().map(map_attachment);
         let vk_info = vk::RenderingInfo {
@@ -624,7 +705,10 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
                 .iter()
                 .map(|attachment| attachment.image_view.format())
                 .collect(),
-            depth_format: info.depth_attachment.as_ref().map(|attachment| attachment.image_view.format()),
+            depth_format: info
+                .depth_attachment
+                .as_ref()
+                .map(|attachment| attachment.image_view.format()),
             stencil_format: info
                 .stencil_attachment
                 .as_ref()
@@ -649,7 +733,11 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
 
     /// Start a label region.
     #[cfg(feature = "debug-markers")]
-    pub(crate) fn begin_label(self, label: vk::DebugUtilsLabelEXT, debug: &Arc<DebugMessenger>) -> Self {
+    pub(crate) fn begin_label(
+        self,
+        label: vk::DebugUtilsLabelEXT,
+        debug: &Arc<DebugMessenger>,
+    ) -> Self {
         unsafe {
             debug.cmd_begin_debug_utils_label(self.handle, &label);
         }

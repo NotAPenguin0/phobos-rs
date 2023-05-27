@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{ByteSize, Error, PipelineCreateInfo, ShaderCreateInfo};
 use crate::pipeline::create_info::*;
+use crate::{ByteSize, Error, PipelineCreateInfo, ShaderCreateInfo};
 
 /// Used to facilitate creating a graphics pipeline. For an example, please check the
 /// [`pipeline`](crate::pipeline) module level documentation.
@@ -30,70 +30,78 @@ impl PipelineBuilder {
                 vertex_input_bindings: vec![],
                 vertex_attributes: vec![],
                 shaders: vec![],
-                input_assembly: PipelineInputAssemblyStateCreateInfo(vk::PipelineInputAssemblyStateCreateInfo {
-                    s_type: vk::StructureType::PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-                    p_next: std::ptr::null(),
-                    flags: Default::default(),
-                    topology: vk::PrimitiveTopology::TRIANGLE_LIST,
-                    primitive_restart_enable: vk::FALSE,
-                }),
-                depth_stencil: PipelineDepthStencilStateCreateInfo(vk::PipelineDepthStencilStateCreateInfo {
-                    s_type: vk::StructureType::PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-                    p_next: std::ptr::null(),
-                    flags: Default::default(),
-                    depth_test_enable: vk::FALSE,
-                    depth_write_enable: vk::FALSE,
-                    depth_compare_op: Default::default(),
-                    depth_bounds_test_enable: vk::FALSE,
-                    stencil_test_enable: vk::FALSE,
-                    front: vk::StencilOpState {
-                        fail_op: Default::default(),
-                        pass_op: Default::default(),
-                        depth_fail_op: Default::default(),
-                        compare_op: Default::default(),
-                        compare_mask: 0,
-                        write_mask: 0,
-                        reference: 0,
+                input_assembly: PipelineInputAssemblyStateCreateInfo(
+                    vk::PipelineInputAssemblyStateCreateInfo {
+                        s_type: vk::StructureType::PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+                        p_next: std::ptr::null(),
+                        flags: Default::default(),
+                        topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                        primitive_restart_enable: vk::FALSE,
                     },
-                    back: vk::StencilOpState {
-                        fail_op: Default::default(),
-                        pass_op: Default::default(),
-                        depth_fail_op: Default::default(),
-                        compare_op: Default::default(),
-                        compare_mask: 0,
-                        write_mask: 0,
-                        reference: 0,
+                ),
+                depth_stencil: PipelineDepthStencilStateCreateInfo(
+                    vk::PipelineDepthStencilStateCreateInfo {
+                        s_type: vk::StructureType::PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+                        p_next: std::ptr::null(),
+                        flags: Default::default(),
+                        depth_test_enable: vk::FALSE,
+                        depth_write_enable: vk::FALSE,
+                        depth_compare_op: Default::default(),
+                        depth_bounds_test_enable: vk::FALSE,
+                        stencil_test_enable: vk::FALSE,
+                        front: vk::StencilOpState {
+                            fail_op: Default::default(),
+                            pass_op: Default::default(),
+                            depth_fail_op: Default::default(),
+                            compare_op: Default::default(),
+                            compare_mask: 0,
+                            write_mask: 0,
+                            reference: 0,
+                        },
+                        back: vk::StencilOpState {
+                            fail_op: Default::default(),
+                            pass_op: Default::default(),
+                            depth_fail_op: Default::default(),
+                            compare_op: Default::default(),
+                            compare_mask: 0,
+                            write_mask: 0,
+                            reference: 0,
+                        },
+                        min_depth_bounds: 0.0,
+                        max_depth_bounds: 0.0,
                     },
-                    min_depth_bounds: 0.0,
-                    max_depth_bounds: 0.0,
-                }),
+                ),
                 dynamic_states: vec![],
-                rasterizer: PipelineRasterizationStateCreateInfo(vk::PipelineRasterizationStateCreateInfo {
-                    s_type: vk::StructureType::PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-                    p_next: std::ptr::null(),
-                    flags: Default::default(),
-                    depth_clamp_enable: vk::FALSE,
-                    rasterizer_discard_enable: vk::FALSE,
-                    polygon_mode: vk::PolygonMode::FILL,
-                    cull_mode: vk::CullModeFlags::NONE,
-                    front_face: vk::FrontFace::COUNTER_CLOCKWISE,
-                    depth_bias_enable: vk::FALSE,
-                    depth_bias_constant_factor: 0.0,
-                    depth_bias_clamp: 0.0,
-                    depth_bias_slope_factor: 0.0,
-                    line_width: 1.0,
-                }),
-                multisample: PipelineMultisampleStateCreateInfo(vk::PipelineMultisampleStateCreateInfo {
-                    s_type: vk::StructureType::PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-                    p_next: std::ptr::null(),
-                    flags: Default::default(),
-                    rasterization_samples: vk::SampleCountFlags::TYPE_1,
-                    sample_shading_enable: vk::FALSE,
-                    min_sample_shading: 0.0,
-                    p_sample_mask: std::ptr::null(),
-                    alpha_to_coverage_enable: vk::FALSE,
-                    alpha_to_one_enable: vk::FALSE,
-                }),
+                rasterizer: PipelineRasterizationStateCreateInfo(
+                    vk::PipelineRasterizationStateCreateInfo {
+                        s_type: vk::StructureType::PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+                        p_next: std::ptr::null(),
+                        flags: Default::default(),
+                        depth_clamp_enable: vk::FALSE,
+                        rasterizer_discard_enable: vk::FALSE,
+                        polygon_mode: vk::PolygonMode::FILL,
+                        cull_mode: vk::CullModeFlags::NONE,
+                        front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                        depth_bias_enable: vk::FALSE,
+                        depth_bias_constant_factor: 0.0,
+                        depth_bias_clamp: 0.0,
+                        depth_bias_slope_factor: 0.0,
+                        line_width: 1.0,
+                    },
+                ),
+                multisample: PipelineMultisampleStateCreateInfo(
+                    vk::PipelineMultisampleStateCreateInfo {
+                        s_type: vk::StructureType::PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+                        p_next: std::ptr::null(),
+                        flags: Default::default(),
+                        rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                        sample_shading_enable: vk::FALSE,
+                        min_sample_shading: 0.0,
+                        p_sample_mask: std::ptr::null(),
+                        alpha_to_coverage_enable: vk::FALSE,
+                        alpha_to_one_enable: vk::FALSE,
+                    },
+                ),
                 blend_attachments: vec![],
                 viewports: vec![],
                 scissors: vec![],
@@ -145,8 +153,16 @@ impl PipelineBuilder {
     /// Add a vertex attribute to the specified binding.
     /// Doing this will automatically calculate offsets and sizes, so make sure to add these in order of declaration in
     /// the shader.
-    pub fn vertex_attribute(mut self, binding: u32, location: u32, format: vk::Format) -> Result<Self> {
-        let offset = self.vertex_binding_offsets.get_mut(&binding).ok_or_else(|| Error::NoVertexBinding)?;
+    pub fn vertex_attribute(
+        mut self,
+        binding: u32,
+        location: u32,
+        format: vk::Format,
+    ) -> Result<Self> {
+        let offset = self
+            .vertex_binding_offsets
+            .get_mut(&binding)
+            .ok_or_else(|| Error::NoVertexBinding)?;
         self.inner
             .vertex_attributes
             .push(VertexInputAttributeDescription(vk::VertexInputAttributeDescription {
@@ -197,7 +213,10 @@ impl PipelineBuilder {
 
     /// Configure all depth state in one call.
     pub fn depth(self, test: bool, write: bool, clamp: bool, op: vk::CompareOp) -> Self {
-        self.depth_test(test).depth_write(write).depth_clamp(clamp).depth_op(op)
+        self.depth_test(test)
+            .depth_write(write)
+            .depth_clamp(clamp)
+            .depth_op(op)
     }
 
     /// Add a dynamic state to the pipeline.
@@ -265,7 +284,11 @@ impl PipelineBuilder {
     }
 
     /// Enable tessellation and set tessellation state.
-    pub fn tessellation(mut self, patch_control_points: u32, flags: vk::PipelineTessellationStateCreateFlags) -> Self {
+    pub fn tessellation(
+        mut self,
+        patch_control_points: u32,
+        flags: vk::PipelineTessellationStateCreateFlags,
+    ) -> Self {
         let mut info = PipelineTessellationStateCreateInfo::default();
         info.0.patch_control_points = patch_control_points;
         info.0.flags = flags;
@@ -293,7 +316,13 @@ impl PipelineBuilder {
     }
 
     /// Add an additive blend attachment, writing to each color component.
-    pub fn blend_additive_unmasked(mut self, src: vk::BlendFactor, dst: vk::BlendFactor, src_alpha: vk::BlendFactor, dst_alpha: vk::BlendFactor) -> Self {
+    pub fn blend_additive_unmasked(
+        mut self,
+        src: vk::BlendFactor,
+        dst: vk::BlendFactor,
+        src_alpha: vk::BlendFactor,
+        dst_alpha: vk::BlendFactor,
+    ) -> Self {
         self.inner
             .blend_attachments
             .push(PipelineColorBlendAttachmentState(vk::PipelineColorBlendAttachmentState {

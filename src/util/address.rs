@@ -55,16 +55,12 @@ impl AsVulkanType for DeviceOrHostAddress {
 
     fn as_vulkan(&self) -> Self::Output {
         match *self {
-            DeviceOrHostAddress::Device(addr) => {
-                vk::DeviceOrHostAddressKHR {
-                    device_address: addr
-                }
-            }
-            DeviceOrHostAddress::Host(ptr) => {
-                vk::DeviceOrHostAddressKHR {
-                    host_address: ptr
-                }
-            }
+            DeviceOrHostAddress::Device(addr) => vk::DeviceOrHostAddressKHR {
+                device_address: addr,
+            },
+            DeviceOrHostAddress::Host(ptr) => vk::DeviceOrHostAddressKHR {
+                host_address: ptr,
+            },
         }
     }
 }
@@ -74,16 +70,12 @@ impl AsVulkanType for DeviceOrHostAddressConst {
 
     fn as_vulkan(&self) -> Self::Output {
         match *self {
-            DeviceOrHostAddressConst::Device(addr) => {
-                vk::DeviceOrHostAddressConstKHR {
-                    device_address: addr
-                }
-            }
-            DeviceOrHostAddressConst::Host(ptr) => {
-                vk::DeviceOrHostAddressConstKHR {
-                    host_address: ptr
-                }
-            }
+            DeviceOrHostAddressConst::Device(addr) => vk::DeviceOrHostAddressConstKHR {
+                device_address: addr,
+            },
+            DeviceOrHostAddressConst::Host(ptr) => vk::DeviceOrHostAddressConstKHR {
+                host_address: ptr,
+            },
         }
     }
 }

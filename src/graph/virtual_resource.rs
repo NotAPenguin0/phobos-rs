@@ -100,11 +100,15 @@ impl VirtualResource {
 /// Syntax sugar to easily construct image virtual resources
 #[macro_export]
 macro_rules! image {
-    ($id:literal) => { ::phobos::prelude::VirtualResource::image($id) }
+    ($id:literal) => {
+        ::phobos::prelude::VirtualResource::image($id)
+    };
 }
 
 /// Syntax sugar to easily construct buffer virtual resources
 #[macro_export]
 macro_rules! buffer {
-    ($id:literal) => { ::phobos::prelude::VirtualResource::buffer($id) }
+    ($id:literal) => {
+        ::phobos::prelude::VirtualResource::buffer($id)
+    };
 }

@@ -5,25 +5,27 @@ use std::sync::MutexGuard;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, BufferView, DescriptorCache, Device, ExecutionManager, ImageView, PipelineCache};
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
 use crate::raytracing::*;
 use crate::sync::domain;
 use crate::sync::domain::ExecutionDomain;
+use crate::{
+    Allocator, BufferView, DescriptorCache, Device, ExecutionManager, ImageView, PipelineCache,
+};
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {
     /// Copy one buffer view to another buffer view.
     /// Both views must have the same length.
     fn copy_buffer(self, src: &BufferView, dst: &BufferView) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
     /// Copy a buffer to an image.
     fn copy_buffer_to_image(self, src: &BufferView, dst: &ImageView) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 }
 
 /// Trait representing a command buffer that supports graphics commands.
@@ -35,44 +37,66 @@ pub trait GraphicsCmdBuffer: TransferCmdBuffer {
     /// Sets the scissor region. Equivalent of `vkCmdSetScissor`.
     fn scissor(self, scissor: vk::Rect2D) -> Self;
     /// Record a single drawcall. Equivalent of `vkCmdDraw`.
-    fn draw(self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Result<Self>
-        where
-            Self: Sized;
+    fn draw(
+        self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) -> Result<Self>
+    where
+        Self: Sized;
     /// Record a single indexed drawcall. Equivalent of `vkCmdDrawIndexed`
-    fn draw_indexed(self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Result<Self>
-        where
-            Self: Sized;
+    fn draw_indexed(
+        self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
+    ) -> Result<Self>
+    where
+        Self: Sized;
     /// Start raytracing. Equivalent of `vkCmdTraceRays`.
-    fn trace_rays(self, width: u32, height: u32, depth: u32) -> Result<Self> where Self: Sized;
+    fn trace_rays(self, width: u32, height: u32, depth: u32) -> Result<Self>
+    where
+        Self: Sized;
     /// Bind a graphics pipeline with a given name.
     /// # Errors
     /// This function can report an error in case the pipeline name is not registered in the cache.
     fn bind_graphics_pipeline(self, name: &str) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 
     /// Bind a ray tracing pipeline with a given name.
     fn bind_ray_tracing_pipeline(self, name: &str) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
     /// Bind a vertex buffer to the given vertex input binding.
     /// Equivalent of `vkCmdBindVertexBuffer`
     fn bind_vertex_buffer(self, binding: u32, buffer: &BufferView) -> Self
-        where
-            Self: Sized;
+    where
+        Self: Sized;
     /// Bind an index buffer. Equivalent of `vkCmdBindIndexBuffer`
     fn bind_index_buffer(self, buffer: &BufferView, ty: vk::IndexType) -> Self
-        where
-            Self: Sized;
+    where
+        Self: Sized;
     /// Blit an image. Equivalent to `vkCmdBlitImage`
-    fn blit_image(self, src: &ImageView, dst: &ImageView, src_offsets: &[vk::Offset3D; 2], dst_offsets: &[vk::Offset3D; 2], filter: vk::Filter) -> Self
-        where
-            Self: Sized;
+    fn blit_image(
+        self,
+        src: &ImageView,
+        dst: &ImageView,
+        src_offsets: &[vk::Offset3D; 2],
+        dst_offsets: &[vk::Offset3D; 2],
+        filter: vk::Filter,
+    ) -> Self
+    where
+        Self: Sized;
 
     /// Set the polygon mode. Only available if VK_EXT_extended_dynamic_state3 was enabled. Equivalent to `vkCmdSetPolygonMode`
     fn set_polygon_mode(self, mode: vk::PolygonMode) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 }
 
 /// Trait representing a command buffer that supports compute commands.
@@ -81,28 +105,32 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
     /// # Errors
     /// This function can report an error in case the pipeline name is not registered in the cache.
     fn bind_compute_pipeline(self, name: &str) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 
     /// Dispatch a compute invocation. See `vkCmdDispatch`
     fn dispatch(self, x: u32, y: u32, z: u32) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 
     /// Build an acceleration structure
     fn build_acceleration_structure(self, info: &AccelerationStructureBuildInfo) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 
     /// Build multiple acceleration structures in a single command
     fn build_acceleration_structures(self, info: &[AccelerationStructureBuildInfo]) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 
     /// Compact an acceleration structure
-    fn compact_acceleration_structure(self, src: &AccelerationStructure, dst: &AccelerationStructure) -> Result<Self>
-        where
-            Self: Sized;
+    fn compact_acceleration_structure(
+        self,
+        src: &AccelerationStructure,
+        dst: &AccelerationStructure,
+    ) -> Result<Self>
+    where
+        Self: Sized;
 
     /// Write acceleration structure properties of multiple acceleration structures in a single command.
     fn write_acceleration_structures_properties<Q: AccelerationStructurePropertyQuery>(
@@ -110,8 +138,8 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
         src: &[AccelerationStructure],
         query_pool: &mut QueryPool<Q>,
     ) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 
     /// Write acceleration structure properties
     fn write_acceleration_structure_properties<Q: AccelerationStructurePropertyQuery>(
@@ -119,8 +147,8 @@ pub trait ComputeCmdBuffer: TransferCmdBuffer {
         src: &AccelerationStructure,
         query_pool: &mut QueryPool<Q>,
     ) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 }
 
 /// Completed command buffer

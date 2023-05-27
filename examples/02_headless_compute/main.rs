@@ -1,11 +1,10 @@
 use std::path::Path;
 
 use anyhow::Result;
-
 use phobos::prelude::*;
 use phobos::query_pool::{PipelineStatisticsQuery, QueryPool, QueryPoolCreateInfo, TimestampQuery};
 
-use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file};
+use crate::example_runner::{load_spirv_file, Context, ExampleApp, ExampleRunner};
 
 /// This example illustrates using compute shaders in phobos, as well as
 /// how phobos can be used without creating a window.
@@ -44,21 +43,28 @@ impl ExampleApp for Compute {
 
     fn run(&mut self, ctx: Context, _thread: ThreadContext) -> Result<()> {
         // Allocate a command buffer on the compute domain
-        let cmd = ctx
-            .exec
-            .on_domain::<domain::Compute>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
+        let cmd = ctx.exec.on_domain::<domain::Compute>(
+            Some(ctx.pipelines.clone()),
+            Some(ctx.descriptors.clone()),
+        )?;
 
         // Create a query pool to record timestamps
-        let mut timestamps = QueryPool::<TimestampQuery>::new(ctx.device.clone(), QueryPoolCreateInfo {
-            count: 2,
-            statistic_flags: None,
-        })?;
+        let mut timestamps = QueryPool::<TimestampQuery>::new(
+            ctx.device.clone(),
+            QueryPoolCreateInfo {
+                count: 2,
+                statistic_flags: None,
+            },
+        )?;
 
         // Create a query pool to record pipeline statistics
-        let mut stats = QueryPool::<PipelineStatisticsQuery>::new(ctx.device, QueryPoolCreateInfo {
-            count: 1,
-            statistic_flags: Some(vk::QueryPipelineStatisticFlags::COMPUTE_SHADER_INVOCATIONS),
-        })?;
+        let mut stats = QueryPool::<PipelineStatisticsQuery>::new(
+            ctx.device,
+            QueryPoolCreateInfo {
+                count: 1,
+                statistic_flags: Some(vk::QueryPipelineStatisticFlags::COMPUTE_SHADER_INVOCATIONS),
+            },
+        )?;
 
         let multiplier: f32 = 2.0;
         let query = stats.next().unwrap();
@@ -89,7 +95,10 @@ impl ExampleApp for Compute {
         let end = *times.last().unwrap();
         println!("Entire command buffer took {} nanoseconds", (end - start).as_nanos());
         let stats = stats.wait_for_single_result(query)?;
-        println!("Number of compute shader invocations: {}", stats.compute_shader_invocations.unwrap());
+        println!(
+            "Number of compute shader invocations: {}",
+            stats.compute_shader_invocations.unwrap()
+        );
 
         Ok(())
     }

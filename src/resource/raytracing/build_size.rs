@@ -3,10 +3,12 @@
 use anyhow::{bail, Result};
 use ash::vk;
 
-use crate::{AccelerationStructure, AccelerationStructureBuildInfo, AccelerationStructureBuildType, Device};
 use crate::core::device::ExtensionID;
 use crate::util::align::align;
 use crate::util::to_vk::{AsVulkanType, IntoVulkanType};
+use crate::{
+    AccelerationStructure, AccelerationStructureBuildInfo, AccelerationStructureBuildType, Device,
+};
 
 /// Holds the required sizes of buffers for the acceleration structure
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
@@ -20,7 +22,12 @@ pub struct AccelerationStructureBuildSize {
 }
 
 /// Get the build sizes for this acceleration structure build info
-pub fn query_build_size(device: &Device, ty: AccelerationStructureBuildType, info: &AccelerationStructureBuildInfo, primitive_counts: &[u32]) -> Result<AccelerationStructureBuildSize> {
+pub fn query_build_size(
+    device: &Device,
+    ty: AccelerationStructureBuildType,
+    info: &AccelerationStructureBuildInfo,
+    primitive_counts: &[u32],
+) -> Result<AccelerationStructureBuildSize> {
     device.require_extension(ExtensionID::AccelerationStructure)?;
     let fns = device.acceleration_structure().unwrap();
 
@@ -32,10 +39,17 @@ pub fn query_build_size(device: &Device, ty: AccelerationStructureBuildType, inf
             );
     }
 
-    let sizes = unsafe { fns.get_acceleration_structure_build_sizes(ty.into_vulkan(), &info.geometry.as_vulkan(), primitive_counts) };
+    let sizes = unsafe {
+        fns.get_acceleration_structure_build_sizes(
+            ty.into_vulkan(),
+            &info.geometry.as_vulkan(),
+            primitive_counts,
+        )
+    };
     let scratch_align = device
         .acceleration_structure_properties()?
-        .min_acceleration_structure_scratch_offset_alignment as vk::DeviceSize;
+        .min_acceleration_structure_scratch_offset_alignment
+        as vk::DeviceSize;
     Ok(AccelerationStructureBuildSize {
         size: align(sizes.acceleration_structure_size, AccelerationStructure::alignment()),
         update_scratch_size: align(sizes.update_scratch_size, scratch_align),

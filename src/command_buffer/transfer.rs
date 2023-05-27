@@ -3,11 +3,13 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::sync::domain::ExecutionDomain;
+use crate::{Allocator, BufferView, Error, ImageView, TransferCmdBuffer, TransferSupport};
 
-impl<D: TransferSupport + ExecutionDomain, A: Allocator> TransferCmdBuffer for IncompleteCommandBuffer<'_, D, A> {
+impl<D: TransferSupport + ExecutionDomain, A: Allocator> TransferCmdBuffer
+    for IncompleteCommandBuffer<'_, D, A>
+{
     /// Copy one buffer to the other.
     /// # Errors
     /// * Fails if the buffer views do not have the same size.
@@ -32,8 +34,12 @@ impl<D: TransferSupport + ExecutionDomain, A: Allocator> TransferCmdBuffer for I
         };
 
         unsafe {
-            self.device
-                .cmd_copy_buffer(self.handle, src.handle(), dst.handle(), std::slice::from_ref(&copy));
+            self.device.cmd_copy_buffer(
+                self.handle,
+                src.handle(),
+                dst.handle(),
+                std::slice::from_ref(&copy),
+            );
         }
 
         Ok(self)

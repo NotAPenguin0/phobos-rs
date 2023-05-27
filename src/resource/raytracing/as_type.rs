@@ -21,7 +21,9 @@ impl IntoVulkanType for AccelerationStructureType {
     fn into_vulkan(self) -> Self::Output {
         match self {
             AccelerationStructureType::TopLevel => vk::AccelerationStructureTypeKHR::TOP_LEVEL,
-            AccelerationStructureType::BottomLevel => vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL,
+            AccelerationStructureType::BottomLevel => {
+                vk::AccelerationStructureTypeKHR::BOTTOM_LEVEL
+            }
             AccelerationStructureType::Generic => vk::AccelerationStructureTypeKHR::GENERIC,
         }
     }

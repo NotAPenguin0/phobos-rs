@@ -9,8 +9,8 @@ use anyhow::Result;
 use ash::prelude::VkResult;
 use ash::vk;
 
-use crate::Device;
 use crate::pool::Poolable;
+use crate::Device;
 
 struct CleanupFnLink<'f> {
     pub f: Box<dyn FnOnce() + 'f>,
@@ -158,7 +158,11 @@ impl<T> Fence<T> {
     }
 
     /// Create a new fence with the specified poll rate for awaiting it as a future.
-    pub fn new_with_poll_rate(device: Device, signaled: bool, poll_rate: Duration) -> Result<Self, vk::Result> {
+    pub fn new_with_poll_rate(
+        device: Device,
+        signaled: bool,
+        poll_rate: Duration,
+    ) -> Result<Self, vk::Result> {
         let info = vk::FenceCreateInfo {
             s_type: vk::StructureType::FENCE_CREATE_INFO,
             p_next: std::ptr::null(),
@@ -197,7 +201,8 @@ impl<T> Fence<T> {
     }
 
     pub(crate) unsafe fn wait_without_cleanup(&self) -> VkResult<()> {
-        self.device.wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
+        self.device
+            .wait_for_fences(slice::from_ref(&self.handle), true, u64::MAX)
     }
 
     /// Waits for the fence by polling repeatedly and yielding execution to the OS. This is useful if you don't care about quickly knowing the fence is

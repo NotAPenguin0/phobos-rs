@@ -9,13 +9,14 @@ use glam::{Mat4, Vec3};
 use layout::backends::svg::SVGWriter;
 use layout::gv;
 use layout::gv::GraphBuilder;
-use winit::event::{ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
-use winit::window::{Window, WindowBuilder};
-
 use phobos::pool::ResourcePool;
 use phobos::prelude::*;
 use phobos::sync::submit_batch::SubmitBatch;
+use winit::event::{
+    ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent,
+};
+use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
+use winit::window::{Window, WindowBuilder};
 
 pub fn front_direction(rotation: Vec3) -> Vec3 {
     let cos_pitch = rotation.x.cos();
@@ -202,8 +203,8 @@ pub fn create_shader(path: &str, stage: vk::ShaderStageFlags) -> ShaderCreateInf
 
 #[allow(dead_code)]
 pub fn save_dotfile<G>(graph: &G, path: &str)
-    where
-        G: GraphViz, {
+where
+    G: GraphViz, {
     let dot = graph.dot().unwrap();
     let dot = format!("{}", dot);
     let mut parser = gv::DotParser::new(&dot);
@@ -295,7 +296,11 @@ pub struct ExampleRunner {
 }
 
 impl ExampleRunner {
-    pub fn new(name: impl Into<String>, window: Option<&WindowContext>, make_settings: impl Fn(AppBuilder<Window>) -> AppSettings<Window>) -> Result<Self> {
+    pub fn new(
+        name: impl Into<String>,
+        window: Option<&WindowContext>,
+        make_settings: impl Fn(AppBuilder<Window>) -> AppSettings<Window>,
+    ) -> Result<Self> {
         std::env::set_var("RUST_LOG", "trace");
         pretty_env_logger::init();
         let mut settings = AppBuilder::new()
@@ -374,7 +379,9 @@ impl ExampleRunner {
         let ctx = self.make_context();
         let frame = self.vk.frame.as_mut().unwrap();
         let surface = self.vk.surface.as_ref().unwrap();
-        block_on(frame.new_frame(self.vk.exec.clone(), window, surface, |ifc| app.frame(ctx, ifc)))?;
+        block_on(
+            frame.new_frame(self.vk.exec.clone(), window, surface, |ifc| app.frame(ctx, ifc)),
+        )?;
 
         Ok(())
     }

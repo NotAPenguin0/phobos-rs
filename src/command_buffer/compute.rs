@@ -3,14 +3,16 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, ComputeCmdBuffer, ComputeSupport, Error};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
 use crate::raytracing::*;
 use crate::sync::domain::ExecutionDomain;
+use crate::{Allocator, ComputeCmdBuffer, ComputeSupport, Error};
 
-impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for IncompleteCommandBuffer<'_, D, A> {
+impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer
+    for IncompleteCommandBuffer<'_, D, A>
+{
     /// Sets the current compute pipeline by looking up the given name in the pipeline cache.
     /// # Errors
     /// - Fails with [`Error::NoPipelineCache`] if this command buffer was created without a pipeline cache.
@@ -27,8 +29,8 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for Inc
     /// }
     /// ```
     fn bind_compute_pipeline(mut self, name: &str) -> Result<Self>
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
         {
             cache.with_compute_pipeline(name, |pipeline| {
@@ -79,34 +81,50 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for Inc
     /// Build a single acceleration structure. This is a write operation to the acceleration structure, so
     /// it must be synchronized.
     fn build_acceleration_structure(self, info: &AccelerationStructureBuildInfo) -> Result<Self>
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         self.build_acceleration_structures(std::slice::from_ref(info))
     }
 
     /// Build multiple acceleration structures in a single Vulkan command.
     /// This is a write operation to the acceleration structures, so it must be
     /// synchronized
-    fn build_acceleration_structures(self, info: &[AccelerationStructureBuildInfo]) -> Result<Self>
-        where
-            Self: Sized, {
-        self.device.require_extension(ExtensionID::AccelerationStructure)?;
+    fn build_acceleration_structures(
+        self,
+        info: &[AccelerationStructureBuildInfo],
+    ) -> Result<Self>
+    where
+        Self: Sized, {
+        self.device
+            .require_extension(ExtensionID::AccelerationStructure)?;
         let as_vk = info.iter().map(|info| info.as_vulkan()).collect::<Vec<_>>();
-        let geometries = as_vk.iter().map(|(geometry, _)| *geometry).collect::<Vec<_>>();
+        let geometries = as_vk
+            .iter()
+            .map(|(geometry, _)| *geometry)
+            .collect::<Vec<_>>();
         let infos = as_vk.iter().map(|(_, ranges)| *ranges).collect::<Vec<_>>();
         unsafe {
             self.device
                 .acceleration_structure()
                 .unwrap()
-                .cmd_build_acceleration_structures(self.handle, geometries.as_slice(), infos.as_slice());
+                .cmd_build_acceleration_structures(
+                    self.handle,
+                    geometries.as_slice(),
+                    infos.as_slice(),
+                );
         }
 
         Ok(self)
     }
 
     /// Compact an acceleration structure. This is read operation on `src`, and a write operation on `dst`
-    fn compact_acceleration_structure(self, src: &AccelerationStructure, dst: &AccelerationStructure) -> Result<Self> {
-        self.device.require_extension(ExtensionID::AccelerationStructure)?;
+    fn compact_acceleration_structure(
+        self,
+        src: &AccelerationStructure,
+        dst: &AccelerationStructure,
+    ) -> Result<Self> {
+        self.device
+            .require_extension(ExtensionID::AccelerationStructure)?;
         let fns = self.device.acceleration_structure().unwrap();
         let info = vk::CopyAccelerationStructureInfoKHR {
             s_type: vk::StructureType::COPY_ACCELERATION_STRUCTURE_INFO_KHR,
@@ -129,10 +147,14 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer for Inc
         src: &[AccelerationStructure],
         query_pool: &mut QueryPool<Q>,
     ) -> Result<Self> {
-        self.device.require_extension(ExtensionID::AccelerationStructure)?;
+        self.device
+            .require_extension(ExtensionID::AccelerationStructure)?;
         let fns = self.device.acceleration_structure().unwrap();
 
-        let handles = src.iter().map(|a| unsafe { a.handle() }).collect::<Vec<_>>();
+        let handles = src
+            .iter()
+            .map(|a| unsafe { a.handle() })
+            .collect::<Vec<_>>();
         let first = query_pool.current();
         unsafe {
             fns.cmd_write_acceleration_structures_properties(

@@ -4,10 +4,11 @@ use std::marker::PhantomData;
 
 use anyhow::Result;
 
-use crate::{
-    Allocator, AppSettings, DebugMessenger, DefaultAllocator, Device, ExecutionManager, FrameManager, PhysicalDevice, Surface, VkInstance, WindowInterface,
-};
 use crate::pool::{ResourcePool, ResourcePoolCreateInfo};
+use crate::{
+    Allocator, AppSettings, DebugMessenger, DefaultAllocator, Device, ExecutionManager,
+    FrameManager, PhysicalDevice, Surface, VkInstance, WindowInterface,
+};
 
 /// ZST implementing initialization without a window
 pub struct HeadlessContext;
@@ -26,7 +27,10 @@ pub trait ContextInit<W: WindowInterface> {
     fn init(settings: &AppSettings<W>) -> Result<Self::Output<DefaultAllocator>>;
 
     /// Initialize the context with a custom allocator
-    fn init_with_allocator<A: Allocator + 'static, F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>>(
+    fn init_with_allocator<
+        A: Allocator + 'static,
+        F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>,
+    >(
         settings: &AppSettings<W>,
         make_alloc: F,
     ) -> Result<Self::Output<A>>;
@@ -51,7 +55,10 @@ impl<W: WindowInterface> ContextInit<W> for HeadlessContext {
     }
 
     /// Initialize the headless context with a custom allocator
-    fn init_with_allocator<A: Allocator + 'static, F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>>(
+    fn init_with_allocator<
+        A: Allocator + 'static,
+        F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>,
+    >(
         settings: &AppSettings<W>,
         make_alloc: F,
     ) -> Result<Self::Output<A>> {
@@ -98,12 +105,16 @@ impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
     }
 
     /// Initialize the windowed context with a custom allocator
-    fn init_with_allocator<A: Allocator + 'static, F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>>(
+    fn init_with_allocator<
+        A: Allocator + 'static,
+        F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>,
+    >(
         settings: &AppSettings<W>,
         make_alloc: F,
     ) -> Result<Self::Output<A>> {
         let instance = VkInstance::new(settings)?;
-        let (surface, physical_device) = { PhysicalDevice::select_with_surface(&instance, settings)? };
+        let (surface, physical_device) =
+            { PhysicalDevice::select_with_surface(&instance, settings)? };
         let device = Device::new(&instance, &physical_device, settings)?;
         let allocator = make_alloc(&instance, &physical_device, &device)?;
         let pool_info = ResourcePoolCreateInfo {
@@ -113,7 +124,13 @@ impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
         };
         let pool = ResourcePool::new(pool_info)?;
         let exec = ExecutionManager::new(device.clone(), &physical_device, pool.clone())?;
-        let frame = FrameManager::new_with_swapchain(&instance, device.clone(), pool.clone(), settings, &surface)?;
+        let frame = FrameManager::new_with_swapchain(
+            &instance,
+            device.clone(),
+            pool.clone(),
+            settings,
+            &surface,
+        )?;
         let debug_messenger = if settings.enable_validation {
             Some(DebugMessenger::new(&instance)?)
         } else {
@@ -135,7 +152,11 @@ impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
 }
 
 /// Initialize all phobos objects with a custom allocator
-pub fn initialize_with_allocator<W: WindowInterface, A: Allocator + 'static, F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>>(
+pub fn initialize_with_allocator<
+    W: WindowInterface,
+    A: Allocator + 'static,
+    F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>,
+>(
     settings: &AppSettings<W>,
     headless: bool,
     make_alloc: F,
@@ -151,7 +172,8 @@ pub fn initialize_with_allocator<W: WindowInterface, A: Allocator + 'static, F: 
     Option<DebugMessenger>,
 )> {
     if headless {
-        let (instance, physical_device, device, allocator, pool, exec, debug_messenger) = HeadlessContext::init_with_allocator(settings, make_alloc)?;
+        let (instance, physical_device, device, allocator, pool, exec, debug_messenger) =
+            HeadlessContext::init_with_allocator(settings, make_alloc)?;
         Ok((
             instance,
             physical_device,
@@ -164,8 +186,17 @@ pub fn initialize_with_allocator<W: WindowInterface, A: Allocator + 'static, F: 
             debug_messenger,
         ))
     } else {
-        let (instance, physical_device, surface, device, allocator, pool, exec, frame, debug_messenger) =
-            WindowedContext::init_with_allocator(settings, make_alloc)?;
+        let (
+            instance,
+            physical_device,
+            surface,
+            device,
+            allocator,
+            pool,
+            exec,
+            frame,
+            debug_messenger,
+        ) = WindowedContext::init_with_allocator(settings, make_alloc)?;
         Ok((
             instance,
             physical_device,

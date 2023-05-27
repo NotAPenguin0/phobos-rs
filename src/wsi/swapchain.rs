@@ -5,8 +5,8 @@ use std::ops::Deref;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{AppSettings, Device, Error, Surface, VkInstance, WindowInterface};
 use crate::image::*;
+use crate::{AppSettings, Device, Error, Surface, VkInstance, WindowInterface};
 
 #[derive(Debug)]
 pub(crate) struct SwapchainImage {
@@ -37,7 +37,12 @@ pub struct Swapchain {
 
 impl Swapchain {
     /// Create a new swapchain.
-    pub fn new<Window: WindowInterface>(instance: &VkInstance, device: Device, settings: &AppSettings<Window>, surface: &Surface) -> Result<Self> {
+    pub fn new<Window: WindowInterface>(
+        instance: &VkInstance,
+        device: Device,
+        settings: &AppSettings<Window>,
+        surface: &Surface,
+    ) -> Result<Self> {
         let format = choose_surface_format(settings, surface)?;
         let present_mode = choose_present_mode(settings, surface);
         let extent = choose_swapchain_extent(settings, surface);
@@ -155,7 +160,10 @@ impl Drop for Swapchain {
     }
 }
 
-fn choose_surface_format<Window: WindowInterface>(settings: &AppSettings<Window>, surface: &Surface) -> Result<vk::SurfaceFormatKHR> {
+fn choose_surface_format<Window: WindowInterface>(
+    settings: &AppSettings<Window>,
+    surface: &Surface,
+) -> Result<vk::SurfaceFormatKHR> {
     // In case requested format isn't found, try this. If that one isn't found we fall back to the first available format.
     const FALLBACK_FORMAT: vk::SurfaceFormatKHR = vk::SurfaceFormatKHR {
         format: vk::Format::B8G8R8A8_SRGB,
@@ -178,7 +186,10 @@ fn choose_surface_format<Window: WindowInterface>(settings: &AppSettings<Window>
         .ok_or_else(|| anyhow::Error::from(Error::NoSurfaceFormat))
 }
 
-fn choose_present_mode<Window: WindowInterface>(settings: &AppSettings<Window>, surface: &Surface) -> vk::PresentModeKHR {
+fn choose_present_mode<Window: WindowInterface>(
+    settings: &AppSettings<Window>,
+    surface: &Surface,
+) -> vk::PresentModeKHR {
     if let Some(mode) = settings.present_mode {
         if surface.present_modes().contains(&mode) {
             return mode;
@@ -188,7 +199,10 @@ fn choose_present_mode<Window: WindowInterface>(settings: &AppSettings<Window>, 
     vk::PresentModeKHR::FIFO
 }
 
-fn choose_swapchain_extent<Window: WindowInterface>(settings: &AppSettings<Window>, surface: &Surface) -> vk::Extent2D {
+fn choose_swapchain_extent<Window: WindowInterface>(
+    settings: &AppSettings<Window>,
+    surface: &Surface,
+) -> vk::Extent2D {
     if surface.capabilities().current_extent.width != u32::MAX {
         return surface.capabilities().current_extent;
     }

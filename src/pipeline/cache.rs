@@ -7,22 +7,23 @@ use std::sync::{Arc, RwLock};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, ComputePipelineCreateInfo, DefaultAllocator, Device, Error, PipelineCreateInfo};
+use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 use crate::core::device::ExtensionID;
-use crate::pipeline::{ComputePipeline, Pipeline, PipelineType, RayTracingPipeline};
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::pipeline_layout::PipelineLayout;
 use crate::pipeline::raytracing::{RayTracingPipelineCreateInfo, ShaderBindingTable, ShaderGroup};
 use crate::pipeline::set_layout::DescriptorSetLayout;
 use crate::pipeline::shader::Shader;
+use crate::pipeline::{ComputePipeline, Pipeline, PipelineType, RayTracingPipeline};
 use crate::util::cache::{Cache, Resource, ResourceKey};
-
-use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
+use crate::{
+    Allocator, ComputePipelineCreateInfo, DefaultAllocator, Device, Error, PipelineCreateInfo,
+};
 
 #[derive(Debug)]
 struct PipelineEntry<P>
-    where
-        P: std::fmt::Debug, {
+where
+    P: std::fmt::Debug, {
     pub info: P,
     #[cfg(feature = "shader-reflection")]
     #[allow(dead_code)]
@@ -132,7 +133,11 @@ impl Resource for Pipeline {
 
         let handle = unsafe {
             device
-                .create_graphics_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
+                .create_graphics_pipelines(
+                    vk::PipelineCache::null(),
+                    std::slice::from_ref(&pci),
+                    None,
+                )
                 .map_err(|(_, e)| Error::VkError(e))?
                 .first()
                 .cloned()
@@ -180,8 +185,8 @@ impl Resource for ComputePipeline {
     const MAX_TIME_TO_LIVE: u32 = 8;
 
     fn create(device: Device, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         let (shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
         let mut pci = info.to_vk(unsafe { layout.handle() });
@@ -201,7 +206,11 @@ impl Resource for ComputePipeline {
 
         let handle = unsafe {
             device
-                .create_compute_pipelines(vk::PipelineCache::null(), std::slice::from_ref(&pci), None)
+                .create_compute_pipelines(
+                    vk::PipelineCache::null(),
+                    std::slice::from_ref(&pci),
+                    None,
+                )
                 .map_err(|(_, e)| Error::VkError(e))?
                 .first()
                 .cloned()
@@ -249,8 +258,8 @@ impl<A: Allocator> Resource for RayTracingPipeline<A> {
     const MAX_TIME_TO_LIVE: u32 = 8;
 
     fn create(device: Device, info: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         device.require_extension(ExtensionID::RayTracingPipeline)?;
         let (alloc, shaders, pipeline_layouts, set_layouts) = params;
         let layout = pipeline_layouts.get_or_create(&info.layout, set_layouts)?;
@@ -302,7 +311,9 @@ impl<A: Allocator> Resource for RayTracingPipeline<A> {
                         any_hit,
                     } => (
                         vk::SHADER_UNUSED_KHR,
-                        closest_hit.map(|sh| sh.index).unwrap_or(vk::SHADER_UNUSED_KHR),
+                        closest_hit
+                            .map(|sh| sh.index)
+                            .unwrap_or(vk::SHADER_UNUSED_KHR),
                         any_hit.map(|sh| sh.index).unwrap_or(vk::SHADER_UNUSED_KHR),
                         vk::SHADER_UNUSED_KHR,
                         vk::RayTracingShaderGroupTypeKHR::TRIANGLES_HIT_GROUP,
@@ -341,9 +352,9 @@ impl<A: Allocator> Resource for RayTracingPipeline<A> {
                 std::slice::from_ref(&pci),
                 None,
             )?
-                .first()
-                .cloned()
-                .unwrap()
+            .first()
+            .cloned()
+            .unwrap()
         };
 
         #[cfg(feature = "log-objects")]
@@ -372,7 +383,11 @@ impl<A: Allocator> Drop for RayTracingPipeline<A> {
 }
 
 impl<A: Allocator> PipelineCacheInner<A> {
-    pub(crate) fn get_pipeline(&mut self, name: &str, rendering_info: PipelineRenderingInfo) -> Result<&Pipeline> {
+    pub(crate) fn get_pipeline(
+        &mut self,
+        name: &str,
+        rendering_info: PipelineRenderingInfo,
+    ) -> Result<&Pipeline> {
         let entry = self.pipeline_infos.get_mut(name);
         let Some(entry) = entry else { return Err(anyhow::Error::from(Error::PipelineNotFound(name.to_string()))); };
         entry.info.rendering_info = rendering_info;
@@ -381,7 +396,8 @@ impl<A: Allocator> PipelineCacheInner<A> {
         for layout in &entry.info.layout.set_layouts {
             self.set_layouts.get_or_create(layout, ())?;
         }
-        self.pipeline_layouts.get_or_create(&entry.info.layout, &mut self.set_layouts)?;
+        self.pipeline_layouts
+            .get_or_create(&entry.info.layout, &mut self.set_layouts)?;
         self.pipelines.get_or_create(
             &entry.info,
             (&mut self.shaders, &mut self.pipeline_layouts, &mut self.set_layouts),
@@ -395,7 +411,8 @@ impl<A: Allocator> PipelineCacheInner<A> {
         for layout in &entry.info.layout.set_layouts {
             self.set_layouts.get_or_create(layout, ())?;
         }
-        self.pipeline_layouts.get_or_create(&entry.info.layout, &mut self.set_layouts)?;
+        self.pipeline_layouts
+            .get_or_create(&entry.info.layout, &mut self.set_layouts)?;
         self.compute_pipelines.get_or_create(
             &entry.info,
             (&mut self.shaders, &mut self.pipeline_layouts, &mut self.set_layouts),
@@ -409,7 +426,8 @@ impl<A: Allocator> PipelineCacheInner<A> {
         for layout in &entry.info.layout.set_layouts {
             self.set_layouts.get_or_create(layout, ())?;
         }
-        self.pipeline_layouts.get_or_create(&entry.info.layout, &mut self.set_layouts)?;
+        self.pipeline_layouts
+            .get_or_create(&entry.info.layout, &mut self.set_layouts)?;
         self.raytracing_pipelines.get_or_create(
             &entry.info,
             (
@@ -459,7 +477,12 @@ impl<A: Allocator> PipelineCache<A> {
                 reflection: refl,
             },
         );
-        inner.pipeline_infos.get_mut(&name).unwrap().info.build_inner();
+        inner
+            .pipeline_infos
+            .get_mut(&name)
+            .unwrap()
+            .info
+            .build_inner();
         Ok(())
     }
 
@@ -475,13 +498,21 @@ impl<A: Allocator> PipelineCache<A> {
                 info,
             },
         );
-        inner.pipeline_infos.get_mut(&name).unwrap().info.build_inner();
+        inner
+            .pipeline_infos
+            .get_mut(&name)
+            .unwrap()
+            .info
+            .build_inner();
         Ok(())
     }
 
     /// Create and register a new compute pipeline into the cache
     #[cfg(feature = "shader-reflection")]
-    pub fn create_named_compute_pipeline(&mut self, mut info: ComputePipelineCreateInfo) -> Result<()> {
+    pub fn create_named_compute_pipeline(
+        &mut self,
+        mut info: ComputePipelineCreateInfo,
+    ) -> Result<()> {
         let refl = match &info.shader {
             None => reflect_shaders(&[])?,
             Some(info) => reflect_shaders(std::slice::from_ref(info))?,
@@ -515,7 +546,10 @@ impl<A: Allocator> PipelineCache<A> {
 
     /// Create and register a new compute pipeline into the cache
     #[cfg(not(feature = "shader-reflection"))]
-    pub fn create_named_compute_pipeline(&mut self, mut info: ComputePipelineCreateInfo) -> Result<()> {
+    pub fn create_named_compute_pipeline(
+        &mut self,
+        mut info: ComputePipelineCreateInfo,
+    ) -> Result<()> {
         let name = info.name.clone();
         let mut inner = self.inner.write().unwrap();
         inner.compute_pipeline_infos.insert(
@@ -529,7 +563,10 @@ impl<A: Allocator> PipelineCache<A> {
 
     /// Create and register a new raytracing pipeline into the cache
     #[cfg(feature = "shader-reflection")]
-    pub fn create_named_raytracing_pipeline(&mut self, mut info: RayTracingPipelineCreateInfo) -> Result<()> {
+    pub fn create_named_raytracing_pipeline(
+        &mut self,
+        mut info: RayTracingPipelineCreateInfo,
+    ) -> Result<()> {
         let refl = reflect_shaders(info.shaders.as_slice())?;
         // Using reflection, we can allow omitting the pipeline layout field.
         info.layout = build_pipeline_layout(&refl);
@@ -548,7 +585,10 @@ impl<A: Allocator> PipelineCache<A> {
 
     /// Create and register a new raytracing pipeline into the cache
     #[cfg(not(feature = "shader-reflection"))]
-    pub fn create_named_raytracing_pipeline(&mut self, mut info: RayTracingPipelineCreateInfo) -> Result<()> {
+    pub fn create_named_raytracing_pipeline(
+        &mut self,
+        mut info: RayTracingPipelineCreateInfo,
+    ) -> Result<()> {
         let name = info.name.clone();
         let mut inner = self.inner.write().unwrap();
         inner.raytracing_pipeline_infos.insert(
@@ -614,7 +654,12 @@ impl<A: Allocator> PipelineCache<A> {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn with_pipeline<F: FnOnce(&Pipeline) -> Result<()>>(&mut self, name: &str, rendering_info: PipelineRenderingInfo, f: F) -> Result<()> {
+    pub(crate) fn with_pipeline<F: FnOnce(&Pipeline) -> Result<()>>(
+        &mut self,
+        name: &str,
+        rendering_info: PipelineRenderingInfo,
+        f: F,
+    ) -> Result<()> {
         let mut inner = self.inner.write().unwrap();
         let pipeline = inner.get_pipeline(name, rendering_info)?;
         f(pipeline)
@@ -624,7 +669,11 @@ impl<A: Allocator> PipelineCache<A> {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn with_compute_pipeline<F: FnOnce(&ComputePipeline) -> Result<()>>(&mut self, name: &str, f: F) -> Result<()> {
+    pub(crate) fn with_compute_pipeline<F: FnOnce(&ComputePipeline) -> Result<()>>(
+        &mut self,
+        name: &str,
+        f: F,
+    ) -> Result<()> {
         let mut inner = self.inner.write().unwrap();
         let pipeline = inner.get_compute_pipeline(name)?;
         f(pipeline)
@@ -634,7 +683,11 @@ impl<A: Allocator> PipelineCache<A> {
     /// # Errors
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
-    pub(crate) fn with_raytracing_pipeline<F: FnOnce(&RayTracingPipeline<A>) -> Result<()>>(&mut self, name: &str, f: F) -> Result<()> {
+    pub(crate) fn with_raytracing_pipeline<F: FnOnce(&RayTracingPipeline<A>) -> Result<()>>(
+        &mut self,
+        name: &str,
+        f: F,
+    ) -> Result<()> {
         let mut inner = self.inner.write().unwrap();
         let pipeline = inner.get_raytracing_pipeline(name)?;
         f(pipeline)

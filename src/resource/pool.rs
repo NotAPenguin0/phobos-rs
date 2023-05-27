@@ -6,8 +6,11 @@ use anyhow::Result;
 use ash::vk;
 use multimap::{Entry, MultiMap};
 
-use crate::{Allocator, BufferView, DefaultAllocator, DescriptorCache, Device, Fence, PipelineCache, ScratchAllocator};
 use crate::allocator::scratch_allocator::ScratchAllocatorCreateInfo;
+use crate::{
+    Allocator, BufferView, DefaultAllocator, DescriptorCache, Device, Fence, PipelineCache,
+    ScratchAllocator,
+};
 
 /// Indicates that this object can be pooled in a [`Pool`](crate::pool::Pool)
 pub trait Poolable {
@@ -19,16 +22,16 @@ pub trait Poolable {
 
     /// Create a new pooled object from a pool.
     fn new_in_pool(pool: &Pool<Self>, key: &Self::Key) -> Result<Pooled<Self>>
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         let item = pool.with(|pool| pool.get(key))?;
         Ok(Pooled::from_pool(pool.clone(), key.clone(), item))
     }
 
     /// Move this item into the pool when it is dropped
     fn into_pooled(self, pool: &Pool<Self>, key: Self::Key) -> Pooled<Self>
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         Pooled::from_pool(pool.clone(), key, self)
     }
 }

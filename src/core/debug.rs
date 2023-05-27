@@ -28,13 +28,16 @@ impl DebugMessenger {
     /// do anything useful.
     pub fn new(instance: &VkInstance) -> Result<Self> {
         // SAFETY: We do not mutate this loader in any way, so the safety contract is satisfied
-        let functions = ash::extensions::ext::DebugUtils::new(unsafe { instance.loader() }, instance);
+        let functions =
+            ash::extensions::ext::DebugUtils::new(unsafe { instance.loader() }, instance);
         let info = vk::DebugUtilsMessengerCreateInfoEXT {
             s_type: vk::StructureType::DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
             p_next: std::ptr::null(),
             flags: Default::default(),
-            message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::WARNING | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
-            message_type: vk::DebugUtilsMessageTypeFlagsEXT::GENERAL | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
+            message_severity: vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
+                | vk::DebugUtilsMessageSeverityFlagsEXT::ERROR,
+            message_type: vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+                | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION,
             pfn_user_callback: Some(vk_debug_callback),
             p_user_data: std::ptr::null::<std::ffi::c_void>() as *mut std::ffi::c_void,
         };
@@ -55,7 +58,8 @@ impl Drop for DebugMessenger {
         trace!("Destroying VkDebugUtilsMessengerEXT {:p}", self.handle);
         unsafe {
             // SAFETY: self is valid, so self.functions and self.handle are valid, non-null objects.
-            self.functions.destroy_debug_utils_messenger(self.handle, None);
+            self.functions
+                .destroy_debug_utils_messenger(self.handle, None);
         }
     }
 }

@@ -6,8 +6,8 @@ use std::hash::{Hash, Hasher};
 use anyhow::Result;
 use ash::vk;
 
-use crate::Device;
 use crate::util::cache::{Resource, ResourceKey};
+use crate::Device;
 
 /// Shader resource object. This is managed by the pipeline cache internally.
 #[derive(Derivative)]

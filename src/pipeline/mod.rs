@@ -53,8 +53,8 @@
 
 use ash::vk;
 
-use crate::{Allocator, Device};
 use crate::pipeline::raytracing::ShaderBindingTable;
+use crate::{Allocator, Device};
 
 pub mod builder;
 pub mod cache;

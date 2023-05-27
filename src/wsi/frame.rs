@@ -69,17 +69,17 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{
-    Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error,
-    ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore, Surface, Swapchain,
-    VkInstance, WindowInterface,
-};
 use crate::allocator::scratch_allocator::ScratchAllocatorCreateInfo;
 use crate::pool::{Poolable, Pooled, ResourcePool};
 use crate::sync::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
 use crate::util::deferred_delete::DeletionQueue;
 use crate::wsi::swapchain::SwapchainImage;
+use crate::{
+    Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error,
+    ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore, Surface, Swapchain,
+    VkInstance, WindowInterface,
+};
 
 /// Information stored for each in-flight frame.
 #[derive(Derivative)]
@@ -343,10 +343,10 @@ impl<A: Allocator> FrameManager<A> {
         surface: &Surface,
         f: F,
     ) -> Result<()>
-        where
-            Window: WindowInterface,
-            D: ExecutionDomain + 'static,
-            F: FnOnce(InFlightContext) -> Result<SubmitBatch<D>>, {
+    where
+        Window: WindowInterface,
+        D: ExecutionDomain + 'static,
+        F: FnOnce(InFlightContext) -> Result<SubmitBatch<D>>, {
         // Advance deletion queue by one frame
         self.swapchain_delete.next_frame();
 

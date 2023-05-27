@@ -3,12 +3,14 @@
 use anyhow::{bail, Result};
 use ash::vk;
 
-use crate::{Allocator, BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::sync::domain::ExecutionDomain;
+use crate::{Allocator, BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 
-impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for IncompleteCommandBuffer<'_, D, A> {
+impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer
+    for IncompleteCommandBuffer<'_, D, A>
+{
     /// Sets the viewport and scissor regions to the entire render area. Can only be called inside a renderpass.
     /// # Example
     /// ```
@@ -52,7 +54,8 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     fn viewport(self, viewport: vk::Viewport) -> Self {
         unsafe {
-            self.device.cmd_set_viewport(self.handle, 0, std::slice::from_ref(&viewport));
+            self.device
+                .cmd_set_viewport(self.handle, 0, std::slice::from_ref(&viewport));
         }
         self
     }
@@ -75,7 +78,8 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// ```
     fn scissor(self, scissor: vk::Rect2D) -> Self {
         unsafe {
-            self.device.cmd_set_scissor(self.handle, 0, std::slice::from_ref(&scissor));
+            self.device
+                .cmd_set_scissor(self.handle, 0, std::slice::from_ref(&scissor));
         }
         self
     }
@@ -96,11 +100,22 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     ///        .draw(6, 1, 0, 0)
     /// }
     /// ```
-    fn draw(mut self, vertex_count: u32, instance_count: u32, first_vertex: u32, first_instance: u32) -> Result<Self> {
+    fn draw(
+        mut self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) -> Result<Self> {
         self = self.ensure_descriptor_state()?;
         unsafe {
-            self.device
-                .cmd_draw(self.handle, vertex_count, instance_count, first_vertex, first_instance);
+            self.device.cmd_draw(
+                self.handle,
+                vertex_count,
+                instance_count,
+                first_vertex,
+                first_instance,
+            );
         }
         Ok(self)
     }
@@ -122,7 +137,14 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     ///        .draw_indexed(6, 1, 0, 0, 0)
     /// }
     /// ```
-    fn draw_indexed(mut self, index_count: u32, instance_count: u32, first_index: u32, vertex_offset: i32, first_instance: u32) -> Result<Self> {
+    fn draw_indexed(
+        mut self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
+    ) -> Result<Self> {
         self = self.ensure_descriptor_state()?;
         unsafe {
             self.device.cmd_draw_indexed(
@@ -139,9 +161,10 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
 
     /// Issue a `vkCmdTraceRaysKHR` command. Requires [`ExtensionID::RayTracingPipeline`] to be enabled.
     fn trace_rays(mut self, width: u32, height: u32, depth: u32) -> Result<Self>
-        where
-            Self: Sized, {
-        self.device.require_extension(ExtensionID::RayTracingPipeline)?;
+    where
+        Self: Sized, {
+        self.device
+            .require_extension(ExtensionID::RayTracingPipeline)?;
         self = self.ensure_descriptor_state()?;
         let fns = self.device.raytracing_pipeline().unwrap();
         let Some(regions) = self.current_sbt_regions else { bail!("called trace_rays() without a valid raytracing pipeline build"); };
@@ -196,8 +219,8 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// * Fails if the pipeline was not previously registered in the pipeline cache.
     /// * Fails if this command buffer has no pipeline cache.
     fn bind_ray_tracing_pipeline(mut self, name: &str) -> Result<Self>
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
         {
             cache.with_raytracing_pipeline(name, |pipeline| {
@@ -255,8 +278,8 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
     /// }
     /// ```
     fn bind_index_buffer(self, buffer: &BufferView, ty: vk::IndexType) -> Self
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         unsafe {
             self.device
                 .cmd_bind_index_buffer(self.handle, buffer.handle(), buffer.offset(), ty);
@@ -266,7 +289,14 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
 
     /// Blit a source image to a destination image, using the specified offsets into the images and a filter. Direct and thin wrapper around
     /// [`vkCmdBlitImage`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdBlitImage.html)
-    fn blit_image(self, src: &ImageView, dst: &ImageView, src_offsets: &[vk::Offset3D; 2], dst_offsets: &[vk::Offset3D; 2], filter: vk::Filter) -> Self
+    fn blit_image(
+        self,
+        src: &ImageView,
+        dst: &ImageView,
+        src_offsets: &[vk::Offset3D; 2],
+        dst_offsets: &[vk::Offset3D; 2],
+        filter: vk::Filter,
+    ) -> Self
     where
         Self: Sized, {
         let blit = vk::ImageBlit {
@@ -316,7 +346,9 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer for Incomp
         let funcs = self
             .device
             .dynamic_state3()
-            .ok_or_else::<anyhow::Error, _>(|| Error::ExtensionNotSupported(ExtensionID::ExtendedDynamicState3).into())?;
+            .ok_or_else::<anyhow::Error, _>(|| {
+                Error::ExtensionNotSupported(ExtensionID::ExtendedDynamicState3).into()
+            })?;
         // SAFETY: Vulkan API call. This function pointer is not null because we just verified its availability.
         unsafe {
             funcs.cmd_set_polygon_mode(self.handle, mode);

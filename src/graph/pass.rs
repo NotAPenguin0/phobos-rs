@@ -77,7 +77,6 @@
 use anyhow::{anyhow, bail, Result};
 use ash::vk;
 
-use crate::{Allocator, ComputeSupport, DefaultAllocator, Device, Error, ImageView, InFlightContext, PhysicalResourceBindings, VirtualResource};
 use crate::command_buffer::IncompleteCommandBuffer;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::{Fsr2DispatchDescription, Fsr2DispatchResources};
@@ -87,6 +86,10 @@ use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
 use crate::pool::LocalPool;
 use crate::sync::domain::ExecutionDomain;
+use crate::{
+    Allocator, ComputeSupport, DefaultAllocator, Device, Error, ImageView, InFlightContext,
+    PhysicalResourceBindings, VirtualResource,
+};
 
 /// The returned value from a pass callback function.
 pub type PassFnResult<'q, D, A> = Result<IncompleteCommandBuffer<'q, D, A>>;
@@ -104,10 +107,15 @@ pub trait PassExecutor<D: ExecutionDomain, U, A: Allocator> {
 }
 
 impl<D, U, A, F> PassExecutor<D, U, A> for F
-    where
-        D: ExecutionDomain,
-        A: Allocator,
-        F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut LocalPool<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A>,
+where
+    D: ExecutionDomain,
+    A: Allocator,
+    F: for<'q> FnMut(
+        IncompleteCommandBuffer<'q, D, A>,
+        &mut LocalPool<A>,
+        &PhysicalResourceBindings,
+        &mut U,
+    ) -> PassFnResult<'q, D, A>,
 {
     /// Record this pass to a command buffer by calling the given function.
     fn execute<'q>(
@@ -253,9 +261,17 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     /// # Errors
     /// * Fails if this pass was not created using [`PassBuilder::render()`]
     /// * Fails if `op` was [`vk::AttachmentLoadOp::CLEAR`], but `clear` was [`None`].
-    pub fn color_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearColorValue>) -> Result<Self> {
+    pub fn color_attachment(
+        mut self,
+        resource: &VirtualResource,
+        op: vk::AttachmentLoadOp,
+        clear: Option<vk::ClearColorValue>,
+    ) -> Result<Self> {
         if !self.inner.is_renderpass {
-            return Err(Error::Uncategorized("Cannot attach color attachment to a pass that is not a renderpass").into());
+            return Err(Error::Uncategorized(
+                "Cannot attach color attachment to a pass that is not a renderpass",
+            )
+            .into());
         }
         if op == vk::AttachmentLoadOp::CLEAR && clear.is_none() {
             return Err(anyhow::Error::from(Error::NoClearValue));
@@ -294,9 +310,17 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     /// # Errors
     /// * Fails if this pass was not created using [`PassBuilder::render()`]
     /// * Fails if `op` was [`vk::AttachmentLoadOp::CLEAR`], but `clear` was [`None`].
-    pub fn depth_attachment(mut self, resource: &VirtualResource, op: vk::AttachmentLoadOp, clear: Option<vk::ClearDepthStencilValue>) -> Result<Self> {
+    pub fn depth_attachment(
+        mut self,
+        resource: &VirtualResource,
+        op: vk::AttachmentLoadOp,
+        clear: Option<vk::ClearDepthStencilValue>,
+    ) -> Result<Self> {
         if !self.inner.is_renderpass {
-            return Err(Error::Uncategorized("Cannot attach depth attachment to a pass that is not a renderpass").into());
+            return Err(Error::Uncategorized(
+                "Cannot attach depth attachment to a pass that is not a renderpass",
+            )
+            .into());
         }
         self.inner.inputs.push(PassResource {
             usage: ResourceUsage::Attachment(AttachmentType::Depth),
@@ -422,7 +446,11 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         self
     }
 
-    fn sample_optional_image(self, resource: &Option<VirtualResource>, stage: PipelineStage) -> Self {
+    fn sample_optional_image(
+        self,
+        resource: &Option<VirtualResource>,
+        stage: PipelineStage,
+    ) -> Self {
         match resource {
             None => self,
             Some(resource) => self.sample_image(resource, stage),
@@ -438,8 +466,14 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     /// Set the executor to be called when recording this pass. This method can be used to deduce types
     /// when a function is used as a pass executor.
     pub fn execute_fn<F>(mut self, exec: F) -> Self
-        where
-            F: for<'q> FnMut(IncompleteCommandBuffer<'q, D, A>, &mut LocalPool<A>, &PhysicalResourceBindings, &mut U) -> PassFnResult<'q, D, A> + 'cb, {
+    where
+        F: for<'q> FnMut(
+                IncompleteCommandBuffer<'q, D, A>,
+                &mut LocalPool<A>,
+                &PhysicalResourceBindings,
+                &mut U,
+            ) -> PassFnResult<'q, D, A>
+            + 'cb, {
         self.inner.execute = Box::new(exec);
         self
     }
@@ -472,10 +506,13 @@ pub struct Fsr2DispatchVirtualResources {
 
 #[cfg(feature = "fsr2")]
 impl Fsr2DispatchVirtualResources {
-    fn resolve_image_resource(resource: &VirtualResource, bindings: &PhysicalResourceBindings) -> Result<ImageView> {
-        let resolved = bindings
-            .resolve(resource)
-            .ok_or_else(|| anyhow!("Missing physical binding for required FSR2 resource: {}", resource.name()))?;
+    fn resolve_image_resource(
+        resource: &VirtualResource,
+        bindings: &PhysicalResourceBindings,
+    ) -> Result<ImageView> {
+        let resolved = bindings.resolve(resource).ok_or_else(|| {
+            anyhow!("Missing physical binding for required FSR2 resource: {}", resource.name())
+        })?;
         let PhysicalResource::Image(image) = &resolved else {
             bail!("FSR2 resource {} should be an image", resource.name());
         };
@@ -483,7 +520,10 @@ impl Fsr2DispatchVirtualResources {
         Ok(image.clone())
     }
 
-    fn resolve_optional_image_resource(resource: &Option<VirtualResource>, bindings: &PhysicalResourceBindings) -> Result<Option<ImageView>> {
+    fn resolve_optional_image_resource(
+        resource: &Option<VirtualResource>,
+        bindings: &PhysicalResourceBindings,
+    ) -> Result<Option<ImageView>> {
         match resource {
             None => Ok(None),
             Some(resource) => Ok(Some(Self::resolve_image_resource(resource, bindings)?)),
@@ -499,7 +539,10 @@ impl Fsr2DispatchVirtualResources {
             motion_vectors: Self::resolve_image_resource(&self.motion_vectors, bindings)?,
             exposure: Self::resolve_optional_image_resource(&self.exposure, bindings)?,
             reactive: Self::resolve_optional_image_resource(&self.reactive, bindings)?,
-            transparency_and_composition: Self::resolve_optional_image_resource(&self.transparency_and_composition, bindings)?,
+            transparency_and_composition: Self::resolve_optional_image_resource(
+                &self.transparency_and_composition,
+                bindings,
+            )?,
             output: Self::resolve_image_resource(&self.output, bindings)?,
         })
     }
@@ -508,14 +551,21 @@ impl Fsr2DispatchVirtualResources {
 #[cfg(feature = "fsr2")]
 impl<'cb, D: ExecutionDomain + ComputeSupport, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     /// Create a pass for FSR2.
-    pub fn fsr2(device: Device, descr: Fsr2DispatchDescription, resources: Fsr2DispatchVirtualResources) -> Pass<'cb, D, U, A> {
+    pub fn fsr2(
+        device: Device,
+        descr: Fsr2DispatchDescription,
+        resources: Fsr2DispatchVirtualResources,
+    ) -> Pass<'cb, D, U, A> {
         let pass = PassBuilder::<'cb, D, U, A>::new("fsr2")
             .sample_image(&resources.color, PipelineStage::COMPUTE_SHADER)
             .sample_image(&resources.motion_vectors, PipelineStage::COMPUTE_SHADER)
             .sample_image(&resources.depth, PipelineStage::COMPUTE_SHADER)
             .sample_optional_image(&resources.exposure, PipelineStage::COMPUTE_SHADER)
             .sample_optional_image(&resources.reactive, PipelineStage::COMPUTE_SHADER)
-            .sample_optional_image(&resources.transparency_and_composition, PipelineStage::COMPUTE_SHADER)
+            .sample_optional_image(
+                &resources.transparency_and_composition,
+                PipelineStage::COMPUTE_SHADER,
+            )
             .write_storage_image(&resources.output, PipelineStage::COMPUTE_SHADER)
             .execute_fn(move |cmd, _, bindings, _| {
                 let resolved_resources = resources.resolve(bindings)?;

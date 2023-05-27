@@ -2,9 +2,13 @@
 
 use ash::vk;
 
-use crate::{AccelerationStructure, AccelerationStructureBuildGeometryInfo, AccelerationStructureGeometryInstancesData, AccelerationStructureGeometryTrianglesData, AccelerationStructureType};
 use crate::util::address::DeviceOrHostAddress;
 use crate::util::to_vk::{AsVulkanType, IntoVulkanType};
+use crate::{
+    AccelerationStructure, AccelerationStructureBuildGeometryInfo,
+    AccelerationStructureGeometryInstancesData, AccelerationStructureGeometryTrianglesData,
+    AccelerationStructureType,
+};
 
 /// All information required to build an acceleration structure
 pub struct AccelerationStructureBuildInfo<'a> {
@@ -33,14 +37,12 @@ impl<'a> Default for AccelerationStructureBuildInfo<'a> {
 impl<'a> AccelerationStructureBuildInfo<'a> {
     /// Create a build info struct for AS build operations
     pub fn new_build() -> Self {
-        Self::default()
-            .mode(vk::BuildAccelerationStructureModeKHR::BUILD)
+        Self::default().mode(vk::BuildAccelerationStructureModeKHR::BUILD)
     }
 
     /// Create a build info struct for AS update operations
     pub fn new_update() -> Self {
-        Self::default()
-            .mode(vk::BuildAccelerationStructureModeKHR::UPDATE)
+        Self::default().mode(vk::BuildAccelerationStructureModeKHR::UPDATE)
     }
 
     /// Set the acceleration structure type
@@ -88,7 +90,11 @@ impl<'a> AccelerationStructureBuildInfo<'a> {
     }
 
     /// Add an AABB geometry to this acceleration structure
-    pub fn push_aabbs(mut self, aabbs: vk::AccelerationStructureGeometryAabbsDataKHR, flags: vk::GeometryFlagsKHR) -> Self {
+    pub fn push_aabbs(
+        mut self,
+        aabbs: vk::AccelerationStructureGeometryAabbsDataKHR,
+        flags: vk::GeometryFlagsKHR,
+    ) -> Self {
         self = self.push_geometry(vk::AccelerationStructureGeometryKHR {
             s_type: vk::StructureType::ACCELERATION_STRUCTURE_GEOMETRY_KHR,
             p_next: std::ptr::null(),
@@ -128,13 +134,20 @@ impl<'a> AccelerationStructureBuildInfo<'a> {
     }
 
     /// Add a primitive range to this acceleration structure
-    pub fn push_range(mut self, primitive_count: u32, primitive_offset: u32, first_vertex: u32, transform_offset: u32) -> Self {
-        self.build_range_infos.push(vk::AccelerationStructureBuildRangeInfoKHR {
-            primitive_count,
-            primitive_offset,
-            first_vertex,
-            transform_offset,
-        });
+    pub fn push_range(
+        mut self,
+        primitive_count: u32,
+        primitive_offset: u32,
+        first_vertex: u32,
+        transform_offset: u32,
+    ) -> Self {
+        self.build_range_infos
+            .push(vk::AccelerationStructureBuildRangeInfoKHR {
+                primitive_count,
+                primitive_offset,
+                first_vertex,
+                transform_offset,
+            });
         self
     }
 

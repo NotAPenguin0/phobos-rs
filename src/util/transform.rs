@@ -21,7 +21,9 @@ impl TransformMatrix {
 impl Default for TransformMatrix {
     fn default() -> Self {
         Self {
-            0: vk::TransformMatrixKHR { matrix: [0.0; 12] },
+            0: vk::TransformMatrixKHR {
+                matrix: [0.0; 12],
+            },
         }
     }
 }

@@ -12,22 +12,34 @@ pub(crate) struct VertexInputBindingDescription(pub(super) vk::VertexInputBindin
 pub(crate) struct VertexInputAttributeDescription(pub(super) vk::VertexInputAttributeDescription);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineInputAssemblyStateCreateInfo(pub(super) vk::PipelineInputAssemblyStateCreateInfo);
+pub(crate) struct PipelineInputAssemblyStateCreateInfo(
+    pub(super) vk::PipelineInputAssemblyStateCreateInfo,
+);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineDepthStencilStateCreateInfo(pub(super) vk::PipelineDepthStencilStateCreateInfo);
+pub(crate) struct PipelineDepthStencilStateCreateInfo(
+    pub(super) vk::PipelineDepthStencilStateCreateInfo,
+);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineRasterizationStateCreateInfo(pub(super) vk::PipelineRasterizationStateCreateInfo);
+pub(crate) struct PipelineRasterizationStateCreateInfo(
+    pub(super) vk::PipelineRasterizationStateCreateInfo,
+);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineMultisampleStateCreateInfo(pub(super) vk::PipelineMultisampleStateCreateInfo);
+pub(crate) struct PipelineMultisampleStateCreateInfo(
+    pub(super) vk::PipelineMultisampleStateCreateInfo,
+);
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) struct PipelineColorBlendAttachmentState(pub(super) vk::PipelineColorBlendAttachmentState);
+pub(crate) struct PipelineColorBlendAttachmentState(
+    pub(super) vk::PipelineColorBlendAttachmentState,
+);
 
 #[derive(Default, Debug, Copy, Clone)]
-pub(crate) struct PipelineTessellationStateCreateInfo(pub(super) vk::PipelineTessellationStateCreateInfo);
+pub(crate) struct PipelineTessellationStateCreateInfo(
+    pub(super) vk::PipelineTessellationStateCreateInfo,
+);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct PipelineRenderingInfo {
@@ -107,8 +119,16 @@ impl PipelineCreateInfo {
         self.vk_rendering_state = vk::PipelineRenderingCreateInfo::builder()
             .view_mask(self.rendering_info.view_mask)
             .color_attachment_formats(self.rendering_info.color_formats.as_slice())
-            .depth_attachment_format(self.rendering_info.depth_format.unwrap_or(vk::Format::UNDEFINED))
-            .stencil_attachment_format(self.rendering_info.stencil_format.unwrap_or(vk::Format::UNDEFINED))
+            .depth_attachment_format(
+                self.rendering_info
+                    .depth_format
+                    .unwrap_or(vk::Format::UNDEFINED),
+            )
+            .stencil_attachment_format(
+                self.rendering_info
+                    .stencil_format
+                    .unwrap_or(vk::Format::UNDEFINED),
+            )
             .build();
     }
 

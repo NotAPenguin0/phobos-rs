@@ -6,22 +6,22 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
-use petgraph::{Incoming, Outgoing};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
+use petgraph::{Incoming, Outgoing};
 
-use crate::{
-    Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph,
-    PhysicalResourceBindings,
-};
-use crate::command_buffer::IncompleteCommandBuffer;
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::command_buffer::IncompleteCommandBuffer;
 use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::task_graph::{Node, Resource};
 use crate::pool::LocalPool;
 use crate::sync::domain::ExecutionDomain;
+use crate::{
+    Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph,
+    PhysicalResourceBindings,
+};
 
 /// Implement this on a type to be able to record this type to a command buffer.
 pub trait RecordGraphToCommandBuffer<D: ExecutionDomain, U, A: Allocator> {
@@ -37,8 +37,8 @@ pub trait RecordGraphToCommandBuffer<D: ExecutionDomain, U, A: Allocator> {
         debug: Option<Arc<DebugMessenger>>,
         user_data: &mut U,
     ) -> Result<IncompleteCommandBuffer<'q, D, A>>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 }
 
 // Traversal
@@ -386,7 +386,7 @@ fn record_node<'q, D: ExecutionDomain, U, A: Allocator>(
 }
 
 impl<'cb, D: ExecutionDomain, U, A: Allocator> RecordGraphToCommandBuffer<D, U, A>
-for BuiltPassGraph<'cb, D, U, A>
+    for BuiltPassGraph<'cb, D, U, A>
 {
     /// Record the rendergraph to the command buffer. This will pass `user_data` along to every pass executor in the graph.
     fn record<'q>(
@@ -397,8 +397,8 @@ for BuiltPassGraph<'cb, D, U, A>
         debug: Option<Arc<DebugMessenger>>,
         user_data: &mut U,
     ) -> Result<IncompleteCommandBuffer<'q, D, A>>
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         let mut active = HashSet::new();
         let mut children = HashSet::new();
         for start in self.graph.sources() {
@@ -415,7 +415,15 @@ for BuiltPassGraph<'cb, D, U, A>
             for child in &children {
                 // If all parents of this child node are in the active set, record it.
                 if parents!(child, self).all(|parent| active.contains(&parent)) {
-                    cmd = record_node(self, *child, bindings, local_pool, cmd, debug.clone(), user_data)?;
+                    cmd = record_node(
+                        self,
+                        *child,
+                        bindings,
+                        local_pool,
+                        cmd,
+                        debug.clone(),
+                        user_data,
+                    )?;
                     recorded_nodes.push(*child);
                 }
             }

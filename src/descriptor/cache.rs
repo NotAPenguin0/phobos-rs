@@ -5,10 +5,10 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{DeletionQueue, DescriptorSet, Device, Error};
 use crate::descriptor::descriptor_pool::{DescriptorPool, DescriptorPoolSize};
 use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::util::cache::Cache;
+use crate::{DeletionQueue, DescriptorSet, Device, Error};
 
 #[derive(Debug)]
 struct DescriptorCacheInner {
@@ -26,7 +26,10 @@ pub struct DescriptorCache {
     inner: Arc<Mutex<DescriptorCacheInner>>,
 }
 
-fn grow_pool_size(mut old_size: DescriptorPoolSize, request: &DescriptorSetBinding) -> DescriptorPoolSize {
+fn grow_pool_size(
+    mut old_size: DescriptorPoolSize,
+    request: &DescriptorSetBinding,
+) -> DescriptorPoolSize {
     for (ty, count) in old_size.0.iter_mut() {
         if request.bindings.iter().any(|binding| binding.ty == *ty) {
             *count *= 2;
@@ -38,7 +41,10 @@ fn grow_pool_size(mut old_size: DescriptorPoolSize, request: &DescriptorSetBindi
 
 impl DescriptorCacheInner {
     /// Get or create a descriptor set and return a reference to it.
-    pub fn get_descriptor_set(&mut self, mut bindings: DescriptorSetBinding) -> Result<&DescriptorSet> {
+    pub fn get_descriptor_set(
+        &mut self,
+        mut bindings: DescriptorSetBinding,
+    ) -> Result<&DescriptorSet> {
         if bindings.bindings.is_empty() {
             return Err(Error::EmptyDescriptorBinding.into());
         }
@@ -86,7 +92,11 @@ impl DescriptorCache {
     /// - This function fails if no descriptor set layout was specified in `bindings`
     /// - This function fails the the requested descriptor set has no descriptors
     /// - This function fails if allocating a descriptor set failed due to an internal error.
-    pub fn with_descriptor_set<F: FnOnce(&DescriptorSet) -> Result<()>>(&mut self, bindings: DescriptorSetBinding, f: F) -> Result<()> {
+    pub fn with_descriptor_set<F: FnOnce(&DescriptorSet) -> Result<()>>(
+        &mut self,
+        bindings: DescriptorSetBinding,
+        f: F,
+    ) -> Result<()> {
         let mut inner = self.inner.lock().unwrap();
         let set = inner.get_descriptor_set(bindings)?;
         f(set)

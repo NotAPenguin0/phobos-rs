@@ -6,12 +6,12 @@ use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, CmdBuffer, DefaultAllocator, Device, Error, Fence, PhysicalDevice};
 use crate::command_buffer::*;
 use crate::core::queue::{DeviceQueue, Queue};
 use crate::pool::{Poolable, Pooled, ResourcePool};
 use crate::sync::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
+use crate::{Allocator, CmdBuffer, DefaultAllocator, Device, Error, Fence, PhysicalDevice};
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
@@ -55,7 +55,11 @@ fn max_queue_count(family: u32, families: &[vk::QueueFamilyProperties]) -> u32 {
 impl<A: Allocator> ExecutionManager<A> {
     /// Create a new execution manager. You should only ever have on instance of this struct
     /// in your program.
-    pub fn new(device: Device, physical_device: &PhysicalDevice, pool: ResourcePool<A>) -> Result<Self> {
+    pub fn new(
+        device: Device,
+        physical_device: &PhysicalDevice,
+        pool: ResourcePool<A>,
+    ) -> Result<Self> {
         let mut counts = HashMap::new();
         let mut device_queues = HashMap::new();
 
@@ -65,7 +69,9 @@ impl<A: Allocator> ExecutionManager<A> {
             .map(|queue| -> Result<Mutex<Queue>> {
                 let index = counts.entry(queue.family_index).or_insert(0);
                 // If we have exceeded the max count for this family, we need to reuse a device queue from earlier
-                let device_queue = if *index >= max_queue_count(queue.family_index, physical_device.queue_families()) {
+                let device_queue = if *index
+                    >= max_queue_count(queue.family_index, physical_device.queue_families())
+                {
                     // Re-use a previously requested device queue. If this panics, the code is bugged (this is not a user error)
                     device_queues.get(&queue.family_index).cloned().unwrap()
                 } else {
@@ -85,7 +91,10 @@ impl<A: Allocator> ExecutionManager<A> {
                     device.clone(),
                     device_queue,
                     *queue,
-                    *physical_device.queue_families().get(queue.family_index as usize).unwrap(),
+                    *physical_device
+                        .queue_families()
+                        .get(queue.family_index as usize)
+                        .unwrap(),
                 )?))
             })
             .collect::<Result<Vec<Mutex<Queue>>>>()?;
@@ -150,7 +159,11 @@ impl<A: Allocator> ExecutionManager<A> {
     }
 
     /// Submit multiple SubmitInfo2 structures.
-    pub(crate) fn submit_batch<D: ExecutionDomain>(&self, submits: &[vk::SubmitInfo2], fence: &Fence) -> Result<()> {
+    pub(crate) fn submit_batch<D: ExecutionDomain>(
+        &self,
+        submits: &[vk::SubmitInfo2],
+        fence: &Fence,
+    ) -> Result<()> {
         let queue = self.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
         queue.submit2(submits, Some(fence))?;
         Ok(())
@@ -194,7 +207,10 @@ impl<A: Allocator> ExecutionManager<A> {
 
 impl<A: Allocator + 'static> ExecutionManager<A> {
     /// Submit a command buffer to its queue.
-    pub fn submit<D: ExecutionDomain + 'static>(&self, mut cmd: CommandBuffer<D>) -> Result<Pooled<Fence>> {
+    pub fn submit<D: ExecutionDomain + 'static>(
+        &self,
+        mut cmd: CommandBuffer<D>,
+    ) -> Result<Pooled<Fence>> {
         let mut fence = Fence::new_in_pool(&self.pool.fences, &())?;
 
         let handle = unsafe { cmd.handle() };

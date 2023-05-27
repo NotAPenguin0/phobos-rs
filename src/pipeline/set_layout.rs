@@ -3,8 +3,8 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::Device;
 use crate::util::cache::{Resource, ResourceKey};
+use crate::Device;
 
 /// A fully built Vulkan descriptor set layout. This is a managed resource, so it cannot be manually
 /// created or dropped.

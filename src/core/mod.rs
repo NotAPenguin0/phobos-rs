@@ -4,7 +4,7 @@ pub mod app_info;
 pub mod debug;
 pub mod device;
 pub mod error;
+pub mod init;
 pub mod instance;
 pub mod physical_device;
 pub mod queue;
-pub mod init;

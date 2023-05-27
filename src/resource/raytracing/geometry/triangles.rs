@@ -65,7 +65,11 @@ impl AccelerationStructureGeometryTrianglesData {
     }
 
     /// Set the index data buffer address and its type
-    pub fn index_data(mut self, ty: vk::IndexType, data: impl Into<DeviceOrHostAddressConst>) -> Self {
+    pub fn index_data(
+        mut self,
+        ty: vk::IndexType,
+        data: impl Into<DeviceOrHostAddressConst>,
+    ) -> Self {
         self.index_type = ty;
         self.index_data = data.into();
         self

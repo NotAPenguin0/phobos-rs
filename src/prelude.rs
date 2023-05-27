@@ -1,7 +1,6 @@
 //! Re-exports most commonly used types in the library
 
 pub use ash::vk;
-
 pub use traits::*;
 
 pub use crate::allocator::default_allocator;
@@ -24,7 +23,6 @@ pub use crate::graph::pass::{Pass, PassBuilder};
 pub use crate::graph::pass_graph::PassGraph;
 pub use crate::graph::physical_resource::PhysicalResourceBindings;
 pub use crate::graph::virtual_resource::VirtualResource;
-pub use crate::pipeline::{PipelineStage, PipelineType};
 pub use crate::pipeline::builder::PipelineBuilder;
 pub use crate::pipeline::cache::PipelineCache;
 pub use crate::pipeline::compute::{ComputePipelineBuilder, ComputePipelineCreateInfo};
@@ -32,11 +30,12 @@ pub use crate::pipeline::create_info::PipelineCreateInfo;
 pub use crate::pipeline::hash::*;
 pub use crate::pipeline::raytracing::RayTracingPipelineBuilder;
 pub use crate::pipeline::shader::ShaderCreateInfo;
-pub use crate::resource::*;
+pub use crate::pipeline::{PipelineStage, PipelineType};
 pub use crate::resource::buffer::{Buffer, BufferView};
 pub use crate::resource::image::{Image, ImageView};
 pub use crate::resource::query_pool::*;
 pub use crate::resource::raytracing::*;
+pub use crate::resource::*;
 pub use crate::sampler::Sampler;
 pub use crate::sync::domain;
 pub use crate::sync::execution_manager::ExecutionManager;

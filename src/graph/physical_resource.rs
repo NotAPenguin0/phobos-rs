@@ -42,12 +42,14 @@ impl PhysicalResourceBindings {
 
     /// Bind an image to all virtual resources with `name(+*)` as their uid.
     pub fn bind_image(&mut self, name: impl Into<String>, image: &ImageView) {
-        self.bindings.insert(name.into(), PhysicalResource::Image(image.clone()));
+        self.bindings
+            .insert(name.into(), PhysicalResource::Image(image.clone()));
     }
 
     /// Bind a buffer to all virtual resources with this name as their uid.
     pub fn bind_buffer(&mut self, name: impl Into<String>, buffer: &BufferView) {
-        self.bindings.insert(name.into(), PhysicalResource::Buffer(*buffer));
+        self.bindings
+            .insert(name.into(), PhysicalResource::Buffer(*buffer));
     }
 
     /// Alias a resource by giving it an alternative name

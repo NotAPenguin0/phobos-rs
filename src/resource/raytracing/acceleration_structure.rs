@@ -3,9 +3,9 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{AccelerationStructureType, BufferView, Device};
 use crate::core::device::ExtensionID;
 use crate::util::to_vk::IntoVulkanType;
+use crate::{AccelerationStructureType, BufferView, Device};
 
 /// Wrapper around a [`VkAccelerationStructureKHR`](vk::AccelerationStructureKHR)
 pub struct AccelerationStructure {
@@ -21,7 +21,12 @@ impl AccelerationStructure {
     /// * `ty`      - The acceleration structure type. Use of [`AccelerationStructureType::Generic`] is discouraged.
     /// * `buffer`  - The backing memory buffer for this acceleration structure.
     /// * `flags`   - Acceleration structure create flags.
-    pub fn new(device: Device, ty: AccelerationStructureType, buffer: BufferView, flags: vk::AccelerationStructureCreateFlagsKHR) -> Result<Self> {
+    pub fn new(
+        device: Device,
+        ty: AccelerationStructureType,
+        buffer: BufferView,
+        flags: vk::AccelerationStructureCreateFlagsKHR,
+    ) -> Result<Self> {
         device.require_extension(ExtensionID::AccelerationStructure)?;
         let fns = device.acceleration_structure().unwrap();
         if ty == AccelerationStructureType::Generic {
@@ -67,16 +72,17 @@ impl AccelerationStructure {
 
     /// Get the device address of this acceleration structure
     pub fn address(&self) -> Result<vk::DeviceAddress> {
-        self.device.require_extension(ExtensionID::AccelerationStructure)?;
+        self.device
+            .require_extension(ExtensionID::AccelerationStructure)?;
         let fns = self.device.acceleration_structure().unwrap();
         unsafe {
-            Ok(
-                fns.get_acceleration_structure_device_address(&vk::AccelerationStructureDeviceAddressInfoKHR {
+            Ok(fns.get_acceleration_structure_device_address(
+                &vk::AccelerationStructureDeviceAddressInfoKHR {
                     s_type: vk::StructureType::ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
                     p_next: std::ptr::null(),
                     acceleration_structure: self.handle(),
-                }),
-            )
+                },
+            ))
         }
     }
 

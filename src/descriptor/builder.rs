@@ -4,12 +4,15 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
-use crate::descriptor::descriptor_set::{DescriptorBinding, DescriptorBufferInfo, DescriptorContents, DescriptorImageInfo, DescriptorSetBinding};
+use crate::descriptor::descriptor_set::{
+    DescriptorBinding, DescriptorBufferInfo, DescriptorContents, DescriptorImageInfo,
+    DescriptorSetBinding,
+};
 use crate::graph::physical_resource::PhysicalResource;
 #[cfg(feature = "shader-reflection")]
 use crate::pipeline::shader_reflection::ReflectionInfo;
 use crate::raytracing::acceleration_structure::AccelerationStructure;
+use crate::{BufferView, Error, ImageView, PhysicalResourceBindings, Sampler, VirtualResource};
 
 /// This structure is used to build up [`DescriptorSetBinding`](crate::descriptor::descriptor_set::DescriptorSetBinding) objects for requesting descriptor sets.
 /// Public usage of this API is deprecated, use the provided methods inside [`IncompleteCommandBuffer`](crate::IncompleteCommandBuffer).
@@ -124,9 +127,17 @@ impl<'r> DescriptorSetBuilder<'r> {
     /// # Errors
     /// Fails if `self` was not constructed with [`DescriptorSetBuilder::with_reflection()`].
     #[cfg(feature = "shader-reflection")]
-    pub fn bind_named_sampled_image(&mut self, name: &str, image: &ImageView, sampler: &Sampler) -> Result<()> {
+    pub fn bind_named_sampled_image(
+        &mut self,
+        name: &str,
+        image: &ImageView,
+        sampler: &Sampler,
+    ) -> Result<()> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
-        let binding = info.bindings.get(name).ok_or_else(|| Error::NoBinding(name.to_string()))?;
+        let binding = info
+            .bindings
+            .get(name)
+            .ok_or_else(|| Error::NoBinding(name.to_string()))?;
         self.bind_sampled_image(binding.binding, image, sampler);
         Ok(())
     }
@@ -150,7 +161,10 @@ impl<'r> DescriptorSetBuilder<'r> {
     #[cfg(feature = "shader-reflection")]
     pub fn bind_named_uniform_buffer(&mut self, name: &str, buffer: &BufferView) -> Result<()> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
-        let binding = info.bindings.get(name).ok_or_else(|| Error::NoBinding(name.to_string()))?;
+        let binding = info
+            .bindings
+            .get(name)
+            .ok_or_else(|| Error::NoBinding(name.to_string()))?;
         self.bind_uniform_buffer(binding.binding, buffer);
         Ok(())
     }
@@ -199,9 +213,7 @@ impl<'r> DescriptorSetBuilder<'r> {
         self.inner.bindings.push(DescriptorBinding {
             binding,
             ty: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
-            descriptors: vec![
-                DescriptorContents::AccelerationStructure(unsafe { accel.handle() })
-            ],
+            descriptors: vec![DescriptorContents::AccelerationStructure(unsafe { accel.handle() })],
         })
     }
 

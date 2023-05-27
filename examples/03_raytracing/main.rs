@@ -4,7 +4,6 @@ use anyhow::Result;
 use ash::vk;
 use glam::{Mat4, Vec3};
 use log::{info, trace};
-
 use phobos::image;
 use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
 use phobos::prelude::*;
@@ -12,7 +11,9 @@ use phobos::sync::domain::{All, Compute};
 use phobos::sync::submit_batch::SubmitBatch;
 use phobos::util::align::align;
 
-use crate::example_runner::{Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, save_dotfile, WindowContext};
+use crate::example_runner::{
+    create_shader, load_spirv_file, save_dotfile, Context, ExampleApp, ExampleRunner, WindowContext,
+};
 
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
@@ -35,13 +36,20 @@ struct RaytracingSample {
     sampler: Sampler,
 }
 
-fn make_input_buffer<T: Copy>(ctx: &mut Context, data: &[T], usage: vk::BufferUsageFlags, alignment: Option<u64>) -> Result<Buffer> {
+fn make_input_buffer<T: Copy>(
+    ctx: &mut Context,
+    data: &[T],
+    usage: vk::BufferUsageFlags,
+    alignment: Option<u64>,
+) -> Result<Buffer> {
     let buffer = match alignment {
         None => Buffer::new(
             ctx.device.clone(),
             &mut ctx.allocator,
             (data.len() * std::mem::size_of::<T>()) as u64,
-            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST | usage,
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR
+                | vk::BufferUsageFlags::TRANSFER_DST
+                | usage,
             MemoryType::CpuToGpu,
         )?,
         Some(alignment) => Buffer::new_aligned(
@@ -49,16 +57,24 @@ fn make_input_buffer<T: Copy>(ctx: &mut Context, data: &[T], usage: vk::BufferUs
             &mut ctx.allocator,
             (data.len() * std::mem::size_of::<T>()) as u64,
             alignment,
-            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR | vk::BufferUsageFlags::TRANSFER_DST | usage,
+            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR
+                | vk::BufferUsageFlags::TRANSFER_DST
+                | usage,
             MemoryType::CpuToGpu,
         )?,
     };
-    buffer.view_full().mapped_slice::<T>()?.copy_from_slice(data);
+    buffer
+        .view_full()
+        .mapped_slice::<T>()?
+        .copy_from_slice(data);
     Ok(buffer)
 }
 
 fn make_vertex_buffer(ctx: &mut Context) -> Result<Buffer> {
-    let vertices: [f32; 18] = [-1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, 1.0];
+    let vertices: [f32; 18] = [
+        -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0,
+        1.0,
+    ];
     make_input_buffer(ctx, &vertices, vk::BufferUsageFlags::VERTEX_BUFFER, None)
 }
 
@@ -83,7 +99,10 @@ fn make_instance_buffer(ctx: &mut Context, blas: &AccelerationStructure) -> Resu
 
 fn blas_build_info<'a>(vertices: &Buffer, indices: &Buffer) -> AccelerationStructureBuildInfo<'a> {
     AccelerationStructureBuildInfo::new_build()
-        .flags(vk::BuildAccelerationStructureFlagsKHR::ALLOW_COMPACTION | vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE)
+        .flags(
+            vk::BuildAccelerationStructureFlagsKHR::ALLOW_COMPACTION
+                | vk::BuildAccelerationStructureFlagsKHR::PREFER_FAST_TRACE,
+        )
         .set_type(AccelerationStructureType::BottomLevel)
         .push_triangles(
             AccelerationStructureGeometryTrianglesData::default()
@@ -92,7 +111,10 @@ fn blas_build_info<'a>(vertices: &Buffer, indices: &Buffer) -> AccelerationStruc
                 .stride((3 * std::mem::size_of::<f32>()) as u64)
                 .max_vertex(5)
                 .index_data(vk::IndexType::UINT32, indices.address())
-                .flags(vk::GeometryFlagsKHR::OPAQUE | vk::GeometryFlagsKHR::NO_DUPLICATE_ANY_HIT_INVOCATION),
+                .flags(
+                    vk::GeometryFlagsKHR::OPAQUE
+                        | vk::GeometryFlagsKHR::NO_DUPLICATE_ANY_HIT_INVOCATION,
+                ),
         )
         .push_range(2, 0, 0, 0)
 }
@@ -103,13 +125,23 @@ fn tlas_build_info<'a>(instances: &Buffer) -> AccelerationStructureBuildInfo<'a>
         .set_type(AccelerationStructureType::TopLevel)
         .push_instances(AccelerationStructureGeometryInstancesData {
             data: instances.address().into(),
-            flags: vk::GeometryFlagsKHR::OPAQUE | vk::GeometryFlagsKHR::NO_DUPLICATE_ANY_HIT_INVOCATION,
+            flags: vk::GeometryFlagsKHR::OPAQUE
+                | vk::GeometryFlagsKHR::NO_DUPLICATE_ANY_HIT_INVOCATION,
         })
         .push_range(1, 0, 0, 0)
 }
 
-fn make_acceleration_structure(ctx: &mut Context, build_info: &AccelerationStructureBuildInfo, prim_counts: &[u32]) -> Result<BackedAccelerationStructure> {
-    let sizes = query_build_size(&ctx.device, AccelerationStructureBuildType::Device, build_info, prim_counts)?;
+fn make_acceleration_structure(
+    ctx: &mut Context,
+    build_info: &AccelerationStructureBuildInfo,
+    prim_counts: &[u32],
+) -> Result<BackedAccelerationStructure> {
+    let sizes = query_build_size(
+        &ctx.device,
+        AccelerationStructureBuildType::Device,
+        build_info,
+        prim_counts,
+    )?;
     let buffer = Buffer::new_device_local(
         ctx.device.clone(),
         &mut ctx.allocator,
@@ -137,7 +169,11 @@ fn make_acceleration_structure(ctx: &mut Context, build_info: &AccelerationStruc
     })
 }
 
-fn make_compacted(ctx: &mut Context, accel: &AccelerationStructure, size: u64) -> Result<(AccelerationStructure, Buffer)> {
+fn make_compacted(
+    ctx: &mut Context,
+    accel: &AccelerationStructure,
+    size: u64,
+) -> Result<(AccelerationStructure, Buffer)> {
     // Create final compacted acceleration structures
     let compact_buffer = Buffer::new_device_local(
         ctx.device.clone(),
@@ -165,7 +201,9 @@ impl ExampleApp for RaytracingSample {
         let mut blas_build_info = blas_build_info(&vtx_buffer, &idx_buffer);
         let blas = make_acceleration_structure(&mut ctx, &blas_build_info, &[2])?;
         // We can now fill the rest of the build info (source and destination acceleration structures, and the scratch data).
-        blas_build_info = blas_build_info.dst(&blas.accel).scratch_data(blas.scratch.address());
+        blas_build_info = blas_build_info
+            .dst(&blas.accel)
+            .scratch_data(blas.scratch.address());
 
         // Create a query pool to query the compacted size.
         let mut qp = QueryPool::<AccelerationStructureCompactedSizeQuery>::new(
@@ -198,14 +236,17 @@ impl ExampleApp for RaytracingSample {
         ctx.exec.submit(cmd)?.wait()?;
 
         // Use our compacted size query to compact this acceleration structure
-        let compacted_size = align(qp.wait_for_single_result(0)?, AccelerationStructure::alignment());
+        let compacted_size =
+            align(qp.wait_for_single_result(0)?, AccelerationStructure::alignment());
         info!("Acceleration structure size after compacting: {} bytes", compacted_size);
         let (compact_as, compact_buffer) = make_compacted(&mut ctx, &blas.accel, compacted_size)?;
 
         let instance_buffer = make_instance_buffer(&mut ctx, &compact_as)?;
         let mut tlas_build_info = tlas_build_info(&instance_buffer);
         let tlas = make_acceleration_structure(&mut ctx, &tlas_build_info, &[1])?;
-        tlas_build_info = tlas_build_info.dst(&tlas.accel).scratch_data(tlas.scratch.address());
+        tlas_build_info = tlas_build_info
+            .dst(&tlas.accel)
+            .scratch_data(tlas.scratch.address());
 
         // Submit compacting and TLAS build command
         let cmd = ctx
@@ -225,7 +266,8 @@ impl ExampleApp for RaytracingSample {
         ctx.exec.submit(cmd)?.wait()?;
 
         let rgen = create_shader("examples/data/raygen.spv", vk::ShaderStageFlags::RAYGEN_KHR);
-        let rchit = create_shader("examples/data/rayhit.spv", vk::ShaderStageFlags::CLOSEST_HIT_KHR);
+        let rchit =
+            create_shader("examples/data/rayhit.spv", vk::ShaderStageFlags::CLOSEST_HIT_KHR);
         let rmiss = create_shader("examples/data/raymiss.spv", vk::ShaderStageFlags::MISS_KHR);
 
         // Create the raytracing pipeline
@@ -290,8 +332,13 @@ impl ExampleApp for RaytracingSample {
         let rt_pass = PassBuilder::new("raytrace")
             .write_storage_image(&rt_image, PipelineStage::RAY_TRACING_SHADER_KHR)
             .execute_fn(|cmd, ifc, bindings, _| {
-                let view = Mat4::look_at_rh(Vec3::new(0.0, 0.0, -1.0), Vec3::new(0.0, 0.0, 1.0), Vec3::new(0.0, 1.0, 0.0));
-                let projection = Mat4::perspective_rh(90.0_f32.to_radians(), 800.0 / 600.0, 0.001, 100.0);
+                let view = Mat4::look_at_rh(
+                    Vec3::new(0.0, 0.0, -1.0),
+                    Vec3::new(0.0, 0.0, 1.0),
+                    Vec3::new(0.0, 1.0, 0.0),
+                );
+                let projection =
+                    Mat4::perspective_rh(90.0_f32.to_radians(), 800.0 / 600.0, 0.001, 100.0);
                 cmd.bind_ray_tracing_pipeline("rt")?
                     .push_constant(vk::ShaderStageFlags::RAYGEN_KHR, 0, &view)
                     .push_constant(vk::ShaderStageFlags::RAYGEN_KHR, 64, &projection)
@@ -311,9 +358,13 @@ impl ExampleApp for RaytracingSample {
             )?
             .sample_image(rt_pass.output(&rt_image).unwrap(), PipelineStage::FRAGMENT_SHADER)
             .execute_fn(|cmd, ifc, bindings, _| {
-                let vertices: Vec<f32> =
-                    vec![-1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0];
-                let mut vtx_buffer = ifc.allocate_scratch_vbo((vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize)?;
+                let vertices: Vec<f32> = vec![
+                    -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0,
+                    1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
+                ];
+                let mut vtx_buffer = ifc.allocate_scratch_vbo(
+                    (vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize,
+                )?;
                 let slice = vtx_buffer.mapped_slice::<f32>()?;
                 slice.copy_from_slice(vertices.as_slice());
                 cmd.full_viewport_scissor()
@@ -347,5 +398,8 @@ impl ExampleApp for RaytracingSample {
 
 fn main() -> Result<()> {
     let window = WindowContext::new("03_raytracing")?;
-    ExampleRunner::new("03_raytracing", Some(&window), |settings| settings.raytracing(true).build())?.run::<RaytracingSample>(Some(window));
+    ExampleRunner::new("03_raytracing", Some(&window), |settings| {
+        settings.raytracing(true).build()
+    })?
+    .run::<RaytracingSample>(Some(window));
 }

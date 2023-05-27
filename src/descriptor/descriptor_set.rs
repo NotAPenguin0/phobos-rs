@@ -3,9 +3,9 @@
 use anyhow::Result;
 use ash::vk;
 
-use crate::{BufferView, Device, ImageView};
 use crate::util::cache::{Resource, ResourceKey};
 use crate::util::pnext::PNext;
+use crate::{BufferView, Device, ImageView};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(crate) struct DescriptorImageInfo {
@@ -118,8 +118,8 @@ impl Resource for DescriptorSet {
     const MAX_TIME_TO_LIVE: u32 = 8;
 
     fn create(device: Device, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self>
-        where
-            Self: Sized, {
+    where
+        Self: Sized, {
         let info = vk::DescriptorSetAllocateInfo {
             s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
             p_next: std::ptr::null(),
@@ -127,7 +127,10 @@ impl Resource for DescriptorSet {
             descriptor_set_count: 1,
             p_set_layouts: &key.layout,
         };
-        let set = unsafe { device.allocate_descriptor_sets(&info) }?.first().cloned().unwrap();
+        let set = unsafe { device.allocate_descriptor_sets(&info) }?
+            .first()
+            .cloned()
+            .unwrap();
         #[cfg(feature = "log-objects")]
         trace!("Created new VkDescriptorSet {set:p}");
 
@@ -163,7 +166,8 @@ impl Resource for DescriptorSet {
                         write.buffer_info = Some(binding_buffer_info(binding));
                     }
                     vk::DescriptorType::ACCELERATION_STRUCTURE_KHR => {
-                        write.acceleration_structure_info = Some(binding_accel_structure_info(binding));
+                        write.acceleration_structure_info =
+                            Some(binding_accel_structure_info(binding));
                     }
                     _ => {
                         todo!();
@@ -179,7 +183,8 @@ impl Resource for DescriptorSet {
                 if let Some(info) = &write.acceleration_structure_info {
                     Some(PNext::WriteDescriptorSetAccelerationStructure(
                         vk::WriteDescriptorSetAccelerationStructureKHR {
-                            s_type: vk::StructureType::WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+                            s_type:
+                                vk::StructureType::WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
                             p_next: std::ptr::null(),
                             acceleration_structure_count: info.len() as u32,
                             p_acceleration_structures: info.as_ptr(),
@@ -196,7 +201,10 @@ impl Resource for DescriptorSet {
             .zip(&pnext)
             .map(|(write, p_next)| vk::WriteDescriptorSet {
                 s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                p_next: p_next.as_ref().map(|p_next| p_next.as_ptr()).unwrap_or(std::ptr::null()),
+                p_next: p_next
+                    .as_ref()
+                    .map(|p_next| p_next.as_ptr())
+                    .unwrap_or(std::ptr::null()),
                 dst_set: write.set,
                 dst_binding: write.binding,
                 dst_array_element: write.array_element,

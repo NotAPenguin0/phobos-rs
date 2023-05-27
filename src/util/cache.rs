@@ -26,8 +26,8 @@ pub trait Resource {
 
     /// Allocates a new resource to be stored in the cache. This function may error, but this error will propagate through the cache's access function.
     fn create(device: Device, key: &Self::Key, params: Self::ExtraParams<'_>) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 }
 
 struct Entry<R> {
@@ -63,7 +63,11 @@ impl<R: Resource + Sized> Cache<R> {
     /// the cache is exists.
     /// # Errors
     /// This function can only error if the requested resource did not exist, and allocation of it failed.
-    pub fn get_or_create<'a, 'b, 's: 'b>(&'s mut self, key: &R::Key, params: R::ExtraParams<'a>) -> Result<&'b R> {
+    pub fn get_or_create<'a, 'b, 's: 'b>(
+        &'s mut self,
+        key: &R::Key,
+        params: R::ExtraParams<'a>,
+    ) -> Result<&'b R> {
         let entry = self.store.entry(key.clone());
         let entry = match entry {
             hash_map::Entry::Occupied(entry) => entry.into_mut(),
@@ -84,6 +88,7 @@ impl<R: Resource + Sized> Cache<R> {
                 entry.ttl -= 1
             }
         });
-        self.store.retain(|_, entry| entry.persistent || entry.ttl != 0);
+        self.store
+            .retain(|_, entry| entry.persistent || entry.ttl != 0);
     }
 }

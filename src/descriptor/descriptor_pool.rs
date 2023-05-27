@@ -6,8 +6,8 @@ use std::fmt::{Display, Formatter};
 use anyhow::Result;
 use ash::vk;
 
-use crate::Device;
 use crate::core::device::ExtensionID;
+use crate::Device;
 
 /// Defines how many descriptors a descriptor pool should be able to hold.
 #[derive(Debug, Clone)]

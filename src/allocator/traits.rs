@@ -32,7 +32,12 @@ pub trait Allocator: Clone + Send + Sync {
     ///     Ok(())
     /// }
     /// ```
-    fn allocate(&mut self, name: &'static str, requirements: &vk::MemoryRequirements, ty: MemoryType) -> Result<Self::Allocation>;
+    fn allocate(
+        &mut self,
+        name: &'static str,
+        requirements: &vk::MemoryRequirements,
+        ty: MemoryType,
+    ) -> Result<Self::Allocation>;
 
     /// Free some memory allocated from this allocator. It's allowed for this function to do nothing, and instead
     /// use [`Drop`] to do this. Note that in this case, the allocation is still dropped. because it is moved into the function.

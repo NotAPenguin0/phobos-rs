@@ -10,7 +10,6 @@ pub use geometry::*;
 pub mod acceleration_structure;
 pub mod as_build_type;
 pub mod as_type;
+pub mod build_info;
 pub mod build_size;
 pub mod geometry;
-pub mod build_info;
-

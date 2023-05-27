@@ -8,8 +8,8 @@ use anyhow::Result;
 use ash;
 use ash::vk;
 
-use crate::{AppSettings, WindowInterface};
 use crate::util::string::unwrap_to_raw_strings;
+use crate::{AppSettings, WindowInterface};
 
 /// Represents the loaded vulkan instance.
 /// You need to create this to initialize the Vulkan API. This is used
@@ -66,7 +66,10 @@ impl Deref for VkInstance {
     }
 }
 
-fn create_vk_instance<Window: WindowInterface>(entry: &ash::Entry, settings: &AppSettings<Window>) -> Result<ash::Instance> {
+fn create_vk_instance<Window: WindowInterface>(
+    entry: &ash::Entry,
+    settings: &AppSettings<Window>,
+) -> Result<ash::Instance> {
     let app_name = CString::new(settings.name.clone())?;
     let engine_name = CString::new("Phobos")?;
     let app_info = vk::ApplicationInfo {

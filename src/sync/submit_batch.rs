@@ -5,13 +5,13 @@ use std::sync::Arc;
 use anyhow::{ensure, Result};
 use ash::vk;
 
+use crate::command_buffer::CommandBuffer;
+use crate::pool::{LocalPool, Poolable, Pooled, ResourcePool};
+use crate::sync::domain::ExecutionDomain;
 use crate::{
     Allocator, CmdBuffer, DefaultAllocator, Device, ExecutionManager, Fence, InFlightContext,
     PipelineStage, Semaphore,
 };
-use crate::command_buffer::CommandBuffer;
-use crate::pool::{LocalPool, Poolable, Pooled, ResourcePool};
-use crate::sync::domain::ExecutionDomain;
 
 #[derive(Debug)]
 struct SubmitInfo<D: ExecutionDomain> {

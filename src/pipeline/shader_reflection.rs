@@ -8,9 +8,9 @@ use ash::vk;
 #[cfg(feature = "shader-reflection")]
 use spv_cross::spirv::{Decoration, ExecutionModel, ShaderResources, Type};
 
-use crate::{Error, ShaderCreateInfo};
 use crate::pipeline::pipeline_layout::{PipelineLayoutCreateInfo, PushConstantRange};
 use crate::pipeline::set_layout::DescriptorSetLayoutCreateInfo;
+use crate::{Error, ShaderCreateInfo};
 
 #[cfg(all(feature = "shader-reflection", not(feature = "hlsl")))]
 type Ast = spv_cross::spirv::Ast<spv_cross::glsl::Target>;
@@ -39,7 +39,11 @@ pub struct ReflectionInfo {
 
 #[cfg(feature = "shader-reflection")]
 fn get_shader_stage(ast: &Ast) -> Result<vk::ShaderStageFlags> {
-    let entry = ast.get_entry_points()?.first().cloned().ok_or_else(|| Error::NoEntryPoint)?;
+    let entry = ast
+        .get_entry_points()?
+        .first()
+        .cloned()
+        .ok_or_else(|| Error::NoEntryPoint)?;
     Ok(match entry.execution_model {
         ExecutionModel::Vertex => vk::ShaderStageFlags::VERTEX,
         ExecutionModel::TessellationControl => vk::ShaderStageFlags::TESSELLATION_CONTROL,
@@ -61,7 +65,12 @@ fn get_shader_stage(ast: &Ast) -> Result<vk::ShaderStageFlags> {
 // Note that aliasing is not supported
 
 #[cfg(feature = "shader-reflection")]
-fn find_sampled_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+fn find_sampled_images(
+    ast: &mut Ast,
+    stage: vk::ShaderStageFlags,
+    resources: &ShaderResources,
+    info: &mut ReflectionInfo,
+) -> Result<()> {
     for image in &resources.sampled_images {
         let binding = ast.get_decoration(image.id, Decoration::Binding)?;
         let set = ast.get_decoration(image.id, Decoration::DescriptorSet)?;
@@ -92,7 +101,12 @@ fn find_sampled_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &S
 }
 
 #[cfg(feature = "shader-reflection")]
-fn find_uniform_buffers(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+fn find_uniform_buffers(
+    ast: &mut Ast,
+    stage: vk::ShaderStageFlags,
+    resources: &ShaderResources,
+    info: &mut ReflectionInfo,
+) -> Result<()> {
     for buffer in &resources.uniform_buffers {
         let binding = ast.get_decoration(buffer.id, Decoration::Binding)?;
         let set = ast.get_decoration(buffer.id, Decoration::DescriptorSet)?;
@@ -111,7 +125,12 @@ fn find_uniform_buffers(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &
 }
 
 #[cfg(feature = "shader-reflection")]
-fn find_storage_buffers(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+fn find_storage_buffers(
+    ast: &mut Ast,
+    stage: vk::ShaderStageFlags,
+    resources: &ShaderResources,
+    info: &mut ReflectionInfo,
+) -> Result<()> {
     for buffer in &resources.storage_buffers {
         let binding = ast.get_decoration(buffer.id, Decoration::Binding)?;
         let set = ast.get_decoration(buffer.id, Decoration::DescriptorSet)?;
@@ -130,7 +149,12 @@ fn find_storage_buffers(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &
 }
 
 #[cfg(feature = "shader-reflection")]
-fn find_storage_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+fn find_storage_images(
+    ast: &mut Ast,
+    stage: vk::ShaderStageFlags,
+    resources: &ShaderResources,
+    info: &mut ReflectionInfo,
+) -> Result<()> {
     for image in &resources.storage_images {
         let binding = ast.get_decoration(image.id, Decoration::Binding)?;
         let set = ast.get_decoration(image.id, Decoration::DescriptorSet)?;
@@ -149,7 +173,12 @@ fn find_storage_images(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &S
 }
 
 #[cfg(feature = "shader-reflection")]
-fn find_acceleration_structures(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+fn find_acceleration_structures(
+    ast: &mut Ast,
+    stage: vk::ShaderStageFlags,
+    resources: &ShaderResources,
+    info: &mut ReflectionInfo,
+) -> Result<()> {
     for image in &resources.acceleration_structures {
         let binding = ast.get_decoration(image.id, Decoration::Binding)?;
         let set = ast.get_decoration(image.id, Decoration::DescriptorSet)?;
@@ -168,7 +197,12 @@ fn find_acceleration_structures(ast: &mut Ast, stage: vk::ShaderStageFlags, reso
 }
 
 #[cfg(feature = "shader-reflection")]
-fn find_push_constants(ast: &mut Ast, stage: vk::ShaderStageFlags, resources: &ShaderResources, info: &mut ReflectionInfo) -> Result<()> {
+fn find_push_constants(
+    ast: &mut Ast,
+    stage: vk::ShaderStageFlags,
+    resources: &ShaderResources,
+    info: &mut ReflectionInfo,
+) -> Result<()> {
     for pc in &resources.push_constant_buffers {
         let ranges = ast.get_active_buffer_ranges(pc.id)?;
         for range in ranges {
@@ -232,27 +266,32 @@ pub(crate) fn reflect_shaders(shaders: &[ShaderCreateInfo]) -> Result<Reflection
     }
 
     Ok(ReflectionInfo {
-        bindings: reflected_shaders.iter().fold(HashMap::default(), |mut acc, shader| {
-            for (name, binding) in &shader.bindings {
-                let entry = acc.entry(name.clone());
-                match entry {
-                    // If this entry is already in the map, add its stage.
-                    Entry::Occupied(entry) => {
-                        let value = entry.into_mut();
-                        if value.set != binding.set || value.ty != binding.ty || value.binding != binding.binding {
-                            panic!("Aliased descriptor sets used.");
+        bindings: reflected_shaders
+            .iter()
+            .fold(HashMap::default(), |mut acc, shader| {
+                for (name, binding) in &shader.bindings {
+                    let entry = acc.entry(name.clone());
+                    match entry {
+                        // If this entry is already in the map, add its stage.
+                        Entry::Occupied(entry) => {
+                            let value = entry.into_mut();
+                            if value.set != binding.set
+                                || value.ty != binding.ty
+                                || value.binding != binding.binding
+                            {
+                                panic!("Aliased descriptor sets used.");
+                            }
+                            value.stage |= binding.stage;
                         }
-                        value.stage |= binding.stage;
-                    }
-                    // Otherwise insert a new binding.
-                    Entry::Vacant(entry) => {
-                        entry.insert(*binding);
+                        // Otherwise insert a new binding.
+                        Entry::Vacant(entry) => {
+                            entry.insert(*binding);
+                        }
                     }
                 }
-            }
 
-            acc
-        }),
+                acc
+            }),
         push_constants: merge_push_constants(&reflected_shaders)?,
     })
 }

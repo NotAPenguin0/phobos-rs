@@ -189,7 +189,7 @@ impl PipelineStatisticsQuery {
             }
             vk::QueryPipelineStatisticFlags::MESH_SHADER_INVOCATIONS_EXT => {
                 output.mesh_shader_invocations = Some(value);
-            },
+            }
             _ => panic!("Unsupported query pipeline statistic flags"),
         }
     }
@@ -340,11 +340,20 @@ impl<Q: Query> QueryPool<Q> {
 
         let flags = vk::QueryResultFlags::TYPE_64 | vk::QueryResultFlags::WAIT;
         // Assumption: Every query in the pool has the same number of items, this should always be the case.
-        let items_per_query = self.queries.first().map(|query| query.size()).unwrap_or_default();
+        let items_per_query = self
+            .queries
+            .first()
+            .map(|query| query.size())
+            .unwrap_or_default();
         let mut buffer = vec![u64::default(); count as usize * items_per_query];
         unsafe {
-            self.device
-                .get_query_pool_results(self.handle, first, count, buffer.as_mut_slice(), flags)?;
+            self.device.get_query_pool_results(
+                self.handle,
+                first,
+                count,
+                buffer.as_mut_slice(),
+                flags,
+            )?;
         }
         let data = buffer
             .chunks_exact(items_per_query)
@@ -369,8 +378,13 @@ impl<Q: Query> QueryPool<Q> {
         let num_items = query.size();
         let mut buffer = vec![u64::default(); num_items];
         unsafe {
-            self.device
-                .get_query_pool_results(self.handle, index, 1, buffer.as_mut_slice(), flags)?;
+            self.device.get_query_pool_results(
+                self.handle,
+                index,
+                1,
+                buffer.as_mut_slice(),
+                flags,
+            )?;
         }
         let data = query.parse_query(&self.device, buffer.as_slice());
         Ok(data)
@@ -391,10 +405,17 @@ impl<Q: Query> QueryPool<Q> {
 }
 
 impl QueryPool<TimestampQuery> {
-    pub(crate) fn write_timestamp(&mut self, bits: u32, cmd: vk::CommandBuffer, stage: PipelineStage, query: u32) {
+    pub(crate) fn write_timestamp(
+        &mut self,
+        bits: u32,
+        cmd: vk::CommandBuffer,
+        stage: PipelineStage,
+        query: u32,
+    ) {
         self.queries.get_mut(query as usize).unwrap().valid_bits = bits;
         unsafe {
-            self.device.cmd_write_timestamp2(cmd, stage, self.handle, query);
+            self.device
+                .cmd_write_timestamp2(cmd, stage, self.handle, query);
         }
     }
 }

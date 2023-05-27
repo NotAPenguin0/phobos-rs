@@ -29,7 +29,13 @@ fn compile_shader(path: &Path, kind: shaderc::ShaderKind, output: &Path) {
     let mut options = CompileOptions::new().unwrap();
     options.set_target_env(TargetEnv::Vulkan, EnvVersion::Vulkan1_2 as u32);
     let binary = compiler
-        .compile_into_spirv(&load_file(path), kind, path.as_os_str().to_str().unwrap(), "main", Some(&options))
+        .compile_into_spirv(
+            &load_file(path),
+            kind,
+            path.as_os_str().to_str().unwrap(),
+            "main",
+            Some(&options),
+        )
         .unwrap();
     save_file(output, binary.as_binary_u8());
 }

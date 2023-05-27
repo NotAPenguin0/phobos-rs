@@ -13,12 +13,12 @@ use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxDimensions2D;
 
-use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2ContextCreateInfo;
 use crate::util::string::unwrap_to_raw_strings;
+use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 
 /// Device extensions that phobos requests but might not be available.
 /// # Example
@@ -108,7 +108,11 @@ impl Device {
     /// Create a new Vulkan device. This is the main interface point with the Vulkan API.
     /// # Errors
     /// * Can fail if vulkan device init fails. This is possible if an optional feature was enabled that is not supported.
-    pub fn new<Window: WindowInterface>(instance: &VkInstance, physical_device: &PhysicalDevice, settings: &AppSettings<Window>) -> Result<Self> {
+    pub fn new<Window: WindowInterface>(
+        instance: &VkInstance,
+        physical_device: &PhysicalDevice,
+        settings: &AppSettings<Window>,
+    ) -> Result<Self> {
         let mut priorities = Vec::<f32>::new();
         let queue_create_infos = physical_device
             .queue_families()
@@ -141,7 +145,8 @@ impl Device {
             .collect::<Result<Vec<CString>, NulError>>()?;
 
         // SAFETY: Vulkan API call. We have a valid reference to a PhysicalDevice, so handle() is valid.
-        let available_extensions = unsafe { instance.enumerate_device_extension_properties(physical_device.handle())? };
+        let available_extensions =
+            unsafe { instance.enumerate_device_extension_properties(physical_device.handle())? };
         let mut enabled_extensions = HashSet::new();
         // Add the extensions we want, but that are not required.
         let dynamic_state3_supported = add_if_supported(
@@ -178,9 +183,9 @@ impl Device {
 
         let ray_query_name = CStr::from_bytes_with_nul(b"VK_KHR_ray_query\0")?;
         let ray_query_supported = settings.raytracing
-            && available_extensions
-            .iter()
-            .any(|ext| ray_query_name == unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) });
+            && available_extensions.iter().any(|ext| {
+                ray_query_name == unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) }
+            });
         if ray_query_supported {
             extension_names.push(CString::from(ray_query_name));
         }
@@ -234,15 +239,16 @@ impl Device {
             info = info.push_next(&mut features_dynamic_state3);
         }
 
-        let mut features_acceleration_structure = vk::PhysicalDeviceAccelerationStructureFeaturesKHR {
-            s_type: vk::StructureType::PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
-            p_next: std::ptr::null_mut(),
-            acceleration_structure: vk::TRUE,
-            acceleration_structure_capture_replay: vk::FALSE,
-            acceleration_structure_indirect_build: vk::FALSE,
-            acceleration_structure_host_commands: vk::FALSE,
-            descriptor_binding_acceleration_structure_update_after_bind: vk::FALSE,
-        };
+        let mut features_acceleration_structure =
+            vk::PhysicalDeviceAccelerationStructureFeaturesKHR {
+                s_type: vk::StructureType::PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+                p_next: std::ptr::null_mut(),
+                acceleration_structure: vk::TRUE,
+                acceleration_structure_capture_replay: vk::FALSE,
+                acceleration_structure_indirect_build: vk::FALSE,
+                acceleration_structure_host_commands: vk::FALSE,
+                descriptor_binding_acceleration_structure_update_after_bind: vk::FALSE,
+            };
 
         let mut features_ray_query = vk::PhysicalDeviceRayQueryFeaturesKHR {
             s_type: vk::StructureType::PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
@@ -324,11 +330,13 @@ impl Device {
             }
         };
 
-        unsafe { instance.get_physical_device_properties2(physical_device.handle(), &mut properties2) };
+        unsafe {
+            instance.get_physical_device_properties2(physical_device.handle(), &mut properties2)
+        };
 
         // Create FSR2 context
         #[cfg(feature = "fsr2")]
-            let fsr2 = unsafe {
+        let fsr2 = unsafe {
             let display_size = FfxDimensions2D {
                 width: settings.fsr2_settings.display_size.0,
                 height: settings.fsr2_settings.display_size.1,
@@ -354,7 +362,10 @@ impl Device {
 
         let inner = DeviceInner {
             handle,
-            queue_families: queue_create_infos.iter().map(|info| info.queue_family_index).collect(),
+            queue_families: queue_create_infos
+                .iter()
+                .map(|info| info.queue_family_index)
+                .collect(),
             properties: *physical_device.properties(),
             accel_structure_properties: accel_properties,
             rt_properties,
@@ -438,7 +449,9 @@ impl Device {
     /// # Errors
     ///
     /// - Fails if [`ExtensionID::AccelerationStructure`] is not enabled.
-    pub fn acceleration_structure_properties(&self) -> Result<&vk::PhysicalDeviceAccelerationStructurePropertiesKHR> {
+    pub fn acceleration_structure_properties(
+        &self,
+    ) -> Result<&vk::PhysicalDeviceAccelerationStructurePropertiesKHR> {
         self.require_extension(ExtensionID::AccelerationStructure)?;
         Ok(self.inner.accel_structure_properties.as_ref().unwrap())
     }
@@ -447,7 +460,9 @@ impl Device {
     /// # Errors
     ///
     /// - Fails if [`ExtensionID::RayTracingPipeline`] is not enabled.
-    pub fn ray_tracing_properties(&self) -> Result<&vk::PhysicalDeviceRayTracingPipelinePropertiesKHR> {
+    pub fn ray_tracing_properties(
+        &self,
+    ) -> Result<&vk::PhysicalDeviceRayTracingPipelinePropertiesKHR> {
         self.require_extension(ExtensionID::RayTracingPipeline)?;
         Ok(self.inner.rt_properties.as_ref().unwrap())
     }

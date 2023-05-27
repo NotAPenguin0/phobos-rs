@@ -1,16 +1,15 @@
 //! Exposes different acceleration structure geometry types
 
 use ash::vk;
-
 pub use instances::*;
 pub use triangles::*;
 
-use crate::{AccelerationStructure, AccelerationStructureType};
 use crate::util::address::DeviceOrHostAddress;
 use crate::util::to_vk::{AsVulkanType, IntoVulkanType};
+use crate::{AccelerationStructure, AccelerationStructureType};
 
-pub mod triangles;
 pub mod instances;
+pub mod triangles;
 
 /// All information required to build the geometry of an acceleration structure
 pub struct AccelerationStructureBuildGeometryInfo<'a> {

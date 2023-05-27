@@ -9,17 +9,21 @@ use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
 use fsr2_sys::{
-    FfxErrorCode, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription, ffxFsr2ContextDestroy,
-    ffxFsr2ContextDispatch, FfxFsr2DispatchDescription, ffxFsr2GetInterfaceVK, ffxFsr2GetJitterOffset, ffxFsr2GetJitterPhaseCount, ffxFsr2GetRenderResolutionFromQualityMode,
-    ffxFsr2GetScratchMemorySizeVK, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType,
-    ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource, FfxResourceState, VkDevice, VkPhysicalDevice,
+    ffxFsr2ContextCreate, ffxFsr2ContextDestroy, ffxFsr2ContextDispatch, ffxFsr2GetInterfaceVK,
+    ffxFsr2GetJitterOffset, ffxFsr2GetJitterPhaseCount, ffxFsr2GetRenderResolutionFromQualityMode,
+    ffxFsr2GetScratchMemorySizeVK, ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK,
+    FfxErrorCode, FfxFsr2Context, FfxFsr2ContextDescription, FfxFsr2DispatchDescription,
+    FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType, FfxResource,
+    FfxResourceState, VkDevice, VkPhysicalDevice,
 };
-pub use fsr2_sys::{FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits, FfxFsr2QualityMode};
+pub use fsr2_sys::{
+    FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits, FfxFsr2QualityMode,
+};
 use thiserror::Error;
-use widestring::{WideChar as wchar_t, WideCStr};
+use widestring::{WideCStr, WideChar as wchar_t};
 
-use crate::{Allocator, ComputeSupport, DeletionQueue, ImageView, IncompleteCommandBuffer};
 use crate::domain::ExecutionDomain;
+use crate::{Allocator, ComputeSupport, DeletionQueue, ImageView, IncompleteCommandBuffer};
 
 /// FSR2 API error, stores an error code that describes the cause of the error
 #[derive(Debug, Error)]
@@ -39,7 +43,7 @@ fn check_fsr2_error(code: FfxErrorCode) -> Result<()> {
         Err(Fsr2Error {
             code,
         }
-            .into())
+        .into())
     }
 }
 
@@ -292,12 +296,24 @@ impl Fsr2Context {
             let functions_1_1 = info.instance.fp_v1_1();
             let fp_table = FfxFsr2InstanceFunctionPointerTableVk {
                 // SAFETY: These are the same functions, but their types are from different crates.
-                fp_enumerate_device_extension_properties: std::mem::transmute::<_, _>(functions_1_0.enumerate_device_extension_properties),
-                fp_get_device_proc_addr: std::mem::transmute::<_, _>(functions_1_0.get_device_proc_addr),
-                fp_get_physical_device_memory_properties: std::mem::transmute::<_, _>(functions_1_0.get_physical_device_memory_properties),
-                fp_get_physical_device_properties: std::mem::transmute::<_, _>(functions_1_0.get_physical_device_properties),
-                fp_get_physical_device_properties2: std::mem::transmute::<_, _>(functions_1_1.get_physical_device_properties2),
-                fp_get_physical_device_features2: std::mem::transmute::<_, _>(functions_1_1.get_physical_device_features2),
+                fp_enumerate_device_extension_properties: std::mem::transmute::<_, _>(
+                    functions_1_0.enumerate_device_extension_properties,
+                ),
+                fp_get_device_proc_addr: std::mem::transmute::<_, _>(
+                    functions_1_0.get_device_proc_addr,
+                ),
+                fp_get_physical_device_memory_properties: std::mem::transmute::<_, _>(
+                    functions_1_0.get_physical_device_memory_properties,
+                ),
+                fp_get_physical_device_properties: std::mem::transmute::<_, _>(
+                    functions_1_0.get_physical_device_properties,
+                ),
+                fp_get_physical_device_properties2: std::mem::transmute::<_, _>(
+                    functions_1_1.get_physical_device_properties2,
+                ),
+                fp_get_physical_device_features2: std::mem::transmute::<_, _>(
+                    functions_1_1.get_physical_device_features2,
+                ),
             };
 
             let phys_device = VkPhysicalDevice::from_raw(info.physical_device.as_raw());
@@ -352,7 +368,11 @@ impl Fsr2Context {
         }
     }
 
-    fn get_optional_image_resource(&mut self, image: &Option<ImageView>, state: FfxResourceState) -> FfxResource {
+    fn get_optional_image_resource(
+        &mut self,
+        image: &Option<ImageView>,
+        state: FfxResourceState,
+    ) -> FfxResource {
         image
             .as_ref()
             .map(|image| self.get_image_resource(image, state))
@@ -377,10 +397,16 @@ impl Fsr2Context {
             command_list: cmd_list,
             color: self.get_image_resource(&resources.color, FfxResourceState::COMPUTE_READ),
             depth: self.get_image_resource(&resources.depth, FfxResourceState::COMPUTE_READ),
-            motion_vectors: self.get_image_resource(&resources.motion_vectors, FfxResourceState::COMPUTE_READ),
-            exposure: self.get_optional_image_resource(&resources.exposure, FfxResourceState::COMPUTE_READ),
-            reactive: self.get_optional_image_resource(&resources.reactive, FfxResourceState::COMPUTE_READ),
-            transparency_and_composition: self.get_optional_image_resource(&resources.transparency_and_composition, FfxResourceState::COMPUTE_READ),
+            motion_vectors: self
+                .get_image_resource(&resources.motion_vectors, FfxResourceState::COMPUTE_READ),
+            exposure: self
+                .get_optional_image_resource(&resources.exposure, FfxResourceState::COMPUTE_READ),
+            reactive: self
+                .get_optional_image_resource(&resources.reactive, FfxResourceState::COMPUTE_READ),
+            transparency_and_composition: self.get_optional_image_resource(
+                &resources.transparency_and_composition,
+                FfxResourceState::COMPUTE_READ,
+            ),
             output: self.get_image_resource(&resources.output, FfxResourceState::UNORDERED_ACCESS),
             jitter_offset: descr.jitter_offset,
             motion_vector_scale: descr.motion_vector_scale,
@@ -425,13 +451,18 @@ impl Fsr2Context {
         let index = self.current_frame % phase_count as usize;
         let mut jitter_x = 0.0;
         let mut jitter_y = 0.0;
-        let error = unsafe { ffxFsr2GetJitterOffset(&mut jitter_x, &mut jitter_y, index as i32, phase_count as u32) };
+        let error = unsafe {
+            ffxFsr2GetJitterOffset(&mut jitter_x, &mut jitter_y, index as i32, phase_count as u32)
+        };
         check_fsr2_error(error)?;
         Ok((jitter_x, jitter_y))
     }
 
     /// Get the recommended render resolution based on a quality setting and the current display resolution.
-    pub fn get_render_resolution(&mut self, quality_mode: FfxFsr2QualityMode) -> Result<FfxDimensions2D> {
+    pub fn get_render_resolution(
+        &mut self,
+        quality_mode: FfxFsr2QualityMode,
+    ) -> Result<FfxDimensions2D> {
         let mut render_width = 0;
         let mut render_height = 0;
         let err = unsafe {
@@ -455,7 +486,11 @@ impl Fsr2Context {
     /// If `max_render_size` is set to `None`, it is assumed to be equal to `display_size`.
     /// Prefer setting `max_render_size` as low as possible to save memory.
     /// If the new display size and max render size are the same as the old values, this function is a no-op.
-    pub fn set_display_resolution(&mut self, display_size: FfxDimensions2D, max_render_size: Option<FfxDimensions2D>) -> Result<()> {
+    pub fn set_display_resolution(
+        &mut self,
+        display_size: FfxDimensions2D,
+        max_render_size: Option<FfxDimensions2D>,
+    ) -> Result<()> {
         // Create new context if something changed
         let max_render_size = max_render_size.unwrap_or(display_size);
         if display_size.width == self.display_size.width

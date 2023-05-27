@@ -9,9 +9,9 @@ use ash::vk::{DeviceMemory, DeviceSize, MemoryRequirements};
 use gpu_allocator::vulkan as vk_alloc;
 use gpu_allocator::vulkan::AllocationScheme;
 
-use crate::{Allocator, Device, Error, PhysicalDevice, VkInstance};
 use crate::allocator::memory_type::MemoryType;
 use crate::allocator::traits;
+use crate::{Allocator, Device, Error, PhysicalDevice, VkInstance};
 
 /// The default allocator. This calls into the `gpu_allocator` crate.
 /// It's important to note that this allocator is `Clone`, `Send` and `Sync`. All its internal state is safely
@@ -72,17 +72,23 @@ impl DefaultAllocator {
     /// let mut allocator = DefaultAllocator::new(&instance, &device, &physical_device)?;
     /// // Use allocator.
     /// ```
-    pub fn new(instance: &VkInstance, device: &Device, physical_device: &PhysicalDevice) -> Result<Self> {
+    pub fn new(
+        instance: &VkInstance,
+        device: &Device,
+        physical_device: &PhysicalDevice,
+    ) -> Result<Self> {
         Ok(Self {
-            alloc: Arc::new(Mutex::new(vk_alloc::Allocator::new(&vk_alloc::AllocatorCreateDesc {
-                instance: (*instance).clone(),
-                // SAFETY: The user passed in a valid Device reference.
-                device: unsafe { device.handle() },
-                // SAFETY: The user passed in a valid PhysicalDevice reference.
-                physical_device: unsafe { physical_device.handle() },
-                debug_settings: Default::default(),
-                buffer_device_address: true,
-            })?)),
+            alloc: Arc::new(Mutex::new(vk_alloc::Allocator::new(
+                &vk_alloc::AllocatorCreateDesc {
+                    instance: (*instance).clone(),
+                    // SAFETY: The user passed in a valid Device reference.
+                    device: unsafe { device.handle() },
+                    // SAFETY: The user passed in a valid PhysicalDevice reference.
+                    physical_device: unsafe { physical_device.handle() },
+                    debug_settings: Default::default(),
+                    buffer_device_address: true,
+                },
+            )?)),
         })
     }
 }
@@ -125,7 +131,12 @@ impl Allocator for DefaultAllocator {
     ///     Ok(())
     /// }
     /// ```
-    fn allocate(&mut self, name: &'static str, requirements: &MemoryRequirements, ty: MemoryType) -> Result<Self::Allocation> {
+    fn allocate(
+        &mut self,
+        name: &'static str,
+        requirements: &MemoryRequirements,
+        ty: MemoryType,
+    ) -> Result<Self::Allocation> {
         let mut alloc = self.alloc.lock().map_err(|_| Error::PoisonError)?;
         let allocation = alloc.allocate(&vk_alloc::AllocationCreateDesc {
             name,

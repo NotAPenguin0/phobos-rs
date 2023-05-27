@@ -5,8 +5,10 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{Allocator, CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffer, PipelineCache};
 use crate::command_buffer::command_pool::CommandPool;
+use crate::{
+    Allocator, CmdBuffer, DescriptorCache, Device, Error, Fence, IncompleteCmdBuffer, PipelineCache,
+};
 
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics and transfer queues could point to the same hardware queue. Synchronization for this is handled for you.
@@ -67,10 +69,19 @@ pub struct Queue {
 }
 
 impl Queue {
-    pub(crate) fn new(device: Device, queue: Arc<Mutex<DeviceQueue>>, info: QueueInfo, family_properties: vk::QueueFamilyProperties) -> Result<Self> {
+    pub(crate) fn new(
+        device: Device,
+        queue: Arc<Mutex<DeviceQueue>>,
+        info: QueueInfo,
+        family_properties: vk::QueueFamilyProperties,
+    ) -> Result<Self> {
         // We create a transient command pool because command buffers will be allocated and deallocated
         // frequently.
-        let pool = CommandPool::new(device.clone(), info.family_index, vk::CommandPoolCreateFlags::TRANSIENT)?;
+        let pool = CommandPool::new(
+            device.clone(),
+            info.family_index,
+            vk::CommandPoolCreateFlags::TRANSIENT,
+        )?;
         Ok(Queue {
             device,
             queue,
@@ -158,8 +169,12 @@ impl Queue {
 
     /// Instantly delete a command buffer, without taking synchronization into account.
     /// This function **must** be externally synchronized.
-    pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer<A>, A: Allocator>(&self, cmd: vk::CommandBuffer) -> Result<()> {
-        self.device.free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd));
+    pub(crate) unsafe fn free_command_buffer<CmdBuf: CmdBuffer<A>, A: Allocator>(
+        &self,
+        cmd: vk::CommandBuffer,
+    ) -> Result<()> {
+        self.device
+            .free_command_buffers(self.pool.handle(), std::slice::from_ref(&cmd));
         Ok(())
     }
 
