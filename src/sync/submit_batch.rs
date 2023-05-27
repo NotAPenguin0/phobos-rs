@@ -94,7 +94,7 @@ impl<D: ExecutionDomain + 'static, A: Allocator> SubmitBatch<D, A> {
     pub fn submit_for_present(
         &mut self,
         cmd: CommandBuffer<D>,
-        ifc: &InFlightContext,
+        ifc: InFlightContext,
         pool: LocalPool<A>,
     ) -> Result<SubmitHandle> {
         self.submit_for_present_after(cmd, ifc, pool, &[], &[])
@@ -106,7 +106,7 @@ impl<D: ExecutionDomain + 'static, A: Allocator> SubmitBatch<D, A> {
     pub fn submit_for_present_after(
         &mut self,
         cmd: CommandBuffer<D>,
-        ifc: &InFlightContext,
+        ifc: InFlightContext,
         pool: LocalPool<A>,
         submits: &[SubmitHandle],
         wait_stages: &[PipelineStage],
@@ -123,7 +123,7 @@ impl<D: ExecutionDomain + 'static, A: Allocator> SubmitBatch<D, A> {
             .map(|handle| self.get_submit_semaphore(*handle).unwrap())
             .collect::<Vec<_>>();
         let mut wait_stages = wait_stages.to_vec();
-        let frame_wait_semaphore = ifc.wait_semaphore.clone();
+        let frame_wait_semaphore = ifc.wait_semaphore;
         // Add this semaphore as a wait semaphore for the first submit, or to the frame commands if there is no other submit
         match self.submits.first_mut() {
             None => {
@@ -138,7 +138,7 @@ impl<D: ExecutionDomain + 'static, A: Allocator> SubmitBatch<D, A> {
 
         self.submits.push(SubmitInfo {
             cmd,
-            signal_semaphore: Some(ifc.signal_semaphore.clone()),
+            signal_semaphore: Some(ifc.signal_semaphore),
             wait_semaphores,
             wait_stages,
         });
@@ -152,7 +152,7 @@ impl<D: ExecutionDomain + 'static, A: Allocator> SubmitBatch<D, A> {
     pub fn submit_for_present_after_all(
         &mut self,
         cmd: CommandBuffer<D>,
-        ifc: &InFlightContext,
+        ifc: InFlightContext,
         pool: LocalPool<A>,
         wait_stage: PipelineStage,
     ) -> Result<SubmitHandle> {
