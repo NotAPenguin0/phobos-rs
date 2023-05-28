@@ -32,6 +32,7 @@ together with a rendering engine using it, so features are currently added as ne
 - Easily batch together submits into one `vkQueueSubmit` call and synchronize them with semaphores using
   the `SubmitBatch` utility.
 - Automatically create a shader binding table for your ray tracing pipeline.
+- Object pools for reusing fences, local allocators, etc.
 
 ## What does Phobos not do?
 
