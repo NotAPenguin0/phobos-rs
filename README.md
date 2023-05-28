@@ -33,6 +33,7 @@ together with a rendering engine using it, so features are currently added as ne
   the `SubmitBatch` utility.
 - Automatically create a shader binding table for your ray tracing pipeline.
 - Object pools for reusing fences, local allocators, etc.
+- Easy integration with FSR2 through the [`fsr2-sys`](https://crates.io/crates/fsr2-sys) crate.
 
 ## What does Phobos not do?
 
