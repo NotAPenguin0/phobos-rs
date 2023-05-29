@@ -26,6 +26,8 @@ together with a rendering engine using it, so features are currently added as ne
 - Descriptor sets are completely hidden. Simply bind resources directly to the command buffer.
 - Automatic pipeline management.
 - Shader reflection to automatically generate pipeline layouts.
+  - Works for both GLSL and HLSL.
+  - Currently only one can be enabled at a time.
 - Automatic double buffering of resources that need it.
 - A linear allocator for per-frame allocations like uniform buffers.
 - Typed command buffers per queue type.
@@ -35,6 +37,7 @@ together with a rendering engine using it, so features are currently added as ne
 - Automatically create a shader binding table for your ray tracing pipeline.
 - Object pools for reusing fences, local allocators, etc.
 - Easy integration with FSR2 through the [`fsr2-sys`](https://crates.io/crates/fsr2-sys) crate.
+-
 
 ## What does Phobos not do?
 
