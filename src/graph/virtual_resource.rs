@@ -5,6 +5,8 @@ use std::fmt::{Display, Formatter};
 use crate::graph::resource::ResourceType;
 
 /// Represents a virtual resource in the system, uniquely identified by a string.
+///
+/// Note that the resource named `swapchain` is assumed to always be the swapchain resource for presenting.
 #[derive(Debug, Default, Clone, Hash, Eq, PartialEq)]
 pub struct VirtualResource {
     pub(crate) name: String,
@@ -26,6 +28,14 @@ impl Display for HashedResource {
 }
 
 impl VirtualResource {
+    pub(crate) fn final_image(name: impl Into<String>) -> Self {
+        VirtualResource {
+            name: name.into(),
+            version: usize::MAX,
+            ty: ResourceType::Image,
+        }
+    }
+
     /// Create a new image virtual resource.
     pub fn image(name: impl Into<String>) -> Self {
         VirtualResource {
@@ -104,7 +114,11 @@ impl VirtualResource {
 
 impl Display for VirtualResource {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.name(), String::from_utf8(vec![b'+'; self.version]).unwrap())
+        if self.version == usize::MAX {
+            write!(f, "{}_final", self.name())
+        } else {
+            write!(f, "{}{}", self.name(), String::from_utf8(vec![b'+'; self.version]).unwrap())
+        }
     }
 }
 

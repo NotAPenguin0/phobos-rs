@@ -114,7 +114,7 @@ impl ExampleApp for Basic {
         ];
 
         // Define a render graph with one pass that clears the swapchain image
-        let graph = PassGraph::new(Some(&swap_resource));
+        let graph = PassGraph::new();
 
         let mut pool = LocalPool::new(ctx.pool.clone())?;
 

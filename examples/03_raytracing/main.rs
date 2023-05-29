@@ -376,7 +376,7 @@ impl ExampleApp for RaytracingSample {
             .build();
 
         let present = PassBuilder::present("present", render_pass.output(&swap).unwrap());
-        let mut graph = PassGraph::new(Some(&swap))
+        let mut graph = PassGraph::new()
             .add_pass(rt_pass)?
             .add_pass(render_pass)?
             .add_pass(present)?

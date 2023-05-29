@@ -62,12 +62,12 @@ pub(crate) type PassGraphInner<'cb, D, U, A> = Graph<
 /// Pass graph, used for synchronizing resources over a single queue.
 pub struct PassGraph<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
     pub(crate) graph:
-        TaskGraph<PassResource, PassResourceBarrier, PassNode<'cb, PassResource, D, U, A>>,
+    TaskGraph<PassResource, PassResourceBarrier, PassNode<'cb, PassResource, D, U, A>>,
     // Note that this is guaranteed to be stable.
     // This is because the only time indices are invalidated is when deleting a node, and even then only the last
     // index is invalidated. Since the source is always the first node, this is never invalidated.
     source: NodeIndex,
-    swapchain: Option<VirtualResource>,
+    swapchain_final: VirtualResource,
     last_usages: HashMap<String, (usize, PipelineStage)>,
 }
 
@@ -167,14 +167,12 @@ macro_rules! barriers {
 }
 
 impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
-    /// Create a new task graph. If rendering to a swapchain, also give it the virtual resource you are planning to use for this.
-    /// This is necessary for proper synchronization.
-    /// There is a tracking issue for improving this part of the API, see <https://github.com/NotAPenguin0/phobos-rs/issues/16>
-    pub fn new(swapchain: Option<&VirtualResource>) -> Self {
+    /// Create a new task graph.
+    pub fn new() -> Self {
         let mut graph = PassGraph {
             graph: TaskGraph::new(),
             source: NodeIndex::default(),
-            swapchain: swapchain.cloned(),
+            swapchain_final: VirtualResource::final_image("swapchain"),
             last_usages: Default::default(),
         };
 
@@ -341,11 +339,9 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
         let Node::Task(source) = self.graph.graph.node_weight_mut(self.source).unwrap() else { panic!("Graph does not have a source node"); };
         // For each output, look for the last usage of this resource in the frame.
         for output in &mut source.outputs {
-            // Will only succeed if swapchain is set and this resource is the swapchain
-            let default = VirtualResource::image("__none__internal__");
             if output
                 .resource
-                .is_associated_with(self.swapchain.as_ref().unwrap_or(&default))
+                .is_associated_with(&self.swapchain_final)
             {
                 output.stage = PipelineStage::COLOR_ATTACHMENT_OUTPUT;
             } else {

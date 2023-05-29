@@ -389,7 +389,7 @@ impl ExampleApp for Fsr2Sample {
             })
             .build();
 
-        let graph = PassGraph::new(Some(&swapchain));
+        let graph = PassGraph::new();
         let graph = graph
             .add_pass(PassBuilder::present("present", output_pass.output(&swapchain).unwrap()))?
             .add_pass(render_pass)?
