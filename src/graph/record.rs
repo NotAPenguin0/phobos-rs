@@ -387,7 +387,7 @@ fn record_node<'q, D: ExecutionDomain, U, A: Allocator>(
 impl<'cb, D: ExecutionDomain, U, A: Allocator> RecordGraphToCommandBuffer<D, U, A>
     for BuiltPassGraph<'cb, D, U, A>
 {
-    /// Record the rendergraph to the command buffer. This will pass `user_data` along to every pass executor in the graph.
+    /// Record the render graph to the command buffer. This will pass `user_data` along to every pass executor in the graph.
     fn record<'q>(
         &mut self,
         mut cmd: IncompleteCommandBuffer<'q, D, A>,

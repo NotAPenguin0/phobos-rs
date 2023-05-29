@@ -50,6 +50,8 @@ struct PipelineCacheInner<A: Allocator> {
 /// [`PipelineCache::create_named_pipeline`].
 ///
 /// This struct is `Clone`, `Send` and `Sync`.
+///
+/// This should generally be accessed through a global [`ResourcePool`](crate::pool::ResourcePool)
 /// # Example usage
 /// ```
 /// use phobos::prelude::*;

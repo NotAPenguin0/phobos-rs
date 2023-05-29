@@ -20,7 +20,7 @@ pub enum PhysicalResource {
 /// ```
 /// use phobos::prelude::*;
 ///
-/// let resource = VirtualResource::new("image");
+/// let resource = VirtualResource::image("image");
 /// let image = Image::new(/*...*/);
 /// let view = image.view(vk::ImageAspectFlags::COLOR)?;
 /// let mut bindings = PhysicalResourceBindings::new();

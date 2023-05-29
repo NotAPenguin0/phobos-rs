@@ -1,9 +1,9 @@
 //! Deals with wrappers for creating and managing Vulkan pipeline objects and their related objects.
 //!
-//! This is a helper that manages creating pipelines, obtaining reflection information from them (if the `shader-reflection` feature is enabled).
+//! The pipeline cache is a helper that manages creating pipelines, obtaining reflection information from them (if the `shader-reflection` feature is enabled).
 //! You probably only want one of these in the entire application. Since it's used everywhere, to ensure safe access
 //! is possible, the inner state of a [`PipelineCache`](crate::PipelineCache) is wrapped in an `Arc<RwLock<PipelineCacheInner>>`,
-//! so this is `Send`, `Sync` and `Clone`.
+//! so this is `Send`, `Sync` and `Clone`. An instance of this is included in the [`ResourcePool`](crate::pool::ResourcePool).
 //!
 //! # Example
 //! The following example uses the [`PipelineBuilder`](crate::PipelineBuilder) utility to make a graphics pipeline and add it to the pipeline cache.
@@ -53,8 +53,8 @@
 
 use ash::vk;
 
-use crate::pipeline::raytracing::ShaderBindingTable;
 use crate::{Allocator, Device};
+use crate::pipeline::raytracing::ShaderBindingTable;
 
 pub mod builder;
 pub mod cache;
