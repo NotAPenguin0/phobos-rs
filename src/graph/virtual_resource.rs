@@ -12,8 +12,10 @@ pub struct VirtualResource {
     ty: ResourceType,
 }
 
+/// Holds a hashed resource in the pass graph implementation
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub struct HashedResource {
+    /// Hash of the resource
     pub hash: u64,
 }
 

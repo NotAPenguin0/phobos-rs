@@ -18,7 +18,7 @@ use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
-use crate::graph::task_graph::{Node, Resource};
+use crate::graph::task_graph::Node;
 use crate::pool::LocalPool;
 use crate::sync::domain::ExecutionDomain;
 
