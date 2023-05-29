@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -19,6 +21,7 @@ use phobos::pool::ResourcePool;
 use phobos::prelude::*;
 use phobos::sync::submit_batch::SubmitBatch;
 
+#[allow(dead_code)]
 pub fn front_direction(rotation: Vec3) -> Vec3 {
     let cos_pitch = rotation.x.cos();
     let cos_yaw = rotation.y.cos();

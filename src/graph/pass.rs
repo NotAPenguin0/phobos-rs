@@ -175,16 +175,24 @@ pub struct Pass<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator
     pub(crate) is_renderpass: bool,
 }
 
+/// Represents a clear color for an attachment. The variant used should match
+/// the type of the attachment.
 #[derive(Copy, Clone, Debug)]
 pub enum ClearColor {
+    /// Clear color for a floating point attachment
     Float([f32; 4]),
+    /// Clear color for an integer attachment
     Int([i32; 4]),
+    /// Clear color for an unsigned integer attachment
     Uint([u32; 4]),
 }
 
+/// Represents a clear value for Depth/Stencil attachmemts.
 #[derive(Copy, Clone, Default, Debug)]
 pub struct ClearDepthStencil {
+    /// Depth buffer clear value
     pub depth: f32,
+    /// Stencil buffer clear value
     pub stencil: u32,
 }
 
