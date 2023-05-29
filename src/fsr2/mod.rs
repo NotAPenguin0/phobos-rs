@@ -345,7 +345,7 @@ impl Fsr2Context {
             let phys_device = VkPhysicalDevice::from_raw(info.physical_device.as_raw());
             let device = VkDevice::from_raw(info.device.as_raw());
 
-            let data_pool = Pool::new(|size| unsafe {
+            let data_pool = Pool::new(|size| {
                 Ok(BackendData(Box::new_zeroed_slice(*size).assume_init()))
             })?;
 

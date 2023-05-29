@@ -264,7 +264,7 @@ impl ExampleApp for Fsr2Sample {
         Ok(())
     }
 
-    fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<SubmitBatch<All>> {
+    fn frame(&mut self, ctx: Context, ifc: InFlightContext) -> Result<SubmitBatch<All>> {
         self.deferred_delete.next_frame();
 
         let swapchain = image!("swapchain");

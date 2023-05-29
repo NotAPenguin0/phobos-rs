@@ -6,22 +6,22 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
+use petgraph::{Incoming, Outgoing};
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
-use petgraph::{Incoming, Outgoing};
 
-use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::{
+    Allocator, BufferView, DebugMessenger, Error, ImageView, PassGraph,
+    PhysicalResourceBindings,
+};
 use crate::command_buffer::IncompleteCommandBuffer;
+use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::graph::pass_graph::{BuiltPassGraph, PassNode, PassResource, PassResourceBarrier};
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::graph::task_graph::{Node, Resource};
 use crate::pool::LocalPool;
 use crate::sync::domain::ExecutionDomain;
-use crate::{
-    Allocator, BufferView, DebugMessenger, Error, ImageView, InFlightContext, PassGraph,
-    PhysicalResourceBindings,
-};
 
 /// Implement this on a type to be able to record this type to a command buffer.
 pub trait RecordGraphToCommandBuffer<D: ExecutionDomain, U, A: Allocator> {

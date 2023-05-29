@@ -69,17 +69,15 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::vk;
 
-use crate::allocator::scratch_allocator::ScratchAllocatorCreateInfo;
+use crate::{
+    Allocator, AppSettings, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence,
+    Image, ImageView, Semaphore, Surface, Swapchain, VkInstance, WindowInterface,
+};
 use crate::pool::{Poolable, Pooled, ResourcePool};
 use crate::sync::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
 use crate::util::deferred_delete::DeletionQueue;
 use crate::wsi::swapchain::SwapchainImage;
-use crate::{
-    Allocator, AppSettings, BufferView, CmdBuffer, DefaultAllocator, Device, Error,
-    ExecutionManager, Fence, Image, ImageView, ScratchAllocator, Semaphore, Surface, Swapchain,
-    VkInstance, WindowInterface,
-};
 
 /// Information stored for each in-flight frame.
 #[derive(Derivative)]

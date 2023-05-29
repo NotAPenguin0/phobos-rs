@@ -77,6 +77,10 @@
 use anyhow::{anyhow, bail, Result};
 use ash::vk;
 
+use crate::{
+    Allocator, ComputeSupport, DefaultAllocator, Device, Error, ImageView,
+    PhysicalResourceBindings, VirtualResource,
+};
 use crate::command_buffer::IncompleteCommandBuffer;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::{Fsr2DispatchDescription, Fsr2DispatchResources};
@@ -86,10 +90,6 @@ use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
 use crate::pool::LocalPool;
 use crate::sync::domain::ExecutionDomain;
-use crate::{
-    Allocator, ComputeSupport, DefaultAllocator, Device, Error, ImageView, InFlightContext,
-    PhysicalResourceBindings, VirtualResource,
-};
 
 /// The returned value from a pass callback function.
 pub type PassFnResult<'q, D, A> = Result<IncompleteCommandBuffer<'q, D, A>>;

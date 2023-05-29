@@ -81,6 +81,7 @@ pub struct ResourcePoolCreateInfo<A: Allocator = DefaultAllocator> {
 /// A local pool that will release its resources back to the main resource pool when it goes out of scope.
 /// Such a scope could be a frame context, or a task spawned on a background thread.
 pub struct LocalPool<A: Allocator = DefaultAllocator> {
+    #[allow(dead_code)]
     pool: ResourcePool<A>,
     vertex_allocator: Pooled<ScratchAllocator<A>>,
     index_allocator: Pooled<ScratchAllocator<A>>,
