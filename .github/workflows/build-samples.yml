@@ -1,0 +1,43 @@
+name: Build examples
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Nightly
+      run: rustup default nightly
+    - name: Build 01_basic
+      run: cargo build --verbose --example 01_basic --features shaderc
+    - name: Build 02_headless_compute
+      run: cargo build --verbose --example 02_headless_compute --features shaderc
+    - name: Build 03_raytracing
+      run: cargo build --verbose --example 03_raytracing --features shaderc
+    - name: Build 04_fsr2
+      run: cargo build --verbose --example 04_fsr2 --features "shaderc, fsr2"
+      
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Nightly
+      run: rustup default nightly
+    - name: Build 01_basic
+      run: cargo build --verbose --example 01_basic --features shaderc
+    - name: Build 02_headless_compute
+      run: cargo build --verbose --example 02_headless_compute --features shaderc
+    - name: Build 03_raytracing
+      run: cargo build --verbose --example 03_raytracing --features shaderc
+    - name: Build 04_fsr2
+      run: cargo build --verbose --example 04_fsr2 --features "shaderc, fsr2"
