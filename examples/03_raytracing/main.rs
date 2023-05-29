@@ -5,6 +5,7 @@ use ash::vk;
 use glam::{Mat4, Vec3};
 use log::{info, trace};
 
+use phobos::graph::pass::ClearColor;
 use phobos::image;
 use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
 use phobos::pool::LocalPool;
@@ -328,7 +329,7 @@ impl ExampleApp for RaytracingSample {
         })
     }
 
-    fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<SubmitBatch<All>> {
+    fn frame(&mut self, ctx: Context, ifc: InFlightContext) -> Result<SubmitBatch<All>> {
         let swap = image!("swapchain");
         let rt_image = image!("rt_out");
 
@@ -354,13 +355,7 @@ impl ExampleApp for RaytracingSample {
             .build();
 
         let render_pass = PassBuilder::render("copy")
-            .color_attachment(
-                &swap,
-                vk::AttachmentLoadOp::CLEAR,
-                Some(vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 0.0],
-                }),
-            )?
+            .clear_color_attachment(&swap, ClearColor::Float([0.0, 0.0, 0.0, 0.0]))?
             .sample_image(rt_pass.output(&rt_image).unwrap(), PipelineStage::FRAGMENT_SHADER)
             .execute_fn(|cmd, ifc, bindings, _| {
                 let vertices: Vec<f32> = vec![

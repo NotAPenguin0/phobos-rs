@@ -15,7 +15,7 @@ use phobos::{
 };
 use phobos::domain::All;
 use phobos::fsr2::Fsr2DispatchDescription;
-use phobos::graph::pass::Fsr2DispatchVirtualResources;
+use phobos::graph::pass::{ClearColor, ClearDepthStencil, Fsr2DispatchVirtualResources};
 use phobos::pool::LocalPool;
 use phobos::sync::submit_batch::SubmitBatch;
 
@@ -304,27 +304,14 @@ impl ExampleApp for Fsr2Sample {
         let mut pool = LocalPool::new(ctx.pool.clone())?;
 
         let render_pass = PassBuilder::render("main_render")
-            .color_attachment(
-                &color,
-                vk::AttachmentLoadOp::CLEAR,
-                Some(vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 0.0],
-                }),
-            )?
-            .color_attachment(
-                &motion_vectors,
-                vk::AttachmentLoadOp::CLEAR,
-                Some(vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 0.0],
-                }),
-            )?
-            .depth_attachment(
+            .clear_color_attachment(&color, ClearColor::Float([0.0, 0.0, 0.0, 0.0]))?
+            .clear_color_attachment(&motion_vectors, ClearColor::Float([0.0, 0.0, 0.0, 0.0]))?
+            .clear_depth_attachment(
                 &depth,
-                vk::AttachmentLoadOp::CLEAR,
-                Some(vk::ClearDepthStencilValue {
+                ClearDepthStencil {
                     depth: 0.0,
                     stencil: 0,
-                }),
+                },
             )?
             .execute_fn(|cmd, pool, _, _| {
                 ubo_struct_assign!(data, pool,
@@ -379,13 +366,7 @@ impl ExampleApp for Fsr2Sample {
         let fsr2_pass = PassBuilder::fsr2(ctx.device.clone(), fsr2_dispatch, fsr2_resources);
 
         let output_pass = PassBuilder::render("sample")
-            .color_attachment(
-                &swapchain,
-                vk::AttachmentLoadOp::CLEAR,
-                Some(vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 0.0],
-                }),
-            )?
+            .clear_color_attachment(&swapchain, ClearColor::Float([0.0, 0.0, 0.0, 0.0]))?
             .sample_image(
                 fsr2_pass.output(&color_upscaled).unwrap(),
                 PipelineStage::FRAGMENT_SHADER,
