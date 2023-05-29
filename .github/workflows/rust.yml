@@ -1,4 +1,4 @@
-name: Rust
+name: Build library
 
 on:
   push:
@@ -11,7 +11,6 @@ env:
 
 jobs:
   build-linux:
-
     runs-on: ubuntu-latest
 
     steps:
@@ -20,6 +19,7 @@ jobs:
       run: rustup default nightly
     - name: Build
       run: cargo build --verbose
+      
   build-windows:
     runs-on: windows-latest
 
@@ -29,3 +29,5 @@ jobs:
       run: rustup default nightly
     - name: Build
       run: cargo build --verbose
+    - name: Build with all features
+      run: cargo build --verbose --all-features
