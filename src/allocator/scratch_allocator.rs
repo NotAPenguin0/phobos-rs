@@ -32,12 +32,14 @@ use anyhow::Result;
 use ash::vk;
 use gpu_allocator::AllocationError::OutOfMemory;
 
-use crate::pool::Poolable;
-use crate::Error::AllocationError;
 use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};
+use crate::Error::AllocationError;
+use crate::pool::Poolable;
 
+/// Info needed to create a scratch allocator in a resource pool
 #[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub struct ScratchAllocatorCreateInfo {
+    /// Usage flags for the internally created buffer
     pub usage: vk::BufferUsageFlags,
 }
 

@@ -1,3 +1,5 @@
+//! Exposes resource pools for reusing objects
+
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
@@ -72,9 +74,13 @@ pub struct ResourcePool<A: Allocator = DefaultAllocator> {
     pub fences: Pool<Fence<()>>,
 }
 
+/// Information needed to create a resource pool
 pub struct ResourcePoolCreateInfo<A: Allocator = DefaultAllocator> {
+    /// Vulkan device object
     pub device: Device,
+    /// GPU memory allocated
     pub allocator: A,
+    /// Size of scratch allocators in this pool
     pub scratch_size: u64,
 }
 
@@ -205,6 +211,7 @@ impl<A: Allocator + 'static> ResourcePool<A> {
 }
 
 impl<A: Allocator> ResourcePool<A> {
+    /// Get a new scratch allocator from the pool with specified usage flags
     pub fn get_scratch_allocator(
         &self,
         usage: vk::BufferUsageFlags,
@@ -217,6 +224,7 @@ impl<A: Allocator> ResourcePool<A> {
         )
     }
 
+    /// Advance internal caches to reclaim resources when possible
     pub fn next_frame(&self) {
         self.pipelines.next_frame();
         self.descriptors.next_frame();
@@ -224,6 +232,7 @@ impl<A: Allocator> ResourcePool<A> {
 }
 
 impl<A: Allocator> LocalPool<A> {
+    /// Create a new local pool from a global resource pool
     pub fn new(pool: ResourcePool<A>) -> Result<Self> {
         let vertex_alloc = pool.get_scratch_allocator(
             vk::BufferUsageFlags::TRANSFER_DST
