@@ -4,15 +4,17 @@ use anyhow::Result;
 use ash::vk;
 use glam::{Mat4, Vec3};
 use log::{info, trace};
+
 use phobos::image;
 use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
+use phobos::pool::LocalPool;
 use phobos::prelude::*;
 use phobos::sync::domain::{All, Compute};
 use phobos::sync::submit_batch::SubmitBatch;
 use phobos::util::align::align;
 
 use crate::example_runner::{
-    create_shader, load_spirv_file, save_dotfile, Context, ExampleApp, ExampleRunner, WindowContext,
+    Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, save_dotfile, WindowContext,
 };
 
 #[path = "../example_runner/lib.rs"]
@@ -219,7 +221,7 @@ impl ExampleApp for RaytracingSample {
         // Create a command buffer. Building acceleration structures is done on a compute command buffer.
         let cmd = ctx
             .exec
-            .on_domain::<Compute, DefaultAllocator>(None, None)?
+            .on_domain::<Compute>()?
             // Building an acceleration structure is just a single command
             .build_acceleration_structure(&blas_build_info)?
             // This barrier is required!
@@ -251,7 +253,7 @@ impl ExampleApp for RaytracingSample {
         // Submit compacting and TLAS build command
         let cmd = ctx
             .exec
-            .on_domain::<Compute, DefaultAllocator>(None, None)?
+            .on_domain::<Compute>()?
             // Build instance TLAS
             // Compact triangle BLAS
             .compact_acceleration_structure(&blas.accel, &compact_as)?
@@ -277,7 +279,7 @@ impl ExampleApp for RaytracingSample {
             .add_ray_hit_group(Some(rchit), None)
             .add_ray_miss_group(rmiss)
             .build();
-        ctx.pipelines.create_named_raytracing_pipeline(pci)?;
+        ctx.pool.pipelines.create_named_raytracing_pipeline(pci)?;
 
         // Create the pipeline for drawing the raytraced result to the screen
         let vertex = create_shader("examples/data/vert.spv", vk::ShaderStageFlags::VERTEX);
@@ -293,7 +295,7 @@ impl ExampleApp for RaytracingSample {
             .attach_shader(vertex.clone())
             .attach_shader(fragment)
             .build();
-        ctx.pipelines.create_named_pipeline(pci)?;
+        ctx.pool.pipelines.create_named_pipeline(pci)?;
 
         let attachment = Image::new(
             ctx.device.clone(),
@@ -329,6 +331,9 @@ impl ExampleApp for RaytracingSample {
     fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<SubmitBatch<All>> {
         let swap = image!("swapchain");
         let rt_image = image!("rt_out");
+
+        let mut pool = LocalPool::new(ctx.pool.clone())?;
+
         let rt_pass = PassBuilder::new("raytrace")
             .write_storage_image(&rt_image, PipelineStage::RAY_TRACING_SHADER_KHR)
             .execute_fn(|cmd, ifc, bindings, _| {
@@ -383,15 +388,13 @@ impl ExampleApp for RaytracingSample {
             .build()?;
 
         let mut bindings = PhysicalResourceBindings::new();
-        bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
+        bindings.bind_image("swapchain", &ifc.swapchain_image);
         bindings.bind_image("rt_out", &self.attachment_view);
-        let cmd = ctx
-            .exec
-            .on_domain::<All, _>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))?;
-        let cmd = graph.record(cmd, &bindings, &mut ifc, None, &mut ())?;
+        let cmd = ctx.exec.on_domain::<All>()?;
+        let cmd = graph.record(cmd, &bindings, &mut pool, None, &mut ())?;
         let cmd = cmd.finish()?;
         let mut batch = ctx.exec.start_submit_batch()?;
-        batch.submit_for_present(cmd, &ifc)?;
+        batch.submit_for_present(cmd, ifc, pool)?;
         Ok(batch)
     }
 }
