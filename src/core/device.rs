@@ -3,9 +3,8 @@
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, NulError};
 use std::fmt::Formatter;
-use std::mem::ManuallyDrop;
 use std::ops::Deref;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 
 use anyhow::Result;
 use ash::extensions::{ext, khr};
@@ -13,12 +12,12 @@ use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxDimensions2D;
 
+use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2ContextCreateInfo;
 use crate::util::string::unwrap_to_raw_strings;
-use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
 
 /// Device extensions that phobos requests but might not be available.
 /// # Example
