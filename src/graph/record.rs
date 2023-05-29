@@ -310,7 +310,7 @@ fn record_image_barrier<'q, D: ExecutionDomain, A: Allocator>(
         p_image_memory_barriers: &vk_barrier,
     };
 
-    Ok(cmd.pipeline_barrier_2(&dependency))
+    Ok(cmd.pipeline_barrier(&dependency))
 }
 
 fn record_buffer_barrier<'q, D: ExecutionDomain, A: Allocator>(
@@ -341,7 +341,7 @@ fn record_buffer_barrier<'q, D: ExecutionDomain, A: Allocator>(
         p_image_memory_barriers: std::ptr::null(),
     };
 
-    Ok(cmd.pipeline_barrier_2(&dependency))
+    Ok(cmd.pipeline_barrier(&dependency))
 }
 
 fn record_barrier<'q, D: ExecutionDomain, A: Allocator>(
