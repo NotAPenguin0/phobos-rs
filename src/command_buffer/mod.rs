@@ -20,10 +20,11 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{
-    Allocator, CmdBuffer, DefaultAllocator, DescriptorCache, DescriptorSetBuilder, Device, Error,
+    Allocator, CmdBuffer, DefaultAllocator, DescriptorCache, Device, Error,
     ExecutionManager, PipelineCache,
 };
 use crate::core::queue::Queue;
+use crate::descriptor::builder::DescriptorSetBuilder;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::sync::domain::ExecutionDomain;
 

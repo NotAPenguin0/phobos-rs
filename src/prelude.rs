@@ -17,7 +17,6 @@ pub use crate::core::init::*;
 pub use crate::core::instance::Instance;
 pub use crate::core::physical_device::*;
 pub use crate::core::queue::QueueType;
-pub use crate::descriptor::builder::DescriptorSetBuilder;
 pub use crate::descriptor::cache::DescriptorCache;
 pub use crate::descriptor::descriptor_set::DescriptorSet;
 pub use crate::graph::pass::{Pass, PassBuilder};

@@ -29,8 +29,9 @@ use crate::raytracing::acceleration_structure::AccelerationStructure;
 /// ```
 #[cfg(feature = "shader-reflection")]
 #[derive(Debug)]
-pub struct DescriptorSetBuilder<'a> {
+pub(crate) struct DescriptorSetBuilder<'a> {
     inner: DescriptorSetBinding,
+    #[allow(dead_code)]
     reflection: Option<&'a ReflectionInfo>,
 }
 
@@ -79,6 +80,7 @@ impl<'r> DescriptorSetBuilder<'r> {
     /// Create a new empty descriptor set builder with associated reflection information.
     /// This enables the usage of the `bind_named_xxx` set of functions.
     #[cfg(feature = "shader-reflection")]
+    #[allow(dead_code)]
     pub fn with_reflection(info: &'r ReflectionInfo) -> Self {
         Self {
             inner: DescriptorSetBinding {
@@ -127,6 +129,7 @@ impl<'r> DescriptorSetBuilder<'r> {
     /// # Errors
     /// Fails if `self` was not constructed with [`DescriptorSetBuilder::with_reflection()`].
     #[cfg(feature = "shader-reflection")]
+    #[allow(dead_code)]
     pub fn bind_named_sampled_image(
         &mut self,
         name: &str,
@@ -159,6 +162,7 @@ impl<'r> DescriptorSetBuilder<'r> {
     /// # Errors
     /// Fails if `self` was not constructed with [`DescriptorSetBuilder::with_reflection()`].
     #[cfg(feature = "shader-reflection")]
+    #[allow(dead_code)]
     pub fn bind_named_uniform_buffer(&mut self, name: &str, buffer: &BufferView) -> Result<()> {
         let Some(info) = self.reflection else { return Err(Error::NoReflectionInformation.into()); };
         let binding = info

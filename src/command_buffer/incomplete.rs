@@ -9,20 +9,21 @@ use anyhow::{anyhow, ensure, Result};
 use ash::vk;
 
 use crate::{
-    Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder,
-    Device, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, PipelineStage,
-    Sampler, VirtualResource,
+    Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, Device, ImageView,
+    IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, PipelineStage, Sampler,
+    VirtualResource,
 };
 use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
+use crate::descriptor::builder::DescriptorSetBuilder;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::query_pool::{QueryPool, ScopedQuery, TimestampQuery};
 use crate::raytracing::acceleration_structure::AccelerationStructure;
 use crate::sync::domain::ExecutionDomain;
 
 impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A>
-    for IncompleteCommandBuffer<'q, D, A>
+for IncompleteCommandBuffer<'q, D, A>
 {
     type Domain = D;
 

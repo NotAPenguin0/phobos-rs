@@ -5,8 +5,7 @@
 //!
 //! The descriptor pool automatically grows as more descriptors are allocated, removing the need to declare its size upfront.
 //!
-//! Binding descriptor sets is handled directly through the command buffer. This functionality is only available if the command
-//! buffer was created using a descriptor and pipeline cache.
+//! Binding descriptor sets is handled directly through the command buffer. For information on this API, see [`IncompleteCommandBuffer`](crate::command_buffer::IncompleteCommandBuffer).
 //!
 //! # Example
 //! ```
@@ -15,7 +14,7 @@
 //! fn descriptor_sets_example<A: Allocator>(device: Device, alloc: A, exec: ExecutionManager, image: &ImageView, sampler: &Sampler) -> Result<()> {
 //!     let descriptors = DescriptorCache::new(device.clone())?;
 //!     let pipelines = PipelineCache::new(device.clone(), alloc)?;
-//!     let cmd = exec.on_domain::<domain::All, A>(Some(pipelines), Some(cache))?
+//!     let cmd = exec.on_domain::<domain::All>()?
 //!         .bind_graphics_pipeline("my_pipeline")?
 //!         // In GLSL: layout(set = 0, binding = 0) uniform sampler2D tex;
 //!         .bind_sampled_image(0, 0, image, &sampler)?
