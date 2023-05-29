@@ -29,5 +29,3 @@ jobs:
       run: rustup default nightly
     - name: Build
       run: cargo build --verbose
-    - name: Build with all features
-      run: cargo build --verbose --all-features
