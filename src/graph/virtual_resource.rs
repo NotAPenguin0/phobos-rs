@@ -7,7 +7,7 @@ use crate::graph::resource::ResourceType;
 /// Represents a virtual resource in the system, uniquely identified by a string.
 #[derive(Debug, Default, Clone, Hash, Eq, PartialEq)]
 pub struct VirtualResource {
-    pub(crate) uid: String,
+    pub(crate) name: String,
     pub(crate) version: usize,
     ty: ResourceType,
 }
@@ -25,18 +25,18 @@ impl Display for HashedResource {
 
 impl VirtualResource {
     /// Create a new image virtual resource.
-    pub fn image(uid: impl Into<String>) -> Self {
+    pub fn image(name: impl Into<String>) -> Self {
         VirtualResource {
-            uid: uid.into(),
+            name: name.into(),
             version: 0,
             ty: ResourceType::Image,
         }
     }
 
     /// Create a new buffer virtual resource.
-    pub fn buffer(uid: impl Into<String>) -> Self {
+    pub fn buffer(name: impl Into<String>) -> Self {
         VirtualResource {
-            uid: uid.into(),
+            name: name.into(),
             version: 0,
             ty: ResourceType::Buffer,
         }
@@ -46,7 +46,7 @@ impl VirtualResource {
     /// a task completes.
     pub fn upgrade(&self) -> Self {
         VirtualResource {
-            uid: self.uid.clone(),
+            name: self.name.clone(),
             version: self.version + 1,
             ty: self.ty,
         }
@@ -54,7 +54,7 @@ impl VirtualResource {
 
     /// Returns the full, original name of the resource
     pub fn name(&self) -> &str {
-        &self.uid
+        &self.name
     }
 
     /// Returns the version of a resource, the larger this the more recent the version of the resource is.
