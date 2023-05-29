@@ -1,4 +1,4 @@
-//! Contains implementations of the compute domain for command buffers
+//! Contains implementations of the graphics domain for command buffers
 
 use anyhow::{bail, Result};
 use ash::vk;
@@ -87,7 +87,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer
     /// Issue a drawcall. This will flush the current descriptor set state and actually bind the descriptor sets.
     /// Directly translates to [`vkCmdDraw`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdDraw.html).
     /// # Errors
-    /// * Fails if flushing the descriptor state fails (this can happen if there is no descriptor cache).
+    /// * Fails if flushing the descriptor state fails.
     /// # Example
     /// ```
     /// # use anyhow::Result;
@@ -123,7 +123,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer
     /// Issue an indexed drawcall. This will flush the current descriptor state and actually bind the
     /// descriptor sets. Directly translates to [`vkCmdDrawIndexed`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdDrawIndexed.html).
     /// # Errors
-    /// * Fails if flushing the descriptor state fails (this can happen if there is no descriptor cache).
+    /// * Fails if flushing the descriptor state fails.
     /// # Example
     /// ```
     /// # use anyhow::Result;
@@ -186,7 +186,6 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer
     /// Bind a graphics pipeline by name.
     /// # Errors
     /// * Fails if the pipeline was not previously registered in the pipeline cache.
-    /// * Fails if this command buffer has no pipeline cache.
     /// # Example
     /// ```
     /// # use phobos::*;
@@ -199,25 +198,23 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer
     /// }
     /// ```
     fn bind_graphics_pipeline(mut self, name: &str) -> Result<Self> {
-        {
-            let Some(rendering_state) = self.current_rendering_state.clone() else { return Err(Error::NoRenderpass.into()) };
-            let cache = self.pipeline_cache.clone();
-            cache.with_pipeline(name, rendering_state, |pipeline| {
-                self.bind_pipeline_impl(
-                    pipeline.handle,
-                    pipeline.layout,
-                    pipeline.set_layouts.clone(),
-                    vk::PipelineBindPoint::GRAPHICS,
-                )
-            })?;
-        }
+        let Some(rendering_state) = self.current_rendering_state.clone() else { return Err(Error::NoRenderpass.into()) };
+        let cache = self.pipeline_cache.clone();
+        cache.with_pipeline(name, rendering_state, |pipeline| {
+            self.bind_pipeline_impl(
+                pipeline.handle,
+                pipeline.layout,
+                pipeline.set_layouts.clone(),
+                vk::PipelineBindPoint::GRAPHICS,
+            )
+        })?;
+
         Ok(self)
     }
 
     /// Bind a ray tracing pipeline by name.
     /// # Errors
     /// * Fails if the pipeline was not previously registered in the pipeline cache.
-    /// * Fails if this command buffer has no pipeline cache.
     fn bind_ray_tracing_pipeline(mut self, name: &str) -> Result<Self>
     where
         Self: Sized, {
@@ -330,6 +327,7 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer
     }
 
     /// Set the polygon mode. Only available if `VK_EXT_extended_dynamic_state3` was enabled on device creation.
+    /// This extension is automatically requested when available.
     /// Equivalent to [`vkCmdSetPolygonModeEXT`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdSetPolygonModeEXT.html)
     /// # Example
     /// ```

@@ -10,8 +10,8 @@ use ash::vk;
 
 use crate::{
     Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder,
-    Device, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache,
-    PipelineStage, Sampler, VirtualResource,
+    Device, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, PipelineStage,
+    Sampler, VirtualResource,
 };
 use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
@@ -108,7 +108,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
             // SAFETY:
             // * self is valid, so self.handle is valid.
             // * We just verified using the ensure statement above that a pipeline is bound.
-            // * Assume index is a valid descriptor set index, otherwise we get a validation layer error
+            // * We assume index is a valid descriptor set index, otherwise we get a validation layer error
             // * Caller passed in a valid descriptor set object.
             self.device.cmd_bind_descriptor_sets(
                 self.handle,
@@ -150,7 +150,6 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
 
     /// If there are unwritten descriptor sets, update the entire descriptor set state by binding a new set.
     /// # Errors
-    /// * Fails if self was created without a descriptor cache.
     /// * Fails if the descriptor set cache lookup fails.
     /// * Fails if binding the descriptor set fails.
     pub(super) fn ensure_descriptor_state(mut self) -> Result<Self> {
@@ -221,7 +220,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
 
     /// Binds a new descriptor with descriptor type [`vk::DescriptorType::COMBINED_IMAGE_SAMPLER`]. The image bound to this is
     /// the image obtained by resolving the input resource from the given resource bindings. The sampler bound to this
-    /// is the one given. This binding is not actually flushed onto the gpu until the next draw or dispatch call.
+    /// is the one given. This binding is not actually flushed to the command buffer until the next draw or dispatch call.
     ///
     /// Expects the image to be in [`vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL`]
     /// # Errors
@@ -232,7 +231,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     /// # use phobos::sync::domain::ExecutionDomain;
     /// # use phobos::*;
     /// fn use_resolve_and_bind<'q, D: ExecutionDomain>(cmd: IncompleteCommandBuffer<'q, D>, image: &ImageView, sampler: &Sampler) -> Result<IncompleteCommandBuffer<'q, D>> {
-    ///     let resource = VirtualResource::image("image");
+    ///     let resource = image!("image");
     ///     let mut bindings = PhysicalResourceBindings::new();
     ///     bindings.bind_image("image", image);
     ///
@@ -254,7 +253,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     }
 
     /// Binds a new descriptor with type [`vk::DescriptorType::COMBINED_IMAGE_SAMPLER`].
-    /// This binding is not actually flushed onto the gpu until the next draw or dispatch call.
+    /// This binding is not actually flushed to the command buffer until the next draw or dispatch call.
     ///
     /// Expects the image to be in [`vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL`]
     /// # Errors
@@ -285,7 +284,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     }
 
     /// Binds a new descriptor with type [`vk::DescriptorType::UNIFORM_BUFFER`].
-    /// This binding is not actually flushed onto the gpu until the next draw or dispatch call.
+    /// This binding is not actually flushed to the command buffer until the next draw or dispatch call.
     /// # Errors
     /// None
     /// # Example
@@ -313,7 +312,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     }
 
     /// Binds a new descriptor with type [`vk::DescriptorType::STORAGE_BUFFER`].
-    /// This binding is not actually flushed onto the gpu until the next draw or dispatch call.
+    /// This binding is not actually flushed to the command buffer until the next draw or dispatch call.
     /// # Errors
     /// None
     /// # Example
@@ -341,7 +340,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     }
 
     /// Binds a new descriptor with type [`vk::DescriptorType::STORAGE_IMAGE`].
-    /// This binding is not actually flushed onto the gpu until the next draw or dispatch call.
+    /// This binding is not actually flushed to the command buffer until the next draw or dispatch call.
     ///
     /// Expects the image to be in [`vk::ImageLayout::GENERAL`]
     /// # Errors
@@ -366,8 +365,8 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     }
 
     /// Binds a new descriptor with descriptor type [`vk::DescriptorType::STORAGE_IMAGE`]. The image bound to this is
-    /// the image obtained by resolving the input resource from the given resource bindings. The sampler bound to this
-    /// is the one given. This binding is not actually flushed onto the gpu until the next draw or dispatch call.
+    /// the image obtained by resolving the input resource from the given resource bindings.
+    /// This binding is not actually flushed to the command buffer until the next draw or dispatch call.
     ///
     /// Expects the image to be in [`vk::ImageLayout::GENERAL`]
     /// # Errors
@@ -462,7 +461,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
             image_memory_barrier_count: 1,
             p_image_memory_barriers: &barrier,
         };
-        self.pipeline_barrier_2(&dependency)
+        self.pipeline_barrier(&dependency)
     }
 
     /// Insert a global memory barrier. If you want to create a barrier for a buffer, prefer using this as every driver
@@ -496,20 +495,20 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
             p_image_memory_barriers: std::ptr::null(),
         };
 
-        self.pipeline_barrier_2(&dependency)
+        self.pipeline_barrier(&dependency)
     }
 
-    /// The direct equivalent of a raw [`vkCmdPipelineBarrier2`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPipelineBarrier2KHR.html).
+    /// The direct equivalent of a raw [`vkCmdPipelineBarrier2`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPipelineBarrier2KHR.html) call.
     /// Before calling this, make sure there is not an automatic way to insert this barrier, for example
     /// using the pass graph or using [`IncompleteCommandBuffer::transition_image()`].
-    pub fn pipeline_barrier_2(self, dependency: &vk::DependencyInfo) -> Self {
+    pub fn pipeline_barrier(self, dependency: &vk::DependencyInfo) -> Self {
         unsafe {
             self.device.cmd_pipeline_barrier2(self.handle, dependency);
         }
         self
     }
 
-    /// Upload a single value of push constants. These are small packets of data stored inside the command buffer, so their state is tracked while executing.
+    /// Upload a single value of push constants. These are small packets of data stored inside the command buffer, so their state is tracked while recording and executing.
     /// Direct translation of [`vkCmdPushConstants`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPushConstants.html).
     /// # Example
     /// ```
@@ -529,7 +528,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
         self.push_constants(stage, offset, std::slice::from_ref(data))
     }
 
-    /// Upload push constants. These are small packets of data stored inside the command buffer, so their state is tracked while executing.
+    /// Upload push constants. These are small packets of data stored inside the command buffer, so their state is tracked while recording and executing.
     /// Direct translation of [`vkCmdPushConstants`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdPushConstants.html).
     /// # Example
     /// ```
@@ -564,7 +563,7 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     }
 
     /// Begin a scoped query. Not all query types are scoped, so the query type must implement
-    /// [`ScopedQuery`]
+    /// [`ScopedQuery`].
     pub fn begin_query<Q: ScopedQuery>(self, query_pool: &QueryPool<Q>, index: u32) -> Self {
         unsafe {
             self.device.cmd_begin_query(

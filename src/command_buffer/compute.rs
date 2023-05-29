@@ -51,8 +51,6 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer
     /// See also: [`vkCmdDispatch`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdDispatch.html)
     ///
     /// # Errors
-    /// * Fails if this required a descriptor set update and this command buffer was created without a
-    ///   descriptor cache.
     /// * Fails if updating the descriptor state fails.
     /// # Example
     /// ```
@@ -114,7 +112,8 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer
         Ok(self)
     }
 
-    /// Compact an acceleration structure. This is read operation on `src`, and a write operation on `dst`
+    /// Compact an acceleration structure. This is read operation on `src`, and a write operation on `dst`, which must both be
+    /// externally synchronized.
     fn compact_acceleration_structure(
         self,
         src: &AccelerationStructure,
@@ -139,6 +138,8 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer
     /// Write acceleration structure properties to the query pool. The property written depends on
     /// the type of the query pool passed in and is automatically inferred to be
     /// [`Q::QUERY_TYPE`].
+    ///
+    /// This is a read operation on the acceleration structures, so it must be externally synchronized.
     fn write_acceleration_structures_properties<Q: AccelerationStructurePropertyQuery>(
         self,
         src: &[AccelerationStructure],
@@ -162,16 +163,18 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer
                 first,
             );
         }
+        // Update the query pool to point to the next available query
         handles.iter().for_each(|_| {
             query_pool.next();
         });
-        // Call next()
         Ok(self)
     }
 
     /// Write acceleration structure properties to the query pool. The property written depends on
     /// the type of the query pool passed in and is automatically inferred to be
     /// [`Q::QUERY_TYPE`].
+    ///
+    /// This is a read operation on the acceleration structure, so it must be externally synchronized.
     fn write_acceleration_structure_properties<Q: AccelerationStructurePropertyQuery>(
         self,
         src: &AccelerationStructure,
