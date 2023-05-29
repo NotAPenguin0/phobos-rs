@@ -214,20 +214,28 @@ impl<A: Allocator + 'static> ExecutionManager<A> {
         let mut fence = Fence::new_in_pool(&self.pool.fences, &())?;
 
         let handle = unsafe { cmd.handle() };
-        let info = vk::SubmitInfo {
-            s_type: vk::StructureType::SUBMIT_INFO,
+
+        let command_buffer_info = vk::CommandBufferSubmitInfo {
+            s_type: vk::StructureType::COMMAND_BUFFER_SUBMIT_INFO,
             p_next: std::ptr::null(),
-            wait_semaphore_count: 0,
-            p_wait_semaphores: std::ptr::null(),
-            p_wait_dst_stage_mask: std::ptr::null(),
-            command_buffer_count: 1,
-            p_command_buffers: &handle,
-            signal_semaphore_count: 0,
-            p_signal_semaphores: std::ptr::null(),
+            command_buffer: handle,
+            device_mask: 0,
+        };
+
+        let info = vk::SubmitInfo2 {
+            s_type: vk::StructureType::SUBMIT_INFO_2,
+            p_next: std::ptr::null(),
+            flags: Default::default(),
+            wait_semaphore_info_count: 0,
+            p_wait_semaphore_infos: std::ptr::null(),
+            command_buffer_info_count: 1,
+            p_command_buffer_infos: &command_buffer_info,
+            signal_semaphore_info_count: 0,
+            p_signal_semaphore_infos: std::ptr::null(),
         };
 
         let queue = self.get_queue::<D>().ok_or_else(|| Error::NoCapableQueue)?;
-        queue.submit(std::slice::from_ref(&info), Some(&fence))?;
+        queue.submit2(std::slice::from_ref(&info), Some(&fence))?;
         let exec = self.clone();
         fence.replace(move |fence| {
             fence.with_cleanup(move || unsafe {

@@ -99,6 +99,7 @@ impl Queue {
     /// Submits a batch of submissions to the queue, and signals the given fence when the
     /// submission is done. When possible, prefer submitting through the
     /// execution manager.
+    #[deprecated(since = "0.9.0", note = "Prefer using Queue::submit2() instead to make full use of the synchronization2 feature.")]
     pub fn submit(&self, submits: &[vk::SubmitInfo], fence: Option<&Fence>) -> Result<()> {
         let fence = match fence {
             None => vk::Fence::null(),
