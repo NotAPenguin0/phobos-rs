@@ -1,10 +1,11 @@
 use std::path::Path;
 
 use anyhow::Result;
+
 use phobos::prelude::*;
 use phobos::query_pool::{PipelineStatisticsQuery, QueryPool, QueryPoolCreateInfo, TimestampQuery};
 
-use crate::example_runner::{load_spirv_file, Context, ExampleApp, ExampleRunner};
+use crate::example_runner::{Context, ExampleApp, ExampleRunner, load_spirv_file};
 
 /// This example illustrates using compute shaders in phobos, as well as
 /// how phobos can be used without creating a window.
@@ -34,19 +35,16 @@ impl ExampleApp for Compute {
         let pci = ComputePipelineBuilder::new("compute")
             .set_shader(ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::COMPUTE, shader_code))
             .build();
-        ctx.pipelines.create_named_compute_pipeline(pci)?;
+        ctx.pool.pipelines.create_named_compute_pipeline(pci)?;
 
         Ok(Self {
             buffer,
         })
     }
 
-    fn run(&mut self, ctx: Context, _thread: ThreadContext) -> Result<()> {
+    fn run(&mut self, ctx: Context) -> Result<()> {
         // Allocate a command buffer on the compute domain
-        let cmd = ctx.exec.on_domain::<domain::Compute>(
-            Some(ctx.pipelines.clone()),
-            Some(ctx.descriptors.clone()),
-        )?;
+        let cmd = ctx.exec.on_domain::<domain::Compute>()?;
 
         // Create a query pool to record timestamps
         let mut timestamps = QueryPool::<TimestampQuery>::new(
