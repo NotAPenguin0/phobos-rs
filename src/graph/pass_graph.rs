@@ -1,24 +1,25 @@
 //! The pass graph module holds the render graph implementation.
 
-use std::collections::hash_map::Entry;
+use std::collections::hash_map::{DefaultHasher, Entry};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
+use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
 use anyhow::Result;
 use ash::vk;
+use petgraph::{Direction, Graph};
 use petgraph::dot::Dot;
 use petgraph::graph::NodeIndex;
 use petgraph::prelude::EdgeRef;
-use petgraph::{Direction, Graph};
 
+use crate::{Allocator, DefaultAllocator, Error};
 use crate::graph::pass::{BoxedPassFn, EmptyPassExecutor, Pass};
 use crate::graph::resource::ResourceUsage;
 use crate::graph::task_graph::{Barrier, Node, Resource, Task, TaskGraph};
-use crate::graph::virtual_resource::VirtualResource;
+use crate::graph::virtual_resource::{HashedResource, VirtualResource};
 use crate::pipeline::PipelineStage;
 use crate::sync::domain::ExecutionDomain;
-use crate::{Allocator, DefaultAllocator, Error};
 
 /// Virtual GPU resource in a task graph.
 #[derive(Derivative, Default, Clone)]
@@ -53,8 +54,10 @@ pub struct PassNode<'cb, R: Resource, D: ExecutionDomain, U = (), A: Allocator =
     pub(crate) is_renderpass: bool,
 }
 
-pub(crate) type PassGraphInner<'cb, D, U, A> =
-    Graph<Node<PassResource, PassResourceBarrier, PassNode<'cb, PassResource, D, U, A>>, String>;
+pub(crate) type PassGraphInner<'cb, D, U, A> = Graph<
+    Node<PassResource, PassResourceBarrier, PassNode<'cb, PassResource, D, U, A>>,
+    <PassResource as Resource>::Uid,
+>;
 
 /// Pass graph, used for synchronizing resources over a single queue.
 pub struct PassGraph<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator> {
@@ -116,14 +119,16 @@ impl Barrier<PassResource> for PassResourceBarrier {
 }
 
 impl Resource for PassResource {
+    type Uid = String;
+
     /// Returns true if `self` is a dependency of `lhs`
     fn is_dependency_of(&self, lhs: &Self) -> bool {
         self.virtual_resource().uid() == lhs.virtual_resource().uid()
     }
 
     /// Return the uid of this virtual resource.
-    fn uid(&self) -> &String {
-        self.virtual_resource().uid()
+    fn uid(&self) -> Self::Uid {
+        format!("{}", self.resource)
     }
 }
 
@@ -265,7 +270,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
         resource: &VirtualResource,
         stage: PipelineStage,
     ) -> Result<()> {
-        let entry = self.last_usages.entry(resource.name());
+        let entry = self.last_usages.entry(resource.name().to_owned());
         match entry {
             Entry::Occupied(mut entry) => {
                 let version = resource.version();
@@ -340,7 +345,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
             {
                 output.stage = PipelineStage::COLOR_ATTACHMENT_OUTPUT;
             } else {
-                let (_, stage) = self.last_usages.get(&output.resource.name()).unwrap();
+                let (_, stage) = self.last_usages.get(output.resource.name()).unwrap();
                 output.stage = *stage;
             }
         }
@@ -378,7 +383,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassGraph<'cb, D, U, A> {
                     edges_to_add.push((
                         node,
                         graph.edges(other_node).next().unwrap().target(),
-                        other_resource.uid().clone(),
+                        other_resource.uid().to_owned(),
                     ));
                     let (stage, access) = barrier_flags.get(&node).cloned().unwrap();
                     barrier_flags.insert(
@@ -435,7 +440,7 @@ impl<D: ExecutionDomain, U, A: Allocator> Display
             Node::Task(task) => f.write_fmt(format_args!("Task: {}", &task.identifier)),
             Node::Barrier(barrier) => f.write_fmt(format_args!(
                 "{}({:#?} => {:#?})\n({:#?} => {:#?})",
-                &barrier.resource.uid(),
+                &barrier.resource.resource,
                 barrier.src_access,
                 barrier.dst_access,
                 barrier.src_stage,

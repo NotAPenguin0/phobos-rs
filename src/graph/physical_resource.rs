@@ -66,6 +66,6 @@ impl PhysicalResourceBindings {
 
     /// Resolve a virtual resource to a physical resource. Returns `None` if the resource was not found.
     pub fn resolve(&self, resource: &VirtualResource) -> Option<&PhysicalResource> {
-        self.bindings.get(&resource.name())
+        self.bindings.get(resource.name())
     }
 }

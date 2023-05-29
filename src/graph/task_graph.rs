@@ -3,17 +3,19 @@
 use std::marker::PhantomData;
 
 use anyhow::Result;
-use petgraph::graph::{EdgeReference, NodeIndex};
 use petgraph::{Graph, Incoming};
+use petgraph::graph::{EdgeReference, NodeIndex};
 
 use crate::Error;
 
 /// Represents a resource in a task graph.
 pub trait Resource {
+    type Uid: Eq + PartialEq;
+
     /// Return true if this resource is a dependency of lhs
     fn is_dependency_of(&self, lhs: &Self) -> bool;
     /// Get the uid of this resource
-    fn uid(&self) -> &String;
+    fn uid(&self) -> Self::Uid;
 }
 
 /// Task in a task dependency graph. This is parametrized on a resource type.
@@ -45,7 +47,7 @@ pub enum Node<R: Resource, B: Barrier<R>, T: Task<R>> {
 
 /// Task graph structure, used for automatic synchronization of resource accesses.
 pub struct TaskGraph<R: Resource, B: Barrier<R> + Clone, T: Task<R>> {
-    pub(crate) graph: Graph<Node<R, B, T>, String>,
+    pub(crate) graph: Graph<Node<R, B, T>, R::Uid>,
 }
 
 impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> Default
@@ -67,7 +69,7 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
 
     fn is_dependent(
         &self,
-        graph: &Graph<Node<R, B, T>, String>,
+        graph: &Graph<Node<R, B, T>, R::Uid>,
         child: NodeIndex,
         parent: NodeIndex,
     ) -> Result<Option<R>> {
@@ -95,7 +97,7 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
         Ok(None)
     }
 
-    fn is_task_node(graph: &Graph<Node<R, B, T>, String>, node: NodeIndex) -> Result<bool> {
+    fn is_task_node(graph: &Graph<Node<R, B, T>, R::Uid>, node: NodeIndex) -> Result<bool> {
         Ok(matches!(
             graph.node_weight(node).ok_or_else(|| Error::NodeNotFound)?,
             Node::Task(_)
@@ -103,14 +105,14 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
     }
 
     pub(crate) fn get_edge_attributes(
-        _: &Graph<Node<R, B, T>, String>,
-        _: EdgeReference<String>,
+        _: &Graph<Node<R, B, T>, R::Uid>,
+        _: EdgeReference<R::Uid>,
     ) -> String {
         String::from("")
     }
 
     pub(crate) fn get_node_attributes(
-        _: &Graph<Node<R, B, T>, String>,
+        _: &Graph<Node<R, B, T>, R::Uid>,
         node: (NodeIndex, &Node<R, B, T>),
     ) -> String {
         match node.1 {
@@ -145,15 +147,13 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
         self.graph.node_indices().for_each(|other_node| {
             // task depends on other task, add an edge other_task -> task
             if let Some(dependency) = self.is_dependent(&self.graph, node, other_node).unwrap() {
-                self.graph
-                    .add_edge(other_node, node, dependency.uid().clone());
+                self.graph.add_edge(other_node, node, dependency.uid());
             }
 
             // Note: no else here, since we will detect cycles and error on them,
             // which is better than silently ignoring some cycles.
             if let Some(dependency) = self.is_dependent(&self.graph, other_node, node).unwrap() {
-                self.graph
-                    .add_edge(node, other_node, dependency.uid().clone());
+                self.graph.add_edge(node, other_node, dependency.uid());
             }
         });
 
@@ -213,10 +213,8 @@ impl<R: Resource + Clone + Default, B: Barrier<R> + Clone, T: Task<R>> TaskGraph
                 }
                 for consumer in consumers {
                     let barrier = self.graph.add_node(Node::Barrier(B::new(resource.clone())));
-                    self.graph
-                        .update_edge(node, barrier, resource.uid().clone());
-                    self.graph
-                        .update_edge(barrier, consumer, resource.uid().clone());
+                    self.graph.update_edge(node, barrier, resource.uid());
+                    self.graph.update_edge(barrier, consumer, resource.uid());
                     if let Some(edge) = self.graph.find_edge(node, consumer) {
                         self.graph.remove_edge(edge);
                     }

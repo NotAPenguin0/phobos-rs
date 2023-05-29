@@ -11,8 +11,7 @@ use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 
 use crate::{
-    Allocator, BufferView, DebugMessenger, Error, ImageView, PassGraph,
-    PhysicalResourceBindings,
+    Allocator, BufferView, DebugMessenger, Error, ImageView, PassGraph, PhysicalResourceBindings,
 };
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
@@ -352,7 +351,7 @@ fn record_barrier<'q, D: ExecutionDomain, A: Allocator>(
     cmd: IncompleteCommandBuffer<'q, D, A>,
 ) -> Result<IncompleteCommandBuffer<'q, D, A>> {
     let physical_resource = bindings.resolve(&barrier.resource.resource);
-    let Some(resource) = physical_resource else { return Err(anyhow::Error::from(Error::NoResourceBound(barrier.resource.uid().clone()))) };
+    let Some(resource) = physical_resource else { return Err(anyhow::Error::from(Error::NoResourceBound(barrier.resource.resource.uid().to_owned()))) };
     match resource {
         PhysicalResource::Image(image) => record_image_barrier(barrier, image, dst_resource, cmd),
         PhysicalResource::Buffer(buffer) => {
