@@ -6,11 +6,11 @@ use anyhow::Result;
 use ash::vk;
 use multimap::{Entry, MultiMap};
 
-use crate::allocator::scratch_allocator::ScratchAllocatorCreateInfo;
 use crate::{
     Allocator, BufferView, DefaultAllocator, DescriptorCache, Device, Fence, PipelineCache,
     ScratchAllocator,
 };
+use crate::allocator::scratch_allocator::ScratchAllocatorCreateInfo;
 
 /// Indicates that this object can be pooled in a [`Pool`](crate::pool::Pool)
 pub trait Poolable {
@@ -182,6 +182,7 @@ impl<P: Poolable> Pool<P> {
 }
 
 impl<A: Allocator + 'static> ResourcePool<A> {
+    /// Create a new resource pool. You should generally only need one in the entire application
     pub fn new(info: ResourcePoolCreateInfo<A>) -> Result<Self> {
         let pipelines = PipelineCache::new(info.device.clone(), info.allocator.clone())?;
         let descriptors = DescriptorCache::new(info.device.clone())?;

@@ -6,20 +6,21 @@ use fsr2_sys::{
     FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits, FfxFsr2QualityMode,
 };
 use glam::{Mat4, Vec3};
+use winit::event::{Event, WindowEvent};
+
+use phobos::{
+    DeletionQueue, GraphicsCmdBuffer, image, Image, ImageView, IncompleteCmdBuffer,
+    InFlightContext, PassBuilder, PassGraph, PhysicalResourceBindings, PipelineBuilder,
+    PipelineStage, RecordGraphToCommandBuffer, Sampler,
+};
 use phobos::domain::All;
 use phobos::fsr2::Fsr2DispatchDescription;
 use phobos::graph::pass::Fsr2DispatchVirtualResources;
 use phobos::pool::LocalPool;
 use phobos::sync::submit_batch::SubmitBatch;
-use phobos::{
-    image, DeletionQueue, GraphicsCmdBuffer, Image, ImageView, InFlightContext,
-    IncompleteCmdBuffer, PassBuilder, PassGraph, PhysicalResourceBindings, PipelineBuilder,
-    PipelineStage, RecordGraphToCommandBuffer, Sampler,
-};
-use winit::event::{Event, WindowEvent};
 
 use crate::example_runner::{
-    create_shader, Camera, Context, ExampleApp, ExampleRunner, WindowContext,
+    Camera, Context, create_shader, ExampleApp, ExampleRunner, WindowContext,
 };
 
 #[path = "../example_runner/lib.rs"]
@@ -424,7 +425,7 @@ impl ExampleApp for Fsr2Sample {
         let cmd = graph.record(cmd, &bindings, &mut pool, None, &mut ())?;
         let cmd = cmd.finish()?;
         let mut batch = ctx.exec.start_submit_batch()?;
-        batch.submit_for_present(cmd, &ifc, pool)?;
+        batch.submit_for_present(cmd, ifc, pool)?;
         Ok(batch)
     }
 }

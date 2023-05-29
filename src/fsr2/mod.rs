@@ -3,27 +3,29 @@
 use std::ffi::c_void;
 use std::fmt::{Display, Formatter};
 use std::mem::MaybeUninit;
+use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
 use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
 use fsr2_sys::{
-    ffxFsr2ContextCreate, ffxFsr2ContextDestroy, ffxFsr2ContextDispatch, ffxFsr2GetInterfaceVK,
-    ffxFsr2GetJitterOffset, ffxFsr2GetJitterPhaseCount, ffxFsr2GetRenderResolutionFromQualityMode,
-    ffxFsr2GetScratchMemorySizeVK, ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK,
-    FfxErrorCode, FfxFsr2Context, FfxFsr2ContextDescription, FfxFsr2DispatchDescription,
-    FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType, FfxResource,
+    FfxErrorCode, FfxFsr2Context, ffxFsr2ContextCreate, FfxFsr2ContextDescription,
+    ffxFsr2ContextDestroy, ffxFsr2ContextDispatch, FfxFsr2DispatchDescription,
+    ffxFsr2GetInterfaceVK, ffxFsr2GetJitterOffset, ffxFsr2GetJitterPhaseCount, ffxFsr2GetRenderResolutionFromQualityMode,
+    ffxFsr2GetScratchMemorySizeVK, FfxFsr2InstanceFunctionPointerTableVk, FfxFsr2Interface, FfxFsr2MsgType,
+    ffxGetCommandListVK, ffxGetDeviceVK, ffxGetTextureResourceVK, FfxResource,
     FfxResourceState, VkDevice, VkPhysicalDevice,
 };
 pub use fsr2_sys::{
     FfxDimensions2D, FfxFloatCoords2D, FfxFsr2InitializationFlagBits, FfxFsr2QualityMode,
 };
 use thiserror::Error;
-use widestring::{WideCStr, WideChar as wchar_t};
+use widestring::{WideChar as wchar_t, WideCStr};
 
-use crate::domain::ExecutionDomain;
 use crate::{Allocator, ComputeSupport, DeletionQueue, ImageView, IncompleteCommandBuffer};
+use crate::domain::ExecutionDomain;
+use crate::pool::{Pool, Poolable, Pooled};
 
 /// FSR2 API error, stores an error code that describes the cause of the error
 #[derive(Debug, Error)]
@@ -102,16 +104,41 @@ impl Display for Fsr2Error {
     }
 }
 
+struct BackendData(pub Box<[u8]>);
+
+impl Deref for BackendData {
+    type Target = Box<[u8]>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for BackendData {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Poolable for BackendData {
+    type Key = usize;
+
+    fn on_release(&mut self) {}
+}
+
 /// Represents the initialized FSR2 context with its backend data.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Fsr2Context {
     context: Box<FfxFsr2Context>,
     backend: FfxFsr2Interface,
-    backend_scratch_data: Box<[u8]>,
+    #[derivative(Debug = "ignore")]
+    backend_scratch_data: Pooled<BackendData>,
     current_frame: usize,
     #[derivative(Debug = "ignore")]
     fp_table: FfxFsr2InstanceFunctionPointerTableVk,
+    #[derivative(Debug = "ignore")]
+    scratch_data_pool: Pool<BackendData>,
     create_flags: FfxFsr2InitializationFlagBits,
     display_size: FfxDimensions2D,
     max_render_size: FfxDimensions2D,
@@ -211,7 +238,7 @@ pub(crate) struct Fsr2ContextCreateInfo<'a> {
 struct ReleasedFsr2Context {
     pub context: Box<FfxFsr2Context>,
     pub backend: FfxFsr2Interface,
-    pub backend_data: Box<[u8]>,
+    pub backend_data: Pooled<BackendData>,
 }
 
 struct Ptr<T>(pub *mut T);
@@ -222,18 +249,17 @@ impl Fsr2Context {
     /// Creates the FSR2 context.
     unsafe fn create_context(
         fp_table: FfxFsr2InstanceFunctionPointerTableVk,
+        mem_pool: &Pool<BackendData>,
         device: VkDevice,
         phys_device: VkPhysicalDevice,
         flags: FfxFsr2InitializationFlagBits,
         display_size: FfxDimensions2D,
         max_render_size: FfxDimensions2D,
-    ) -> Result<(Box<FfxFsr2Context>, FfxFsr2Interface, Box<[u8]>)> {
+    ) -> Result<(Box<FfxFsr2Context>, FfxFsr2Interface, Pooled<BackendData>)> {
         // First allocate a scratch buffer for backend instance data.
         // SAFETY: We assume a valid VkPhysicalDevice was passed in.
         let scratch_size = ffxFsr2GetScratchMemorySizeVK(phys_device, &fp_table);
-
-        let scratch_data = Box::new_zeroed_slice(scratch_size);
-        let mut scratch_data = scratch_data.assume_init();
+        let mut scratch_data = BackendData::new_in_pool(mem_pool, &scratch_size)?;
         let scratch_pointer = scratch_data.as_mut_ptr();
 
         // Create the backend interface. We create an uninitialized interface struct first and let the API function
@@ -319,8 +345,13 @@ impl Fsr2Context {
             let phys_device = VkPhysicalDevice::from_raw(info.physical_device.as_raw());
             let device = VkDevice::from_raw(info.device.as_raw());
 
+            let data_pool = Pool::new(|size| unsafe {
+                Ok(BackendData(Box::new_zeroed_slice(*size).assume_init()))
+            })?;
+
             let (context, backend, scratch) = Self::create_context(
                 fp_table,
+                &data_pool,
                 device,
                 phys_device,
                 info.flags,
@@ -341,6 +372,7 @@ impl Fsr2Context {
                 backend_scratch_data: scratch,
                 current_frame: 0,
                 fp_table,
+                scratch_data_pool: data_pool,
                 create_flags: info.flags,
                 display_size: info.display_size,
                 max_render_size: info.max_render_size,
@@ -504,6 +536,7 @@ impl Fsr2Context {
         let (context, backend, scratch) = unsafe {
             Self::create_context(
                 self.fp_table,
+                &self.scratch_data_pool,
                 self.device,
                 self.phys_device,
                 self.create_flags,
