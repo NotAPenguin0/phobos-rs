@@ -19,7 +19,7 @@ pub use crate::core::physical_device::*;
 pub use crate::core::queue::QueueType;
 pub use crate::descriptor::cache::DescriptorCache;
 pub use crate::descriptor::descriptor_set::DescriptorSet;
-pub use crate::graph::pass::{Pass, PassBuilder};
+pub use crate::graph::pass::{ClearColor, ClearDepthStencil, Pass, PassBuilder};
 pub use crate::graph::pass_graph::PassGraph;
 pub use crate::graph::physical_resource::PhysicalResourceBindings;
 pub use crate::graph::virtual_resource::VirtualResource;

@@ -16,10 +16,11 @@
 //!
 //! First, we define some virtual resources.
 //! ```
+//! use phobos::image;
 //! use phobos::prelude::*;
 //!
-//! let offscreen = ph::VirtualResource::image("offscreen");
-//! let swapchain = ph::VirtualResource::image("swapchain");
+//! let offscreen = image!("offscreen");
+//! let swapchain = image!("swapchain");
 //! ```
 //! Now we create the offscreen pass. Note that we use [`PassBuilder::render()`] to create a render pass.
 //! This is a pass that outputs to at least one color or depth attachment by using the graphics pipeline.
@@ -33,9 +34,7 @@
 //!     // the debug-markers feature is enabled.
 //!     .color([1.0, 0.0, 0.0, 1.0])
 //!     // Add a single color attachment that will be cleared to red.
-//!     .color_attachment(&offscreen,
-//!                       vk::AttachmentLoadOp::CLEAR,
-//!                       Some(vk::ClearColorValue{ float32: [1.0, 0.0, 0.0, 1.0] }))?
+//!     .clear_color_attachment(&offscreen, ClearColor::Float([1.0, 0.0, 0.0, 0.0]))?
 //!     .build();
 //!
 //! ```
@@ -55,9 +54,7 @@
 //!     // Let's color this pass green
 //!     .color([0.0, 1.0, 0.0, 1.0])
 //!     // Clear the swapchain to black.
-//!     .color_attachment(&swapchain,
-//!                       vk::AttachmentLoadOp::CLEAR,
-//!                       Some(vk::ClearColorValue{ float32: [0.0, 0.0, 0.0, 1.0] }))?
+//!     .clear_color_attachment(&swapchain, ClearColor::Float([0.0, 0.0, 0.0, 0.0]))?
 //!     // We sample the input resource in the fragment shader.
 //!     .sample_image(&input_resource, PipelineStage::FRAGMENT_SHADER)
 //!     .execute_fn(|mut cmd, local_pool, bindings, _| {
