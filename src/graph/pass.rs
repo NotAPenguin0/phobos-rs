@@ -79,9 +79,7 @@ use anyhow::{anyhow, bail};
 use anyhow::Result;
 use ash::vk;
 
-use crate::{
-    Allocator, DefaultAllocator, Error, PhysicalResourceBindings, VirtualResource,
-};
+use crate::{Allocator, DefaultAllocator, Error, PhysicalResourceBindings, VirtualResource};
 #[cfg(feature = "fsr2")]
 use crate::{ComputeSupport, Device, ImageView};
 use crate::command_buffer::IncompleteCommandBuffer;
@@ -94,6 +92,7 @@ use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
 use crate::pool::LocalPool;
 use crate::sync::domain::ExecutionDomain;
+use crate::util::to_vk::IntoVulkanType;
 
 /// The returned value from a pass callback function.
 pub type PassFnResult<'q, D, A> = Result<IncompleteCommandBuffer<'q, D, A>>;
@@ -174,6 +173,48 @@ pub struct Pass<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator
     #[derivative(Debug = "ignore")]
     pub(crate) execute: BoxedPassFn<'cb, D, U, A>,
     pub(crate) is_renderpass: bool,
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+pub enum ClearColor {
+    Float([f32; 4]),
+    Int([i32; 4]),
+    Uint([u32; 4]),
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+pub struct ClearDepthStencil {
+    pub depth: f32,
+    pub stencil: u32,
+}
+
+impl IntoVulkanType for ClearColor {
+    type Output = vk::ClearColorValue;
+
+    fn into_vulkan(self) -> Self::Output {
+        match self {
+            ClearColor::Float(values) => vk::ClearColorValue {
+                float32: values,
+            },
+            ClearColor::Int(values) => vk::ClearColorValue {
+                int32: values,
+            },
+            ClearColor::Uint(values) => vk::ClearColorValue {
+                uint32: values,
+            },
+        }
+    }
+}
+
+impl IntoVulkanType for ClearDepthStencil {
+    type Output = vk::ClearDepthStencilValue;
+
+    fn into_vulkan(self) -> Self::Output {
+        vk::ClearDepthStencilValue {
+            depth: self.depth,
+            stencil: self.stencil,
+        }
+    }
 }
 
 /// Used to create [`Pass`] objects correctly.
@@ -308,6 +349,42 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         });
 
         Ok(self)
+    }
+
+    /// Clear a color attachment with the specified clear color
+    /// # Errors
+    /// * Fails if this pass was not created using [`PassBuilder::render()`]
+    pub fn clear_color_attachment(
+        self,
+        resource: &VirtualResource,
+        color: ClearColor,
+    ) -> Result<Self> {
+        self.color_attachment(resource, vk::AttachmentLoadOp::CLEAR, Some(color.into_vulkan()))
+    }
+
+    /// Load a color attachment
+    /// # Errors
+    /// * Fails if this pass was not created using [`PassBuilder::render()`]
+    pub fn load_color_attachment(self, resource: &VirtualResource) -> Result<Self> {
+        self.color_attachment(resource, vk::AttachmentLoadOp::LOAD, None)
+    }
+
+    /// Clear the depth attachment with the specified clear values
+    /// # Errors
+    /// * Fails if this pass was not created using [`PassBuilder::render()`]
+    pub fn clear_depth_attachment(
+        self,
+        resource: &VirtualResource,
+        clear: ClearDepthStencil,
+    ) -> Result<Self> {
+        self.depth_attachment(resource, vk::AttachmentLoadOp::CLEAR, Some(clear.into_vulkan()))
+    }
+
+    /// Load a depth attachment
+    /// # Errors
+    /// * Fails if this pass was not created using [`PassBuilder::render()`]
+    pub fn load_depth_attachment(self, resource: &VirtualResource) -> Result<Self> {
+        self.depth_attachment(resource, vk::AttachmentLoadOp::LOAD, None)
     }
 
     /// Adds a depth attachment to this pass. If [`vk::AttachmentLoadOp::CLEAR`] was specified, `clear` must not be None.
