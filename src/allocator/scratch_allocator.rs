@@ -99,21 +99,25 @@ impl<A: Allocator> ScratchAllocator<A> {
         usage: vk::BufferUsageFlags,
     ) -> Result<Self> {
         let buffer = Buffer::new(device.clone(), allocator, max_size, usage, MemoryType::CpuToGpu)?;
-        // TODO: Fix for multiple usage flags
-        let alignment = if usage
+        let mut alignment = 0;
+        if usage
             .intersects(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER)
         {
-            16
+            alignment = alignment.max(16);
         } else if usage.contains(vk::BufferUsageFlags::UNIFORM_BUFFER) {
-            device
-                .properties()
-                .limits
-                .min_uniform_buffer_offset_alignment
+            alignment = alignment.max(
+                device
+                    .properties()
+                    .limits
+                    .min_uniform_buffer_offset_alignment,
+            );
         } else if usage.contains(vk::BufferUsageFlags::STORAGE_BUFFER) {
-            device
-                .properties()
-                .limits
-                .min_storage_buffer_offset_alignment
+            alignment = alignment.max(
+                device
+                    .properties()
+                    .limits
+                    .min_storage_buffer_offset_alignment,
+            );
         } else {
             unimplemented!()
         };
