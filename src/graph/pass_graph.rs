@@ -119,7 +119,7 @@ impl Barrier<PassResource> for PassResourceBarrier {
 }
 
 impl Resource for PassResource {
-    type Uid = String;
+    type Uid = HashedResource;
 
     /// Returns true if `self` is a dependency of `lhs`
     fn is_dependency_of(&self, lhs: &Self) -> bool {
@@ -128,7 +128,11 @@ impl Resource for PassResource {
 
     /// Return the uid of this virtual resource.
     fn uid(&self) -> Self::Uid {
-        format!("{}", self.resource)
+        let mut hasher = DefaultHasher::new();
+        self.virtual_resource().hash(&mut hasher);
+        HashedResource {
+            hash: hasher.finish(),
+        }
     }
 }
 
