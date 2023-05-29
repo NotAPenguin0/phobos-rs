@@ -241,10 +241,6 @@ struct ReleasedFsr2Context {
     pub backend_data: Pooled<BackendData>,
 }
 
-struct Ptr<T>(pub *mut T);
-
-unsafe impl<T> Send for Ptr<T> {}
-
 impl Fsr2Context {
     /// Creates the FSR2 context.
     unsafe fn create_context(
@@ -293,21 +289,7 @@ impl Fsr2Context {
             fp_message: fsr2_message_callback,
         };
 
-        // With validation enabled, FSR2 initialization overflows the stack,
-        // possibly because of large shader binaries? As a workaround, we move
-        // initialization to a separate thread with a larger stack size.
-
-        let context_ptr = Ptr(context.as_mut_ptr());
-        let err = std::thread::Builder::new()
-            .name("phobos::fsr2 context init".into())
-            .stack_size(4 * 1024 * 1024)
-            .spawn(move || {
-                let ptr = context_ptr;
-                ffxFsr2ContextCreate(ptr.0, &info)
-            })
-            .unwrap()
-            .join()
-            .unwrap();
+        let err = ffxFsr2ContextCreate(context.as_mut_ptr(), &info);
         check_fsr2_error(err)?;
 
         let context = context.assume_init();
@@ -345,9 +327,8 @@ impl Fsr2Context {
             let phys_device = VkPhysicalDevice::from_raw(info.physical_device.as_raw());
             let device = VkDevice::from_raw(info.device.as_raw());
 
-            let data_pool = Pool::new(|size| {
-                Ok(BackendData(Box::new_zeroed_slice(*size).assume_init()))
-            })?;
+            let data_pool =
+                Pool::new(|size| Ok(BackendData(Box::new_zeroed_slice(*size).assume_init())))?;
 
             let (context, backend, scratch) = Self::create_context(
                 fp_table,
