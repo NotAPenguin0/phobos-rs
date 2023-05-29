@@ -175,7 +175,7 @@ pub struct Pass<'cb, D: ExecutionDomain, U = (), A: Allocator = DefaultAllocator
     pub(crate) is_renderpass: bool,
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum ClearColor {
     Float([f32; 4]),
     Int([i32; 4]),

@@ -4,6 +4,7 @@ use anyhow::Result;
 
 use phobos::{image, vk};
 use phobos::command_buffer::traits::*;
+use phobos::graph::pass::ClearColor;
 use phobos::pool::LocalPool;
 use phobos::prelude::*;
 use phobos::sync::domain::All;
@@ -120,13 +121,7 @@ impl ExampleApp for Basic {
         // Render pass that renders to an offscreen attachment
         let offscreen_pass = PassBuilder::render("offscreen")
             .color([1.0, 0.0, 0.0, 1.0])
-            .color_attachment(
-                &offscreen,
-                vk::AttachmentLoadOp::CLEAR,
-                Some(vk::ClearColorValue {
-                    float32: [1.0, 0.0, 0.0, 1.0],
-                }),
-            )?
+            .clear_color_attachment(&offscreen, ClearColor::Float([0.0, 0.0, 0.0, 0.0]))?
             .execute_fn(|mut cmd, ifc, _bindings, _| {
                 // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
                 let mut buffer = ifc.allocate_scratch_vbo(
@@ -146,13 +141,7 @@ impl ExampleApp for Basic {
         // Render pass that samples the offscreen attachment, and possibly does some postprocessing to it
         let sample_pass = PassBuilder::render(String::from("sample"))
             .color([0.0, 1.0, 0.0, 1.0])
-            .color_attachment(
-                &swap_resource,
-                vk::AttachmentLoadOp::CLEAR,
-                Some(vk::ClearColorValue {
-                    float32: [1.0, 0.0, 0.0, 1.0],
-                }),
-            )?
+            .clear_color_attachment(&swap_resource, ClearColor::Float([0.0, 0.0, 0.0, 0.0]))?
             .sample_image(
                 offscreen_pass.output(&offscreen).unwrap(),
                 PipelineStage::FRAGMENT_SHADER,
