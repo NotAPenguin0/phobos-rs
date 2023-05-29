@@ -13,20 +13,21 @@ use crate::command_buffer::command_pool::CommandPool;
 /// Abstraction over vulkan queue capabilities. Note that in raw Vulkan, there is no 'Graphics queue'. Phobos will expose one, but behind the scenes the exposed
 /// e.g. graphics and transfer queues could point to the same hardware queue. Synchronization for this is handled for you.
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
+#[repr(u32)]
 pub enum QueueType {
     /// Queue that supports graphics operations. Per the vulkan spec, this queue also always supports
     /// transfer operations. Phobos will try to match this to a hardware queue that also
     /// supports compute operations. This is always guaranteed to be available if graphics operations
     /// are supported.
     #[default]
-    Graphics = vk::QueueFlags::GRAPHICS.as_raw() as isize,
+    Graphics = vk::QueueFlags::GRAPHICS.as_raw(),
     /// Queue that supports compute operations. Per the vulkan spec, this queue also always supports
     /// transfer operations. Phobos will try to match this to a hardware queue that does not support
     /// graphics operations if possible, to make full use of async compute when available.
-    Compute = vk::QueueFlags::COMPUTE.as_raw() as isize,
+    Compute = vk::QueueFlags::COMPUTE.as_raw(),
     /// Queue that supports transfer operations. Phobos will try to match this to a hardware queue that only supports
     /// transfer operations if possible.
-    Transfer = vk::QueueFlags::TRANSFER.as_raw() as isize,
+    Transfer = vk::QueueFlags::TRANSFER.as_raw(),
 }
 
 /// Stores all information of a queue that was found on the physical device.
