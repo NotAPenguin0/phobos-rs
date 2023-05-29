@@ -9,9 +9,9 @@ use ash::vk::{DeviceMemory, DeviceSize, MemoryRequirements};
 use gpu_allocator::vulkan as vk_alloc;
 use gpu_allocator::vulkan::AllocationScheme;
 
+use crate::{Allocator, Device, Error, PhysicalDevice, VkInstance};
 use crate::allocator::memory_type::MemoryType;
 use crate::allocator::traits;
-use crate::{Allocator, Device, Error, PhysicalDevice, VkInstance};
 
 /// The default allocator. This calls into the `gpu_allocator` crate.
 /// It's important to note that this allocator is `Clone`, `Send` and `Sync`. All its internal state is safely
@@ -25,9 +25,15 @@ use crate::{Allocator, Device, Error, PhysicalDevice, VkInstance};
 /// # use anyhow::Result;
 /// # fn vk_get_memory_requirements(device: &Device, buffer: &Buffer) -> vk::MemoryRequirements { unimplemented!() }
 /// # fn vk_bind_buffer_memory(device: &Device, buffer: &Buffer, memory: vk::DeviceMemory, offset: u64) { unimplemented!() }
-/// fn use_allocator(device: Device, allocator: DefaultAllocator, buffer: Buffer) -> Result<()> {
+/// fn use_allocator(
+///     instance: VkInstance,
+///     physical_device: PhysicalDevice,
+///     device: Device,
+///     allocator: DefaultAllocator,
+///     buffer: Buffer)
+///     -> Result<()> {
 ///     let mut allocator = DefaultAllocator::new(&instance, &device, &physical_device)?;
-///     let requirements: vk_get_memory_requirements(&device, &buffer);
+///     let requirements = vk_get_memory_requirements(&device, &buffer);
 ///     let memory = allocator.allocate("buffer_memory", &requirements, MemoryType::GpuOnly)?;
 ///     // SAFETY: We are passing `memory.offset()` correctly.
 ///     vk_bind_buffer_memory(&device, &buffer, unsafe { memory.memory() }, memory.offset());
@@ -219,6 +225,9 @@ impl traits::Allocation for Allocation {
 
     /// Obtain a mapped pointer to this allocation. This pointer can be used to directly write into the owned memory.
     /// This pointer already points into the exact memory region of the suballocation, so no offset must be applied.
+    ///
+    /// Note: generally you want to write through a buffer instead of directly through the allocation, though internally
+    /// it goes through this path anyway.
     ///
     /// * Returns `None` if this memory was not mappable (not [`HOST_VISIBLE`](ash::vk::MemoryPropertyFlags::HOST_VISIBLE)). Memory allocated with [`MemoryType::CpuToGpu`] is always mappable.
     /// * If this memory comes from a [`HOST_VISIBLE`](ash::vk::MemoryPropertyFlags::HOST_VISIBLE) heap, this returns `Some(ptr)`, with `ptr` a non-null pointer pointing to the allocation memory.

@@ -5,10 +5,10 @@ use std::sync::{Arc, Mutex};
 use anyhow::Result;
 use ash::vk;
 
+use crate::{DeletionQueue, DescriptorSet, Device, Error};
 use crate::descriptor::descriptor_pool::{DescriptorPool, DescriptorPoolSize};
 use crate::descriptor::descriptor_set::DescriptorSetBinding;
 use crate::util::cache::Cache;
-use crate::{DeletionQueue, DescriptorSet, Device, Error};
 
 #[derive(Debug)]
 struct DescriptorCacheInner {
@@ -93,7 +93,7 @@ impl DescriptorCache {
     /// - This function fails the the requested descriptor set has no descriptors
     /// - This function fails if allocating a descriptor set failed due to an internal error.
     pub fn with_descriptor_set<F: FnOnce(&DescriptorSet) -> Result<()>>(
-        &mut self,
+        &self,
         bindings: DescriptorSetBinding,
         f: F,
     ) -> Result<()> {

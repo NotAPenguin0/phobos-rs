@@ -3,10 +3,10 @@
 use anyhow::{bail, Result};
 use ash::vk;
 
+use crate::{Allocator, BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::sync::domain::ExecutionDomain;
-use crate::{Allocator, BufferView, Error, GfxSupport, GraphicsCmdBuffer, ImageView};
 
 impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer
     for IncompleteCommandBuffer<'_, D, A>
@@ -199,9 +199,9 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer
     /// }
     /// ```
     fn bind_graphics_pipeline(mut self, name: &str) -> Result<Self> {
-        let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
         {
             let Some(rendering_state) = self.current_rendering_state.clone() else { return Err(Error::NoRenderpass.into()) };
+            let cache = self.pipeline_cache.clone();
             cache.with_pipeline(name, rendering_state, |pipeline| {
                 self.bind_pipeline_impl(
                     pipeline.handle,
@@ -221,18 +221,17 @@ impl<D: GfxSupport + ExecutionDomain, A: Allocator> GraphicsCmdBuffer
     fn bind_ray_tracing_pipeline(mut self, name: &str) -> Result<Self>
     where
         Self: Sized, {
-        let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
-        {
-            cache.with_raytracing_pipeline(name, |pipeline| {
-                self.current_sbt_regions = Some(pipeline.shader_binding_table.regions);
-                self.bind_pipeline_impl(
-                    pipeline.handle,
-                    pipeline.layout,
-                    pipeline.set_layouts.clone(),
-                    vk::PipelineBindPoint::RAY_TRACING_KHR,
-                )
-            })?;
-        }
+        let cache = self.pipeline_cache.clone();
+        cache.with_raytracing_pipeline(name, |pipeline| {
+            self.current_sbt_regions = Some(pipeline.shader_binding_table.regions);
+            self.bind_pipeline_impl(
+                pipeline.handle,
+                pipeline.layout,
+                pipeline.set_layouts.clone(),
+                vk::PipelineBindPoint::RAY_TRACING_KHR,
+            )
+        })?;
+
         Ok(self)
     }
 

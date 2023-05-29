@@ -1,16 +1,16 @@
 //! Exposes command buffer wrappers for recording GPU commands.
 //! # Incomplete command buffers
 //!
-//! Vulkan command buffers need to call `vkEndCommandBuffer` before they can be submitted. After this call, no more commands should be
-//! recorded to it. For this reason, we expose two command buffer types. The [`IncompleteCommandBuffer`] still accepts commands, and can only
+//! Vulkan command buffers need to call [`vkEndCommandBuffer`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkEndCommandBuffer.html) before they can be submitted.
+//! After this call, no more commands should be recorded to it. For this reason, we expose two command buffer types. The [`IncompleteCommandBuffer`] still accepts commands, and can only
 //! be converted into a [`CommandBuffer`] by calling [`IncompleteCommandBuffer::finish`](crate::command_buffer::IncompleteCommandBuffer::finish). This turns it into a complete command buffer, which can
 //! be submitted to the execution manager.
 //!
 //! # Commands
-//! All commands are implemented through traits for each domain. These are all defined inside the [`traits`] module, and are most easily imported
+//! All commands are implemented through traits for each [domain](crate::sync::domain). These are all defined inside the [`traits`] module, and are most easily imported
 //! through the [`prelude`](crate::prelude).
 //!
-//! There are also a bunch of methods that do not directly translate to Vulkan commands, for example for binding descriptor sets directly.
+//! There are also a few methods that do not directly translate to Vulkan commands, for example for binding descriptor sets directly.
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -19,13 +19,13 @@ use std::sync::MutexGuard;
 use anyhow::Result;
 use ash::vk;
 
-use crate::core::queue::Queue;
-use crate::pipeline::create_info::PipelineRenderingInfo;
-use crate::sync::domain::ExecutionDomain;
 use crate::{
     Allocator, CmdBuffer, DefaultAllocator, DescriptorCache, DescriptorSetBuilder, Device, Error,
     ExecutionManager, PipelineCache,
 };
+use crate::core::queue::Queue;
+use crate::pipeline::create_info::PipelineRenderingInfo;
+use crate::sync::domain::ExecutionDomain;
 
 pub mod compute;
 pub mod graphics;
@@ -44,7 +44,7 @@ pub(crate) mod state;
 /// # use phobos::sync::domain::ExecutionDomain;
 /// # use anyhow::Result;
 ///
-/// fn finish_and_wait<D: ExecutionDomain + 'static>(exec: ExecutionManager, cmd: IncompleteCommandBuffer<D>) -> Result<()> {
+/// fn finish_and_wait<D: ExecutionDomain + 'static, A: Allocator>(exec: ExecutionManager, cmd: IncompleteCommandBuffer<D, A>) -> Result<()> {
 ///     let cmd: CommandBuffer<D> = cmd.finish()?;
 ///     let mut fence = exec.submit(cmd)?;
 ///     fence.wait()
@@ -57,7 +57,7 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 }
 
 /// This struct represents an incomplete command buffer.
-/// This is a command buffer that has not been called [`IncompleteCommandBuffer::finish()`](crate::IncompleteCommandBuffer::finish) on yet.
+/// This is a command buffer that has not been finished yet with [`IncompleteCommandBuffer::finish()`](crate::IncompleteCommandBuffer::finish).
 /// Calling this method will turn it into an immutable command buffer which can then be submitted
 /// to the queue it was allocated from. See also [`ExecutionManager`].
 ///
@@ -67,7 +67,7 @@ pub struct CommandBuffer<D: ExecutionDomain> {
 /// # use phobos::sync::domain::{ExecutionDomain, Graphics};
 /// # use anyhow::Result;
 /// fn submit_some_commands(exec: ExecutionManager) -> Result<()> {
-///     let cmd: IncompleteCommandBuffer<Graphics> = exec.on_domain::<Graphics>(None, None)?;
+///     let cmd: IncompleteCommandBuffer<Graphics> = exec.on_domain::<Graphics>()?;
 ///     // ... record some commands
 ///     let mut fence = exec.submit(cmd.finish()?)?;
 ///     fence.wait()?;
@@ -91,16 +91,16 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain, A: Allocator = Defaul
     timestamp_valid_bits: u32,
     current_pipeline_layout: vk::PipelineLayout,
     current_set_layouts: Vec<vk::DescriptorSetLayout>,
-    current_bindpoint: vk::PipelineBindPoint,
     // TODO: Note: technically not correct
+    current_bindpoint: vk::PipelineBindPoint,
     current_rendering_state: Option<PipelineRenderingInfo>,
     current_render_area: vk::Rect2D,
     current_descriptor_sets: Option<HashMap<u32, DescriptorSetBuilder<'static>>>,
     descriptor_state_needs_update: bool,
     current_sbt_regions: Option<[vk::StridedDeviceAddressRegionKHR; 4]>,
     // TODO: Only update disturbed descriptor sets
-    descriptor_cache: Option<DescriptorCache>,
-    pipeline_cache: Option<PipelineCache<A>>,
+    descriptor_cache: DescriptorCache,
+    pipeline_cache: PipelineCache<A>,
     _domain: PhantomData<D>,
 }
 

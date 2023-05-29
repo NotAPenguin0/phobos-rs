@@ -5,15 +5,15 @@ use std::sync::MutexGuard;
 use anyhow::Result;
 use ash::vk;
 
+use crate::{
+    Allocator, BufferView, DescriptorCache, Device, ExecutionManager, ImageView, PipelineCache,
+};
 use crate::command_buffer::CommandBuffer;
 use crate::core::queue::Queue;
 use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
 use crate::raytracing::*;
 use crate::sync::domain;
 use crate::sync::domain::ExecutionDomain;
-use crate::{
-    Allocator, BufferView, DescriptorCache, Device, ExecutionManager, ImageView, PipelineCache,
-};
 
 /// Trait representing a command buffer that supports transfer commands.
 pub trait TransferCmdBuffer {
@@ -171,8 +171,8 @@ pub trait IncompleteCmdBuffer<'q, A: Allocator> {
         queue_lock: MutexGuard<'q, Queue>,
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,
-        pipelines: Option<PipelineCache<A>>,
-        descriptors: Option<DescriptorCache>,
+        pipelines: PipelineCache<A>,
+        descriptors: DescriptorCache,
     ) -> Result<Self>
     where
         Self: Sized;

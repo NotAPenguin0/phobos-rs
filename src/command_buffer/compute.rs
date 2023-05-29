@@ -3,27 +3,25 @@
 use anyhow::Result;
 use ash::vk;
 
+use crate::{Allocator, ComputeCmdBuffer, ComputeSupport};
 use crate::command_buffer::IncompleteCommandBuffer;
 use crate::core::device::ExtensionID;
 use crate::query_pool::{AccelerationStructurePropertyQuery, QueryPool};
 use crate::raytracing::*;
 use crate::sync::domain::ExecutionDomain;
-use crate::{Allocator, ComputeCmdBuffer, ComputeSupport, Error};
 
 impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer
     for IncompleteCommandBuffer<'_, D, A>
 {
     /// Sets the current compute pipeline by looking up the given name in the pipeline cache.
     /// # Errors
-    /// - Fails with [`Error::NoPipelineCache`] if this command buffer was created without a pipeline cache.
     /// - Fails if the given name is not a valid compute pipeline name.
     /// # Example
     /// ```
     /// # use phobos::*;
     /// # use phobos::sync::domain::ExecutionDomain;
     /// # use anyhow::Result;
-    /// // Assumes "my_pipeline" was previously added to the pipeline cache with `PipelineCache::create_named_compute_pipeline()`,
-    /// // and that cmd was created with this cache.
+    /// // Assumes "my_pipeline" was previously added to the pipeline cache with `PipelineCache::create_named_compute_pipeline()`.
     /// fn compute_pipeline<D: ExecutionDomain + ComputeSupport>(cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
     ///     cmd.bind_compute_pipeline("my_pipeline")
     /// }
@@ -31,17 +29,16 @@ impl<D: ComputeSupport + ExecutionDomain, A: Allocator> ComputeCmdBuffer
     fn bind_compute_pipeline(mut self, name: &str) -> Result<Self>
     where
         Self: Sized, {
-        let Some(mut cache) = self.pipeline_cache.clone() else { return Err(Error::NoPipelineCache.into()); };
-        {
-            cache.with_compute_pipeline(name, |pipeline| {
-                self.bind_pipeline_impl(
-                    pipeline.handle,
-                    pipeline.layout,
-                    pipeline.set_layouts.clone(),
-                    vk::PipelineBindPoint::COMPUTE,
-                )
-            })?;
-        }
+        let cache = self.pipeline_cache.clone();
+        cache.with_compute_pipeline(name, |pipeline| {
+            self.bind_pipeline_impl(
+                pipeline.handle,
+                pipeline.layout,
+                pipeline.set_layouts.clone(),
+                vk::PipelineBindPoint::COMPUTE,
+            )
+        })?;
+
         Ok(self)
     }
 

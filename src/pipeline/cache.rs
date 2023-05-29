@@ -7,18 +7,19 @@ use std::sync::{Arc, RwLock};
 use anyhow::Result;
 use ash::vk;
 
-use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
+use crate::{
+    Allocator, ComputePipelineCreateInfo, DefaultAllocator, Device, Error, PipelineCreateInfo,
+};
 use crate::core::device::ExtensionID;
+use crate::pipeline::{ComputePipeline, Pipeline, PipelineType, RayTracingPipeline};
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::pipeline::pipeline_layout::PipelineLayout;
 use crate::pipeline::raytracing::{RayTracingPipelineCreateInfo, ShaderBindingTable, ShaderGroup};
 use crate::pipeline::set_layout::DescriptorSetLayout;
 use crate::pipeline::shader::Shader;
-use crate::pipeline::{ComputePipeline, Pipeline, PipelineType, RayTracingPipeline};
 use crate::util::cache::{Cache, Resource, ResourceKey};
-use crate::{
-    Allocator, ComputePipelineCreateInfo, DefaultAllocator, Device, Error, PipelineCreateInfo,
-};
+
+use super::shader_reflection::{build_pipeline_layout, reflect_shaders, ReflectionInfo};
 
 #[derive(Debug)]
 struct PipelineEntry<P>
@@ -655,7 +656,7 @@ impl<A: Allocator> PipelineCache<A> {
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
     pub(crate) fn with_pipeline<F: FnOnce(&Pipeline) -> Result<()>>(
-        &mut self,
+        &self,
         name: &str,
         rendering_info: PipelineRenderingInfo,
         f: F,
@@ -670,7 +671,7 @@ impl<A: Allocator> PipelineCache<A> {
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
     pub(crate) fn with_compute_pipeline<F: FnOnce(&ComputePipeline) -> Result<()>>(
-        &mut self,
+        &self,
         name: &str,
         f: F,
     ) -> Result<()> {
@@ -684,7 +685,7 @@ impl<A: Allocator> PipelineCache<A> {
     /// - This function can fail if the requested pipeline does not exist in the cache
     /// - This function can fail if allocating the pipeline fails.
     pub(crate) fn with_raytracing_pipeline<F: FnOnce(&RayTracingPipeline<A>) -> Result<()>>(
-        &mut self,
+        &self,
         name: &str,
         f: F,
     ) -> Result<()> {

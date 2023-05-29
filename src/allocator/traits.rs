@@ -16,7 +16,8 @@ pub trait Allocator: Clone + Send + Sync {
     type Allocation: Allocation;
 
     /// Allocates raw memory of a specific memory type. The given name is used for internal tracking and
-    /// debug logging. To get proper [`MemoryRequirements`], call [`vkGetBufferMemoryRequirements`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetBufferMemoryRequirements.html) or
+    /// debug logging. To get proper [`VkMemoryRequirements`](crate::vk::MemoryRequirements),
+    /// call [`vkGetBufferMemoryRequirements`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetBufferMemoryRequirements.html) or
     /// [`vkGetImageMemoryRequirements`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkGetImageMemoryRequirements.html) with your buffer or image.
     /// # Example
     /// ```
@@ -79,8 +80,8 @@ pub trait Allocation: Default {
     /// The user must not free this memory or access a range outside of (`allocation.offset()..allocation.offset() + allocation.size())`.
     unsafe fn memory(&self) -> vk::DeviceMemory;
 
-    /// Get the offset in this `VkDeviceMemory` this allocation refers to. This is exposed because the allocator implementation may choose
-    /// to subdivide large memory blocks into smaller allocations.
+    /// Get the offset in this [`VkDeviceMemory`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkDeviceMemory.html) this allocation refers to.
+    /// This is exposed because the allocator implementation may choose to subdivide large memory blocks into smaller allocations.
     /// # Example
     /// This is useful when binding memory to a buffer or image.
     /// ```

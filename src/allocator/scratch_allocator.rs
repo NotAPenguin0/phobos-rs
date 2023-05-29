@@ -47,7 +47,10 @@ pub struct ScratchAllocatorCreateInfo {
 /// that needs to be updated every frame, like a uniform buffer for transform data.
 /// Because of this typical usage, the scratch allocator allocates memory with [`MemoryType::CpuToGpu`].
 ///
-/// See also: [`InFlightContext`](crate::InFlightContext), [`MemoryType`]
+/// The best way to obtain a scratch allocator is through a [`LocalPool`](crate::pool::LocalPool). This gives
+/// a scratch allocator that is reset and recycled at the end of the pool's lifetime.
+///
+/// See also: [`LocalPool`](crate::pool::LocalPool), [`MemoryType`]
 ///
 /// # Example
 /// ```
@@ -83,7 +86,7 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// given in the usage flags. The actual allocated size may be slightly larger to satisfy alignment requirements.
     /// # Errors
     /// * Fails if the internal allocation fails. This is possible when VRAM runs out.
-    /// * Fails if the memory heap used for the allocation is nt mappable.
+    /// * Fails if the memory heap used for the allocation is not mappable.
     /// # Example
     /// ```
     /// # use phobos::*;
@@ -155,7 +158,7 @@ impl<A: Allocator> ScratchAllocator<A> {
         let padding = self.alignment - unaligned_part;
         let padded_size = size + padding;
         if self.offset + padded_size > self.buffer.size() {
-            Err(anyhow::Error::from(AllocationError(OutOfMemory)))
+            Err(AllocationError(OutOfMemory).into())
         } else {
             let offset = self.offset;
             self.offset += padded_size;
@@ -164,8 +167,8 @@ impl<A: Allocator> ScratchAllocator<A> {
     }
 
     /// Resets the current offset into the allocator back to the beginning. Proper external synchronization needs to be
-    /// added to ensure old buffers are not overwritten. Usually this is done by having one scratch allocator instance
-    /// per frame or thread context.
+    /// added to ensure old buffers are not overwritten. This is usually done by using allocators from a [`LocalPool`](crate::pool::LocalPool)
+    /// and keeping the pool alive as long as GPU execution.
     /// # Safety
     /// This function is safe if the old allocations can be completely discarded by the next time [`Self::allocate()`] is called.
     /// # Example

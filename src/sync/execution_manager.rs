@@ -6,12 +6,12 @@ use std::sync::{Arc, Mutex, MutexGuard, TryLockError, TryLockResult};
 use anyhow::Result;
 use ash::vk;
 
+use crate::{Allocator, CmdBuffer, DefaultAllocator, Device, Error, Fence, PhysicalDevice};
 use crate::command_buffer::*;
 use crate::core::queue::{DeviceQueue, Queue};
 use crate::pool::{Poolable, Pooled, ResourcePool};
 use crate::sync::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
-use crate::{Allocator, CmdBuffer, DefaultAllocator, Device, Error, Fence, PhysicalDevice};
 
 /// The execution manager is responsible for allocating command buffers on correct
 /// queues. To obtain any command buffer, you must allocate it by calling
@@ -123,8 +123,8 @@ impl<A: Allocator> ExecutionManager<A> {
         Queue::allocate_command_buffer::<'q, A, D::CmdBuf<'q, A>>(
             self.device.clone(),
             queue,
-            Some(self.pool.pipelines.clone()),
-            Some(self.pool.descriptors.clone()),
+            self.pool.pipelines.clone(),
+            self.pool.descriptors.clone(),
         )
     }
 
@@ -135,8 +135,8 @@ impl<A: Allocator> ExecutionManager<A> {
         Queue::allocate_command_buffer::<'q, A, D::CmdBuf<'q, A>>(
             self.device.clone(),
             queue,
-            Some(self.pool.pipelines.clone()),
-            Some(self.pool.descriptors.clone()),
+            self.pool.pipelines.clone(),
+            self.pool.descriptors.clone(),
         )
     }
 

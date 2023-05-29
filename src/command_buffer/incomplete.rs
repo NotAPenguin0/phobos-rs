@@ -8,18 +8,18 @@ use std::sync::{Arc, MutexGuard};
 use anyhow::{anyhow, ensure, Result};
 use ash::vk;
 
-use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::{
+    Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder,
+    Device, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache,
+    PipelineStage, Sampler, VirtualResource,
+};
 use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
+use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
 use crate::core::queue::Queue;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::query_pool::{QueryPool, ScopedQuery, TimestampQuery};
 use crate::raytracing::acceleration_structure::AccelerationStructure;
 use crate::sync::domain::ExecutionDomain;
-use crate::{
-    Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, DescriptorSetBuilder,
-    Device, Error, ImageView, IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache,
-    PipelineStage, Sampler, VirtualResource,
-};
 
 impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A>
     for IncompleteCommandBuffer<'q, D, A>
@@ -33,8 +33,8 @@ impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A>
         queue_lock: MutexGuard<'q, Queue>,
         handle: vk::CommandBuffer,
         flags: vk::CommandBufferUsageFlags,
-        pipelines: Option<PipelineCache<A>>,
-        descriptors: Option<DescriptorCache>,
+        pipelines: PipelineCache<A>,
+        descriptors: DescriptorCache,
     ) -> Result<Self> {
         unsafe {
             let begin_info = vk::CommandBufferBeginInfo {
@@ -159,16 +159,14 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
             return Ok(self);
         }
 
-        let Some(mut cache) = self.descriptor_cache.clone() else { return Err(Error::NoDescriptorCache.into()); };
-        {
-            for (index, builder) in self.current_descriptor_sets.take().unwrap() {
-                let mut info = builder.build();
-                info.layout = *self.current_set_layouts.get(index as usize).unwrap();
-                cache.with_descriptor_set(info, |set| {
-                    self.bind_descriptor_set(index, set)?;
-                    Ok(())
-                })?;
-            }
+        let cache = self.descriptor_cache.clone();
+        for (index, builder) in self.current_descriptor_sets.take().unwrap() {
+            let mut info = builder.build();
+            info.layout = *self.current_set_layouts.get(index as usize).unwrap();
+            cache.with_descriptor_set(info, |set| {
+                self.bind_descriptor_set(index, set)?;
+                Ok(())
+            })?;
         }
 
         // We updated all our descriptor sets, were good now.
@@ -601,46 +599,6 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
             .ok_or_else(|| anyhow!("Query pool capacity exceeded"))?;
         query_pool.write_timestamp(self.timestamp_valid_bits, self.handle, stage, index);
         Ok(self)
-    }
-
-    /// Returns true if this command buffer was created with a pipeline cache.
-    /// # Example
-    /// ```
-    /// # use log::warn;
-    /// # use phobos::*;
-    /// # use phobos::sync::domain::ExecutionDomain;
-    /// # use anyhow::Result;
-    /// fn check_pipeline_cache<D: ExecutionDomain + GfxSupport>(cmd: IncompleteCommandBuffer<D>) -> Result<IncompleteCommandBuffer<D>> {
-    ///     if cmd.has_pipeline_cache() {
-    ///         cmd.bind_graphics_pipeline("my_pipeline")
-    ///     } else {
-    ///         warn!("No pipeline cache set, could not bind pipeline");
-    ///         Ok(cmd)
-    ///     }
-    /// }
-    /// ```
-    pub fn has_pipeline_cache(&self) -> bool {
-        self.pipeline_cache.is_some()
-    }
-
-    /// Returns true if this command buffer was created with a descriptor cache.
-    /// # Example
-    /// ```
-    /// # use log::warn;
-    /// # use phobos::*;
-    /// # use phobos::sync::domain::ExecutionDomain;
-    /// # use anyhow::Result;
-    /// fn check_descriptor_cache<D: ExecutionDomain>(cmd: IncompleteCommandBuffer<D>, buffer: &BufferView) -> Result<IncompleteCommandBuffer<D>> {
-    ///     if cmd.has_descriptor_cache() {
-    ///         cmd.bind_uniform_buffer(0, 0, buffer)
-    ///     } else {
-    ///         warn!("No descriptor cache set, could not bind uniform buffer");
-    ///         Ok(cmd)
-    ///     }
-    /// }
-    /// ```
-    pub fn has_descriptor_cache(&self) -> bool {
-        self.descriptor_cache.is_some()
     }
 
     /// Begins a dynamic renderpass. This must be called before binding any pipelines.
