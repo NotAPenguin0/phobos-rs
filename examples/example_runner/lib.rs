@@ -9,14 +9,15 @@ use glam::{Mat4, Vec3};
 use layout::backends::svg::SVGWriter;
 use layout::gv;
 use layout::gv::GraphBuilder;
-use phobos::pool::ResourcePool;
-use phobos::prelude::*;
-use phobos::sync::submit_batch::SubmitBatch;
 use winit::event::{
     ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent,
 };
 use winit::event_loop::{ControlFlow, EventLoop, EventLoopBuilder};
 use winit::window::{Window, WindowBuilder};
+
+use phobos::pool::ResourcePool;
+use phobos::prelude::*;
+use phobos::sync::submit_batch::SubmitBatch;
 
 pub fn front_direction(rotation: Vec3) -> Vec3 {
     let cos_pitch = rotation.x.cos();
@@ -224,6 +225,41 @@ where
             println!("dot render error: {}", e);
         }
     }
+}
+
+#[allow(dead_code)]
+pub fn staged_buffer_upload<T: Copy>(
+    mut ctx: Context,
+    data: &[T],
+    usage: vk::BufferUsageFlags,
+) -> Result<Buffer> {
+    let staging = Buffer::new(
+        ctx.device.clone(),
+        &mut ctx.allocator,
+        data.len() as u64 * std::mem::size_of::<T>() as u64,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        MemoryType::CpuToGpu,
+    )?;
+
+    let mut staging_view = staging.view_full();
+    staging_view.mapped_slice()?.copy_from_slice(data);
+
+    let buffer = Buffer::new_device_local(
+        ctx.device,
+        &mut ctx.allocator,
+        staging.size(),
+        vk::BufferUsageFlags::TRANSFER_DST | usage,
+    )?;
+    let view = buffer.view_full();
+
+    let cmd = ctx
+        .exec
+        .on_domain::<domain::Transfer>()?
+        .copy_buffer(&staging_view, &view)?
+        .finish()?;
+
+    ctx.exec.submit(cmd)?.wait()?;
+    Ok(buffer)
 }
 
 #[derive(Debug)]

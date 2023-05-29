@@ -3,8 +3,11 @@
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, NulError};
 use std::fmt::Formatter;
+#[allow(unused_imports)]
+use std::mem::ManuallyDrop;
 use std::ops::Deref;
-use std::sync::Arc;
+#[allow(unused_imports)]
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::Result;
 use ash::extensions::{ext, khr};

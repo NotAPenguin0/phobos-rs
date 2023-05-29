@@ -74,17 +74,21 @@
 //!
 //! Binding physical resources and recording is covered under the [`graph`](crate::graph) module documentation.
 
-use anyhow::{anyhow, bail, Result};
+#[cfg(feature = "fsr2")]
+use anyhow::{anyhow, bail};
+use anyhow::Result;
 use ash::vk;
 
 use crate::{
-    Allocator, ComputeSupport, DefaultAllocator, Device, Error, ImageView,
-    PhysicalResourceBindings, VirtualResource,
+    Allocator, DefaultAllocator, Error, PhysicalResourceBindings, VirtualResource,
 };
+#[cfg(feature = "fsr2")]
+use crate::{ComputeSupport, Device, ImageView};
 use crate::command_buffer::IncompleteCommandBuffer;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::{Fsr2DispatchDescription, Fsr2DispatchResources};
 use crate::graph::pass_graph::PassResource;
+#[cfg(feature = "fsr2")]
 use crate::graph::physical_resource::PhysicalResource;
 use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
@@ -446,6 +450,7 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         self
     }
 
+    #[allow(dead_code)]
     fn sample_optional_image(
         self,
         resource: &Option<VirtualResource>,

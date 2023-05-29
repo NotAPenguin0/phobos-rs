@@ -1,13 +1,17 @@
 use std::path::Path;
 
 use anyhow::Result;
-use futures::executor::block_on;
+
+use phobos::{image, vk};
 use phobos::command_buffer::traits::*;
+use phobos::pool::LocalPool;
 use phobos::prelude::*;
 use phobos::sync::domain::All;
-use phobos::vk;
+use phobos::sync::submit_batch::SubmitBatch;
 
-use crate::example_runner::{load_spirv_file, Context, ExampleApp, ExampleRunner, WindowContext};
+use crate::example_runner::{
+    Context, ExampleApp, ExampleRunner, load_spirv_file, staged_buffer_upload, WindowContext,
+};
 
 #[path = "../example_runner/lib.rs"]
 mod example_runner;
@@ -50,7 +54,7 @@ impl ExampleApp for Basic {
             .build();
 
         // Store the pipeline in the pipeline cache
-        ctx.pipelines.create_named_pipeline(pci)?;
+        ctx.pool.pipelines.create_named_pipeline(pci)?;
 
         let frag_code = load_spirv_file(Path::new("examples/data/blue.spv"));
         let fragment = ShaderCreateInfo::from_spirv(vk::ShaderStageFlags::FRAGMENT, frag_code);
@@ -65,7 +69,7 @@ impl ExampleApp for Basic {
             .attach_shader(vertex)
             .attach_shader(fragment)
             .build();
-        ctx.pipelines.create_named_pipeline(pci)?;
+        ctx.pool.pipelines.create_named_pipeline(pci)?;
 
         // Define some resources we will use for rendering
         let image = Image::new(
@@ -86,16 +90,11 @@ impl ExampleApp for Basic {
             offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
             offscreen: image,
             sampler: Sampler::default(ctx.device.clone())?,
-            vertex_buffer: block_on(async {
-                staged_buffer_upload(
-                    ctx.device.clone(),
-                    ctx.allocator.clone(),
-                    ctx.exec.clone(),
-                    data.as_slice(),
-                )
-                .unwrap()
-                .await
-            }),
+            vertex_buffer: staged_buffer_upload(
+                ctx.clone(),
+                data.as_slice(),
+                vk::BufferUsageFlags::VERTEX_BUFFER,
+            )?,
         };
 
         Ok(Self {
@@ -103,10 +102,10 @@ impl ExampleApp for Basic {
         })
     }
 
-    fn frame(&mut self, ctx: Context, mut ifc: InFlightContext) -> Result<CommandBuffer<All>> {
+    fn frame(&mut self, ctx: Context, ifc: InFlightContext) -> Result<SubmitBatch<All>> {
         // Define a virtual resource pointing to the swapchain
-        let swap_resource = VirtualResource::image("swapchain");
-        let offscreen = VirtualResource::image("offscreen");
+        let swap_resource = image!("swapchain");
+        let offscreen = image!("offscreen");
 
         let vertices: Vec<f32> = vec![
             -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0,
@@ -115,6 +114,8 @@ impl ExampleApp for Basic {
 
         // Define a render graph with one pass that clears the swapchain image
         let graph = PassGraph::new(Some(&swap_resource));
+
+        let mut pool = LocalPool::new(ctx.pool.clone())?;
 
         // Render pass that renders to an offscreen attachment
         let offscreen_pass = PassBuilder::render("offscreen")
@@ -183,18 +184,17 @@ impl ExampleApp for Basic {
             .build()?;
 
         let mut bindings = PhysicalResourceBindings::new();
-        bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
+        bindings.bind_image("swapchain", &ifc.swapchain_image);
         bindings.bind_image("offscreen", &self.resources.offscreen_view);
         // create a command buffer capable of executing graphics commands
-        let cmd = ctx
-            .exec
-            .on_domain::<All, _>(Some(ctx.pipelines.clone()), Some(ctx.descriptors.clone()))
-            .unwrap();
+        let cmd = ctx.exec.on_domain::<All>().unwrap();
         // record render graph to this command buffer
         let cmd = graph
-            .record(cmd, &bindings, &mut ifc, None, &mut ())?
-            .finish();
-        cmd
+            .record(cmd, &bindings, &mut pool, None, &mut ())?
+            .finish()?;
+        let mut batch = ctx.exec.start_submit_batch()?;
+        batch.submit_for_present(cmd, ifc, pool)?;
+        Ok(batch)
     }
 }
 
