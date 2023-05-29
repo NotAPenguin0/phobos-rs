@@ -5,9 +5,9 @@ use std::ffi::CStr;
 use anyhow::Result;
 use ash::vk;
 
+use crate::{AppSettings, Error, Instance, Surface, WindowInterface};
 use crate::core::queue::{QueueInfo, QueueType};
 use crate::util::string::wrap_c_str;
-use crate::{AppSettings, Error, Surface, VkInstance, WindowInterface};
 
 /// Stores queried properties of a Vulkan extension.
 #[derive(Debug, Default)]
@@ -40,7 +40,7 @@ pub struct PhysicalDevice {
 impl PhysicalDevice {
     /// Selects the best available physical device from the given requirements and parameters.
     pub fn select<Window: WindowInterface>(
-        instance: &VkInstance,
+        instance: &Instance,
         surface: Option<&Surface>,
         settings: &AppSettings<Window>,
     ) -> Result<Self> {
@@ -198,7 +198,7 @@ impl PhysicalDevice {
 
     /// Selects the best available physical device and creates a surface on it.
     pub fn select_with_surface<Window: WindowInterface>(
-        instance: &VkInstance,
+        instance: &Instance,
         settings: &AppSettings<Window>,
     ) -> Result<(Surface, Self)> {
         let mut surface = Surface::new(&instance, &settings)?;

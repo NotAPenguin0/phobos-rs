@@ -5,7 +5,7 @@ use std::ops::Deref;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
+use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
 
 /// Contains all information about a [`VkSurfaceKHR`](vk::SurfaceKHR)
 #[derive(Derivative)]
@@ -27,7 +27,7 @@ pub struct Surface {
 impl Surface {
     /// Create a new surface.
     pub fn new<Window: WindowInterface>(
-        instance: &VkInstance,
+        instance: &Instance,
         settings: &AppSettings<Window>,
     ) -> Result<Self> {
         if let Some(window) = settings.window {

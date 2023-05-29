@@ -9,7 +9,7 @@ use ash::vk::{DeviceMemory, DeviceSize, MemoryRequirements};
 use gpu_allocator::vulkan as vk_alloc;
 use gpu_allocator::vulkan::AllocationScheme;
 
-use crate::{Allocator, Device, Error, PhysicalDevice, VkInstance};
+use crate::{Allocator, Device, Error, Instance, PhysicalDevice};
 use crate::allocator::memory_type::MemoryType;
 use crate::allocator::traits;
 
@@ -26,7 +26,7 @@ use crate::allocator::traits;
 /// # fn vk_get_memory_requirements(device: &Device, buffer: &Buffer) -> vk::MemoryRequirements { unimplemented!() }
 /// # fn vk_bind_buffer_memory(device: &Device, buffer: &Buffer, memory: vk::DeviceMemory, offset: u64) { unimplemented!() }
 /// fn use_allocator(
-///     instance: VkInstance,
+///     instance: Instance,
 ///     physical_device: PhysicalDevice,
 ///     device: Device,
 ///     allocator: DefaultAllocator,
@@ -79,7 +79,7 @@ impl DefaultAllocator {
     /// // Use allocator.
     /// ```
     pub fn new(
-        instance: &VkInstance,
+        instance: &Instance,
         device: &Device,
         physical_device: &PhysicalDevice,
     ) -> Result<Self> {

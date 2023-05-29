@@ -5,8 +5,8 @@ use std::ops::Deref;
 use anyhow::Result;
 use ash::vk;
 
+use crate::Instance;
 use crate::util::string::wrap_c_str;
-use crate::VkInstance;
 
 /// Vulkan debug messenger, can be passed to certain functions to extend debugging functionality.
 ///
@@ -26,7 +26,7 @@ pub struct DebugMessenger {
 impl DebugMessenger {
     /// Creates a new debug messenger. Requires the vulkan validation layers to be enabled to
     /// do anything useful.
-    pub fn new(instance: &VkInstance) -> Result<Self> {
+    pub fn new(instance: &Instance) -> Result<Self> {
         // SAFETY: We do not mutate this loader in any way, so the safety contract is satisfied
         let functions =
             ash::extensions::ext::DebugUtils::new(unsafe { instance.loader() }, instance);

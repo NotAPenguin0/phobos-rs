@@ -71,7 +71,7 @@ use ash::vk;
 
 use crate::{
     Allocator, AppSettings, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence,
-    Image, ImageView, Semaphore, Surface, Swapchain, VkInstance, WindowInterface,
+    Image, ImageView, Instance, Semaphore, Surface, Swapchain, WindowInterface,
 };
 use crate::pool::{Poolable, Pooled, ResourcePool};
 use crate::sync::domain::ExecutionDomain;
@@ -319,7 +319,7 @@ impl<A: Allocator> FrameManager<A> {
 
     /// Initialize frame manager and create a swapchain.
     pub fn new_with_swapchain<W: WindowInterface>(
-        instance: &VkInstance,
+        instance: &Instance,
         device: Device,
         pool: ResourcePool<A>,
         settings: &AppSettings<W>,

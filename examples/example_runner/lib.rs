@@ -299,7 +299,7 @@ pub struct VulkanContext {
     pub physical_device: PhysicalDevice,
     pub surface: Option<Surface>,
     pub debug_messenger: DebugMessenger,
-    pub instance: VkInstance,
+    pub instance: Instance,
 }
 
 #[derive(Clone)]

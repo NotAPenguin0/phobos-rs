@@ -4,11 +4,11 @@ use std::marker::PhantomData;
 
 use anyhow::Result;
 
-use crate::pool::{ResourcePool, ResourcePoolCreateInfo};
 use crate::{
     Allocator, AppSettings, DebugMessenger, DefaultAllocator, Device, ExecutionManager,
-    FrameManager, PhysicalDevice, Surface, VkInstance, WindowInterface,
+    FrameManager, Instance, PhysicalDevice, Surface, WindowInterface,
 };
+use crate::pool::{ResourcePool, ResourcePoolCreateInfo};
 
 /// ZST implementing initialization without a window
 pub struct HeadlessContext;
@@ -29,7 +29,7 @@ pub trait ContextInit<W: WindowInterface> {
     /// Initialize the context with a custom allocator
     fn init_with_allocator<
         A: Allocator + 'static,
-        F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>,
+        F: FnOnce(&Instance, &PhysicalDevice, &Device) -> Result<A>,
     >(
         settings: &AppSettings<W>,
         make_alloc: F,
@@ -38,7 +38,7 @@ pub trait ContextInit<W: WindowInterface> {
 
 impl<W: WindowInterface> ContextInit<W> for HeadlessContext {
     type Output<A: Allocator> = (
-        VkInstance,
+        Instance,
         PhysicalDevice,
         Device,
         A,
@@ -57,12 +57,12 @@ impl<W: WindowInterface> ContextInit<W> for HeadlessContext {
     /// Initialize the headless context with a custom allocator
     fn init_with_allocator<
         A: Allocator + 'static,
-        F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>,
+        F: FnOnce(&Instance, &PhysicalDevice, &Device) -> Result<A>,
     >(
         settings: &AppSettings<W>,
         make_alloc: F,
     ) -> Result<Self::Output<A>> {
-        let instance = VkInstance::new(settings)?;
+        let instance = Instance::new(settings)?;
         let physical_device = PhysicalDevice::select(&instance, None, settings)?;
         let device = Device::new(&instance, &physical_device, settings)?;
         let allocator = make_alloc(&instance, &physical_device, &device)?;
@@ -86,7 +86,7 @@ impl<W: WindowInterface> ContextInit<W> for HeadlessContext {
 impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
     /// All created vulkan objects
     type Output<A: Allocator> = (
-        VkInstance,
+        Instance,
         PhysicalDevice,
         Surface,
         Device,
@@ -107,12 +107,12 @@ impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
     /// Initialize the windowed context with a custom allocator
     fn init_with_allocator<
         A: Allocator + 'static,
-        F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>,
+        F: FnOnce(&Instance, &PhysicalDevice, &Device) -> Result<A>,
     >(
         settings: &AppSettings<W>,
         make_alloc: F,
     ) -> Result<Self::Output<A>> {
-        let instance = VkInstance::new(settings)?;
+        let instance = Instance::new(settings)?;
         let (surface, physical_device) =
             { PhysicalDevice::select_with_surface(&instance, settings)? };
         let device = Device::new(&instance, &physical_device, settings)?;
@@ -155,13 +155,13 @@ impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
 pub fn initialize_with_allocator<
     W: WindowInterface,
     A: Allocator + 'static,
-    F: FnOnce(&VkInstance, &PhysicalDevice, &Device) -> Result<A>,
+    F: FnOnce(&Instance, &PhysicalDevice, &Device) -> Result<A>,
 >(
     settings: &AppSettings<W>,
     headless: bool,
     make_alloc: F,
 ) -> Result<(
-    VkInstance,
+    Instance,
     PhysicalDevice,
     Option<Surface>,
     Device,
@@ -216,7 +216,7 @@ pub fn initialize<W: WindowInterface>(
     settings: &AppSettings<W>,
     headless: bool,
 ) -> Result<(
-    VkInstance,
+    Instance,
     PhysicalDevice,
     Option<Surface>,
     Device,

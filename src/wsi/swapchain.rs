@@ -5,8 +5,8 @@ use std::ops::Deref;
 use anyhow::Result;
 use ash::vk;
 
+use crate::{AppSettings, Device, Error, Instance, Surface, WindowInterface};
 use crate::image::*;
-use crate::{AppSettings, Device, Error, Surface, VkInstance, WindowInterface};
 
 #[derive(Debug)]
 pub(crate) struct SwapchainImage {
@@ -38,7 +38,7 @@ pub struct Swapchain {
 impl Swapchain {
     /// Create a new swapchain.
     pub fn new<Window: WindowInterface>(
-        instance: &VkInstance,
+        instance: &Instance,
         device: Device,
         settings: &AppSettings<Window>,
         surface: &Surface,

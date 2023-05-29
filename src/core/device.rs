@@ -15,7 +15,7 @@ use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxDimensions2D;
 
-use crate::{AppSettings, Error, PhysicalDevice, VkInstance, WindowInterface};
+use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
 #[cfg(feature = "fsr2")]
@@ -111,7 +111,7 @@ impl Device {
     /// # Errors
     /// * Can fail if vulkan device init fails. This is possible if an optional feature was enabled that is not supported.
     pub fn new<Window: WindowInterface>(
-        instance: &VkInstance,
+        instance: &Instance,
         physical_device: &PhysicalDevice,
         settings: &AppSettings<Window>,
     ) -> Result<Self> {
@@ -430,7 +430,7 @@ impl Device {
     /// # Example
     /// ```
     /// # use phobos::*;
-    /// use std::ffi::{CStr};
+    /// use std::ffi::CStr;
     /// fn list_device_info(device: Device) {
     ///     let properties = device.properties();
     ///     // SAFETY: The Vulkan API is guaranteed to return a null-terminated string.
@@ -449,7 +449,6 @@ impl Device {
     /// Get the physical device properties related to acceleration structures.
     ///
     /// # Errors
-    ///
     /// - Fails if [`ExtensionID::AccelerationStructure`] is not enabled.
     pub fn acceleration_structure_properties(
         &self,
@@ -460,7 +459,6 @@ impl Device {
 
     /// Get the physical device properties related to raytracing pipelines
     /// # Errors
-    ///
     /// - Fails if [`ExtensionID::RayTracingPipeline`] is not enabled.
     pub fn ray_tracing_properties(
         &self,
@@ -531,7 +529,7 @@ impl Device {
         self.inner.rt_pipeline.as_ref()
     }
 
-    /// True we only have a single queue, and thus the sharing mode for resources is always EXCLUSIVE.
+    /// True we only have a single queue, and thus the sharing mode for resources is always `VK_SHARING_MODE_EXCLUSIVE`.
     /// Not extremely useful on the user side, but maybe you want to know whether one physical queue is being multiplexed
     /// behind your back.
     pub fn is_single_queue(&self) -> bool {

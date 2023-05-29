@@ -8,22 +8,22 @@ use anyhow::Result;
 use ash;
 use ash::vk;
 
-use crate::util::string::unwrap_to_raw_strings;
 use crate::{AppSettings, WindowInterface};
+use crate::util::string::unwrap_to_raw_strings;
 
 /// Represents the loaded vulkan instance.
 /// You need to create this to initialize the Vulkan API. This is used
 /// to create the device from.
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct VkInstance {
+pub struct Instance {
     #[derivative(Debug = "ignore")]
     entry: ash::Entry,
     #[derivative(Debug = "ignore")]
     instance: ash::Instance,
 }
 
-impl VkInstance {
+impl Instance {
     /// Initializes the Vulkan API.
     /// # Errors
     /// * Can fail if the Vulkan loader was not found. Check for valid Vulkan drivers.
@@ -34,7 +34,7 @@ impl VkInstance {
         let instance = create_vk_instance(&entry, settings)?;
         #[cfg(feature = "log-objects")]
         trace!("Created new VkInstance {:p}", instance.handle());
-        Ok(VkInstance {
+        Ok(Instance {
             entry,
             instance,
         })
@@ -48,7 +48,7 @@ impl VkInstance {
     }
 }
 
-impl Drop for VkInstance {
+impl Drop for Instance {
     fn drop(&mut self) {
         #[cfg(feature = "log-objects")]
         trace!("Destroying VkInstance {:p}", self.instance.handle());
@@ -58,7 +58,7 @@ impl Drop for VkInstance {
     }
 }
 
-impl Deref for VkInstance {
+impl Deref for Instance {
     type Target = ash::Instance;
 
     fn deref(&self) -> &Self::Target {
