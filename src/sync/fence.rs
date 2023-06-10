@@ -9,8 +9,8 @@ use anyhow::Result;
 use ash::prelude::VkResult;
 use ash::vk;
 
-use crate::pool::Poolable;
 use crate::Device;
+use crate::pool::Poolable;
 
 struct CleanupFnLink<'f> {
     pub f: Box<dyn FnOnce() + 'f>,
@@ -32,9 +32,9 @@ pub trait FenceValue<T> {
 /// ```
 /// use phobos::prelude::*;
 ///
-/// let exec = ExecutionManager::new(device, &physical_device)?;
+/// let exec = ExecutionManager::new(device, &physical_device, pool)?;
 /// // Obtain some command buffer
-/// let cmd = exec.on_domain::<domain::All, _>(None, None)?.finish()?;
+/// let cmd = exec.on_domain::<domain::All>()?.finish()?;
 /// let fence = exec.submit(cmd)?;
 /// // We can now await this fence, or attach a resulting value to it to make the future
 /// // a little more useful
@@ -66,7 +66,7 @@ pub trait FenceValue<T> {
 ///     staging_view.mapped_slice()?.copy_from_slice(src);
 ///     // Create a command buffer to copy the buffers
 ///     let cmd =
-///         exec.on_domain::<domain::Transfer>(None, None)?
+///         exec.on_domain::<domain::Transfer>()?
 ///             .copy_buffer(&staging_view, &view)?
 ///             .finish()?;
 ///     // Submit our command buffer and obtain a fence
@@ -89,16 +89,19 @@ pub trait FenceValue<T> {
 /// async fn upload_buffer<T: Copy>(device: Device, mut allocator: DefaultAllocator, exec: ExecutionManager, src: &[T]) -> Result<Buffer> {
 ///     // ... snip
 ///     // Submit our command buffer and obtain a fence
-///     let fence = exec.submit(cmd)?;
+///     let mut fence = exec.submit(cmd)?;
 ///     // Attach our resulting buffer and await the fence.
+///     // To do this we have to use fence.replace() to replace the value inside the pooled object.
 ///     fence
-///         // Add a cleanup function which will take ownership of any data that needs to be freed
-///         // after the fence completes.
-///         // The future will call these functions when the fence is ready.
-///         .with_cleanup(move || {
-///             drop(staging);
-///         })
-///         .attach_value(Ok(buffer)).await
+///         .replace(|fence| {
+///             // Add a cleanup function which will take ownership of any data that needs to be freed
+///             // after the fence completes.
+///             // The future will call these functions when the fence is ready.
+///             fence.with_cleanup(move || {
+///                 drop(staging);
+///             })
+///         }).await?;
+///     Ok(buffer)
 /// }
 /// ```
 ///

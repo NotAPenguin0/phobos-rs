@@ -20,8 +20,8 @@
 //! // Define a pass that will handle the layout transition to `VK_IMAGE_LAYOUT_PRESENT_SRC_KHR`.
 //! // This is required in your main frame graph.
 //! let present_pass = PassBuilder::present("present", &swap_resource);
-//! // Create the graph. Note that we need to pass the swapchain resource to it as well.
-//! let mut graph = PassGraph::<domain::Graphics>::new(Some(&swap_resource));
+//! // Create the graph.
+//! let mut graph = PassGraph::<domain::Graphics>::new();
 //! // Add our pass
 //! graph.add_pass(present_pass)?;
 //! // Build the graph and obtain a BuiltPassGraph.
@@ -43,10 +43,10 @@
 //!
 //! // Bind swapchain virtual resource to this frame's swapchain image.
 //! let mut bindings = PhysicalResourceBindings::new();
-//! bindings.bind_image("swapchain", ifc.swapchain_image.as_ref().unwrap());
-//! let cmd = exec.on_domain::<domain::Graphics>(None, None)?;
+//! bindings.bind_image("swapchain", &ifc.swapchain_image);
+//! let cmd = exec.on_domain::<domain::Graphics>()?;
 //! // Debug messenger not required, but recommended together with the `debug-markers` feature.
-//! let final_cmd = graph.record(cmd, &bindings, &mut ifc, Some(debug_messenger))?
+//! let final_cmd = graph.record(cmd, &bindings, &mut pool, Some(debug_messenger))?
 //!                 .finish();
 //! ```
 
