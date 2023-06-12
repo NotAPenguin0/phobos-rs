@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use anyhow::Result;
 use ash::vk;
 
-use crate::pipeline::create_info::*;
 use crate::{ByteSize, Error, PipelineCreateInfo, ShaderCreateInfo};
+use crate::pipeline::create_info::*;
 
 /// Used to facilitate creating a graphics pipeline. For an example, please check the
 /// [`pipeline`](crate::pipeline) module level documentation.
@@ -312,6 +312,21 @@ impl PipelineBuilder {
                 alpha_blend_op: vk::BlendOp::ADD,
                 color_write_mask: vk::ColorComponentFlags::RGBA,
             }));
+        self
+    }
+
+    /// Add a blend attachment writing to each color component
+    pub fn blend_attachment(mut self, src_color: vk::BlendFactor, dst_color: vk::BlendFactor, color_op: vk::BlendOp, src_alpha: vk::BlendFactor, dst_alpha: vk::BlendFactor, alpha_op: vk::BlendOp) -> Self {
+        self.inner.blend_attachments.push(PipelineColorBlendAttachmentState(vk::PipelineColorBlendAttachmentState {
+            blend_enable: vk::TRUE,
+            src_color_blend_factor: src_color,
+            dst_color_blend_factor: dst_color,
+            color_blend_op: color_op,
+            src_alpha_blend_factor: src_alpha,
+            dst_alpha_blend_factor: dst_alpha,
+            alpha_blend_op: alpha_op,
+            color_write_mask: vk::ColorComponentFlags::RGBA,
+        }));
         self
     }
 
