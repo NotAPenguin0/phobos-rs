@@ -21,7 +21,7 @@ struct CleanupFnLink<'f> {
 pub trait FenceValue<T> {
     /// Get the value of this fence. Note that using this without an attached value will panic.
     /// Using this before the fence was awaited may result in undefined behaviour.
-    fn value(&mut self) -> T;
+    fn value(&mut self) -> Option<T>;
 }
 
 /// Wrapper around a [`VkFence`](vk::Fence) object. Fences are used for CPU-GPU sync.
@@ -128,14 +128,9 @@ pub type GpuFuture<T> = Fence<T>;
 impl<T> FenceValue<T> for Fence<T> {
     /// Get the value of this fence. Note that using this without an attached value will panic.
     /// Using this before the fence was awaited may result in undefined behaviour.
-    default fn value(&mut self) -> T {
-        self.value.take().unwrap()
+    fn value(&mut self) -> Option<T> {
+        self.value.take()
     }
-}
-
-impl FenceValue<()> for Fence<()> {
-    /// For fences that do not hold a value, this does nothing.
-    fn value(&mut self) {}
 }
 
 impl Fence<()> {
@@ -214,7 +209,7 @@ impl<T> Fence<T> {
     /// <br>
     /// ## rayon
     /// If the rayon feature is enabled, this will first yield to rayon and then yield to the OS if there is no rayon work.
-    pub fn wait_and_yield(&mut self) -> Result<T> {
+    pub fn wait_and_yield(&mut self) -> Result<Option<T>> {
         loop {
             if self.poll_status()? {
                 break;
@@ -242,7 +237,7 @@ impl<T> Fence<T> {
 
     /// Waits for the fence to be signaled with no timeout. Note that this is a blocking call. For the nonblocking version, use the `Future` implementation by calling
     /// `.await`.
-    pub fn wait(&mut self) -> Result<T> {
+    pub fn wait(&mut self) -> Result<Option<T>> {
         let result = unsafe { self.wait_without_cleanup() };
         self.call_cleanup_chain();
         // Return previous result
@@ -286,7 +281,7 @@ impl<T> Fence<T> {
 // Note that the future implementation for Fence works by periodically polling the fence.
 // This could not be desirable depending on the timeout chosen by the implementation.
 impl<T> std::future::Future for Fence<T> {
-    type Output = T;
+    type Output = Option<T>;
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         let status = unsafe { self.device.get_fence_status(self.handle).unwrap() };

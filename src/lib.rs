@@ -86,7 +86,6 @@
 //! - [`buffer`] for managing [`VkBuffer`](vk::Buffer) objects.
 //! - [`util`] for various utilities and common patterns like buffer uploads.
 
-#![feature(min_specialization)]
 #![cfg_attr(feature = "fsr2", feature(new_uninit))]
 #![warn(missing_docs)]
 
