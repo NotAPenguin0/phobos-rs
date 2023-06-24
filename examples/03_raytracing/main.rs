@@ -15,7 +15,7 @@ use phobos::sync::submit_batch::SubmitBatch;
 use phobos::util::align::align;
 
 use crate::example_runner::{
-    Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, save_dotfile, WindowContext,
+    Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, WindowContext,
 };
 
 #[path = "../example_runner/lib.rs"]

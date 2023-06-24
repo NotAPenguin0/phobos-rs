@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 phobos = { path = "../..", features = ["shaderc", "fsr2"] }
+layout-rs = "0.1.1"

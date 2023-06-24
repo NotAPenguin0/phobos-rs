@@ -8,9 +8,6 @@ use std::path::Path;
 use anyhow::{bail, Result};
 use futures::executor::block_on;
 use glam::{Mat4, Vec3};
-use layout::backends::svg::SVGWriter;
-use layout::gv;
-use layout::gv::GraphBuilder;
 use winit::event::{
     ElementState, Event, MouseButton, MouseScrollDelta, VirtualKeyCode, WindowEvent,
 };
@@ -203,31 +200,6 @@ pub fn load_spirv_file(path: &Path) -> Vec<u32> {
 pub fn create_shader(path: &str, stage: vk::ShaderStageFlags) -> ShaderCreateInfo {
     let code = load_spirv_file(Path::new(path));
     ShaderCreateInfo::from_spirv(stage, code)
-}
-
-#[allow(dead_code)]
-pub fn save_dotfile<G>(graph: &G, path: &str)
-where
-    G: GraphViz, {
-    let dot = graph.dot().unwrap();
-    let dot = format!("{}", dot);
-    let mut parser = gv::DotParser::new(&dot);
-    match parser.process() {
-        Ok(g) => {
-            let mut svg = SVGWriter::new();
-            let mut builder = GraphBuilder::new();
-            builder.visit_graph(&g);
-            let mut vg = builder.get();
-            vg.do_it(false, false, false, &mut svg);
-            let svg = svg.finalize();
-            let mut f = File::create(Path::new(path)).unwrap();
-            f.write(&svg.as_bytes()).unwrap();
-        }
-        Err(e) => {
-            parser.print_error();
-            println!("dot render error: {}", e);
-        }
-    }
 }
 
 #[allow(dead_code)]
