@@ -112,8 +112,8 @@ pub struct Fence<T = ()> {
     #[derivative(Debug = "ignore")]
     first_cleanup_fn: Option<Box<CleanupFnLink<'static>>>,
     value: Option<T>,
-    poll_rate: Duration,
     handle: vk::Fence,
+    wait_thread_spawned: bool,
 }
 
 // SAFETY: Fences refer to a VkFence object on the gpu, which is not dropped when it goes out of scope and can
@@ -144,7 +144,7 @@ impl Fence<()> {
             first_cleanup_fn: self.first_cleanup_fn.take(),
             device: self.device.clone(),
             value: Some(value),
-            poll_rate: self.poll_rate,
+            wait_thread_spawned: false,
         }
     }
 }
@@ -152,15 +152,6 @@ impl Fence<()> {
 impl<T> Fence<T> {
     /// Create a new fence, possibly in the signaled status.
     pub fn new(device: Device, signaled: bool) -> Result<Self, vk::Result> {
-        Self::new_with_poll_rate(device, signaled, Duration::from_millis(5))
-    }
-
-    /// Create a new fence with the specified poll rate for awaiting it as a future.
-    pub fn new_with_poll_rate(
-        device: Device,
-        signaled: bool,
-        poll_rate: Duration,
-    ) -> Result<Self, vk::Result> {
         let info = vk::FenceCreateInfo {
             s_type: vk::StructureType::FENCE_CREATE_INFO,
             p_next: std::ptr::null(),
@@ -179,10 +170,20 @@ impl<T> Fence<T> {
         Ok(Fence {
             handle,
             device,
-            poll_rate,
             first_cleanup_fn: None,
             value: None,
+            wait_thread_spawned: false,
         })
+    }
+
+    /// Create a new fence with the specified poll rate for awaiting it as a future.
+    #[deprecated(since = "0.10.0", note="`poll_rate` is ignored, use `new` instead")]
+    pub fn new_with_poll_rate(
+        device: Device,
+        signaled: bool,
+        _poll_rate: Duration,
+    ) -> Result<Self, vk::Result> {
+        Self::new(device, signaled)
     }
 
     fn call_cleanup_chain(&mut self) {
@@ -278,8 +279,6 @@ impl<T> Fence<T> {
     }
 }
 
-// Note that the future implementation for Fence works by periodically polling the fence.
-// This could not be desirable depending on the timeout chosen by the implementation.
 impl<T> std::future::Future for Fence<T> {
     type Output = Option<T>;
 
@@ -288,16 +287,22 @@ impl<T> std::future::Future for Fence<T> {
 
         if status {
             self.call_cleanup_chain();
-            Poll::Ready(self.as_mut().value())
-        } else {
+            self.wait_thread_spawned = false;
+            return Poll::Ready(self.as_mut().value());
+        } else if !self.wait_thread_spawned {
             let waker = ctx.waker().clone();
-            let poll_rate = self.poll_rate;
+            let device = self.device.clone();
+            let fence_handle = self.handle;
             std::thread::spawn(move || {
-                std::thread::sleep(poll_rate);
+                unsafe {
+                    device
+                        .wait_for_fences(slice::from_ref(&fence_handle), true, u64::MAX)
+                        .unwrap();
+                }
                 waker.wake();
             });
-            Poll::Pending
         }
+        Poll::Pending
     }
 }
 
