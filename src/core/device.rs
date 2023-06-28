@@ -9,18 +9,19 @@ use std::ops::Deref;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ash::extensions::{ext, khr};
 use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxDimensions2D;
+use futures::future::err;
 
-use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2ContextCreateInfo;
 use crate::util::string::unwrap_to_raw_strings;
+use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
 
 /// Device extensions that phobos requests but might not be available.
 /// # Example
@@ -67,7 +68,7 @@ struct DeviceInner {
     #[derivative(Debug = "ignore")]
     rt_pipeline: Option<khr::RayTracingPipeline>,
     #[derivative(Debug = "ignore")]
-    debug_utils: Option<ext::DebugUtils>
+    debug_utils: Option<ext::DebugUtils>,
 }
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
@@ -321,7 +322,7 @@ impl Device {
         };
 
         let debug_utils = if settings.enable_validation {
-            Some( ext::DebugUtils::new( unsafe { instance.loader() }, &instance ))
+            Some(ext::DebugUtils::new(unsafe { instance.loader() }, &instance))
         } else {
             None
         };
@@ -476,13 +477,14 @@ impl Device {
         Ok(self.inner.rt_properties.as_ref().unwrap())
     }
 
-    /// Get the debug_utils object
+    /// Get access to the functions of VK_EXT_debug_utils
     /// # Errors
-    /// - Fails if validation layer is disabled
-    pub fn debug_utils(
-        &self
-    ) -> Result<&ext::DebugUtils> {
-        Ok(self.inner.debug_utils.as_ref().unwrap())
+    /// - Fails if validation layers are disabled
+    pub fn debug_utils(&self) -> Result<&ext::DebugUtils> {
+        self.inner
+            .debug_utils
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("DebugUtils does not exist"))
     }
 
     /// Check if a device extension is enabled.

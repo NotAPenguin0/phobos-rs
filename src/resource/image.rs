@@ -20,6 +20,7 @@ use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
 
+use crate::core::traits::{AsRaw, Nameable};
 use crate::{Allocation, Allocator, DefaultAllocator, Device, MemoryType};
 
 /// Abstraction over a [`VkImage`](vk::Image). Stores information about size, format, etc. Additionally couples the image data together
@@ -304,13 +305,13 @@ impl<A: Allocator> Image<A> {
     }
 }
 
-unsafe impl crate::core::traits::AsRaw for Image {
+unsafe impl AsRaw for Image {
     unsafe fn as_raw(&self) -> u64 {
         self.handle().as_raw()
     }
 }
 
-impl crate::core::traits::Nameable for Image {
+impl Nameable for Image {
     const OBJECT_TYPE: vk::ObjectType = vk::ObjectType::IMAGE;
 }
 

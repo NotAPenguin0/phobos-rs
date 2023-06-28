@@ -5,6 +5,7 @@ use ash::vk;
 use ash::vk::Handle;
 
 use crate::core::device::ExtensionID;
+use crate::core::traits::{AsRaw, Nameable};
 use crate::util::to_vk::IntoVulkanType;
 use crate::{AccelerationStructureType, BufferView, Device};
 
@@ -93,13 +94,13 @@ impl AccelerationStructure {
     }
 }
 
-unsafe impl crate::core::traits::AsRaw for AccelerationStructure {
+unsafe impl AsRaw for AccelerationStructure {
     unsafe fn as_raw(&self) -> u64 {
         self.handle().as_raw()
     }
 }
 
-impl crate::core::traits::Nameable for AccelerationStructure {
+impl Nameable for AccelerationStructure {
     const OBJECT_TYPE: vk::ObjectType = vk::ObjectType::ACCELERATION_STRUCTURE_KHR;
 }
 

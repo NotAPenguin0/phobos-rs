@@ -37,6 +37,7 @@ use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
 
+use crate::core::traits::{AsRaw, Nameable};
 use crate::util::align::align;
 use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 
@@ -278,13 +279,13 @@ impl<A: Allocator> Buffer<A> {
     }
 }
 
-unsafe impl crate::core::traits::AsRaw for Buffer {
+unsafe impl AsRaw for Buffer {
     unsafe fn as_raw(&self) -> u64 {
         self.handle().as_raw()
     }
 }
 
-impl crate::core::traits::Nameable for Buffer {
+impl Nameable for Buffer {
     const OBJECT_TYPE: vk::ObjectType = vk::ObjectType::BUFFER;
 }
 
