@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use ash::vk;
+use ash::vk::Handle;
 
 use crate::{Allocation, Allocator, DefaultAllocator, Device, MemoryType};
 
@@ -301,6 +302,16 @@ impl<A: Allocator> Image<A> {
     pub fn samples(&self) -> vk::SampleCountFlags {
         self.samples
     }
+}
+
+unsafe impl crate::core::traits::AsRaw for Image {
+    unsafe fn as_raw(&self) -> u64 {
+        self.handle().as_raw()
+    }
+}
+
+impl crate::core::traits::Nameable for Image {
+    const OBJECT_TYPE: vk::ObjectType = vk::ObjectType::IMAGE;
 }
 
 impl<A: Allocator> Drop for Image<A> {
