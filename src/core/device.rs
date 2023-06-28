@@ -66,6 +66,8 @@ struct DeviceInner {
     acceleration_structure: Option<khr::AccelerationStructure>,
     #[derivative(Debug = "ignore")]
     rt_pipeline: Option<khr::RayTracingPipeline>,
+    #[derivative(Debug = "ignore")]
+    debug_utils: Option<ext::DebugUtils>
 }
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
@@ -318,6 +320,12 @@ impl Device {
             None
         };
 
+        let debug_utils = if settings.enable_validation {
+            Some( ext::DebugUtils::new( unsafe { instance.loader() }, &instance ))
+        } else {
+            None
+        };
+
         match &mut accel_properties {
             None => {}
             Some(properties) => {
@@ -375,6 +383,7 @@ impl Device {
             dynamic_state3,
             acceleration_structure,
             rt_pipeline,
+            debug_utils,
             #[cfg(feature = "fsr2")]
             fsr2_context: Mutex::new(fsr2),
         };
@@ -465,6 +474,15 @@ impl Device {
     ) -> Result<&vk::PhysicalDeviceRayTracingPipelinePropertiesKHR> {
         self.require_extension(ExtensionID::RayTracingPipeline)?;
         Ok(self.inner.rt_properties.as_ref().unwrap())
+    }
+
+    /// Get the debug_utils object
+    /// # Errors
+    /// - Fails if validation layer is disabled
+    pub fn debug_utils(
+        &self
+    ) -> Result<&ext::DebugUtils> {
+        Ok(self.inner.debug_utils.as_ref().unwrap())
     }
 
     /// Check if a device extension is enabled.
