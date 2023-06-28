@@ -35,6 +35,7 @@ use std::ptr::NonNull;
 
 use anyhow::Result;
 use ash::vk;
+use ash::vk::Handle;
 
 use crate::util::align::align;
 use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
@@ -275,6 +276,16 @@ impl<A: Allocator> Buffer<A> {
     pub fn address(&self) -> vk::DeviceAddress {
         self.address
     }
+}
+
+unsafe impl crate::core::traits::AsRaw for Buffer {
+    unsafe fn as_raw(&self) -> u64 {
+        self.handle().as_raw()
+    }
+}
+
+impl crate::core::traits::Nameable for Buffer {
+    const OBJECT_TYPE: vk::ObjectType = vk::ObjectType::BUFFER;
 }
 
 impl<A: Allocator> Drop for Buffer<A> {
