@@ -37,9 +37,9 @@ use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
 
+use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 use crate::core::traits::{AsRaw, Nameable};
 use crate::util::align::align;
-use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 
 /// Wrapper around a [`VkBuffer`](vk::Buffer).
 #[derive(Derivative)]
@@ -67,6 +67,7 @@ unsafe impl<A: Allocator> Send for Buffer<A> {}
 pub struct BufferView {
     handle: vk::Buffer,
     pointer: Option<NonNull<c_void>>,
+    address: vk::DeviceAddress,
     offset: vk::DeviceSize,
     size: vk::DeviceSize,
 }
@@ -238,6 +239,7 @@ impl<A: Allocator> Buffer<A> {
                     self.pointer
                         .map(|p| NonNull::new(p.as_ptr().offset(offset as isize)).unwrap())
                 },
+                address: self.address + offset,
                 size,
             })
         }
@@ -251,6 +253,7 @@ impl<A: Allocator> Buffer<A> {
             handle: self.handle,
             pointer: self.pointer,
             offset: 0,
+            address: self.address,
             size: self.size,
         }
     }
@@ -332,5 +335,10 @@ impl BufferView {
     /// Get the size of this buffer view.
     pub fn size(&self) -> vk::DeviceSize {
         self.size
+    }
+
+    /// Get the device address of the start of this buffer view.
+    pub fn address(&self) -> vk::DeviceAddress {
+        self.address
     }
 }
