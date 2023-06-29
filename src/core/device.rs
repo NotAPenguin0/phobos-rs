@@ -16,6 +16,7 @@ use ash::vk;
 use fsr2_sys::FfxDimensions2D;
 use futures::future::err;
 
+use crate::core::traits::Nameable;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
 #[cfg(feature = "fsr2")]
@@ -560,6 +561,22 @@ impl Device {
     #[cfg(feature = "fsr2")]
     pub fn fsr2_context(&self) -> MutexGuard<ManuallyDrop<Fsr2Context>> {
         self.inner.fsr2_context.lock().unwrap()
+    }
+
+    /// Set the name of any given compatible object for debugging purposes
+    pub fn set_name<T: Nameable>(&self, object: &T, name: &str) -> Result<()> {
+        let object_name = CString::new(name)?;
+        let name_info = vk::DebugUtilsObjectNameInfoEXT::builder()
+            .object_type(<T as Nameable>::OBJECT_TYPE)
+            .object_handle(unsafe { object.as_raw() })
+            .object_name(&object_name)
+            .build();
+
+        unsafe {
+            Ok(self
+                .debug_utils()?
+                .set_debug_utils_object_name(self.handle().handle(), &name_info)?)
+        }
     }
 }
 
