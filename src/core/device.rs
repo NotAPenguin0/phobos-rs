@@ -9,18 +9,20 @@ use std::ops::Deref;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ash::extensions::{ext, khr};
 use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxDimensions2D;
+use futures::future::err;
 
-use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
+use crate::core::traits::Nameable;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2ContextCreateInfo;
 use crate::util::string::unwrap_to_raw_strings;
+use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
 
 /// Device extensions that phobos requests but might not be available.
 /// # Example
@@ -66,6 +68,8 @@ struct DeviceInner {
     acceleration_structure: Option<khr::AccelerationStructure>,
     #[derivative(Debug = "ignore")]
     rt_pipeline: Option<khr::RayTracingPipeline>,
+    #[derivative(Debug = "ignore")]
+    debug_utils: Option<ext::DebugUtils>,
 }
 
 /// Wrapper around a `VkDevice`. The device provides access to almost the entire
@@ -318,6 +322,12 @@ impl Device {
             None
         };
 
+        let debug_utils = if settings.enable_validation {
+            Some(ext::DebugUtils::new(unsafe { instance.loader() }, &instance))
+        } else {
+            None
+        };
+
         match &mut accel_properties {
             None => {}
             Some(properties) => {
@@ -375,6 +385,7 @@ impl Device {
             dynamic_state3,
             acceleration_structure,
             rt_pipeline,
+            debug_utils,
             #[cfg(feature = "fsr2")]
             fsr2_context: Mutex::new(fsr2),
         };
@@ -467,6 +478,16 @@ impl Device {
         Ok(self.inner.rt_properties.as_ref().unwrap())
     }
 
+    /// Get access to the functions of VK_EXT_debug_utils
+    /// # Errors
+    /// - Fails if validation layers are disabled
+    pub fn debug_utils(&self) -> Result<&ext::DebugUtils> {
+        self.inner
+            .debug_utils
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("DebugUtils does not exist"))
+    }
+
     /// Check if a device extension is enabled.
     /// # Example
     /// ```
@@ -540,6 +561,22 @@ impl Device {
     #[cfg(feature = "fsr2")]
     pub fn fsr2_context(&self) -> MutexGuard<ManuallyDrop<Fsr2Context>> {
         self.inner.fsr2_context.lock().unwrap()
+    }
+
+    /// Set the name of any given compatible object for debugging purposes
+    pub fn set_name<T: Nameable>(&self, object: &T, name: &str) -> Result<()> {
+        let object_name = CString::new(name)?;
+        let name_info = vk::DebugUtilsObjectNameInfoEXT::builder()
+            .object_type(<T as Nameable>::OBJECT_TYPE)
+            .object_handle(unsafe { object.as_raw() })
+            .object_name(&object_name)
+            .build();
+
+        unsafe {
+            Ok(self
+                .debug_utils()?
+                .set_debug_utils_object_name(self.handle().handle(), &name_info)?)
+        }
     }
 }
 

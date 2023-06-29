@@ -82,6 +82,7 @@ impl ExampleApp for Basic {
             vk::Format::R8G8B8A8_SRGB,
             vk::SampleCountFlags::TYPE_1,
         )?;
+        ctx.device.set_name(&image, "Render Image")?;
         let data: Vec<f32> = vec![
             -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0,
             1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
@@ -97,6 +98,7 @@ impl ExampleApp for Basic {
                 vk::BufferUsageFlags::VERTEX_BUFFER,
             )?,
         };
+        ctx.device.set_name(&resources.vertex_buffer, "Vertex Buffer")?;
 
         Ok(Self {
             resources,

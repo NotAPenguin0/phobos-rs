@@ -2,8 +2,10 @@
 
 use anyhow::Result;
 use ash::vk;
+use ash::vk::Handle;
 
 use crate::core::device::ExtensionID;
+use crate::core::traits::{AsRaw, Nameable};
 use crate::util::to_vk::IntoVulkanType;
 use crate::{AccelerationStructureType, BufferView, Device};
 
@@ -90,6 +92,16 @@ impl AccelerationStructure {
     pub fn ty(&self) -> AccelerationStructureType {
         self.ty
     }
+}
+
+unsafe impl AsRaw for AccelerationStructure {
+    unsafe fn as_raw(&self) -> u64 {
+        self.handle().as_raw()
+    }
+}
+
+impl Nameable for AccelerationStructure {
+    const OBJECT_TYPE: vk::ObjectType = vk::ObjectType::ACCELERATION_STRUCTURE_KHR;
 }
 
 impl Drop for AccelerationStructure {

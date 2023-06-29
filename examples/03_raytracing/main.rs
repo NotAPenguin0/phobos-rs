@@ -44,6 +44,7 @@ fn make_input_buffer<T: Copy>(
     data: &[T],
     usage: vk::BufferUsageFlags,
     alignment: Option<u64>,
+    name: &str,
 ) -> Result<Buffer> {
     let buffer = match alignment {
         None => Buffer::new(
@@ -70,6 +71,7 @@ fn make_input_buffer<T: Copy>(
         .view_full()
         .mapped_slice::<T>()?
         .copy_from_slice(data);
+    ctx.device.set_name(&buffer, name)?;
     Ok(buffer)
 }
 
@@ -78,12 +80,12 @@ fn make_vertex_buffer(ctx: &mut Context) -> Result<Buffer> {
         -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0,
         1.0,
     ];
-    make_input_buffer(ctx, &vertices, vk::BufferUsageFlags::VERTEX_BUFFER, None)
+    make_input_buffer(ctx, &vertices, vk::BufferUsageFlags::VERTEX_BUFFER, None, "Vertex Buffer")
 }
 
 fn make_index_buffer(ctx: &mut Context) -> Result<Buffer> {
     let indices = (0..=5).collect::<Vec<u32>>();
-    make_input_buffer(ctx, indices.as_slice(), vk::BufferUsageFlags::INDEX_BUFFER, None)
+    make_input_buffer(ctx, indices.as_slice(), vk::BufferUsageFlags::INDEX_BUFFER, None, "Index Buffer")
 }
 
 fn make_instance_buffer(ctx: &mut Context, blas: &AccelerationStructure) -> Result<Buffer> {
@@ -97,7 +99,7 @@ fn make_instance_buffer(ctx: &mut Context, blas: &AccelerationStructure) -> Resu
         .acceleration_structure(&blas, AccelerationStructureBuildType::Device)?;
     // The Vulkan spec states: For any element of pInfos[i].pGeometries or pInfos[i].ppGeometries with a geometryType of VK_GEOMETRY_TYPE_INSTANCES_KHR,
     // if geometry.arrayOfPointers is VK_FALSE, geometry.instances.data.deviceAddress must be aligned to 16 bytes
-    make_input_buffer(ctx, std::slice::from_ref(&instance), Default::default(), Some(16))
+    make_input_buffer(ctx, std::slice::from_ref(&instance), Default::default(), Some(16), "Instance Buffer")
 }
 
 fn blas_build_info<'a>(vertices: &Buffer, indices: &Buffer) -> AccelerationStructureBuildInfo<'a> {
@@ -138,6 +140,7 @@ fn make_acceleration_structure(
     ctx: &mut Context,
     build_info: &AccelerationStructureBuildInfo,
     prim_counts: &[u32],
+    name: &str,
 ) -> Result<BackedAccelerationStructure> {
     let sizes = query_build_size(
         &ctx.device,
@@ -164,6 +167,7 @@ fn make_acceleration_structure(
         buffer.view_full(),
         vk::AccelerationStructureCreateFlagsKHR::default(),
     )?;
+    ctx.device.set_name(&acceleration_structure, name)?;
     Ok(BackedAccelerationStructure {
         accel: acceleration_structure,
         buffer,
@@ -202,7 +206,7 @@ impl ExampleApp for RaytracingSample {
         // We only need to set the build mode, flags and all geometry.
         // src and dst acceleration structures can be left empty
         let mut blas_build_info = blas_build_info(&vtx_buffer, &idx_buffer);
-        let blas = make_acceleration_structure(&mut ctx, &blas_build_info, &[2])?;
+        let blas = make_acceleration_structure(&mut ctx, &blas_build_info, &[2], "BLAS")?;
         // We can now fill the rest of the build info (source and destination acceleration structures, and the scratch data).
         blas_build_info = blas_build_info
             .dst(&blas.accel)
@@ -246,7 +250,7 @@ impl ExampleApp for RaytracingSample {
 
         let instance_buffer = make_instance_buffer(&mut ctx, &compact_as)?;
         let mut tlas_build_info = tlas_build_info(&instance_buffer);
-        let tlas = make_acceleration_structure(&mut ctx, &tlas_build_info, &[1])?;
+        let tlas = make_acceleration_structure(&mut ctx, &tlas_build_info, &[1], "TLAS")?;
         tlas_build_info = tlas_build_info
             .dst(&tlas.accel)
             .scratch_data(tlas.scratch.address());
