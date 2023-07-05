@@ -28,6 +28,13 @@ impl Default for TransformMatrix {
     }
 }
 
+impl TransformMatrix {
+    /// Create a new TransformMatrix using TransformMatrixKHR
+    pub fn new(in_transform: &vk::TransformMatrixKHR) -> Self {
+        Self(in_transform)
+    }
+}
+
 impl IntoVulkanType for TransformMatrix {
     type Output = vk::TransformMatrixKHR;
 
