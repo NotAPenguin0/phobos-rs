@@ -2,10 +2,13 @@
 
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use std::task::{Poll, Context};
 
 use anyhow::Result;
 use ash::vk;
+use futures::Future;
 use multimap::{Entry, MultiMap};
 
 use crate::{
@@ -118,6 +121,16 @@ impl<P: Poolable> Pooled<P> {
     pub fn replace<F: FnOnce(P) -> P>(&mut self, f: F) {
         let item = self.item.take().unwrap();
         self.item = Some(f(item));
+    }
+}
+
+impl<P: Poolable + Future<Output = T>, T> Future for Pooled<P> {
+    type Output = T;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // SAFETY: self is pinned, and poll() will not move out of self
+        let item = unsafe { self.map_unchecked_mut(|poolable| poolable.item.as_mut().unwrap()) };
+        item.poll(cx)
     }
 }
 
