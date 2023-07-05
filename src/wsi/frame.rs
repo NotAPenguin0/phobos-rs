@@ -247,7 +247,7 @@ impl<A: Allocator> FrameManager<A> {
     /// will signal. Any commands for this frame submitted from somewhere else must be synchronized to this submission.
     fn submit<D: ExecutionDomain + 'static>(&mut self, batch: SubmitBatch<D>) -> Result<()> {
         // Finish the submit batch and submit it. We store the fence so we can wait on it later.
-        let mut per_frame = &mut self.per_frame[self.current_frame as usize];
+        let per_frame = &mut self.per_frame[self.current_frame as usize];
         per_frame.fence = batch.finish()?;
         Ok(())
     }
@@ -369,7 +369,7 @@ impl<A: Allocator> FrameManager<A> {
         }
 
         let submission = {
-            let mut per_frame = &mut self.per_frame[self.current_frame as usize];
+            let per_frame = &mut self.per_frame[self.current_frame as usize];
             // Delete the command buffer used the previous time this frame was allocated.
             if let Some(cmd) = &mut per_frame.command_buffer {
                 unsafe { cmd.delete(exec.clone())? }

@@ -9,12 +9,11 @@ use std::ops::Deref;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result};
 use ash::extensions::{ext, khr};
 use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxDimensions2D;
-use futures::future::err;
 
 use crate::core::traits::Nameable;
 #[cfg(feature = "fsr2")]
