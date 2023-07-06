@@ -26,7 +26,6 @@ impl ExampleApp for Compute {
             ctx.device,
             &mut ctx.allocator,
             (1024 * 4 * std::mem::size_of::<f32>()) as u64,
-            vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::TRANSFER_DST,
             MemoryType::CpuToGpu,
         )?;
 

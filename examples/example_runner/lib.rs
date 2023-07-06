@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Read};
 use std::path::Path;
 
 use anyhow::{bail, Result};
@@ -175,7 +175,7 @@ macro_rules! ubo_struct_assign {
                 $($fname:$ftype,)*
             }
 
-            let mut buffer_name = $pool.allocate_scratch_ubo(std::mem::size_of::<$name>() as vk::DeviceSize)?;
+            let mut buffer_name = $pool.allocate_scratch_buffer(std::mem::size_of::<$name>() as vk::DeviceSize)?;
             let $var = buffer_name.mapped_slice::<$name>()?;
             let mut $var = $var.get_mut(0).unwrap();
 
@@ -206,13 +206,11 @@ pub fn create_shader(path: &str, stage: vk::ShaderStageFlags) -> ShaderCreateInf
 pub fn staged_buffer_upload<T: Copy>(
     mut ctx: Context,
     data: &[T],
-    usage: vk::BufferUsageFlags,
 ) -> Result<Buffer> {
     let staging = Buffer::new(
         ctx.device.clone(),
         &mut ctx.allocator,
         data.len() as u64 * std::mem::size_of::<T>() as u64,
-        vk::BufferUsageFlags::TRANSFER_SRC,
         MemoryType::CpuToGpu,
     )?;
 
@@ -223,7 +221,6 @@ pub fn staged_buffer_upload<T: Copy>(
         ctx.device,
         &mut ctx.allocator,
         staging.size(),
-        vk::BufferUsageFlags::TRANSFER_DST | usage,
     )?;
     let view = buffer.view_full();
 

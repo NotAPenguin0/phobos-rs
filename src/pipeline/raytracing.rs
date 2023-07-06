@@ -99,9 +99,6 @@ impl<A: Allocator> ShaderBindingTable<A> {
             device.clone(),
             &mut allocator,
             sbt_size as u64,
-            vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR
-                | vk::BufferUsageFlags::TRANSFER_DST
-                | vk::BufferUsageFlags::TRANSFER_SRC,
             MemoryType::CpuToGpu,
         )?;
         let handles = unsafe {

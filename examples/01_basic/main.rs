@@ -95,7 +95,6 @@ impl ExampleApp for Basic {
             vertex_buffer: staged_buffer_upload(
                 ctx.clone(),
                 data.as_slice(),
-                vk::BufferUsageFlags::VERTEX_BUFFER,
             )?,
         };
         ctx.device.set_name(&resources.vertex_buffer, "Vertex Buffer")?;
@@ -124,9 +123,9 @@ impl ExampleApp for Basic {
         let offscreen_pass = PassBuilder::render("offscreen")
             .color([1.0, 0.0, 0.0, 1.0])
             .clear_color_attachment(&offscreen, ClearColor::Float([0.0, 0.0, 0.0, 0.0]))?
-            .execute_fn(|mut cmd, ifc, _bindings, _| {
+            .execute_fn(|mut cmd, pool, _bindings, _| {
                 // Our pass will render a fullscreen quad that 'clears' the screen, just so we can test pipeline creation
-                let mut buffer = ifc.allocate_scratch_vbo(
+                let mut buffer = pool.allocate_scratch_buffer(
                     (vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize,
                 )?;
                 let slice = buffer.mapped_slice::<f32>()?;
@@ -148,7 +147,7 @@ impl ExampleApp for Basic {
                 offscreen_pass.output(&offscreen).unwrap(),
                 PipelineStage::FRAGMENT_SHADER,
             )
-            .execute_fn(|cmd, _ifc, bindings, _| {
+            .execute_fn(|cmd, _pool, bindings, _| {
                 cmd.full_viewport_scissor()
                     .bind_graphics_pipeline("sample")?
                     .resolve_and_bind_sampled_image(

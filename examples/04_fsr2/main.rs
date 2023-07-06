@@ -376,7 +376,7 @@ impl ExampleApp for Fsr2Sample {
                     -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0,
                     1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
                 ];
-                let mut vtx_buffer = local_pool.allocate_scratch_vbo(
+                let mut vtx_buffer = local_pool.allocate_scratch_buffer(
                     (vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize,
                 )?;
                 let slice = vtx_buffer.mapped_slice::<f32>()?;

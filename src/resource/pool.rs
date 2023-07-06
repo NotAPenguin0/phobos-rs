@@ -15,7 +15,6 @@ use crate::{
     Allocator, BufferView, DefaultAllocator, DescriptorCache, Device, Fence, PipelineCache,
     ScratchAllocator,
 };
-use crate::allocator::scratch_allocator::ScratchAllocatorCreateInfo;
 
 /// Indicates that this object can be pooled in a [`Pool`](crate::pool::Pool)
 pub trait Poolable {
@@ -92,10 +91,7 @@ pub struct ResourcePoolCreateInfo<A: Allocator = DefaultAllocator> {
 pub struct LocalPool<A: Allocator = DefaultAllocator> {
     #[allow(dead_code)]
     pool: ResourcePool<A>,
-    vertex_allocator: Pooled<ScratchAllocator<A>>,
-    index_allocator: Pooled<ScratchAllocator<A>>,
-    uniform_allocator: Pooled<ScratchAllocator<A>>,
-    storage_allocator: Pooled<ScratchAllocator<A>>,
+    scratch_allocator: Pooled<ScratchAllocator<A>>,
 }
 
 impl<P: Poolable> Clone for Pool<P> {
@@ -208,8 +204,8 @@ impl<A: Allocator + 'static> ResourcePool<A> {
         let descriptors = DescriptorCache::new(info.device.clone())?;
         let device = info.device.clone();
         let mut alloc = info.allocator.clone();
-        let allocators = Pool::new(move |key: &ScratchAllocatorCreateInfo| {
-            ScratchAllocator::new(device.clone(), &mut alloc, info.scratch_size, key.usage)
+        let allocators = Pool::new(move |_| {
+            ScratchAllocator::new(device.clone(), &mut alloc, info.scratch_size)
         })?;
         let device = info.device.clone();
         let fences = Pool::new(move |_| Ok(Fence::new(device.clone(), false)?))?;
@@ -224,16 +220,13 @@ impl<A: Allocator + 'static> ResourcePool<A> {
 }
 
 impl<A: Allocator> ResourcePool<A> {
-    /// Get a new scratch allocator from the pool with specified usage flags
+    /// Get a new scratch allocator from the pool
     pub fn get_scratch_allocator(
         &self,
-        usage: vk::BufferUsageFlags,
     ) -> Result<Pooled<ScratchAllocator<A>>> {
         ScratchAllocator::new_in_pool(
             &self.allocators,
-            &ScratchAllocatorCreateInfo {
-                usage,
-            },
+            &()
         )
     }
 
@@ -247,54 +240,17 @@ impl<A: Allocator> ResourcePool<A> {
 impl<A: Allocator> LocalPool<A> {
     /// Create a new local pool from a global resource pool
     pub fn new(pool: ResourcePool<A>) -> Result<Self> {
-        let vertex_alloc = pool.get_scratch_allocator(
-            vk::BufferUsageFlags::TRANSFER_DST
-                | vk::BufferUsageFlags::TRANSFER_SRC
-                | vk::BufferUsageFlags::VERTEX_BUFFER,
-        )?;
-        let index_alloc = pool.get_scratch_allocator(
-            vk::BufferUsageFlags::TRANSFER_DST
-                | vk::BufferUsageFlags::TRANSFER_SRC
-                | vk::BufferUsageFlags::INDEX_BUFFER,
-        )?;
-        let uniform_alloc = pool.get_scratch_allocator(
-            vk::BufferUsageFlags::TRANSFER_DST
-                | vk::BufferUsageFlags::TRANSFER_SRC
-                | vk::BufferUsageFlags::UNIFORM_BUFFER,
-        )?;
-        let storage_alloc = pool.get_scratch_allocator(
-            vk::BufferUsageFlags::TRANSFER_DST
-                | vk::BufferUsageFlags::TRANSFER_SRC
-                | vk::BufferUsageFlags::STORAGE_BUFFER,
-        )?;
+        let alloc = pool.get_scratch_allocator()?;
 
         Ok(Self {
             pool,
-            vertex_allocator: vertex_alloc,
-            index_allocator: index_alloc,
-            uniform_allocator: uniform_alloc,
-            storage_allocator: storage_alloc,
+            scratch_allocator: alloc,
         })
     }
 
-    /// Allocate a scratch vertex buffer, which is only valid for the scope of this local pool.
+    /// Allocate a scratch buffer, which is only valid for the scope of this local pool.
     /// See also: [`ScratchAllocator`](crate::ScratchAllocator)
-    pub fn allocate_scratch_vbo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
-        self.vertex_allocator.allocate(size)
-    }
-    /// Allocate a scratch index buffer, which is only valid for the scope of this local pool.
-    /// See also: [`ScratchAllocator`](crate::ScratchAllocator)
-    pub fn allocate_scratch_ibo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
-        self.index_allocator.allocate(size)
-    }
-    /// Allocate a scratch uniform buffer, which is only valid for the scope of this local pool.
-    /// See also: [`ScratchAllocator`](crate::ScratchAllocator)
-    pub fn allocate_scratch_ubo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
-        self.uniform_allocator.allocate(size)
-    }
-    /// Allocate a scratch shader storage buffer, which is only valid for the scope of this local pool.
-    /// See also: [`ScratchAllocator`](crate::ScratchAllocator)
-    pub fn allocate_scratch_ssbo(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
-        self.storage_allocator.allocate(size)
+    pub fn allocate_scratch_buffer(&mut self, size: vk::DeviceSize) -> Result<BufferView> {
+        self.scratch_allocator.allocate(size)
     }
 }

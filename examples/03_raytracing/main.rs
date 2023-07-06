@@ -4,7 +4,6 @@ use anyhow::Result;
 use ash::vk;
 use glam::{Mat4, Vec3};
 use log::{info, trace};
-
 use phobos::graph::pass::ClearColor;
 use phobos::image;
 use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
@@ -15,7 +14,7 @@ use phobos::sync::submit_batch::SubmitBatch;
 use phobos::util::align::align;
 
 use crate::example_runner::{
-    Context, create_shader, ExampleApp, ExampleRunner, load_spirv_file, WindowContext,
+    create_shader, load_spirv_file, Context, ExampleApp, ExampleRunner, WindowContext,
 };
 
 #[path = "../example_runner/lib.rs"]
@@ -42,7 +41,6 @@ struct RaytracingSample {
 fn make_input_buffer<T: Copy>(
     ctx: &mut Context,
     data: &[T],
-    usage: vk::BufferUsageFlags,
     alignment: Option<u64>,
     name: &str,
 ) -> Result<Buffer> {
@@ -51,9 +49,6 @@ fn make_input_buffer<T: Copy>(
             ctx.device.clone(),
             &mut ctx.allocator,
             (data.len() * std::mem::size_of::<T>()) as u64,
-            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR
-                | vk::BufferUsageFlags::TRANSFER_DST
-                | usage,
             MemoryType::CpuToGpu,
         )?,
         Some(alignment) => Buffer::new_aligned(
@@ -61,9 +56,6 @@ fn make_input_buffer<T: Copy>(
             &mut ctx.allocator,
             (data.len() * std::mem::size_of::<T>()) as u64,
             alignment,
-            vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR
-                | vk::BufferUsageFlags::TRANSFER_DST
-                | usage,
             MemoryType::CpuToGpu,
         )?,
     };
@@ -80,12 +72,12 @@ fn make_vertex_buffer(ctx: &mut Context) -> Result<Buffer> {
         -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0,
         1.0,
     ];
-    make_input_buffer(ctx, &vertices, vk::BufferUsageFlags::VERTEX_BUFFER, None, "Vertex Buffer")
+    make_input_buffer(ctx, &vertices, None, "Vertex Buffer")
 }
 
 fn make_index_buffer(ctx: &mut Context) -> Result<Buffer> {
     let indices = (0..=5).collect::<Vec<u32>>();
-    make_input_buffer(ctx, indices.as_slice(), vk::BufferUsageFlags::INDEX_BUFFER, None, "Index Buffer")
+    make_input_buffer(ctx, indices.as_slice(), None, "Index Buffer")
 }
 
 fn make_instance_buffer(ctx: &mut Context, blas: &AccelerationStructure) -> Result<Buffer> {
@@ -99,7 +91,7 @@ fn make_instance_buffer(ctx: &mut Context, blas: &AccelerationStructure) -> Resu
         .acceleration_structure(&blas, AccelerationStructureBuildType::Device)?;
     // The Vulkan spec states: For any element of pInfos[i].pGeometries or pInfos[i].ppGeometries with a geometryType of VK_GEOMETRY_TYPE_INSTANCES_KHR,
     // if geometry.arrayOfPointers is VK_FALSE, geometry.instances.data.deviceAddress must be aligned to 16 bytes
-    make_input_buffer(ctx, std::slice::from_ref(&instance), Default::default(), Some(16), "Instance Buffer")
+    make_input_buffer(ctx, std::slice::from_ref(&instance), Some(16), "Instance Buffer")
 }
 
 fn blas_build_info<'a>(vertices: &Buffer, indices: &Buffer) -> AccelerationStructureBuildInfo<'a> {
@@ -148,19 +140,10 @@ fn make_acceleration_structure(
         build_info,
         prim_counts,
     )?;
-    let buffer = Buffer::new_device_local(
-        ctx.device.clone(),
-        &mut ctx.allocator,
-        sizes.size,
-        vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR,
-    )?;
+    let buffer = Buffer::new_device_local(ctx.device.clone(), &mut ctx.allocator, sizes.size)?;
     // Allocate scratch buffer for building the acceleration structure
-    let scratch_buffer = Buffer::new_device_local(
-        ctx.device.clone(),
-        &mut ctx.allocator,
-        sizes.build_scratch_size,
-        vk::BufferUsageFlags::STORAGE_BUFFER,
-    )?;
+    let scratch_buffer =
+        Buffer::new_device_local(ctx.device.clone(), &mut ctx.allocator, sizes.build_scratch_size)?;
     let acceleration_structure = AccelerationStructure::new(
         ctx.device.clone(),
         build_info.ty(),
@@ -182,12 +165,7 @@ fn make_compacted(
     size: u64,
 ) -> Result<(AccelerationStructure, Buffer)> {
     // Create final compacted acceleration structures
-    let compact_buffer = Buffer::new_device_local(
-        ctx.device.clone(),
-        &mut ctx.allocator,
-        size,
-        vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR,
-    )?;
+    let compact_buffer = Buffer::new_device_local(ctx.device.clone(), &mut ctx.allocator, size)?;
     let compact_as = AccelerationStructure::new(
         ctx.device.clone(),
         accel.ty(),
@@ -361,12 +339,12 @@ impl ExampleApp for RaytracingSample {
         let render_pass = PassBuilder::render("copy")
             .clear_color_attachment(&swap, ClearColor::Float([0.0, 0.0, 0.0, 0.0]))?
             .sample_image(rt_pass.output(&rt_image).unwrap(), PipelineStage::FRAGMENT_SHADER)
-            .execute_fn(|cmd, ifc, bindings, _| {
+            .execute_fn(|cmd, pool, bindings, _| {
                 let vertices: Vec<f32> = vec![
                     -1.0, 1.0, 0.0, 1.0, -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0,
                     1.0, 1.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
                 ];
-                let mut vtx_buffer = ifc.allocate_scratch_vbo(
+                let mut vtx_buffer = pool.allocate_scratch_buffer(
                     (vertices.len() * std::mem::size_of::<f32>()) as vk::DeviceSize,
                 )?;
                 let slice = vtx_buffer.mapped_slice::<f32>()?;

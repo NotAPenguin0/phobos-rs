@@ -32,16 +32,9 @@ use anyhow::Result;
 use ash::vk;
 use gpu_allocator::AllocationError::OutOfMemory;
 
-use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};
-use crate::Error::AllocationError;
 use crate::pool::Poolable;
-
-/// Info needed to create a scratch allocator in a resource pool
-#[derive(Copy, Clone, Hash, Eq, PartialEq)]
-pub struct ScratchAllocatorCreateInfo {
-    /// Usage flags for the internally created buffer
-    pub usage: vk::BufferUsageFlags,
-}
+use crate::Error::AllocationError;
+use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};
 
 /// A linear allocator used for short-lived resources. A good example of such a resource is a buffer
 /// that needs to be updated every frame, like a uniform buffer for transform data.
@@ -82,8 +75,10 @@ pub struct ScratchAllocator<A: Allocator = DefaultAllocator> {
 }
 
 impl<A: Allocator> ScratchAllocator<A> {
-    /// Create a new scratch allocator with a specified maximum capacity. All possible usages for buffers allocated from this should be
-    /// given in the usage flags. The actual allocated size may be slightly larger to satisfy alignment requirements.
+    /// Create a new scratch allocator with a specified maximum capacity.
+    /// The actual allocated size may be slightly larger to satisfy alignment requirements.
+    /// Alignment requirement is the maximum alignment needed for any buffer type. For more granular control, use
+    /// [`Self::new_with_alignment()`]
     /// # Errors
     /// * Fails if the internal allocation fails. This is possible when VRAM runs out.
     /// * Fails if the memory heap used for the allocation is not mappable.
@@ -92,39 +87,21 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// # use phobos::*;
     /// # use anyhow::Result;
     /// fn make_scratch_allocator<A: Allocator>(device: Device, alloc: &mut A) -> Result<ScratchAllocator<A>> {
-    ///     ScratchAllocator::new(device, alloc, 1024 as usize, vk::BufferUsageFlags::UNIFORM_BUFFER)
+    ///     ScratchAllocator::new(device, alloc, 1024 as usize)
     /// }
     /// ```
     pub fn new(
         device: Device,
         allocator: &mut A,
         max_size: impl Into<vk::DeviceSize>,
-        usage: vk::BufferUsageFlags,
     ) -> Result<Self> {
-        let buffer = Buffer::new(device.clone(), allocator, max_size, usage, MemoryType::CpuToGpu)?;
-        let mut alignment = 0;
-        if usage
-            .intersects(vk::BufferUsageFlags::VERTEX_BUFFER | vk::BufferUsageFlags::INDEX_BUFFER)
-        {
-            alignment = alignment.max(16);
-        } else if usage.contains(vk::BufferUsageFlags::UNIFORM_BUFFER) {
-            alignment = alignment.max(
-                device
-                    .properties()
-                    .limits
-                    .min_uniform_buffer_offset_alignment,
-            );
-        } else if usage.contains(vk::BufferUsageFlags::STORAGE_BUFFER) {
-            alignment = alignment.max(
-                device
-                    .properties()
-                    .limits
-                    .min_storage_buffer_offset_alignment,
-            );
-        } else {
-            unimplemented!()
-        };
+        Self::new_with_alignment(device, allocator, max_size, 256)
+    }
 
+    /// Create a new scratch allocator with given alignment. The alignment used must be large enough to satisfy the alignment requirements
+    /// of all buffer usage flags buffers from this allocator will be used with.
+    pub fn new_with_alignment(device: Device, allocator: &mut A, max_size: impl Into<vk::DeviceSize>, alignment: u64) -> Result<Self> {
+        let buffer = Buffer::new(device, allocator, max_size, MemoryType::CpuToGpu)?;
         if buffer.is_mapped() {
             Ok(Self {
                 buffer,
@@ -182,7 +159,7 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// }
     ///
     /// fn use_scratch_allocator<A: Allocator>(device: Device, alloc: &mut A) -> Result<()> {
-    ///     let mut allocator = ScratchAllocator::new(device.clone(), alloc, 128 as u64, vk::BufferUsageFlags::UNIFORM_BUFFER)?;
+    ///     let mut allocator = ScratchAllocator::new(device.clone(), alloc, 128 as u64)?;
     ///     let buffer: BufferView = allocator.allocate(128 as u64)?;
     ///     let mut fence = use_the_buffer(buffer);
     ///     fence.wait()?;
@@ -199,7 +176,7 @@ impl<A: Allocator> ScratchAllocator<A> {
 }
 
 impl<A: Allocator> Poolable for ScratchAllocator<A> {
-    type Key = ScratchAllocatorCreateInfo;
+    type Key = ();
 
     fn on_release(&mut self) {
         unsafe { self.reset() }

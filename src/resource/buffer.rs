@@ -16,8 +16,6 @@
 //!                       alloc.clone(),
 //!                       // 16 bytes large
 //!                       16 as vk::DeviceSize,
-//!                       // We will use this buffer as a uniform buffer only
-//!                       vk::BufferUsageFlags::UNIFORM_BUFFER,
 //!                       // CpuToGpu will always set HOST_VISIBLE and HOST_COHERENT, and try to set DEVICE_LOCAL.
 //!                       // Usually this resides on the PCIe BAR.
 //!                       MemoryType::CpuToGpu);
@@ -37,9 +35,10 @@ use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
 
-use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
+use crate::core::device::ExtensionID;
 use crate::core::traits::{AsRaw, Nameable};
 use crate::util::align::align;
+use crate::{Allocation, Allocator, DefaultAllocator, Device, Error, MemoryType};
 
 /// Wrapper around a [`VkBuffer`](vk::Buffer).
 #[derive(Derivative)]
@@ -76,14 +75,35 @@ pub struct BufferView {
 // so its value is not dropped when sending this to a different thread.
 unsafe impl Send for BufferView {}
 
+fn get_buffer_usage_flags(device: &Device) -> vk::BufferUsageFlags {
+    let mut usage = vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS
+        | vk::BufferUsageFlags::INDEX_BUFFER
+        | vk::BufferUsageFlags::INDIRECT_BUFFER
+        | vk::BufferUsageFlags::STORAGE_BUFFER
+        | vk::BufferUsageFlags::STORAGE_TEXEL_BUFFER
+        | vk::BufferUsageFlags::TRANSFER_DST
+        | vk::BufferUsageFlags::TRANSFER_SRC
+        | vk::BufferUsageFlags::UNIFORM_BUFFER
+        | vk::BufferUsageFlags::UNIFORM_TEXEL_BUFFER
+        | vk::BufferUsageFlags::VERTEX_BUFFER;
+    if device.is_extension_enabled(ExtensionID::AccelerationStructure) {
+        usage |= vk::BufferUsageFlags::ACCELERATION_STRUCTURE_STORAGE_KHR
+            | vk::BufferUsageFlags::ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_KHR;
+    }
+    if device.is_extension_enabled(ExtensionID::RayTracingPipeline) {
+        usage |= vk::BufferUsageFlags::SHADER_BINDING_TABLE_KHR;
+    }
+
+    usage
+}
+
 impl<A: Allocator> Buffer<A> {
     /// Allocate a new buffer with a specific size, at a specific memory location.
-    /// All usage flags must be given.
+    /// Buffers are created with all possible usage flags, excecpt for sparse memory flags.
     pub fn new(
         device: Device,
         allocator: &mut A,
         size: impl Into<vk::DeviceSize>,
-        usage: vk::BufferUsageFlags,
         location: MemoryType,
     ) -> Result<Self> {
         let size = size.into();
@@ -92,6 +112,9 @@ impl<A: Allocator> Buffer<A> {
         } else {
             vk::SharingMode::CONCURRENT
         };
+
+        let usage = get_buffer_usage_flags(&device);
+
         let handle = unsafe {
             device.create_buffer(
                 &vk::BufferCreateInfo {
@@ -99,7 +122,7 @@ impl<A: Allocator> Buffer<A> {
                     p_next: std::ptr::null(),
                     flags: vk::BufferCreateFlags::empty(),
                     size,
-                    usage: usage | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                    usage,
                     sharing_mode,
                     queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT {
                         device.queue_families().len() as u32
@@ -147,7 +170,6 @@ impl<A: Allocator> Buffer<A> {
         allocator: &mut A,
         size: impl Into<vk::DeviceSize>,
         alignment: impl Into<vk::DeviceSize>,
-        usage: vk::BufferUsageFlags,
         location: MemoryType,
     ) -> Result<Self> {
         let alignment = alignment.into();
@@ -157,6 +179,7 @@ impl<A: Allocator> Buffer<A> {
         } else {
             vk::SharingMode::CONCURRENT
         };
+        let usage = get_buffer_usage_flags(&device);
         let handle = unsafe {
             device.create_buffer(
                 &vk::BufferCreateInfo {
@@ -164,7 +187,7 @@ impl<A: Allocator> Buffer<A> {
                     p_next: std::ptr::null(),
                     flags: vk::BufferCreateFlags::empty(),
                     size,
-                    usage: usage | vk::BufferUsageFlags::SHADER_DEVICE_ADDRESS,
+                    usage,
                     sharing_mode,
                     queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT {
                         device.queue_families().len() as u32
@@ -212,9 +235,8 @@ impl<A: Allocator> Buffer<A> {
         device: Device,
         allocator: &mut A,
         size: impl Into<vk::DeviceSize>,
-        usage: vk::BufferUsageFlags,
     ) -> Result<Self> {
-        Self::new(device, allocator, size, usage, MemoryType::GpuOnly)
+        Self::new(device, allocator, size, MemoryType::GpuOnly)
     }
 
     /// Creates a view into an offset and size of the buffer.
