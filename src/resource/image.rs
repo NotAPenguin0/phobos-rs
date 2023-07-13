@@ -260,10 +260,10 @@ impl<A: Allocator> Image<A> {
     pub fn whole_view(&self, aspect: vk::ImageAspectFlags) -> Result<ImageView> {
         let view_type = if self.size.width == 1 && self.size.width == 1 && self.size.depth == 1 {
             vk::ImageViewType::TYPE_1D
+        } else if self.size.depth > 1 {
+            vk::ImageViewType::TYPE_3D
         } else if self.size.height > 1 {
             vk::ImageViewType::TYPE_2D
-        } else if self.size.depth > 1 {
-            vk::ImageViewType::TYPE_3D    
         } else {
             anyhow::bail!("Image extents invalid");
         };
