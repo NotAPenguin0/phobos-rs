@@ -259,7 +259,7 @@ impl<A: Allocator> Image<A> {
         )
     }
 
-    /// Construct a trivial [`ImageView`] from this [`Image`]. This is an image view that views the
+    /// Construct an [`ImageView`] from this [`Image`]. This is an image view that views the
     /// image subresource specified by the given arguments.
     /// * `aspect` - The image aspect flags that will be used to create the image view
     /// * `view_type` - The image type of the view. Must be supported by the image type of the current image
