@@ -216,6 +216,7 @@ impl Device {
         features.pipeline_statistics_query = vk::TRUE;
         features_1_2.buffer_device_address = vk::TRUE;
         features_1_2.host_query_reset = vk::TRUE;
+        features_1_2.descriptor_indexing = vk::TRUE;
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
         features_1_3.maintenance4 = vk::TRUE;

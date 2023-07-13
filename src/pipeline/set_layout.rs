@@ -35,6 +35,8 @@ pub struct DescriptorSetLayoutCreateInfo {
     /// Whether this descriptor set layout is persistent. Should only be true if the pipeline layout
     /// this belongs to is also persistent.
     pub persistent: bool,
+    /// The binding flags for each binding, these are set separately because they go in a separate vulkan struct.
+    pub flags: Vec<vk::DescriptorBindingFlags>,
 }
 
 impl ResourceKey for DescriptorSetLayoutCreateInfo {
@@ -50,8 +52,16 @@ impl Resource for DescriptorSetLayout {
     const MAX_TIME_TO_LIVE: u32 = 8;
 
     fn create(device: Device, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self> {
+        let mut flags = vk::DescriptorSetLayoutBindingFlagsCreateInfo {
+            s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+            p_next: std::ptr::null(),
+            binding_count: key.bindings.len() as u32,
+            p_binding_flags: key.flags.as_ptr(),
+        };
+
         let info = vk::DescriptorSetLayoutCreateInfo::builder()
             .bindings(key.bindings.as_slice())
+            .push_next(&mut flags)
             .build();
         let handle = unsafe { device.create_descriptor_set_layout(&info, None)? };
         #[cfg(feature = "log-objects")]

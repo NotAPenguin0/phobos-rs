@@ -123,6 +123,21 @@ impl<'r> DescriptorSetBuilder<'r> {
         });
     }
 
+    /// Bind an entire array of sampled images using the same sampler.
+    pub fn bind_sampled_image_array(&mut self, binding: u32, images: &[ImageView], sampler: &Sampler) {
+        self.inner.bindings.push(DescriptorBinding {
+            binding,
+            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            descriptors: images.iter().map(|image| {
+                DescriptorContents::Image(DescriptorImageInfo {
+                    sampler: unsafe { sampler.handle() },
+                    view: image.clone(),
+                    layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+                })
+            }).collect()
+        });
+    }
+
     /// Bind an image view to the given binding as a [`vk::DescriptorType::COMBINED_IMAGE_SAMPLER`].
     /// Uses the reflection information provided at construction to look up the correct binding slot by its name
     /// defined in the shader.

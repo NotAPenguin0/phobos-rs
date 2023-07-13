@@ -26,6 +26,7 @@ pub(crate) struct BindingInfo {
     pub stage: vk::ShaderStageFlags,
     pub count: u32,
     pub ty: vk::DescriptorType,
+    pub flags: vk::DescriptorBindingFlags,
 }
 
 /// Stores reflection information about a pipeline. Can be used to derive a pipeline layout
@@ -76,14 +77,14 @@ fn find_sampled_images(
         let set = ast.get_decoration(image.id, Decoration::DescriptorSet)?;
         let ty = ast.get_type(image.type_id)?;
         let Type::SampledImage { array, .. } = ty else { unimplemented!() };
-        let count = if !array.is_empty() {
+        let (count, flags) = if !array.is_empty() {
             if array[0] == 0 {
-                4096 // Max unbounded array size. If this is ever exceeded, I'll fix it.
+                (4096, vk::DescriptorBindingFlags::PARTIALLY_BOUND)
             } else {
-                array[0]
+                (array[0], vk::DescriptorBindingFlags::PARTIALLY_BOUND)
             }
         } else {
-            1
+            (1, vk::DescriptorBindingFlags::empty())
         };
 
         info.bindings.insert(
@@ -94,6 +95,7 @@ fn find_sampled_images(
                 stage,
                 count,
                 ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                flags,
             },
         );
     }
@@ -118,6 +120,7 @@ fn find_uniform_buffers(
                 stage,
                 count: 1,
                 ty: vk::DescriptorType::UNIFORM_BUFFER,
+                flags: vk::DescriptorBindingFlags::empty(),
             },
         );
     }
@@ -142,6 +145,7 @@ fn find_storage_buffers(
                 stage,
                 count: 1,
                 ty: vk::DescriptorType::STORAGE_BUFFER,
+                flags: vk::DescriptorBindingFlags::empty(),
             },
         );
     }
@@ -166,6 +170,7 @@ fn find_storage_images(
                 stage,
                 count: 1,
                 ty: vk::DescriptorType::STORAGE_IMAGE,
+                flags: vk::DescriptorBindingFlags::empty(),
             },
         );
     }
@@ -190,6 +195,7 @@ fn find_acceleration_structures(
                 stage,
                 count: 1,
                 ty: vk::DescriptorType::ACCELERATION_STRUCTURE_KHR,
+                flags: vk::DescriptorBindingFlags::empty(),
             },
         );
     }
@@ -318,6 +324,7 @@ pub(crate) fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCrea
                     stage_flags: binding.stage,
                     p_immutable_samplers: std::ptr::null(),
                 });
+                set.flags.push(binding.flags);
             }
             Entry::Vacant(entry) => {
                 entry.insert(DescriptorSetLayoutCreateInfo {
@@ -328,6 +335,7 @@ pub(crate) fn build_pipeline_layout(info: &ReflectionInfo) -> PipelineLayoutCrea
                         stage_flags: binding.stage,
                         p_immutable_samplers: std::ptr::null(),
                     }],
+                    flags: vec![binding.flags],
                     persistent: false,
                 });
             }

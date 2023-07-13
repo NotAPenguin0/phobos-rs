@@ -8,22 +8,22 @@ use std::sync::{Arc, MutexGuard};
 use anyhow::{anyhow, ensure, Result};
 use ash::vk;
 
-use crate::{
-    Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, Device, ImageView,
-    IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, PipelineStage, Sampler,
-    VirtualResource,
-};
-use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::command_buffer::state::{RenderingAttachmentInfo, RenderingInfo};
+use crate::command_buffer::{CommandBuffer, IncompleteCommandBuffer};
 use crate::core::queue::Queue;
 use crate::descriptor::builder::DescriptorSetBuilder;
 use crate::pipeline::create_info::PipelineRenderingInfo;
 use crate::query_pool::{QueryPool, ScopedQuery, TimestampQuery};
 use crate::raytracing::acceleration_structure::AccelerationStructure;
 use crate::sync::domain::ExecutionDomain;
+use crate::{
+    Allocator, BufferView, DebugMessenger, DescriptorCache, DescriptorSet, Device, ImageView,
+    IncompleteCmdBuffer, PhysicalResourceBindings, PipelineCache, PipelineStage, Sampler,
+    VirtualResource,
+};
 
 impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A>
-for IncompleteCommandBuffer<'q, D, A>
+    for IncompleteCommandBuffer<'q, D, A>
 {
     type Domain = D;
 
@@ -279,6 +279,21 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
     ) -> Result<Self> {
         self.modify_descriptor_set(set, |builder| {
             builder.bind_sampled_image(binding, image, sampler);
+            Ok(())
+        })?;
+        Ok(self)
+    }
+
+    /// Bind an entire array of sampled images using the same sampler.
+    pub fn bind_sampled_image_array(
+        mut self,
+        set: u32,
+        binding: u32,
+        images: &[ImageView],
+        sampler: &Sampler,
+    ) -> Result<Self> {
+        self.modify_descriptor_set(set, |builder| {
+            builder.bind_sampled_image_array(binding, images, sampler);
             Ok(())
         })?;
         Ok(self)
