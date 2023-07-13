@@ -283,13 +283,18 @@ impl ExampleApp for RaytracingSample {
         let attachment = Image::new(
             ctx.device.clone(),
             &mut ctx.allocator,
-            800,
-            600,
+            vk::Extent3D {
+                width: 800,
+                height: 600,
+                depth: 1,
+            },
             vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::STORAGE,
             vk::Format::R32G32B32A32_SFLOAT,
             vk::SampleCountFlags::TYPE_1,
+            1,
+            1
         )?;
-        let view = attachment.view(vk::ImageAspectFlags::COLOR)?;
+        let view = attachment.whole_view(vk::ImageAspectFlags::COLOR, vk::ImageViewType::TYPE_2D)?;
 
         let sampler = Sampler::default(ctx.device.clone())?;
 
