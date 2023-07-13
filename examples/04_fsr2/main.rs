@@ -17,6 +17,7 @@ use phobos::{
 use phobos::domain::All;
 use phobos::fsr2::Fsr2DispatchDescription;
 use phobos::graph::pass::{ClearColor, ClearDepthStencil, Fsr2DispatchVirtualResources};
+use phobos::image::ImageCreateInfo;
 use phobos::pool::LocalPool;
 use phobos::sync::submit_batch::SubmitBatch;
 
@@ -49,16 +50,16 @@ impl Attachment {
         let image = Image::new(
             ctx.device.clone(),
             &mut ctx.allocator,
-            vk::Extent3D {
+            ImageCreateInfo {
                 width,
                 height,
-                depth: 1 
+                depth: 1,
+                usage,
+                format,
+                samples: vk::SampleCountFlags::TYPE_1,
+                mip_levels: 1,
+                layers: 1,
             },
-            usage | extra_usage,
-            format,
-            vk::SampleCountFlags::TYPE_1,
-            1,
-            1,
         )?;
         let view = image.whole_view(aspect)?;
         Ok(Self {

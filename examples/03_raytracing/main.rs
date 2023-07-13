@@ -6,6 +6,7 @@ use glam::{Mat4, Vec3};
 use log::{info, trace};
 use phobos::graph::pass::ClearColor;
 use phobos::image;
+use phobos::image::ImageCreateInfo;
 use phobos::pipeline::raytracing::RayTracingPipelineBuilder;
 use phobos::pool::LocalPool;
 use phobos::prelude::*;
@@ -283,16 +284,16 @@ impl ExampleApp for RaytracingSample {
         let attachment = Image::new(
             ctx.device.clone(),
             &mut ctx.allocator,
-            vk::Extent3D {
+            ImageCreateInfo {
                 width: 800,
                 height: 600,
                 depth: 1,
+                usage: vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::STORAGE,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+                samples: vk::SampleCountFlags::TYPE_1,
+                mip_levels: 1,
+                layers: 1,
             },
-            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::STORAGE,
-            vk::Format::R32G32B32A32_SFLOAT,
-            vk::SampleCountFlags::TYPE_1,
-            1,
-            1
         )?;
         let view = attachment.whole_view(vk::ImageAspectFlags::COLOR)?;
 

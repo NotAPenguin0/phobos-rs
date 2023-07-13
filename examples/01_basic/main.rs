@@ -5,6 +5,7 @@ use anyhow::Result;
 use phobos::{image, vk};
 use phobos::command_buffer::traits::*;
 use phobos::graph::pass::ClearColor;
+use phobos::image::ImageCreateInfo;
 use phobos::pool::LocalPool;
 use phobos::prelude::*;
 use phobos::sync::domain::All;
@@ -76,16 +77,16 @@ impl ExampleApp for Basic {
         let image = Image::new(
             ctx.device.clone(),
             &mut ctx.allocator,
-            vk::Extent3D {
+            ImageCreateInfo {
                 width: 800,
                 height: 600,
                 depth: 1,
+                usage: vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
+                format: vk::Format::R8G8B8A8_SRGB,
+                samples: vk::SampleCountFlags::TYPE_1,
+                mip_levels: 1,
+                layers: 1,
             },
-            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
-            vk::Format::R8G8B8A8_SRGB,
-            vk::SampleCountFlags::TYPE_1,
-            1,
-            1,
         )?;
         ctx.device.set_name(&image, "Render Image")?;
         let data: Vec<f32> = vec![
