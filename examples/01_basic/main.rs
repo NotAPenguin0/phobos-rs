@@ -76,11 +76,16 @@ impl ExampleApp for Basic {
         let image = Image::new(
             ctx.device.clone(),
             &mut ctx.allocator,
-            800,
-            600,
+            vk::Extent3D {
+                width: 800,
+                height: 600,
+                depth: 1,
+            },
             vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
             vk::Format::R8G8B8A8_SRGB,
             vk::SampleCountFlags::TYPE_1,
+            1,
+            1,
         )?;
         ctx.device.set_name(&image, "Render Image")?;
         let data: Vec<f32> = vec![
@@ -89,7 +94,7 @@ impl ExampleApp for Basic {
         ];
 
         let resources = Resources {
-            offscreen_view: image.view(vk::ImageAspectFlags::COLOR)?,
+            offscreen_view: image.whole_view(vk::ImageAspectFlags::COLOR)?,
             offscreen: image,
             sampler: Sampler::default(ctx.device.clone())?,
             vertex_buffer: staged_buffer_upload(

@@ -94,7 +94,7 @@ impl Swapchain {
                     vk::SampleCountFlags::TYPE_1,
                 );
                 // Create a trivial ImgView.
-                let view = image.view(vk::ImageAspectFlags::COLOR)?;
+                let view = image.whole_view(vk::ImageAspectFlags::COLOR)?;
                 // Bundle them together into an owning ImageView
                 Ok(SwapchainImage {
                     image,

@@ -89,6 +89,23 @@ pub struct ImgView {
     id: u64,
 }
 
+/// Settings that describe how an image view should be created from its Image
+pub struct ImageViewCreateInfo {
+    /// Image aspect
+    pub aspect: vk::ImageAspectFlags,
+    /// View type of the image view
+    pub view_type: vk::ImageViewType,
+    /// Base mip level (starting mip level)
+    pub base_mip_level: u32,
+    /// Number of mip levels to use in the view (set to None to use the rest)
+    pub level_count: Option<u32>,
+    /// Base layer (starting layer)
+    pub base_layer: u32,
+    /// Number of layers to use in the view (set to None to use the rest)
+    pub layers: Option<u32>,
+}
+
+
 /// Reference-counted version of [`ImgView`].
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ImageView(pub Arc<ImgView>);
@@ -111,11 +128,12 @@ impl<A: Allocator> Image<A> {
     pub fn new(
         device: Device,
         alloc: &mut A,
-        width: u32,
-        height: u32,
+        extent: vk::Extent3D,
         usage: vk::ImageUsageFlags,
         format: vk::Format,
         samples: vk::SampleCountFlags,
+        mip_levels: u32,
+        layers: u32,
     ) -> Result<Self> {
         let sharing_mode = if device.is_single_queue()
             || usage.intersects(
@@ -127,21 +145,27 @@ impl<A: Allocator> Image<A> {
             vk::SharingMode::CONCURRENT
         };
 
+        let image_type = if extent.height == 1 && extent.depth == 1 {
+            vk::ImageType::TYPE_1D
+        } else if extent.height > 1 {
+            vk::ImageType::TYPE_2D
+        } else if extent.depth > 1 {
+            vk::ImageType::TYPE_3D
+        } else {
+            return Err(anyhow::anyhow!("Image extents invalid"));
+        };
+
         let handle = unsafe {
             device.create_image(
                 &vk::ImageCreateInfo {
                     s_type: vk::StructureType::IMAGE_CREATE_INFO,
                     p_next: std::ptr::null(),
                     flags: Default::default(),
-                    image_type: vk::ImageType::TYPE_2D,
+                    image_type,
                     format,
-                    extent: vk::Extent3D {
-                        width,
-                        height,
-                        depth: 1,
-                    },
-                    mip_levels: 1,
-                    array_layers: 1,
+                    extent,
+                    mip_levels,
+                    array_layers: layers,
                     samples,
                     tiling: vk::ImageTiling::OPTIMAL,
                     usage,
@@ -176,13 +200,9 @@ impl<A: Allocator> Image<A> {
             device,
             handle,
             format,
-            size: vk::Extent3D {
-                width,
-                height,
-                depth: 1,
-            },
-            layers: 1,
-            mip_levels: 1,
+            size: extent,
+            layers,
+            mip_levels,
             samples,
             memory: Some(memory),
         })
@@ -210,26 +230,81 @@ impl<A: Allocator> Image<A> {
     }
 
     /// Construct a trivial [`ImageView`] from this [`Image`]. This is an image view that views the
-    /// entire image subresource.
+    /// whole image subresource.
+    /// * `aspect` - The image aspect flags that will be used to create the image view
     /// <br>
     /// <br>
     /// # Lifetime
     /// The returned [`ImageView`] is valid as long as `self` is valid.
-    pub fn view(&self, aspect: vk::ImageAspectFlags) -> Result<ImageView> {
+    pub fn whole_view(&self, aspect: vk::ImageAspectFlags) -> Result<ImageView> {
+        let view_type = if self.size.width == 1 && self.size.width == 1 && self.size.depth == 1 {
+            vk::ImageViewType::TYPE_1D
+        } else if self.size.height > 1 {
+            vk::ImageViewType::TYPE_2D
+        } else if self.size.depth > 1 {
+            vk::ImageViewType::TYPE_3D    
+        } else {
+            anyhow::bail!("Image extents invalid");
+        };
+
+        self.view(
+            ImageViewCreateInfo {
+                aspect,
+                view_type,
+                base_mip_level: 0,
+                level_count: None,
+                base_layer: 0,
+                layers: None,
+            },
+        )
+    }
+
+    /// Construct an [`ImageView`] from this [`Image`]. This is an image view that views the
+    /// image subresource specified by the given arguments.
+    /// * `aspect` - The image aspect flags that will be used to create the image view
+    /// * `view_type` - The image type of the view. Must be supported by the image type of the current image
+    /// * `base_mip_level` - Starting mip level that the view sub-resource will look from
+    /// * `level_count` - End mip level that the view sub-resource will look to. Set to None to get the remainder of the mip levels
+    /// * `base_layer` - Starting layer that the view sub-resource will look from
+    /// * `layers` - End layer that the view sub-resource will look to. Set to None to get the remainder of the layer
+    /// <br>
+    /// <br>
+    /// # Lifetime
+    /// The returned [`ImageView`] is valid as long as `self` is valid.
+    pub fn view(
+        &self,
+        create_info: ImageViewCreateInfo,
+    ) -> Result<ImageView> {
+        let ImageViewCreateInfo {
+            aspect,
+            view_type,
+            base_mip_level,
+            level_count,
+            base_layer,
+            layers
+        } = create_info;
+
+        // TODO: Validate args
         let info = vk::ImageViewCreateInfo {
             s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
             p_next: std::ptr::null(),
             flags: Default::default(),
             image: self.handle,
-            view_type: vk::ImageViewType::TYPE_2D, // TODO: 3D images, cubemaps, etc
+            view_type,
             format: self.format,
             components: vk::ComponentMapping::default(),
             subresource_range: vk::ImageSubresourceRange {
                 aspect_mask: aspect,
-                base_mip_level: 0,
-                level_count: self.mip_levels,
-                base_array_layer: 0,
-                layer_count: self.layers,
+                base_mip_level,
+                level_count: match level_count {
+                    Some(count) => count,
+                    None => self.mip_levels - base_mip_level,
+                },
+                base_array_layer: base_layer,
+                layer_count: match layers {
+                    Some(count) => count,
+                    None => self.layers - base_layer,
+                },
             },
         };
 
