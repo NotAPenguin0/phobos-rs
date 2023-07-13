@@ -54,7 +54,7 @@ impl Attachment {
                 width,
                 height,
                 depth: 1,
-                usage,
+                usage: usage | extra_usage,
                 format,
                 samples: vk::SampleCountFlags::TYPE_1,
                 mip_levels: 1,
