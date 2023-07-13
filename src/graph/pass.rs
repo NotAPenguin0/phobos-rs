@@ -89,6 +89,7 @@ use crate::graph::resource::{AttachmentType, ResourceUsage};
 use crate::pipeline::PipelineStage;
 use crate::pool::LocalPool;
 use crate::sync::domain::ExecutionDomain;
+use crate::traits::GfxSupport;
 use crate::util::to_vk::IntoVulkanType;
 
 /// The returned value from a pass callback function.
@@ -300,6 +301,93 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         }
     }
 
+    /// Declare that a resource will be used as a sampled image in the given pipeline stages.
+    pub fn sample_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
+        self.inner.inputs.push(PassResource {
+            usage: ResourceUsage::ShaderRead,
+            resource: resource.clone(),
+            stage,
+            layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            clear_value: None,
+            load_op: None,
+        });
+        self
+    }
+
+    /// Declare that a resource will be used as a storage image that is written to in the given pipeline stages.
+    pub fn write_storage_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
+        self.inner.inputs.push(PassResource {
+            usage: ResourceUsage::ShaderWrite,
+            resource: resource.clone(),
+            stage,
+            layout: vk::ImageLayout::GENERAL,
+            clear_value: None,
+            load_op: None,
+        });
+        self.inner.outputs.push(PassResource {
+            usage: ResourceUsage::ShaderWrite,
+            resource: resource.upgrade(),
+            stage,
+            layout: vk::ImageLayout::GENERAL,
+            clear_value: None,
+            load_op: None,
+        });
+        self
+    }
+
+    /// Declare that a resource will be used as a storage image that will be read from in the given pipeline stages.
+    pub fn read_storage_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
+        self.inner.inputs.push(PassResource {
+            usage: ResourceUsage::ShaderRead,
+            resource: resource.clone(),
+            stage,
+            layout: vk::ImageLayout::GENERAL,
+            clear_value: None,
+            load_op: None,
+        });
+        self
+    }
+
+    #[allow(dead_code)]
+    fn sample_optional_image(
+        self,
+        resource: &Option<VirtualResource>,
+        stage: PipelineStage,
+    ) -> Self {
+        match resource {
+            None => self,
+            Some(resource) => self.sample_image(resource, stage),
+        }
+    }
+
+    /// Set the executor to be called when recording this pass.
+    pub fn executor(mut self, exec: impl PassExecutor<D, U, A> + 'cb) -> Self {
+        self.inner.execute = Box::new(exec);
+        self
+    }
+
+    /// Set the executor to be called when recording this pass. This method can be used to deduce types
+    /// when a function is used as a pass executor.
+    pub fn execute_fn<F>(mut self, exec: F) -> Self
+    where
+        F: for<'q> FnMut(
+                IncompleteCommandBuffer<'q, D, A>,
+                &mut LocalPool<A>,
+                &PhysicalResourceBindings,
+                &mut U,
+            ) -> PassFnResult<'q, D, A>
+            + 'cb, {
+        self.inner.execute = Box::new(exec);
+        self
+    }
+
+    /// Obtain a built [`Pass`] object.
+    pub fn build(self) -> Pass<'cb, D, U, A> {
+        self.inner
+    }
+}
+
+impl<'cb, D: GfxSupport + ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
     /// Set the color of this pass. This can show up in graphics debuggers like RenderDoc.
     #[cfg(feature = "debug-markers")]
     pub fn color(mut self, color: [f32; 4]) -> Self {
@@ -483,91 +571,6 @@ impl<'cb, D: ExecutionDomain, U, A: Allocator> PassBuilder<'cb, D, U, A> {
         });
 
         self
-    }
-
-    /// Declare that a resource will be used as a sampled image in the given pipeline stages.
-    pub fn sample_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
-        self.inner.inputs.push(PassResource {
-            usage: ResourceUsage::ShaderRead,
-            resource: resource.clone(),
-            stage,
-            layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-            clear_value: None,
-            load_op: None,
-        });
-        self
-    }
-
-    /// Declare that a resource will be used as a storage image that is written to in the given pipeline stages.
-    pub fn write_storage_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
-        self.inner.inputs.push(PassResource {
-            usage: ResourceUsage::ShaderWrite,
-            resource: resource.clone(),
-            stage,
-            layout: vk::ImageLayout::GENERAL,
-            clear_value: None,
-            load_op: None,
-        });
-        self.inner.outputs.push(PassResource {
-            usage: ResourceUsage::ShaderWrite,
-            resource: resource.upgrade(),
-            stage,
-            layout: vk::ImageLayout::GENERAL,
-            clear_value: None,
-            load_op: None,
-        });
-        self
-    }
-
-    /// Declare that a resource will be used as a storage image that will be read from in the given pipeline stages.
-    pub fn read_storage_image(mut self, resource: &VirtualResource, stage: PipelineStage) -> Self {
-        self.inner.inputs.push(PassResource {
-            usage: ResourceUsage::ShaderRead,
-            resource: resource.clone(),
-            stage,
-            layout: vk::ImageLayout::GENERAL,
-            clear_value: None,
-            load_op: None,
-        });
-        self
-    }
-
-    #[allow(dead_code)]
-    fn sample_optional_image(
-        self,
-        resource: &Option<VirtualResource>,
-        stage: PipelineStage,
-    ) -> Self {
-        match resource {
-            None => self,
-            Some(resource) => self.sample_image(resource, stage),
-        }
-    }
-
-    /// Set the executor to be called when recording this pass.
-    pub fn executor(mut self, exec: impl PassExecutor<D, U, A> + 'cb) -> Self {
-        self.inner.execute = Box::new(exec);
-        self
-    }
-
-    /// Set the executor to be called when recording this pass. This method can be used to deduce types
-    /// when a function is used as a pass executor.
-    pub fn execute_fn<F>(mut self, exec: F) -> Self
-    where
-        F: for<'q> FnMut(
-                IncompleteCommandBuffer<'q, D, A>,
-                &mut LocalPool<A>,
-                &PhysicalResourceBindings,
-                &mut U,
-            ) -> PassFnResult<'q, D, A>
-            + 'cb, {
-        self.inner.execute = Box::new(exec);
-        self
-    }
-
-    /// Obtain a built [`Pass`] object.
-    pub fn build(self) -> Pass<'cb, D, U, A> {
-        self.inner
     }
 }
 
