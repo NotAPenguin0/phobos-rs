@@ -90,6 +90,7 @@ pub struct ImgView {
 }
 
 /// Settings that describe how an image view should be created from its Image
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct ImageViewCreateInfo {
     /// Image aspect
     pub aspect: vk::ImageAspectFlags,
@@ -122,21 +123,36 @@ unsafe impl Send for ImageView {}
 
 unsafe impl Sync for ImageView {}
 
+/// Settings that describe how an image should be created
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct ImageCreateInfo {
+    /// Width in pixels of the image
+    pub width: u32,
+    /// Height in pixels of the image
+    pub height: u32,
+    /// Depth in pixels of the image, set to 1 for 2D images.
+    pub depth: u32,
+    /// Image usage flags
+    pub usage: vk::ImageUsageFlags,
+    /// Pixel format of the image
+    pub format: vk::Format,
+    /// MSAA samples
+    pub samples: vk::SampleCountFlags,
+    /// Number of mip levels. Set to 1 if not using mipmapping
+    pub mip_levels: u32,
+    /// Number of array layers. Set to 1 for non-array textures.
+    pub layers: u32,
+}
+
 impl<A: Allocator> Image<A> {
-    // TODO: Allow specifying an initial layout for convenience
     /// Create a new simple [`VkImage`] and allocate some memory to it.
     pub fn new(
         device: Device,
         alloc: &mut A,
-        extent: vk::Extent3D,
-        usage: vk::ImageUsageFlags,
-        format: vk::Format,
-        samples: vk::SampleCountFlags,
-        mip_levels: u32,
-        layers: u32,
+        info: ImageCreateInfo,
     ) -> Result<Self> {
         let sharing_mode = if device.is_single_queue()
-            || usage.intersects(
+            || info.usage.intersects(
                 vk::ImageUsageFlags::COLOR_ATTACHMENT
                     | vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
             ) {
@@ -145,16 +161,21 @@ impl<A: Allocator> Image<A> {
             vk::SharingMode::CONCURRENT
         };
 
-        let image_type = if extent.height == 1 && extent.depth == 1 {
+        let image_type = if info.height == 1 && info.depth == 1 {
             vk::ImageType::TYPE_1D
-        } else if extent.height > 1 {
-            vk::ImageType::TYPE_2D
-        } else if extent.depth > 1 {
+        } else if info.depth > 1 {
             vk::ImageType::TYPE_3D
+        } else if info.height > 1 {
+            vk::ImageType::TYPE_2D
         } else {
             return Err(anyhow::anyhow!("Image extents invalid"));
         };
 
+        let extent = vk::Extent3D {
+            width: info.width,
+            height: info.height,
+            depth: info.depth
+        };
         let handle = unsafe {
             device.create_image(
                 &vk::ImageCreateInfo {
@@ -162,13 +183,13 @@ impl<A: Allocator> Image<A> {
                     p_next: std::ptr::null(),
                     flags: Default::default(),
                     image_type,
-                    format,
+                    format: info.format,
                     extent,
-                    mip_levels,
-                    array_layers: layers,
-                    samples,
+                    mip_levels: info.mip_levels,
+                    array_layers: info.layers,
+                    samples: info.samples,
                     tiling: vk::ImageTiling::OPTIMAL,
-                    usage,
+                    usage: info.usage,
                     sharing_mode,
                     queue_family_index_count: if sharing_mode == vk::SharingMode::CONCURRENT {
                         device.queue_families().len() as u32
@@ -199,11 +220,11 @@ impl<A: Allocator> Image<A> {
         Ok(Self {
             device,
             handle,
-            format,
+            format: info.format,
             size: extent,
-            layers,
-            mip_levels,
-            samples,
+            layers: info.layers,
+            mip_levels: info.mip_levels,
+            samples: info.samples,
             memory: Some(memory),
         })
     }
