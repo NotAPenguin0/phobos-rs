@@ -89,6 +89,23 @@ pub struct ImgView {
     id: u64,
 }
 
+/// Settings that describe how an image view should be created from its Image
+pub struct ImageViewCreateInfo {
+    /// Image aspect
+    pub aspect: vk::ImageAspectFlags,
+    /// View type of the image view
+    pub view_type: vk::ImageViewType,
+    /// Base mip level (starting mip level)
+    pub base_mip_level: u32,
+    /// Number of mip levels to use in the view (set to None to use the rest)
+    pub level_count: Option<u32>,
+    /// Base layer (starting layer)
+    pub base_layer: u32,
+    /// Number of layers to use in the view (set to None to use the rest)
+    pub layers: Option<u32>,
+}
+
+
 /// Reference-counted version of [`ImgView`].
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ImageView(pub Arc<ImgView>);
@@ -219,20 +236,26 @@ impl<A: Allocator> Image<A> {
     /// <br>
     /// # Lifetime
     /// The returned [`ImageView`] is valid as long as `self` is valid.
-    pub fn whole_view(
-        &self,
-        aspect: vk::ImageAspectFlags,
-        view_type: vk::ImageViewType,
-    ) -> Result<ImageView> {
-        // Node from nodle man: I don't think this should even be a function tbh because
-        // the view() function itself isn't *that* bloated with arguments 
+    pub fn whole_view(&self, aspect: vk::ImageAspectFlags) -> Result<ImageView> {
+        let view_type = if self.size.width == 1 && self.size.width == 1 && self.size.depth == 1 {
+            vk::ImageViewType::TYPE_1D
+        } else if self.size.height > 1 {
+            vk::ImageViewType::TYPE_2D
+        } else if self.size.depth > 1 {
+            vk::ImageViewType::TYPE_3D    
+        } else {
+            anyhow::bail!("Image extents invalid");
+        };
+
         self.view(
-            aspect,
-            view_type,
-            0,
-            None,
-            0,
-            None
+            ImageViewCreateInfo {
+                aspect,
+                view_type,
+                base_mip_level: 0,
+                level_count: None,
+                base_layer: 0,
+                layers: None,
+            },
         )
     }
 
@@ -250,13 +273,17 @@ impl<A: Allocator> Image<A> {
     /// The returned [`ImageView`] is valid as long as `self` is valid.
     pub fn view(
         &self,
-        aspect: vk::ImageAspectFlags,
-        view_type: vk::ImageViewType,
-        base_mip_level: u32,
-        level_count: Option<u32>,
-        base_layer: u32,
-        layers: Option<u32>,
+        create_info: ImageViewCreateInfo,
     ) -> Result<ImageView> {
+        let ImageViewCreateInfo {
+            aspect,
+            view_type,
+            base_mip_level,
+            level_count,
+            base_layer,
+            layers
+        } = create_info;
+
         // TODO: Validate args
         let info = vk::ImageViewCreateInfo {
             s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,

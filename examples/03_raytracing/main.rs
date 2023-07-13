@@ -294,7 +294,7 @@ impl ExampleApp for RaytracingSample {
             1,
             1
         )?;
-        let view = attachment.whole_view(vk::ImageAspectFlags::COLOR, vk::ImageViewType::TYPE_2D)?;
+        let view = attachment.whole_view(vk::ImageAspectFlags::COLOR)?;
 
         let sampler = Sampler::default(ctx.device.clone())?;
 

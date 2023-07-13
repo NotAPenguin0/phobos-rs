@@ -1,5 +1,4 @@
 
-
 use std::time::Instant;
 
 use anyhow::Result;
@@ -50,13 +49,18 @@ impl Attachment {
         let image = Image::new(
             ctx.device.clone(),
             &mut ctx.allocator,
-            width,
-            height,
+            vk::Extent3D {
+                width,
+                height,
+                depth: 1 
+            },
             usage | extra_usage,
             format,
             vk::SampleCountFlags::TYPE_1,
+            1,
+            1,
         )?;
-        let view = image.view(aspect)?;
+        let view = image.whole_view(aspect)?;
         Ok(Self {
             image,
             view,

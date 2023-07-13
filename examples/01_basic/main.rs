@@ -94,7 +94,7 @@ impl ExampleApp for Basic {
         ];
 
         let resources = Resources {
-            offscreen_view: image.whole_view(vk::ImageAspectFlags::COLOR, vk::ImageViewType::TYPE_2D)?,
+            offscreen_view: image.whole_view(vk::ImageAspectFlags::COLOR)?,
             offscreen: image,
             sampler: Sampler::default(ctx.device.clone())?,
             vertex_buffer: staged_buffer_upload(
