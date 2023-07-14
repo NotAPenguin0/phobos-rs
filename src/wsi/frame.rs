@@ -254,7 +254,7 @@ impl<A: Allocator> FrameManager<A> {
 
     /// Present a frame to the swapchain. This is the same as calling
     /// `glfwSwapBuffers()` in OpenGL code.
-    fn present(&self, exec: ExecutionManager<A>) -> Result<()> {
+    fn present_internal(&self, exec: ExecutionManager<A>) -> Result<()> {
         let per_frame = &self.per_frame[self.current_frame as usize];
         let functions = &self.swapchain.functions;
         let queue = exec.get_present_queue();
@@ -329,20 +329,17 @@ impl<A: Allocator> FrameManager<A> {
         FrameManager::new(device, pool, swapchain)
     }
 
-    /// Obtain a new frame context to run commands in.
-    /// This will call the provided callback function to obtain a [`SubmitBatch`](crate::sync::submit_batch::SubmitBatch)
-    /// which contains the commands to be submitted for this frame.
-    pub async fn new_frame<Window, D, F>(
+
+    /// Acquire a new InFlightContext to execute commands for this frame
+    pub fn acquire<Window, D, F>(
         &mut self,
         exec: ExecutionManager<A>,
         window: &Window,
         surface: &Surface,
-        f: F,
-    ) -> Result<()>
+    ) -> Result<InFlightContext>
     where
         Window: WindowInterface,
-        D: ExecutionDomain + 'static,
-        F: FnOnce(InFlightContext) -> Result<SubmitBatch<D>>, {
+        D: ExecutionDomain + 'static, {
         // Advance deletion queue by one frame
         self.swapchain_delete.next_frame();
 
@@ -359,7 +356,7 @@ impl<A: Allocator> FrameManager<A> {
             let mut new_swapchain = self.resize_swapchain(window, surface)?;
             std::mem::swap(&mut new_swapchain, &mut self.swapchain);
             self.swapchain_delete.push(new_swapchain); // now old swapchain after swapping.
-
+        
             // Acquire image again. Note that this won't wait on the same fence again is it is never reset.
             let AcquiredImage {
                 index,
@@ -367,27 +364,37 @@ impl<A: Allocator> FrameManager<A> {
             } = self.acquire_image()?;
             self.current_image = index;
         }
+            
+        let per_frame = &mut self.per_frame[self.current_frame as usize];
+        // Delete the command buffer used the previous time this frame was allocated.
+        if let Some(cmd) = &mut per_frame.command_buffer {
+            unsafe { cmd.delete(exec.clone())? }
+        }
+        per_frame.command_buffer = None;
+        let image = self.swapchain.images()[self.current_image as usize]
+            .view
+            .clone();
+    
+        Ok(InFlightContext {
+            swapchain_image: image,
+            wait_semaphore: per_frame.image_ready.clone(),
+            signal_semaphore: per_frame.gpu_finished.clone(),
+        })
+    }
 
-        let submission = {
-            let per_frame = &mut self.per_frame[self.current_frame as usize];
-            // Delete the command buffer used the previous time this frame was allocated.
-            if let Some(cmd) = &mut per_frame.command_buffer {
-                unsafe { cmd.delete(exec.clone())? }
-            }
-            per_frame.command_buffer = None;
-            let image = self.swapchain.images()[self.current_image as usize]
-                .view
-                .clone();
-
-            let ifc = InFlightContext {
-                swapchain_image: image,
-                wait_semaphore: per_frame.image_ready.clone(),
-                signal_semaphore: per_frame.gpu_finished.clone(),
-            };
-            f(ifc)?
-        };
+    pub async fn present<Window, D, F>(
+        &mut self,
+        exec: ExecutionManager<A>,
+        ifc: InFlightContext,
+        submission: SubmitBatch<D>,
+        window: &Window,
+        surface: &Surface,
+    ) -> Result<()>
+    where
+        Window: WindowInterface,
+        D: ExecutionDomain + 'static, {
         self.submit(submission)?;
-        self.present(exec)
+        self.present_internal(exec)
     }
 
     /// Unsafe access to the underlying swapchain.

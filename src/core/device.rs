@@ -143,7 +143,7 @@ impl Device {
             })
             .collect::<Vec<_>>();
         let mut extension_names: Vec<CString> = settings
-            .gpu_requirements
+            .gpu_features
             .device_extensions
             .iter()
             .map(|ext| CString::new(ext.clone()))
@@ -209,10 +209,10 @@ impl Device {
             info!("{:?}", ext);
         }
 
-        let mut features = settings.gpu_requirements.features;
-        let mut features_1_1 = settings.gpu_requirements.features_1_1;
-        let mut features_1_2 = settings.gpu_requirements.features_1_2;
-        let mut features_1_3 = settings.gpu_requirements.features_1_3;
+        let mut features = settings.gpu_features.features;
+        let mut features_1_1 = settings.gpu_features.features_1_1;
+        let mut features_1_2 = settings.gpu_features.features_1_2;
+        let mut features_1_3 = settings.gpu_features.features_1_3;
         features.pipeline_statistics_query = vk::TRUE;
         features_1_2.buffer_device_address = vk::TRUE;
         features_1_2.host_query_reset = vk::TRUE;

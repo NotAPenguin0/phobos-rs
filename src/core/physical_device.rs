@@ -49,9 +49,9 @@ impl PhysicalDevice {
             return Err(anyhow::Error::from(Error::NoGPU));
         }
 
-        devices
+        let devices = devices
             .iter()
-            .find_map(|device| -> Option<PhysicalDevice> {
+            .filter_map(|device| {
                 let mut physical_device = PhysicalDevice {
                     handle: *device,
                     properties: unsafe { instance.get_physical_device_properties(*device) },
@@ -75,25 +75,9 @@ impl PhysicalDevice {
                     ..Default::default()
                 };
 
-                if settings.gpu_requirements.dedicated
-                    && physical_device.properties.device_type
-                        != vk::PhysicalDeviceType::DISCRETE_GPU
-                {
-                    return None;
-                }
-                if settings.gpu_requirements.min_video_memory > total_video_memory(&physical_device)
-                {
-                    return None;
-                }
-                if settings.gpu_requirements.min_dedicated_video_memory
-                    > total_device_memory(&physical_device)
-                {
-                    return None;
-                }
-
                 physical_device.queues = {
                     settings
-                        .gpu_requirements
+                        .gpu_features
                         .queues
                         .iter()
                         .filter_map(|request| -> Option<QueueInfo> {
@@ -138,7 +122,7 @@ impl PhysicalDevice {
 
                 // We now have a list of all the queues that were found matching our request. If this amount is smaller than the number of requested queues,
                 // at least one is missing and could not be fulfilled. In this case we reject the device.
-                if physical_device.queues.len() < settings.gpu_requirements.queues.len() {
+                if physical_device.queues.len() < settings.gpu_features.queues.len() {
                     return None;
                 }
 
@@ -165,7 +149,7 @@ impl PhysicalDevice {
 
                 // Check if all requested extensions are present
                 if !settings
-                    .gpu_requirements
+                    .gpu_features
                     .device_extensions
                     .iter()
                     .all(|requested_extension| {
@@ -178,22 +162,16 @@ impl PhysicalDevice {
                     return None;
                 }
 
-                let name =
-                    unsafe { CStr::from_ptr(physical_device.properties.device_name.as_ptr()) };
-                info!(
-                    "Picked physical device {:?}, driver version {:?}.",
-                    name, physical_device.properties.driver_version
-                );
-                info!(
-                    "Device has {} bytes of available video memory, of which {} are device local.",
-                    total_video_memory(&physical_device),
-                    total_device_memory(&physical_device)
-                );
-                #[cfg(feature = "log-objects")]
-                trace!("Created new VkPhysicalDevice {:p}", physical_device.handle);
                 Some(physical_device)
             })
-            .ok_or_else(|| anyhow::Error::from(Error::NoGPU))
+            .collect::<Vec<_>>();
+
+        if devices.is_empty() {
+            return Err(anyhow::Error::from(Error::NoGPU));
+        }
+
+        // Let the user pick the physical device based on the valid ones that where given
+        Ok((settings.gpu_selector)(devices))
     }
 
     /// Selects the best available physical device and creates a surface on it.

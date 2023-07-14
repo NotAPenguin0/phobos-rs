@@ -42,15 +42,11 @@ pub struct QueueRequest {
     pub queue_type: QueueType,
 }
 
-/// Minimum requirements for the GPU. This will be used to determine what physical device is selected, and enable
-/// optional Vulkan features and extensions.
+/// Needed to enable optional Vulkan features / extensions after selecting an appropriate GPU
 /// # Example
 /// ```
 /// # use phobos::*;
-/// let mut requirements = GPURequirements {
-///     dedicated: true,
-///     min_video_memory: 1024  * 1024 * 1024,
-///     min_dedicated_video_memory: 1024  * 1024 * 1024,
+/// let mut requirements = GPUFeatures {
 ///     queues: vec![
 ///         QueueRequest {
 ///             dedicated: false,
@@ -63,13 +59,7 @@ pub struct QueueRequest {
 /// requirements.features.sampler_anisotropy = vk::TRUE;
 /// ```
 #[derive(Default, Debug)]
-pub struct GPURequirements {
-    /// Whether a dedicated GPU is required. Setting this to true will discard integrated GPUs.
-    pub dedicated: bool,
-    /// Minimum amount of video memory required, in bytes. Note that this might count shared memory if RAM is shared.
-    pub min_video_memory: usize,
-    /// Minimum amount of dedicated video memory, in bytes. This only counts memory that is on the device.
-    pub min_dedicated_video_memory: usize,
+pub struct GPUFeatures {
     /// Command queue types requested from the physical device. For more information, see
     /// [`QueueRequest`]
     pub queues: Vec<QueueRequest>,
@@ -115,7 +105,7 @@ impl Default for Fsr2Settings {
 }
 
 /// Application settings used to initialize the phobos context.
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct AppSettings<'a, Window: WindowInterface> {
     /// Application name. Possibly displayed in debugging tools, task manager, etc.
     pub name: String,
@@ -133,8 +123,10 @@ pub struct AppSettings<'a, Window: WindowInterface> {
     /// [`VK_PRESENT_MODE_FIFO_KHR`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html),
     /// as this is guaranteed to always be supported.
     pub present_mode: Option<vk::PresentModeKHR>,
+    /// GPU selector for selecting the physical device.
+    pub gpu_selector: Box<dyn Fn(Vec<crate::PhysicalDevice>) -> crate::PhysicalDevice>,
     /// Minimum requirements the selected physical device should have.
-    pub gpu_requirements: GPURequirements,
+    pub gpu_features: GPUFeatures,
     /// Maximum size of scratch allocators. This is the maximum size of [`ScratchAllocator`](crate::ScratchAllocator) objects
     /// created from resource pools.
     pub scratch_buffer_size: u64,
@@ -157,7 +149,8 @@ impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
             window: None,
             surface_format: None,
             present_mode: None,
-            gpu_requirements: GPURequirements::default(),
+            gpu_selector: Box::new(|mut devices| devices.pop().unwrap()),
+            gpu_features: GPUFeatures::default(),
             scratch_buffer_size: 1,
             raytracing: false,
             #[cfg(feature = "fsr2")]
@@ -239,9 +232,16 @@ impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
         self
     }
 
-    /// The gpu requirements that the physical device must satisfy.
-    pub fn gpu(mut self, gpu: GPURequirements) -> Self {
-        self.inner.gpu_requirements = gpu;
+    /// Selector that will select the GPU / PhysicalDevice.
+    /// If there are GPU that do not support the GPU optional features, they will be skipped during iteration
+    pub fn gpu_selector(mut self, function: impl Fn(Vec<crate::PhysicalDevice>) -> crate::PhysicalDevice + 'static) -> Self {
+        self.inner.gpu_selector = Box::new(function);
+        self
+    }
+
+    /// The GPU optional features.
+    pub fn gpu_features(mut self, features: GPUFeatures) -> Self {
+        self.inner.gpu_features = features;
         self
     }
 
