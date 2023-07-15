@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::ffi::CString;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use ash::vk;
 use petgraph::{Incoming, Outgoing};
 use petgraph::graph::NodeIndex;
@@ -94,41 +94,44 @@ fn find_resolve_attachment<D: ExecutionDomain, U, A: Allocator>(
     pass: &PassNode<PassResource, D, U, A>,
     bindings: &PhysicalResourceBindings,
     resource: &PassResource,
-) -> Option<ImageView> {
-    pass.outputs
-        .iter()
-        .find(|output| match &output.usage {
-            ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => {
-                resource.resource.is_associated_with(resolve)
-            }
-            _ => false,
-        })
-        .map(|resolve| {
+) -> Result<Option<ImageView>> {
+    let output = pass.outputs.iter().find(|output| match &output.usage {
+        ResourceUsage::Attachment(AttachmentType::Resolve(resolve)) => {
+            resource.resource.is_associated_with(resolve)
+        }
+        _ => false,
+    });
+
+    Ok(match output {
+        None => None,
+        Some(resolve) => {
             let Some(PhysicalResource::Image(image)) = bindings.resolve(&resolve.resource) else {
-                // TODO: handle or report this error better
-                panic!("No resource bound");
+                bail!("No image resource bound to resolve attachment {}", &resolve.resource);
             };
-            image
-        })
-        .cloned()
+            Some(image.clone())
+        }
+    })
 }
 
 fn color_attachments<D: ExecutionDomain, U, A: Allocator>(
     pass: &PassNode<PassResource, D, U, A>,
     bindings: &PhysicalResourceBindings,
 ) -> Result<Vec<RenderingAttachmentInfo>> {
-    Ok(pass
+    pass
         .outputs
         .iter()
-        .filter_map(|resource| -> Option<RenderingAttachmentInfo> {
+        .filter_map(|resource| -> Option<Result<RenderingAttachmentInfo>> {
             if !matches!(resource.usage, ResourceUsage::Attachment(AttachmentType::Color)) {
                 return None;
             }
             let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
-                // TODO: handle or report this error better
-                panic!("No resource bound");
+                return Some(Err(anyhow!("No image resource bound to color attachment {}", &resource.resource)));
             };
-            let resolve = find_resolve_attachment(pass, bindings, resource);
+            let resolve;
+            match find_resolve_attachment(pass, bindings, resource) {
+                Ok(image) => resolve = image,
+                Err(e) => { return Some(Err(e)); }
+            };
             // Attachment should always have a load op set, or our library is bugged
             let info = RenderingAttachmentInfo {
                 image_view: image.clone(),
@@ -142,28 +145,33 @@ fn color_attachments<D: ExecutionDomain, U, A: Allocator>(
                 store_op: vk::AttachmentStoreOp::STORE,
                 clear_value: resource.clear_value.unwrap_or(vk::ClearValue::default()),
             };
-            Some(info)
+            Some(Ok(info))
         })
-        .collect())
+        .collect()
 }
 
 fn depth_attachment<D: ExecutionDomain, U, A: Allocator>(
     pass: &PassNode<PassResource, D, U, A>,
     bindings: &PhysicalResourceBindings,
-) -> Option<RenderingAttachmentInfo> {
+) -> Option<Result<RenderingAttachmentInfo>> {
     pass.outputs
         .iter()
-        .filter_map(|resource| -> Option<RenderingAttachmentInfo> {
+        .filter_map(|resource| -> Option<Result<RenderingAttachmentInfo>> {
             if resource.layout != vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL {
                 return None;
             }
 
             let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
-                // TODO: handle or report this error better
-                panic!("No resource bound");
+                return Some(Err(anyhow!("No image resource bound to depth attachment {}", &resource.resource)));
             };
 
-            let resolve = find_resolve_attachment(pass, bindings, resource);
+            let resolve;
+            match find_resolve_attachment(pass, bindings, resource) {
+                Ok(image) => resolve = image,
+                Err(e) => {
+                    return Some(Err(e));
+                }
+            };
 
             let info = RenderingAttachmentInfo {
                 image_view: image.clone(),
@@ -177,7 +185,7 @@ fn depth_attachment<D: ExecutionDomain, U, A: Allocator>(
                 store_op: vk::AttachmentStoreOp::STORE,
                 clear_value: resource.clear_value.unwrap_or(vk::ClearValue::default()),
             };
-            Some(info)
+            Some(Ok(info))
         })
         .next()
 }
@@ -185,17 +193,16 @@ fn depth_attachment<D: ExecutionDomain, U, A: Allocator>(
 fn render_area<D: ExecutionDomain, U, A: Allocator>(
     pass: &PassNode<PassResource, D, U, A>,
     bindings: &PhysicalResourceBindings,
-) -> vk::Rect2D {
+) -> Result<vk::Rect2D> {
     let resource = pass
         .outputs
         .iter()
         .find(|resource| matches!(resource.usage, ResourceUsage::Attachment(_)))
         .unwrap();
     let Some(PhysicalResource::Image(image)) = bindings.resolve(&resource.resource) else {
-        // TODO: handle or report this error better
-        panic!("No resource bound");
+        bail!("No image resource bound to attachment {}", &resource.resource);
     };
-    vk::Rect2D {
+    Ok(vk::Rect2D {
         offset: vk::Offset2D {
             x: 0,
             y: 0,
@@ -205,7 +212,7 @@ fn render_area<D: ExecutionDomain, U, A: Allocator>(
             width: image.width(),
             height: image.height(),
         },
-    }
+    })
 }
 
 #[cfg(feature = "debug-markers")]
@@ -248,11 +255,14 @@ fn record_pass<'q, D: ExecutionDomain, U, A: Allocator>(
     if pass.is_renderpass {
         let info = RenderingInfo {
             flags: Default::default(),
-            render_area: render_area(pass, bindings),
+            render_area: render_area(pass, bindings)?,
             layer_count: 1, // TODO: Multilayer rendering fix
             view_mask: 0,
             color_attachments: color_attachments(pass, bindings)?,
-            depth_attachment: depth_attachment(pass, bindings),
+            depth_attachment: match depth_attachment(pass, bindings) {
+                None => None,
+                Some(result) => Some(result?),
+            },
             stencil_attachment: None, // TODO: Stencil
         };
         cmd = cmd.begin_rendering(&info);
