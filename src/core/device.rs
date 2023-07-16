@@ -9,19 +9,19 @@ use std::ops::Deref;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use anyhow::{Result};
+use anyhow::Result;
 use ash::extensions::{ext, khr};
 use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxDimensions2D;
 
+use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
 use crate::core::traits::Nameable;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2ContextCreateInfo;
 use crate::util::string::unwrap_to_raw_strings;
-use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
 
 /// Device extensions that phobos requests but might not be available.
 /// # Example
@@ -283,6 +283,32 @@ impl Device {
         if rt_pipeline_supported {
             info = info.push_next(&mut features_ray_tracing_pipeline);
         }
+
+        let mut features_descriptor_indexing = vk::PhysicalDeviceDescriptorIndexingFeatures {
+            s_type: vk::StructureType::PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
+            p_next: std::ptr::null_mut(),
+            shader_input_attachment_array_dynamic_indexing: vk::FALSE,
+            shader_uniform_texel_buffer_array_dynamic_indexing: vk::FALSE,
+            shader_storage_texel_buffer_array_dynamic_indexing: vk::FALSE,
+            shader_uniform_buffer_array_non_uniform_indexing: vk::FALSE,
+            shader_sampled_image_array_non_uniform_indexing: vk::FALSE,
+            shader_storage_buffer_array_non_uniform_indexing: vk::FALSE,
+            shader_storage_image_array_non_uniform_indexing: vk::FALSE,
+            shader_input_attachment_array_non_uniform_indexing: vk::FALSE,
+            shader_uniform_texel_buffer_array_non_uniform_indexing: vk::FALSE,
+            shader_storage_texel_buffer_array_non_uniform_indexing: vk::FALSE,
+            descriptor_binding_uniform_buffer_update_after_bind: vk::FALSE,
+            descriptor_binding_sampled_image_update_after_bind: vk::FALSE,
+            descriptor_binding_storage_image_update_after_bind: vk::FALSE,
+            descriptor_binding_storage_buffer_update_after_bind: vk::FALSE,
+            descriptor_binding_uniform_texel_buffer_update_after_bind: vk::FALSE,
+            descriptor_binding_storage_texel_buffer_update_after_bind: vk::FALSE,
+            descriptor_binding_update_unused_while_pending: vk::FALSE,
+            descriptor_binding_partially_bound: vk::TRUE,
+            descriptor_binding_variable_descriptor_count: vk::FALSE,
+            runtime_descriptor_array: vk::FALSE,
+        };
+        info = info.push_next(&mut features_descriptor_indexing);
 
         let info = info.build();
 
