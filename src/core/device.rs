@@ -217,6 +217,9 @@ impl Device {
         features_1_2.buffer_device_address = vk::TRUE;
         features_1_2.host_query_reset = vk::TRUE;
         features_1_2.descriptor_indexing = vk::TRUE;
+        features_1_2.runtime_descriptor_array = vk::TRUE;
+        features_1_2.descriptor_binding_partially_bound = vk::TRUE;
+        features_1_2.shader_sampled_image_array_non_uniform_indexing = vk::TRUE;
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
         features_1_3.maintenance4 = vk::TRUE;
@@ -283,32 +286,6 @@ impl Device {
         if rt_pipeline_supported {
             info = info.push_next(&mut features_ray_tracing_pipeline);
         }
-
-        let mut features_descriptor_indexing = vk::PhysicalDeviceDescriptorIndexingFeatures {
-            s_type: vk::StructureType::PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
-            p_next: std::ptr::null_mut(),
-            shader_input_attachment_array_dynamic_indexing: vk::FALSE,
-            shader_uniform_texel_buffer_array_dynamic_indexing: vk::FALSE,
-            shader_storage_texel_buffer_array_dynamic_indexing: vk::FALSE,
-            shader_uniform_buffer_array_non_uniform_indexing: vk::FALSE,
-            shader_sampled_image_array_non_uniform_indexing: vk::FALSE,
-            shader_storage_buffer_array_non_uniform_indexing: vk::FALSE,
-            shader_storage_image_array_non_uniform_indexing: vk::FALSE,
-            shader_input_attachment_array_non_uniform_indexing: vk::FALSE,
-            shader_uniform_texel_buffer_array_non_uniform_indexing: vk::FALSE,
-            shader_storage_texel_buffer_array_non_uniform_indexing: vk::FALSE,
-            descriptor_binding_uniform_buffer_update_after_bind: vk::FALSE,
-            descriptor_binding_sampled_image_update_after_bind: vk::FALSE,
-            descriptor_binding_storage_image_update_after_bind: vk::FALSE,
-            descriptor_binding_storage_buffer_update_after_bind: vk::FALSE,
-            descriptor_binding_uniform_texel_buffer_update_after_bind: vk::FALSE,
-            descriptor_binding_storage_texel_buffer_update_after_bind: vk::FALSE,
-            descriptor_binding_update_unused_while_pending: vk::FALSE,
-            descriptor_binding_partially_bound: vk::TRUE,
-            descriptor_binding_variable_descriptor_count: vk::FALSE,
-            runtime_descriptor_array: vk::TRUE,
-        };
-        info = info.push_next(&mut features_descriptor_indexing);
 
         let info = info.build();
 
