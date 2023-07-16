@@ -306,7 +306,7 @@ impl Device {
             descriptor_binding_update_unused_while_pending: vk::FALSE,
             descriptor_binding_partially_bound: vk::TRUE,
             descriptor_binding_variable_descriptor_count: vk::FALSE,
-            runtime_descriptor_array: vk::FALSE,
+            runtime_descriptor_array: vk::TRUE,
         };
         info = info.push_next(&mut features_descriptor_indexing);
 
