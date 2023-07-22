@@ -2,7 +2,6 @@
 
 ![build](https://github.com/NotAPenguin0/phobos-rs/actions/workflows/rust.yml/badge.svg)
 ![build-samples](https://github.com/NotAPenguin0/phobos-rs/actions/workflows/build-samples.yml/badge.svg)
-![tests](https://github.com/NotAPenguin0/phobos-rs/actions/workflows/tests.yml/badge.svg)
 
 Phobos is a Vulkan abstraction library aiming to create Vulkan applications more easily. It provides abstractions to automatically
 manage common Vulkan problems like synchronization and resource management. At the same time, it aims to 
