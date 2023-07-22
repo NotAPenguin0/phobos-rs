@@ -32,9 +32,9 @@ use anyhow::Result;
 use ash::vk;
 use gpu_allocator::AllocationError::OutOfMemory;
 
-use crate::pool::Poolable;
-use crate::Error::AllocationError;
 use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};
+use crate::Error::AllocationError;
+use crate::pool::Poolable;
 
 /// A linear allocator used for short-lived resources. A good example of such a resource is a buffer
 /// that needs to be updated every frame, like a uniform buffer for transform data.
@@ -100,7 +100,12 @@ impl<A: Allocator> ScratchAllocator<A> {
 
     /// Create a new scratch allocator with given alignment. The alignment used must be large enough to satisfy the alignment requirements
     /// of all buffer usage flags buffers from this allocator will be used with.
-    pub fn new_with_alignment(device: Device, allocator: &mut A, max_size: impl Into<vk::DeviceSize>, alignment: u64) -> Result<Self> {
+    pub fn new_with_alignment(
+        device: Device,
+        allocator: &mut A,
+        max_size: impl Into<vk::DeviceSize>,
+        alignment: u64,
+    ) -> Result<Self> {
         let buffer = Buffer::new(device, allocator, max_size, MemoryType::CpuToGpu)?;
         if buffer.is_mapped() {
             Ok(Self {
@@ -122,7 +127,7 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// # use phobos::prelude::*;
     /// # use anyhow::Result;
     /// fn use_scratch_allocator<A: Allocator>(device: Device, alloc: &mut A) -> Result<()> {
-    ///     let mut allocator = ScratchAllocator::new(device.clone(), alloc, 1 * 1024u64, vk::BufferUsageFlags::UNIFORM_BUFFER)?;
+    ///     let mut allocator = ScratchAllocator::new(device.clone(), alloc, 1 * 1024u64)?;
     ///     let buffer: BufferView = allocator.allocate(64 as u64)?;
     ///     Ok(())
     /// }
@@ -131,8 +136,12 @@ impl<A: Allocator> ScratchAllocator<A> {
         let size = size.into();
         // Part of the buffer that is over the min alignment
         let unaligned_part = size % self.alignment;
-        // Amount of padding bytes to insert
-        let padding = self.alignment - unaligned_part;
+        // Amount of padding bytes to insert. This is zero if there are no unaligned bytes
+        let padding = if unaligned_part == 0 {
+            0
+        } else {
+            self.alignment - unaligned_part
+        };
         let padded_size = size + padding;
         if self.offset + padded_size > self.buffer.size() {
             Err(AllocationError(OutOfMemory).into())
