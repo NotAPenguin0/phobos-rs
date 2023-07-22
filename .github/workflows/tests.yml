@@ -14,7 +14,5 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install Nightly
-        run: rustup default nightly
       - name: Test
         run: cargo test --tests

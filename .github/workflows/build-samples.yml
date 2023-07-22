@@ -15,8 +15,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Install Nightly
-      run: rustup default nightly
     - name: Build 01_basic
       run: cargo build --verbose --example 01_basic --features shaderc
     - name: Build 02_headless_compute
@@ -29,8 +27,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Install Nightly
-      run: rustup default nightly
     - name: Build 01_basic
       run: cargo build --verbose --example 01_basic --features shaderc
     - name: Build 02_headless_compute
