@@ -54,6 +54,30 @@ pub struct DescriptorSet {
     pub(crate) handle: vk::DescriptorSet,
 }
 
+impl DescriptorSet {
+    pub(crate) fn new_uninitialized(device: Device, layout: vk::DescriptorSetLayout, pool: vk::DescriptorPool) -> Result<Self> {
+        let info = vk::DescriptorSetAllocateInfo {
+            s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
+            p_next: std::ptr::null(),
+            descriptor_pool: pool,
+            descriptor_set_count: 1,
+            p_set_layouts: &layout as *const _,
+        };
+        let set = unsafe { device.allocate_descriptor_sets(&info) }?
+            .first()
+            .cloned()
+            .unwrap();
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkDescriptorSet {set:p}");
+
+        Ok(DescriptorSet {
+            device,
+            pool: pool,
+            handle: set,
+        })
+    }
+}
+
 fn binding_image_info(binding: &DescriptorBinding) -> Vec<vk::DescriptorImageInfo> {
     binding
         .descriptors
@@ -120,26 +144,13 @@ impl Resource for DescriptorSet {
     fn create(device: Device, key: &Self::Key, _: Self::ExtraParams<'_>) -> Result<Self>
     where
         Self: Sized, {
-        let info = vk::DescriptorSetAllocateInfo {
-            s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
-            p_next: std::ptr::null(),
-            descriptor_pool: key.pool,
-            descriptor_set_count: 1,
-            p_set_layouts: &key.layout,
-        };
-        let set = unsafe { device.allocate_descriptor_sets(&info) }?
-            .first()
-            .cloned()
-            .unwrap();
-        #[cfg(feature = "log-objects")]
-        trace!("Created new VkDescriptorSet {set:p}");
-
+        let descriptor_set = DescriptorSet::new_uninitialized(device.clone(), key.layout, key.pool)?;
         let writes = key
             .bindings
             .iter()
             .map(|binding| {
                 let mut write = WriteDescriptorSet {
-                    set,
+                    set: descriptor_set.handle,
                     binding: binding.binding,
                     array_element: 0,
                     count: binding.descriptors.len() as u32,
@@ -226,11 +237,7 @@ impl Resource for DescriptorSet {
             device.update_descriptor_sets(vk_writes.as_slice(), &[]);
         }
 
-        Ok(DescriptorSet {
-            device,
-            pool: key.pool,
-            handle: set,
-        })
+        Ok(descriptor_set)
     }
 }
 
