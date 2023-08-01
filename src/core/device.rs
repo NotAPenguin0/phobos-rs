@@ -9,19 +9,19 @@ use std::ops::Deref;
 #[allow(unused_imports)]
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use anyhow::{Result};
+use anyhow::Result;
 use ash::extensions::{ext, khr};
 use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxDimensions2D;
 
+use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
 use crate::core::traits::Nameable;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2ContextCreateInfo;
 use crate::util::string::unwrap_to_raw_strings;
-use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
 
 /// Device extensions that phobos requests but might not be available.
 /// # Example
@@ -217,6 +217,9 @@ impl Device {
         features_1_2.buffer_device_address = vk::TRUE;
         features_1_2.host_query_reset = vk::TRUE;
         features_1_2.descriptor_indexing = vk::TRUE;
+        features_1_2.runtime_descriptor_array = vk::TRUE;
+        features_1_2.descriptor_binding_partially_bound = vk::TRUE;
+        features_1_2.shader_sampled_image_array_non_uniform_indexing = vk::TRUE;
         features_1_3.synchronization2 = vk::TRUE;
         features_1_3.dynamic_rendering = vk::TRUE;
         features_1_3.maintenance4 = vk::TRUE;

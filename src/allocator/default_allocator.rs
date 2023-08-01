@@ -139,7 +139,7 @@ impl Allocator for DefaultAllocator {
     /// ```
     fn allocate(
         &mut self,
-        name: &'static str,
+        name: &str,
         requirements: &MemoryRequirements,
         ty: MemoryType,
     ) -> Result<Self::Allocation> {

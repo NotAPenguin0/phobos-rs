@@ -35,7 +35,7 @@ pub trait Allocator: Clone + Send + Sync {
     /// ```
     fn allocate(
         &mut self,
-        name: &'static str,
+        name: &str,
         requirements: &vk::MemoryRequirements,
         ty: MemoryType,
     ) -> Result<Self::Allocation>;

@@ -13,15 +13,15 @@
 //! a `str` to a `String`. Most API functions will ask for an [`ImageView`].
 
 use std::ops::Deref;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::Result;
 use ash::vk;
 use ash::vk::Handle;
 
-use crate::core::traits::{AsRaw, Nameable};
 use crate::{Allocation, Allocator, DefaultAllocator, Device, MemoryType};
+use crate::core::traits::{AsRaw, Nameable};
 
 /// Abstraction over a [`VkImage`](vk::Image). Stores information about size, format, etc. Additionally couples the image data together
 /// with a memory allocation.
@@ -340,10 +340,10 @@ impl<A: Allocator> Image<A> {
             samples: self.samples,
             aspect,
             size: self.size,
-            base_level: 0,
-            level_count: self.mip_levels,
-            base_layer: 0,
-            layer_count: self.layers,
+            base_level: base_mip_level,
+            level_count: info.subresource_range.level_count,
+            base_layer,
+            layer_count: info.subresource_range.layer_count,
             id: ImgView::get_new_id(),
         })))
     }
