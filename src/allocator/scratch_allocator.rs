@@ -30,10 +30,8 @@
 
 use anyhow::Result;
 use ash::vk;
-use gpu_allocator::AllocationError::OutOfMemory;
 
 use crate::{Allocator, Buffer, BufferView, DefaultAllocator, Device, Error, MemoryType};
-use crate::Error::AllocationError;
 use crate::pool::Poolable;
 
 /// A linear allocator used for short-lived resources. A good example of such a resource is a buffer
@@ -81,8 +79,8 @@ pub struct ScratchAllocator<A: Allocator = DefaultAllocator> {
 impl<A: Allocator> ScratchAllocator<A> {
     /// Create a new scratch allocator with a minimum capacity for internally allocated chunks.
     /// The actual allocated size may be slightly larger to satisfy alignment requirements.
-    /// Alignment requirement is the maximum alignment needed for any buffer type. For more granular control, use
-    /// [`Self::new_with_alignment()`]
+    /// Default alignment is 256.
+    /// Chunk size requirement is the minimum size for buffer allocations.
     /// # Errors
     /// * Fails if the chunk size is not a multiple of the alignment value
     /// # Example
@@ -102,7 +100,8 @@ impl<A: Allocator> ScratchAllocator<A> {
     }
 
     /// Create a new scratch allocator with given alignment. The alignment used must be large enough to satisfy the alignment requirements
-    /// of all buffer usage flags buffers from this allocator will be used with.
+    /// of all buffer usage flags buffers from this allocator will be used with. Chunk size requirement is the minimum size for buffer allocations.
+    /// This will create a single chunk with ``chunk_size`` size to reduce the load on the first few allocations.
     /// # Errors
     /// * Fails if the internal allocation fails. This is possible when VRAM runs out.
     /// * Fails if the memory heap used for the allocation is not mappable.
@@ -156,7 +155,7 @@ impl<A: Allocator> ScratchAllocator<A> {
         
         // Check if we can use the current (last) buffer
         let current_buffer = self.buffers.get(self.current_buffer);
-        let use_current_buffer = current_buffer.map(|buffer| self.local_offset + padded_size < buffer.size()).unwrap_or_default();
+        let use_current_buffer = current_buffer.map(|buffer| self.local_offset + padded_size <= buffer.size()).unwrap_or_default();
 
         // Get a buffer view to return
         let view = if use_current_buffer {
@@ -175,7 +174,7 @@ impl<A: Allocator> ScratchAllocator<A> {
             self.local_offset = 0;
             let view = buffer.view(0u64, size);
             self.buffers.push(buffer);
-            self.current_buffer = self.buffers.len() - 1;
+            self.current_buffer += 1;
             view
         };
 
@@ -186,6 +185,10 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// Resets the current offset into the allocator back to the beginning. Proper external synchronization needs to be
     /// added to ensure old buffers are not overwritten. This is usually done by using allocators from a [`LocalPool`](crate::pool::LocalPool)
     /// and keeping the pool alive as long as GPU execution.
+    /// # Errors
+    /// * Fails if the internal allocation fails. This is possible when VRAM runs out.
+    /// * Fails if the memory heap used for the allocation is not mappable.
+    /// * Fails if the given compressed size is 0.
     /// # Safety
     /// This function is safe if the old allocations can be completely discarded by the next time [`Self::allocate()`] is called.
     /// # Example
@@ -204,18 +207,36 @@ impl<A: Allocator> ScratchAllocator<A> {
     ///     let mut fence = use_the_buffer(buffer);
     ///     fence.wait()?;
     ///     // SAFETY: We just waited for the fence, so all work using our allocator is done.
-    ///     unsafe { allocator.reset(); }
+    ///     unsafe { allocator.reset(None); }
     ///     // We are back at the beginning of the allocator, so there are 128 bytes free again.
     ///     let buffer: BufferView = allocator.allocate(128 as u64)?;
     ///     Ok(())
     /// }
     /// ```
-    pub unsafe fn reset(&mut self) {
+    pub unsafe fn reset(&mut self, compressed_sized: Option<vk::DeviceSize>) -> Result<()> {
+        // Compressed size after reset when we have multiple buffers
+        if self.buffers.len() > 1 {
+            let compressed_size = compressed_sized.map(|size| {
+                ((size as f32) / (self.alignment as f32)).ceil() as u64 * self.alignment
+            }).unwrap_or_else(|| {
+                // We know that the sizes of the buffers is always aligned, so we shouldn't need to re-align
+                self.buffers.iter().map(|buf| buf.size()).sum()
+            });
+
+            // Create a new buffer that should contain *all* allocations during the frame 
+            let buffer = Buffer::new(self.device.clone(), &mut self.allocator, compressed_size, MemoryType::CpuToGpu)?;
+            if !buffer.is_mapped() {
+                anyhow::bail!(Error::UnmappableBuffer);
+            }
+
+            self.buffers.clear();
+            self.buffers.push(buffer);
+        }
+
         self.current_buffer = 0;
         self.local_offset = 0;
 
-        // Note: This doesn't drop the internally stored chunks for the sake of performance
-        // allows the scratch allocator to not have to re-allocate new GPU memory every time
+        return Ok(());
     }
 }
 
@@ -223,6 +244,6 @@ impl<A: Allocator> Poolable for ScratchAllocator<A> {
     type Key = ();
 
     fn on_release(&mut self) {
-        unsafe { self.reset() }
+        unsafe { self.reset(None).unwrap() }
     }
 }

@@ -86,7 +86,7 @@ pub fn use_entire_scratch_allocator() -> Result<()> {
 pub fn scratch_allocator_allocate_new_chunks() -> Result<()> {
     let mut context = framework::make_context()?;
     let mut scratch_allocator =
-        ScratchAllocator::new(context.device.clone(), &mut context.allocator, CHUNK_SIZE)?;
+        ScratchAllocator::new(context.device.clone(), &mut context.allocator, 1024)?;
     // First allocate a smaller buffer
     let _buffer = scratch_allocator.allocate(512 as u64)?;
     // This should definitely exceed the capacity of the allocator (causing it to allocate a new chunk)
@@ -102,7 +102,7 @@ pub fn reset_scratch_allocator() -> Result<()> {
     // Allocate a first buffer.
     let _buffer = scratch_allocator.allocate(800 as u64)?;
     // Now reset it, so we should be able to allocate again
-    unsafe { scratch_allocator.reset(); }
+    unsafe { scratch_allocator.reset(None)?; }
     let _buffer = scratch_allocator.allocate(800 as u64)?;
     Ok(())
 }
@@ -128,7 +128,7 @@ pub fn scratch_allocator_mass_allocate() -> Result<()> {
         }
 
         // Now reset it, so we should be able to allocate again
-        unsafe { scratch_allocator.reset(); }
+        unsafe { scratch_allocator.reset(None)?; }
     }
 
     Ok(())

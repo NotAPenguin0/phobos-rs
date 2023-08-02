@@ -69,7 +69,7 @@ impl<W: WindowInterface> ContextInit<W> for HeadlessContext {
         let pool_info = ResourcePoolCreateInfo {
             device: device.clone(),
             allocator: allocator.clone(),
-            scratch_chunk_size: settings.scratch_buffer_size,
+            scratch_chunk_size: settings.scratch_chunk_size,
         };
         let pool = ResourcePool::new(pool_info)?;
         let exec = ExecutionManager::new(device.clone(), &physical_device, pool.clone())?;
@@ -120,7 +120,7 @@ impl<W: WindowInterface> ContextInit<W> for WindowedContext<W> {
         let pool_info = ResourcePoolCreateInfo {
             device: device.clone(),
             allocator: allocator.clone(),
-            scratch_chunk_size: settings.scratch_buffer_size,
+            scratch_chunk_size: settings.scratch_chunk_size,
         };
         let pool = ResourcePool::new(pool_info)?;
         let exec = ExecutionManager::new(device.clone(), &physical_device, pool.clone())?;
