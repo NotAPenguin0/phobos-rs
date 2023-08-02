@@ -135,9 +135,9 @@ pub struct AppSettings<'a, Window: WindowInterface> {
     pub present_mode: Option<vk::PresentModeKHR>,
     /// Minimum requirements the selected physical device should have.
     pub gpu_requirements: GPURequirements,
-    /// Maximum size of scratch allocators. This is the maximum size of [`ScratchAllocator`](crate::ScratchAllocator) objects
-    /// created from resource pools.
-    pub scratch_buffer_size: u64,
+    /// Minimum size of scratch allocator chunks. This is the minimum size of [`ScratchAllocator`](crate::ScratchAllocator) chunks
+    /// created internally.
+    pub scratch_chunk_size: u64,
     /// Whether to enable raytracing extensions.
     pub raytracing: bool,
     /// FSR2 context settings.
@@ -158,7 +158,7 @@ impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
             surface_format: None,
             present_mode: None,
             gpu_requirements: GPURequirements::default(),
-            scratch_buffer_size: 1,
+            scratch_chunk_size: 32768,
             raytracing: false,
             #[cfg(feature = "fsr2")]
             fsr2_settings: Fsr2Settings::default(),
@@ -245,10 +245,10 @@ impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
         self
     }
 
-    /// Scratch allocator size for each of the buffer types.
-    pub fn scratch_size(mut self, size: impl Into<u64>) -> Self {
+    /// Scratch allocator chunk size for each of the internally allocated buffers.
+    pub fn scratch_chunk_size(mut self, size: impl Into<u64>) -> Self {
         let size = size.into();
-        self.inner.scratch_buffer_size = size;
+        self.inner.scratch_chunk_size = size;
         self
     }
 

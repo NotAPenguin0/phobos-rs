@@ -51,12 +51,14 @@ pub fn cpu_to_gpu_is_mappable() -> Result<()> {
     Ok(())
 }
 
+const CHUNK_SIZE: u64 = 32768;
+
 #[test]
 pub fn make_scratch_allocator() -> Result<()> {
     let mut context = framework::make_context()?;
 
     let _scratch_allocator =
-        ScratchAllocator::new(context.device.clone(), &mut context.allocator, 1024 as u64)?;
+        ScratchAllocator::new(context.device.clone(), &mut context.allocator, CHUNK_SIZE)?;
     Ok(())
 }
 
@@ -64,7 +66,7 @@ pub fn make_scratch_allocator() -> Result<()> {
 pub fn use_scratch_allocator() -> Result<()> {
     let mut context = framework::make_context()?;
     let mut scratch_allocator =
-        ScratchAllocator::new(context.device.clone(), &mut context.allocator, 1024 as u64)?;
+        ScratchAllocator::new(context.device.clone(), &mut context.allocator, CHUNK_SIZE)?;
     // Try allocating a buffer that should fit in the scratch allocator's memory.
     let _buffer = scratch_allocator.allocate(128 as u64)?;
     Ok(())
@@ -75,21 +77,20 @@ pub fn use_entire_scratch_allocator() -> Result<()> {
     // Try allocating the entire scratch allocator's memory for a single buffer
     let mut context = framework::make_context()?;
     let mut scratch_allocator =
-        ScratchAllocator::new(context.device.clone(), &mut context.allocator, 1024 as u64)?;
+        ScratchAllocator::new(context.device.clone(), &mut context.allocator, CHUNK_SIZE)?;
     let _buffer = scratch_allocator.allocate(1024 as u64)?;
     Ok(())
 }
 
 #[test]
-pub fn scratch_allocator_out_of_memory() -> Result<()> {
+pub fn scratch_allocator_allocate_new_chunks() -> Result<()> {
     let mut context = framework::make_context()?;
     let mut scratch_allocator =
-        ScratchAllocator::new(context.device.clone(), &mut context.allocator, 1024 as u64)?;
+        ScratchAllocator::new(context.device.clone(), &mut context.allocator, 1024)?;
     // First allocate a smaller buffer
     let _buffer = scratch_allocator.allocate(512 as u64)?;
-    // This should definitely exceed the capacity of the allocator
-    let result = scratch_allocator.allocate(2048 as u64);
-    assert!(result.is_err(), "Allocating more memory than available from a scratch allocator should fail");
+    // This should definitely exceed the capacity of the allocator (causing it to allocate a new chunk)
+    let _result = scratch_allocator.allocate(2048 as u64);
     Ok(())
 }
 
@@ -97,11 +98,38 @@ pub fn scratch_allocator_out_of_memory() -> Result<()> {
 pub fn reset_scratch_allocator() -> Result<()> {
     let mut context = framework::make_context()?;
     let mut scratch_allocator =
-        ScratchAllocator::new(context.device.clone(), &mut context.allocator, 1024 as u64)?;
+        ScratchAllocator::new(context.device.clone(), &mut context.allocator, CHUNK_SIZE)?;
     // Allocate a first buffer.
     let _buffer = scratch_allocator.allocate(800 as u64)?;
     // Now reset it, so we should be able to allocate again
-    unsafe { scratch_allocator.reset(); }
+    unsafe { scratch_allocator.reset(None)?; }
     let _buffer = scratch_allocator.allocate(800 as u64)?;
+    Ok(())
+}
+
+#[test]
+pub fn scratch_allocator_mass_allocate() -> Result<()> {
+    let mut context = framework::make_context()?;
+    let mut scratch_allocator =
+        ScratchAllocator::new(context.device.clone(), &mut context.allocator, CHUNK_SIZE)?;
+
+    // Mass allocate / deallocate
+    for _ in 0..8 {
+        // 16 allocations 4kb each
+        for _ in 0..16 {
+            let buffer = scratch_allocator.allocate(4096u64)?;
+            assert_eq!(buffer.size(), 4096u64);
+        }
+
+        // 4 allocations 64kb each
+        for _ in 0..16 {
+            let buffer = scratch_allocator.allocate(65536u64)?;
+            assert_eq!(buffer.size(), 65536u64);
+        }
+
+        // Now reset it, so we should be able to allocate again
+        unsafe { scratch_allocator.reset(None)?; }
+    }
+
     Ok(())
 }

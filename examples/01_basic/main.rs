@@ -86,6 +86,7 @@ impl ExampleApp for Basic {
                 samples: vk::SampleCountFlags::TYPE_1,
                 mip_levels: 1,
                 layers: 1,
+                memory_type: phobos::MemoryType::GpuOnly
             },
         )?;
         ctx.device.set_name(&image, "Render Image")?;

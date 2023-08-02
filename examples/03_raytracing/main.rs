@@ -293,6 +293,7 @@ impl ExampleApp for RaytracingSample {
                 samples: vk::SampleCountFlags::TYPE_1,
                 mip_levels: 1,
                 layers: 1,
+                memory_type: phobos::MemoryType::GpuOnly
             },
         )?;
         let view = attachment.whole_view(vk::ImageAspectFlags::COLOR)?;

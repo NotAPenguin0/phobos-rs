@@ -82,8 +82,8 @@ pub struct ResourcePoolCreateInfo<A: Allocator = DefaultAllocator> {
     pub device: Device,
     /// GPU memory allocated
     pub allocator: A,
-    /// Size of scratch allocators in this pool
-    pub scratch_size: u64,
+    /// Minimum size of chunks for scratch allocators in this pool
+    pub scratch_chunk_size: u64,
 }
 
 /// A local pool that will release its resources back to the main resource pool when it goes out of scope.
@@ -205,7 +205,7 @@ impl<A: Allocator + 'static> ResourcePool<A> {
         let device = info.device.clone();
         let mut alloc = info.allocator.clone();
         let allocators = Pool::new(move |_| {
-            ScratchAllocator::new(device.clone(), &mut alloc, info.scratch_size)
+            ScratchAllocator::new(device.clone(), &mut alloc, info.scratch_chunk_size)
         })?;
         let device = info.device.clone();
         let fences = Pool::new(move |_| Ok(Fence::new(device.clone(), false)?))?;

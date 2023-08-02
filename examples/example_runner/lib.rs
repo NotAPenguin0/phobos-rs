@@ -316,7 +316,7 @@ impl ExampleRunner {
             .name(name)
             .validation(true)
             .present_mode(vk::PresentModeKHR::MAILBOX)
-            .scratch_size(1 * 1024u64) // 1 KiB scratch memory per buffer type per frame
+            .scratch_chunk_size(1 * 1024u64) // 1 KiB scratch memory per internal buffer
             .gpu(GPURequirements {
                 dedicated: false,
                 min_video_memory: 1 * 1024 * 1024 * 1024, // 1 GiB.

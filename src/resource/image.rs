@@ -142,6 +142,8 @@ pub struct ImageCreateInfo {
     pub mip_levels: u32,
     /// Number of array layers. Set to 1 for non-array textures.
     pub layers: u32,
+    /// The memory location that VMA will use for allocating the image
+    pub memory_type: MemoryType,
 }
 
 impl<A: Allocator> Image<A> {
@@ -211,8 +213,7 @@ impl<A: Allocator> Image<A> {
 
         let requirements = unsafe { device.get_image_memory_requirements(handle) };
 
-        // TODO: Proper memory location configuration
-        let memory = alloc.allocate("image_", &requirements, MemoryType::GpuOnly)?;
+        let memory = alloc.allocate("image_", &requirements, info.memory_type)?;
         unsafe {
             device.bind_image_memory(handle, memory.memory(), memory.offset())?;
         }
