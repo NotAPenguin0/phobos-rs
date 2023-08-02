@@ -37,7 +37,7 @@ pub fn make_context_with_queues(
         .name("phobos test framework")
         .version((0, 0, 1))
         .validation(false)
-        .scratch_size(1024 as u64)
+        .scratch_chunk_size(1024 as u64)
         .gpu(GPURequirements {
             dedicated: false,
             min_video_memory: 0,
