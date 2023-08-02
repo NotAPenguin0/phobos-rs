@@ -72,7 +72,7 @@ pub struct ScratchAllocator<A: Allocator = DefaultAllocator> {
     device: Device,
     allocator: A,
     buffers: Vec<Buffer<A>>,
-    current_buffer: Option<usize>,
+    current_buffer: usize,
     local_offset: vk::DeviceSize,
     chunk_size: vk::DeviceSize,
     alignment: vk::DeviceSize,
@@ -84,8 +84,7 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// Alignment requirement is the maximum alignment needed for any buffer type. For more granular control, use
     /// [`Self::new_with_alignment()`]
     /// # Errors
-    /// * Fails if the internal allocation fails. This is possible when VRAM runs out.
-    /// * Fails if the memory heap used for the allocation is not mappable.
+    /// * Fails if the chunk size is not a multiple of the alignment value
     /// # Example
     /// ```
     /// # use phobos::*;
@@ -104,6 +103,10 @@ impl<A: Allocator> ScratchAllocator<A> {
 
     /// Create a new scratch allocator with given alignment. The alignment used must be large enough to satisfy the alignment requirements
     /// of all buffer usage flags buffers from this allocator will be used with.
+    /// # Errors
+    /// * Fails if the internal allocation fails. This is possible when VRAM runs out.
+    /// * Fails if the memory heap used for the allocation is not mappable.
+    /// * Fails if the chunk size is not a multiple of the alignment value
     pub fn new_with_alignment(
         device: Device,
         allocator: &mut A,
@@ -114,11 +117,16 @@ impl<A: Allocator> ScratchAllocator<A> {
             anyhow::bail!("Chunk size must be a multiple of alignment");
         }
 
+        let buffer = Buffer::new(device.clone(), allocator, chunk_size, MemoryType::CpuToGpu)?;
+        if !buffer.is_mapped() {
+            anyhow::bail!(Error::UnmappableBuffer);
+        }
+
         Ok(Self {
-            buffers: Vec::new(),
+            buffers: vec![buffer],
             local_offset: 0,
             chunk_size,
-            current_buffer: None,
+            current_buffer: 0,
             alignment,
             device,
             allocator: allocator.clone(),
@@ -128,7 +136,8 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// Allocate at least size bytes from the allocator. The actual amount allocated may be slightly more to satisfy alignment
     /// requirements.
     /// # Errors
-    /// - Fails if the allocator has ran out of memory.
+    /// * Fails if the internal allocation fails. This is possible when VRAM runs out.
+    /// * Fails if the memory heap used for the allocation is not mappable.
     /// # Example
     /// ```
     /// # use phobos::prelude::*;
@@ -143,27 +152,30 @@ impl<A: Allocator> ScratchAllocator<A> {
         let size: u64 = size.into();
 
         // Round up to the preferred alignment value
-        let padded_size = ((size as f32) / (256 as f32)).ceil() as u64 * 256;
+        let padded_size = ((size as f32) / (self.alignment as f32)).ceil() as u64 * self.alignment;
         
         // Check if we can use the current (last) buffer
-        let current_buffer = self.current_buffer.map(|i| &self.buffers[i]);
+        let current_buffer = self.buffers.get(self.current_buffer);
         let use_current_buffer = current_buffer.map(|buffer| self.local_offset + padded_size < buffer.size()).unwrap_or_default();
 
         // Get a buffer view to return
         let view = if use_current_buffer {
             current_buffer.unwrap().view(self.local_offset, size)
         } else {
-            // Create a new chunked buffer with the chunk size 
+            // In case we want to allocate something larger than the chunk size
             let whole_buffer_size = size.max(self.chunk_size);
+            let whole_buffer_size = ((whole_buffer_size as f32) / (self.alignment as f32)).ceil() as u64 * self.alignment;
+            
+            // Create a new chunked buffer with the chunk size 
             let buffer = Buffer::new(self.device.clone(), &mut self.allocator, whole_buffer_size, MemoryType::CpuToGpu)?;
             if !buffer.is_mapped() {
-                return Err(anyhow::Error::from(Error::UnmappableBuffer));
+                anyhow::bail!(Error::UnmappableBuffer);
             }
 
             self.local_offset = 0;
             let view = buffer.view(0u64, size);
             self.buffers.push(buffer);
-            self.current_buffer = Some(self.buffers.len() - 1);
+            self.current_buffer = self.buffers.len() - 1;
             view
         };
 
@@ -199,10 +211,7 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// }
     /// ```
     pub unsafe fn reset(&mut self) {
-        if let Some(index) = self.current_buffer.as_mut() {
-            *index = 0;
-        }
-
+        self.current_buffer = 0;
         self.local_offset = 0;
 
         // Note: This doesn't drop the internally stored chunks for the sake of performance
