@@ -106,10 +106,10 @@ impl<R: BindlessResource> BindlessHandle<R> {
     }
 }
 
-struct BindlessPoolInner<R> {
+pub(crate) struct BindlessPoolInner<R> {
     items: Vec<Option<R>>,
     free: Vec<u32>,
-    descriptor_set: crate::DescriptorSet,
+    pub(crate) descriptor_set: Arc<crate::DescriptorSet>,
 }
 
 impl<R: BindlessResource> BindlessPoolInner<R> {
@@ -156,7 +156,7 @@ pub struct BindlessPool<R> {
 }
 
 impl<P: BindlessResource> BindlessPool<P> {
-    fn with<F: FnOnce(&mut BindlessPoolInner<P>) -> R, R>(&self, f: F) -> R {
+    pub(crate) fn with<F: FnOnce(&mut BindlessPoolInner<P>) -> R, R>(&self, f: F) -> R {
         let mut inner = self.inner.lock().unwrap();
         f(&mut inner)
     }
@@ -231,6 +231,7 @@ impl<P: BindlessResource> BindlessPool<P> {
         };
         let dsl = crate::pipeline::set_layout::DescriptorSetLayout::create(device.clone(), &dsl_info, ())?;
         let descriptor_set = unsafe { crate::DescriptorSet::new_uninitialized(device, dsl.handle(), pool)? };
+        let descriptor_set = Arc::new(descriptor_set);
 
         let inner = BindlessPoolInner {
             items: vec![],

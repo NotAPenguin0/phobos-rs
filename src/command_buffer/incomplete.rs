@@ -22,6 +22,8 @@ use crate::{
     VirtualResource,
 };
 
+use super::DescriptorState;
+
 impl<'q, D: ExecutionDomain, A: Allocator> IncompleteCmdBuffer<'q, A>
     for IncompleteCommandBuffer<'q, D, A>
 {
@@ -123,6 +125,27 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
         Ok(())
     }
 
+    fn set_descriptor_set(
+        &mut self,
+        set: u32,
+        descriptor_set: Arc<crate::DescriptorSet>,
+    ) -> Result<()> {
+        if self.current_descriptor_sets.is_none() {
+            self.current_descriptor_sets = Some(HashMap::new());
+        }
+
+        match self.current_descriptor_sets.as_mut().unwrap().entry(set) {
+            Entry::Occupied(mut entry) => {
+                *entry.get_mut() = DescriptorState::DescriptorSet(descriptor_set.clone());
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(DescriptorState::DescriptorSet(descriptor_set.clone()));
+            }
+        };
+        self.descriptor_state_needs_update = true;
+        Ok(())
+    }
+
     /// Modify the descriptor set state at a given set binding.
     /// # Errors
     /// * Fails if the supplied callback fails.
@@ -137,12 +160,20 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
 
         match self.current_descriptor_sets.as_mut().unwrap().entry(set) {
             Entry::Occupied(mut entry) => {
-                f(entry.get_mut())?;
+                match entry.get_mut() {
+                    DescriptorState::Builder(ref mut builder) => f(builder)?,
+                    entry => {
+                        // replace descriptor set with builder
+                        let mut builder = DescriptorSetBuilder::new();
+                        f(&mut builder)?;
+                        *entry = DescriptorState::Builder(builder);
+                    },
+                }
             }
             Entry::Vacant(entry) => {
                 let mut builder = DescriptorSetBuilder::new();
                 f(&mut builder)?;
-                entry.insert(builder);
+                entry.insert(DescriptorState::Builder(builder));
             }
         };
         self.descriptor_state_needs_update = true;
@@ -160,13 +191,20 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
         }
 
         let cache = self.descriptor_cache.clone();
-        for (index, builder) in self.current_descriptor_sets.take().unwrap() {
-            let mut info = builder.build();
-            info.layout = *self.current_set_layouts.get(index as usize).unwrap();
-            cache.with_descriptor_set(info, |set| {
-                self.bind_descriptor_set(index, set)?;
-                Ok(())
-            })?;
+        for (index, state) in self.current_descriptor_sets.take().unwrap() {
+            match state {
+                DescriptorState::Builder(builder) => {
+                    let mut info = builder.build();
+                    info.layout = *self.current_set_layouts.get(index as usize).unwrap();
+                    cache.with_descriptor_set(info, |set| {
+                        self.bind_descriptor_set(index, set)?;
+                        Ok(())
+                    })?;
+                },
+                DescriptorState::DescriptorSet(set) => {
+                    self.bind_descriptor_set(index, &set)?;
+                }
+            }
         }
 
         // We updated all our descriptor sets, were good now.
@@ -296,6 +334,22 @@ impl<D: ExecutionDomain, A: Allocator> IncompleteCommandBuffer<'_, D, A> {
             builder.bind_sampled_image_array(binding, images, sampler);
             Ok(())
         })?;
+        Ok(self)
+    }
+
+    /// Bind a [`BindlessPool`](crate::resouce::bindless::BindlessPool)
+    pub fn bind_bindless_pool<R>(
+        mut self,
+        index: u32,
+        bindless_pool: &crate::bindless::BindlessPool<R>
+    ) -> Result<Self>
+    where
+        R: crate::bindless::BindlessResource
+    {
+        bindless_pool.with(|p| {
+            self.set_descriptor_set(index, p.descriptor_set.clone())
+        })?;
+
         Ok(self)
     }
 
