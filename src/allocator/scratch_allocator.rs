@@ -88,7 +88,7 @@ impl<A: Allocator> ScratchAllocator<A> {
     /// # use phobos::*;
     /// # use anyhow::Result;
     /// fn make_scratch_allocator<A: Allocator>(device: Device, alloc: &mut A) -> Result<ScratchAllocator<A>> {
-    ///     ScratchAllocator::new(device, alloc, 1024 as usize)
+    ///     ScratchAllocator::new(device, alloc, 1024 as u64)
     /// }
     /// ```
     pub fn new(

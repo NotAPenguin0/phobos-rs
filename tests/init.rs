@@ -55,7 +55,7 @@ pub fn requesting_raytracing_does_not_fail() -> Result<()> {
 
 #[test]
 pub fn vulkan_loaded() -> Result<()> {
-    let context = framework::make_context()?;
+    let context = framework::make_context().expect("Can initialize context.");
     let handle = context.instance.handle();
     assert_ne!(handle.as_raw(), 0, "VkInstance handle should not be zero");
     let loader = unsafe { context.instance.loader() };
@@ -65,7 +65,7 @@ pub fn vulkan_loaded() -> Result<()> {
 
 #[test]
 pub fn valid_device() -> Result<()> {
-    let context = framework::make_context()?;
+    let context = framework::make_context().expect("Can initialize context.");
     let handle = unsafe { context.device.handle() };
     assert_ne!(handle.handle().as_raw(), 0, "VkDevice handle should not be zero");
     // Also try a vulkan function call on it to make sure it is loaded properly
