@@ -163,6 +163,16 @@ impl PhysicalDevice {
                     }
                 }
 
+                // If raytracing is enabled, check if rt extensions are supported
+                if settings.raytracing {
+                    if physical_device.extension_properties.iter().all(|ext| {
+                        ext.name != ash::extensions::khr::RayTracingPipeline::name().to_str().unwrap()
+                            && ext.name != ash::extensions::khr::AccelerationStructure::name().to_str().unwrap()
+                    }) {
+                        return None;
+                    }
+                }
+
                 // Check if all requested extensions are present
                 if !settings
                     .gpu_requirements
