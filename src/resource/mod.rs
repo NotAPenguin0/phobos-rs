@@ -6,3 +6,4 @@ pub mod pool;
 pub mod query_pool;
 pub mod raytracing;
 pub mod sampler;
+pub mod bindless;

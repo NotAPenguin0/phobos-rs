@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::MutexGuard;
+use std::sync::{MutexGuard, Arc};
 
 use anyhow::Result;
 use ash::vk;
@@ -57,6 +57,13 @@ pub struct CommandBuffer<D: ExecutionDomain> {
     _domain: PhantomData<D>,
 }
 
+#[derive(Derivative)]
+#[derivative(Debug)]
+enum DescriptorState {
+    Builder(DescriptorSetBuilder<'static>),
+    DescriptorSet(Arc<crate::DescriptorSet>),
+}
+
 /// This struct represents an incomplete command buffer.
 /// This is a command buffer that has not been finished yet with [`IncompleteCommandBuffer::finish()`](crate::IncompleteCommandBuffer::finish).
 /// Calling this method will turn it into an immutable command buffer which can then be submitted
@@ -96,7 +103,7 @@ pub struct IncompleteCommandBuffer<'q, D: ExecutionDomain, A: Allocator = Defaul
     current_bindpoint: vk::PipelineBindPoint,
     current_rendering_state: Option<PipelineRenderingInfo>,
     current_render_area: vk::Rect2D,
-    current_descriptor_sets: Option<HashMap<u32, DescriptorSetBuilder<'static>>>,
+    current_descriptor_sets: Option<HashMap<u32, DescriptorState>>,
     descriptor_state_needs_update: bool,
     current_sbt_regions: Option<[vk::StridedDeviceAddressRegionKHR; 4]>,
     // TODO: Only update disturbed descriptor sets
