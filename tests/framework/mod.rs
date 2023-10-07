@@ -9,7 +9,6 @@ use phobos::{
     PhysicalDevice, QueueRequest, QueueType,
 };
 use phobos::pool::ResourcePool;
-use phobos::wsi::window::HeadlessWindowInterface;
 
 #[derive(Clone, Debug)]
 pub struct Context<A: Allocator> {
@@ -33,7 +32,7 @@ pub fn make_context() -> Result<Context<DefaultAllocator>> {
 pub fn make_context_with_queues(
     queues: impl Into<Vec<QueueRequest>>,
 ) -> Result<Context<DefaultAllocator>> {
-    let settings = AppBuilder::<HeadlessWindowInterface>::new()
+    let settings = AppBuilder::new()
         .name("phobos test framework")
         .version((0, 0, 1))
         .validation(false)
@@ -51,7 +50,7 @@ pub fn make_context_with_queues(
         })
         .build();
     let (instance, phys_device, None, device, allocator, pool, exec, None, None) =
-        phobos::initialize(&settings, true)? else {
+        phobos::initialize(&settings)? else {
         panic!("test framework: requested headless non-debug context but got debug context or a window.");
     };
 
@@ -66,11 +65,11 @@ pub fn make_context_with_queues(
 }
 
 pub fn make_context_with_settings<
-    F: FnOnce(AppBuilder<HeadlessWindowInterface>) -> AppBuilder<HeadlessWindowInterface>,
+    F: FnOnce(AppBuilder) -> AppBuilder,
 >(
     callback: F,
 ) -> Result<Context<DefaultAllocator>> {
-    let builder = AppBuilder::<HeadlessWindowInterface>::new()
+    let builder = AppBuilder::new()
         .name("phobos test framework")
         .version((0, 0, 1))
         .validation(false)
@@ -92,7 +91,7 @@ pub fn make_context_with_settings<
 
     let settings = callback(builder).build();
     let (instance, phys_device, None, device, allocator, pool, exec, None, None) =
-        phobos::initialize(&settings, true)? else {
+        phobos::initialize(&settings)? else {
         panic!("test framework: requested headless non-debug context but got debug context or a window.");
     };
 

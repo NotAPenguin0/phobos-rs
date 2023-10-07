@@ -4,8 +4,7 @@ use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxFsr2InitializationFlagBits;
 
-use crate::core::queue::QueueType;
-use crate::WindowInterface;
+use crate::{core::queue::QueueType, Window};
 
 /// Structure holding a queue with specific capabilities to request from the physical device.
 ///
@@ -64,7 +63,7 @@ pub struct QueueRequest {
 /// ```
 #[derive(Default, Debug)]
 pub struct GPURequirements {
-    /// Whether a dedicated GPU is required. Setting this to true will discard integrated GPUs.
+/// Whether a dedicated GPU is required. Setting this to true will discard integrated GPUs.
     pub dedicated: bool,
     /// Minimum amount of video memory required, in bytes. Note that this might count shared memory if RAM is shared.
     pub min_video_memory: usize,
@@ -87,6 +86,22 @@ pub struct GPURequirements {
     pub features_1_3: vk::PhysicalDeviceVulkan13Features,
     /// Vulkan device extensions that should be present and enabled.
     pub device_extensions: Vec<String>,
+}
+
+/// Extra data that is stored within the AppSettings whenever we want to enable renderable Surfaces 
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct SurfaceSettings<'a> {
+    /// Optionally a preferred surface format. This is ignored for a headless context. If set to None, a fallback surface format will be chosen.
+    /// This format is `{BGRA8_SRGB, NONLINEAR_SRGB}` if it is available. Otherwise, the format is implementation-defined.
+    pub surface_format: Option<vk::SurfaceFormatKHR>,
+    /// Optionally a preferred present mode. This is ignored for a headless context. If set to None, this will fall back to
+    /// [`VK_PRESENT_MODE_FIFO_KHR`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html),
+    /// as this is guaranteed to always be supported.
+    pub present_mode: Option<vk::PresentModeKHR>,
+    /// The window that we will use for rendering. Do note that this doesn't necessarily need to be a winit window
+    #[derivative(Debug = "ignore")]
+    pub window: &'a dyn Window,
 }
 
 /// Holds context settings for the FSR2 library
@@ -116,23 +131,15 @@ impl Default for Fsr2Settings {
 
 /// Application settings used to initialize the phobos context.
 #[derive(Debug)]
-pub struct AppSettings<'a, Window: WindowInterface> {
+pub struct AppSettings<'a> {
     /// Application name. Possibly displayed in debugging tools, task manager, etc.
     pub name: String,
     /// Application version.
     pub version: (u32, u32, u32),
     /// Enable Vulkan validation layers for additional debug output. For developing this should almost always be on.
     pub enable_validation: bool,
-    /// Optionally a reference to an object implementing a windowing system. If this is not `None`, it will be used to create a
-    /// [`VkSurfaceKHR`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkSurfaceKHR.html) to present to.
-    pub window: Option<&'a Window>,
-    /// Optionally a preferred surface format. This is ignored for a headless context. If set to None, a fallback surface format will be chosen.
-    /// This format is `{BGRA8_SRGB, NONLINEAR_SRGB}` if it is available. Otherwise, the format is implementation-defined.
-    pub surface_format: Option<vk::SurfaceFormatKHR>,
-    /// Optionally a preferred present mode. This is ignored for a headless context. If set to None, this will fall back to
-    /// [`VK_PRESENT_MODE_FIFO_KHR`](https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html),
-    /// as this is guaranteed to always be supported.
-    pub present_mode: Option<vk::PresentModeKHR>,
+    /// Set to None for headless rendering, or to Some with the approriate settings
+    pub surface_settings: Option<SurfaceSettings<'a>>,
     /// Minimum requirements the selected physical device should have.
     pub gpu_requirements: GPURequirements,
     /// Minimum size of scratch allocator chunks. This is the minimum size of [`ScratchAllocator`](crate::ScratchAllocator) chunks
@@ -145,61 +152,40 @@ pub struct AppSettings<'a, Window: WindowInterface> {
     pub fsr2_settings: Fsr2Settings,
 }
 
-impl<'a, Window: WindowInterface> Default for AppSettings<'a, Window> {
-    /// Create some default app settings. One thing to note is that this sets scratch allocator size to 1 byte.
-    /// This is because passing 0 as the size of a scratch allocator is invalid, and wrapping them in `Option<T>` is
-    /// also not great for convenience.
-    fn default() -> Self {
-        AppSettings {
-            name: String::from(""),
-            version: (0, 0, 0),
-            enable_validation: false,
-            window: None,
-            surface_format: None,
-            present_mode: None,
-            gpu_requirements: GPURequirements::default(),
-            scratch_chunk_size: 32768,
-            raytracing: false,
-            #[cfg(feature = "fsr2")]
-            fsr2_settings: Fsr2Settings::default(),
-        }
-    }
-}
-
 /// The app builder is a convenience struct to easily create [`AppSettings`](crate::AppSettings).
 ///
 /// For information about each of the fields, see [`AppSettings`](crate::AppSettings)
 /// # Example
 /// ```
 /// # use phobos::*;
-/// # use phobos::wsi::window::HeadlessWindowInterface;
 ///
 /// // No window, so we have to specify the headless window interface type.
-/// let info: AppSettings<_> = AppBuilder::<HeadlessWindowInterface>::new()
+/// let info: AppSettings<_> = AppBuilder::<()>::new()
 ///     .name("My phobos application")
 ///     .present_mode(vk::PresentModeKHR::FIFO)
 ///     .scratch_size(1024)
 ///     .validation(true)
 ///     .build();
 /// ```
-pub struct AppBuilder<'a, Window: WindowInterface> {
-    inner: AppSettings<'a, Window>,
+pub struct AppBuilder<'a> {
+    inner: AppSettings<'a>,
 }
 
-impl<'a, Window: WindowInterface> Default for AppBuilder<'a, Window> {
-    /// Create a new app builder with default settings.
-    fn default() -> Self {
-        Self {
-            inner: AppSettings::default(),
-        }
-    }
-}
-
-impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
+impl<'a> AppBuilder<'a> {
     /// Create a new app builder with default settings.
     pub fn new() -> Self {
         AppBuilder {
-            inner: AppSettings::default(),
+            inner: AppSettings {
+                name: String::from(""),
+                version: (0, 0, 0),
+                enable_validation: false,
+                gpu_requirements: GPURequirements::default(),
+                scratch_chunk_size: 32768,
+                raytracing: false,
+                #[cfg(feature = "fsr2")]
+                fsr2_settings: Fsr2Settings::default(),
+                surface_settings: None,
+            }
         }
     }
 
@@ -221,27 +207,15 @@ impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
         self
     }
 
-    /// Set the window interface.
-    pub fn window(mut self, window: &'a Window) -> Self {
-        self.inner.window = Some(window);
-        self
-    }
-
-    /// The surface format to use (if using a window context).
-    pub fn surface_format(mut self, format: vk::SurfaceFormatKHR) -> Self {
-        self.inner.surface_format = Some(format);
-        self
-    }
-
-    /// The present mode to use (if using a window context).
-    pub fn present_mode(mut self, mode: vk::PresentModeKHR) -> Self {
-        self.inner.present_mode = Some(mode);
-        self
-    }
-
     /// The gpu requirements that the physical device must satisfy.
     pub fn gpu(mut self, gpu: GPURequirements) -> Self {
         self.inner.gpu_requirements = gpu;
+        self
+    }
+
+    /// Enable or disable windowed surface
+    pub fn surface(mut self, surface: Option<SurfaceSettings<'a>>) -> Self {
+        self.inner.surface_settings = surface;
         self
     }
 
@@ -284,7 +258,7 @@ impl<'a, Window: WindowInterface> AppBuilder<'a, Window> {
     }
 
     /// Build the resulting application settings.
-    pub fn build(self) -> AppSettings<'a, Window> {
+    pub fn build(self) -> AppSettings<'a> {
         self.inner
     }
 }

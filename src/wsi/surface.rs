@@ -5,7 +5,7 @@ use std::ops::Deref;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
+use crate::{Instance, PhysicalDevice, Window};
 
 /// Contains all information about a [`VkSurfaceKHR`](vk::SurfaceKHR)
 #[derive(Derivative)]
@@ -26,34 +26,30 @@ pub struct Surface {
 
 impl Surface {
     /// Create a new surface.
-    pub fn new<Window: WindowInterface>(
+    pub fn new(
         instance: &Instance,
-        settings: &AppSettings<Window>,
+        window: &dyn Window
     ) -> Result<Self> {
-        if let Some(window) = settings.window {
-            let functions =
-                ash::extensions::khr::Surface::new(unsafe { instance.loader() }, instance);
-            let handle = unsafe {
-                ash_window::create_surface(
-                    instance.loader(),
-                    instance,
-                    window.raw_display_handle(),
-                    window.raw_window_handle(),
-                    None,
-                )?
-            };
-            #[cfg(feature = "log-objects")]
-            trace!("Created new VkSurfaceKHR {handle:p}");
-            Ok(Surface {
-                handle,
-                functions,
-                capabilities: Default::default(),
-                formats: vec![],
-                present_modes: vec![],
-            })
-        } else {
-            Err(anyhow::Error::from(Error::NoWindow))
-        }
+        let functions =
+            ash::extensions::khr::Surface::new(unsafe { instance.loader() }, instance);
+        let handle = unsafe {
+            ash_window::create_surface(
+                instance.loader(),
+                instance,
+                window.raw_display_handle(),
+                window.raw_window_handle(),
+                None,
+            )?
+        };
+        #[cfg(feature = "log-objects")]
+        trace!("Created new VkSurfaceKHR {handle:p}");
+        Ok(Surface {
+            handle,
+            functions,
+            capabilities: Default::default(),
+            formats: vec![],
+            present_modes: vec![],
+        })
     }
 
     /// Query support for features, capabilities and formats for this surface.

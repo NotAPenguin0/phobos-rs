@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::fs::File;
-use std::io::{Read};
+use std::io::Read;
 use std::path::Path;
 
 use anyhow::{bail, Result};
@@ -307,7 +307,7 @@ impl ExampleRunner {
     pub fn new(
         name: impl Into<String>,
         window: Option<&WindowContext>,
-        make_settings: impl Fn(AppBuilder<Window>) -> AppSettings<Window>,
+        make_settings: impl Fn(AppBuilder) -> AppSettings,
     ) -> Result<Self> {
         std::env::set_var("RUST_LOG", "trace");
         pretty_env_logger::init();
@@ -315,7 +315,6 @@ impl ExampleRunner {
             .version((1, 0, 0))
             .name(name)
             .validation(true)
-            .present_mode(vk::PresentModeKHR::MAILBOX)
             .scratch_chunk_size(1 * 1024u64) // 1 KiB scratch memory per internal buffer
             .gpu(GPURequirements {
                 dedicated: false,
@@ -338,15 +337,17 @@ impl ExampleRunner {
                 ..Default::default()
             });
 
-        match window {
-            None => {}
-            Some(window) => {
-                settings = settings.window(&window.window);
-            }
-        };
+        if let Some(window) = window {
+            settings = settings.surface(Some(SurfaceSettings {
+                surface_format: None,
+                present_mode: Some(vk::PresentModeKHR::MAILBOX),
+                window: &window.window,
+            }));
+        }
+
         let settings = make_settings(settings);
 
-        let (instance, physical_device, surface, device, allocator, pool, exec, frame, Some(debug_messenger)) = initialize(&settings, window.is_none())? else {
+        let (instance, physical_device, surface, device, allocator, pool, exec, frame, Some(debug_messenger)) = initialize(&settings)? else {
             panic!("Asked for debug messenger but didnt get one")
         };
 

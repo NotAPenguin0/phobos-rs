@@ -5,7 +5,7 @@ use std::ffi::CStr;
 use anyhow::Result;
 use ash::vk;
 
-use crate::{AppSettings, Error, Instance, Surface, WindowInterface};
+use crate::{AppSettings, Error, Instance, Surface};
 use crate::core::queue::{QueueInfo, QueueType};
 use crate::util::string::wrap_c_str;
 
@@ -39,10 +39,10 @@ pub struct PhysicalDevice {
 
 impl PhysicalDevice {
     /// Selects the best available physical device from the given requirements and parameters.
-    pub fn select<Window: WindowInterface>(
+    pub fn select(
         instance: &Instance,
         surface: Option<&Surface>,
-        settings: &AppSettings<Window>,
+        settings: &AppSettings,
     ) -> Result<Self> {
         let devices = unsafe { instance.enumerate_physical_devices()? };
         if devices.is_empty() {
@@ -204,17 +204,6 @@ impl PhysicalDevice {
                 Some(physical_device)
             })
             .ok_or_else(|| anyhow::Error::from(Error::NoGPU))
-    }
-
-    /// Selects the best available physical device and creates a surface on it.
-    pub fn select_with_surface<Window: WindowInterface>(
-        instance: &Instance,
-        settings: &AppSettings<Window>,
-    ) -> Result<(Surface, Self)> {
-        let mut surface = Surface::new(&instance, &settings)?;
-        let physical_device = PhysicalDevice::select(&instance, Some(&surface), &settings)?;
-        surface.query_details(&physical_device)?;
-        Ok((surface, physical_device))
     }
 
     /// Get all queue families available on this device. This is different from

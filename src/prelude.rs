@@ -55,5 +55,5 @@ pub mod traits {
     pub use crate::command_buffer::traits::*;
     pub use crate::graph::pass_graph::GraphViz;
     pub use crate::graph::record::RecordGraphToCommandBuffer;
-    pub use crate::wsi::window::{WindowInterface, WindowSize};
+    pub use crate::wsi::window::{Window, WindowSize};
 }
