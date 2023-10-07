@@ -8,7 +8,7 @@ use anyhow::Result;
 use ash;
 use ash::vk;
 
-use crate::{AppSettings, WindowInterface};
+use crate::{AppSettings, SurfaceSettings};
 use crate::util::string::unwrap_to_raw_strings;
 
 /// Represents the loaded vulkan instance.
@@ -29,7 +29,7 @@ impl Instance {
     /// * Can fail if the Vulkan loader was not found. Check for valid Vulkan drivers.
     /// * Can fail if an instance extension or layer was requested that is not supported. This can happen when
     ///   validation is enabled through [`AppSettings`], but the Vulkan SDK is not installed.
-    pub fn new<Window: WindowInterface>(settings: &AppSettings<Window>) -> Result<Self> {
+    pub fn new(settings: &AppSettings) -> Result<Self> {
         let entry = unsafe { ash::Entry::load()? };
         let instance = create_vk_instance(&entry, settings)?;
         #[cfg(feature = "log-objects")]
@@ -66,9 +66,9 @@ impl Deref for Instance {
     }
 }
 
-fn create_vk_instance<Window: WindowInterface>(
+fn create_vk_instance(
     entry: &ash::Entry,
-    settings: &AppSettings<Window>,
+    settings: &AppSettings,
 ) -> Result<ash::Instance> {
     let app_name = CString::new(settings.name.clone())?;
     let engine_name = CString::new("Phobos")?;
@@ -93,18 +93,18 @@ fn create_vk_instance<Window: WindowInterface>(
         extensions.push(CString::from(ash::extensions::ext::DebugUtils::name()));
     }
 
-    info!("Enabled instance extensions:");
-    for ext in &extensions {
-        info!("{:?}", ext);
-    }
-
-    if let Some(window) = settings.window {
+    if let Some(SurfaceSettings { window, .. }) = settings.surface_settings {
         extensions.extend(
             ash_window::enumerate_required_extensions(window.raw_display_handle())?
                 .to_vec()
                 .iter()
                 .map(|&raw_str| unsafe { CString::from(CStr::from_ptr(raw_str)) }),
         );
+    }
+
+    info!("Enabled instance extensions:");
+    for ext in &extensions {
+        info!("{:?}", ext);
     }
 
     let layers_raw = unwrap_to_raw_strings(layers.as_slice());

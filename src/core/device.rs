@@ -15,8 +15,9 @@ use ash::vk;
 #[cfg(feature = "fsr2")]
 use fsr2_sys::FfxDimensions2D;
 
-use crate::{AppSettings, Error, Instance, PhysicalDevice, WindowInterface};
+use crate::{AppSettings, Error, Instance, PhysicalDevice};
 use crate::core::traits::Nameable;
+use derivative::Derivative;
 #[cfg(feature = "fsr2")]
 use crate::fsr2::Fsr2Context;
 #[cfg(feature = "fsr2")]
@@ -113,10 +114,10 @@ impl Device {
     /// Create a new Vulkan device. This is the main interface point with the Vulkan API.
     /// # Errors
     /// * Can fail if vulkan device init fails. This is possible if an optional feature was enabled that is not supported.
-    pub fn new<Window: WindowInterface>(
+    pub fn new(
         instance: &Instance,
         physical_device: &PhysicalDevice,
-        settings: &AppSettings<Window>,
+        settings: &AppSettings,
     ) -> Result<Self> {
         let mut priorities = Vec::<f32>::new();
         let queue_create_infos = physical_device
@@ -196,7 +197,7 @@ impl Device {
         }
 
         // Add required extensions
-        if settings.window.is_some() {
+        if settings.surface_settings.is_some() {
             extension_names.push(CString::from(khr::Swapchain::name()));
         }
 

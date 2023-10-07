@@ -70,14 +70,16 @@ use anyhow::Result;
 use ash::vk;
 
 use crate::{
-    Allocator, AppSettings, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence,
-    Image, ImageView, Instance, Semaphore, Surface, Swapchain, WindowInterface,
+    Allocator, CmdBuffer, DefaultAllocator, Device, Error, ExecutionManager, Fence,
+    Image, ImageView, Instance, Semaphore, Surface, Swapchain, SurfaceSettings,
 };
 use crate::pool::{Poolable, Pooled, ResourcePool};
 use crate::sync::domain::ExecutionDomain;
 use crate::sync::submit_batch::SubmitBatch;
 use crate::util::deferred_delete::DeletionQueue;
 use crate::wsi::swapchain::SwapchainImage;
+
+use super::window::Window;
 
 /// Information stored for each in-flight frame.
 #[derive(Derivative)]
@@ -169,9 +171,9 @@ impl<A: Allocator> FrameManager<A> {
         }
     }
 
-    fn resize_swapchain<Window: WindowInterface>(
+    fn resize_swapchain(
         &mut self,
-        window: &Window,
+        window: &dyn Window,
         surface: &Surface,
     ) -> Result<Swapchain> {
         let mut new_swapchain = Swapchain {
@@ -318,29 +320,28 @@ impl<A: Allocator> FrameManager<A> {
     }
 
     /// Initialize frame manager and create a swapchain.
-    pub fn new_with_swapchain<W: WindowInterface>(
+    pub fn new_with_swapchain(
         instance: &Instance,
         device: Device,
         pool: ResourcePool<A>,
-        settings: &AppSettings<W>,
+        surface_settings: &SurfaceSettings,
         surface: &Surface,
     ) -> Result<Self> {
-        let swapchain = Swapchain::new(instance, device.clone(), settings, surface)?;
+        let swapchain = Swapchain::new(instance, device.clone(), surface_settings, surface)?;
         FrameManager::new(device, pool, swapchain)
     }
 
     /// Obtain a new frame context to run commands in.
     /// This will call the provided callback function to obtain a [`SubmitBatch`](crate::sync::submit_batch::SubmitBatch)
     /// which contains the commands to be submitted for this frame.
-    pub async fn new_frame<Window, D, F>(
+    pub async fn new_frame<D, F>(
         &mut self,
         exec: ExecutionManager<A>,
-        window: &Window,
+        window: &dyn Window,
         surface: &Surface,
         f: F,
     ) -> Result<()>
     where
-        Window: WindowInterface,
         D: ExecutionDomain + 'static,
         F: FnOnce(InFlightContext) -> Result<SubmitBatch<D>>, {
         // Advance deletion queue by one frame
